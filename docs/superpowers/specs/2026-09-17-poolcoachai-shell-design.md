@@ -33,8 +33,8 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
 
 - Lưu trữ cục bộ (Drift/SQLite) và đồng bộ Supabase
 - Nhận diện cú đánh bằng camera/vision
-- Coach AI thật (lượt này là kịch bản định sẵn)
-- Player Intelligence thật (phát hiện điểm yếu từ dữ liệu)
+- Nối LLM cho Coach Chat qua Supabase Edge Function (mục 2.2 tầng 4)
+- Lớp Player Intelligence đầy đủ (mục 2.2 tầng 1) — lượt này chỉ có các hàm tối thiểu mà màn hình cần
 - Ghi trận đấu chi tiết từng cú theo từng ván
 - Xác thực người dùng, nhiều thiết bị, sao lưu đám mây
 
@@ -88,9 +88,83 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
   `Vi.coachWeakSkill(skill, rate)` → `'Tỷ lệ vào bi nhóm $skill của bạn là $rate%, thấp nhất trong 5 nhóm.'`
 - Nếu dữ liệu chưa đủ để kết luận, app **nói thẳng là chưa đủ dữ liệu** và mời người chơi tập thêm — không được đoán bừa để lấp chỗ trống.
 
-**Coach Chat:** ở các lượt chưa nối AI thật, Coach Chat **không** trả lời tự do bằng kịch bản. Thay vào đó nó hiển thị một tập câu hỏi có sẵn mà hệ thống thực sự trả lời được bằng logic đã tính (ví dụ "Tôi đang yếu kỹ năng nào?" → chạy `weakestSkill()` và trả về con số thật). Khi nối LLM thật, lớp logic này thành công cụ mà mô hình gọi, không phải bị thay thế.
+**Coach Chat:** xem mục 2.2 — đây là chỗ duy nhất trong sản phẩm thực sự cần LLM, và LLM ở đó chỉ được **diễn giải** số liệu đã tính, không được tự tính.
 
 **Hệ quả với dữ liệu mẫu:** dữ liệu mẫu vẫn được dựng có chủ đích (người chơi hạng G yếu Điều bi), nhưng kết luận "yếu Điều bi" phải do hàm `weakestSkill()` **tính ra** từ 24 buổi tập đó, chứ không phải một câu viết sẵn đặt cạnh. Nếu ai sửa dữ liệu mẫu, kết luận phải tự đổi theo.
+
+---
+
+## 2.2 Phân tầng AI: chỗ nào logic thuần, chỗ nào LLM
+
+Câu hỏi "dùng logic hay dùng AI" là câu hỏi sai. Đáp án là **cả hai, khác vai trò**. Bốn tầng, mỗi tầng một loại:
+
+### Tầng 1 — Player Intelligence: logic thuần, không LLM
+
+Tỷ lệ thành công, xu hướng theo thời gian, nhóm kỹ năng yếu nhất, đã đủ điều kiện lên cấp chưa. Tất cả đều là công thức thống kê rõ ràng. Viết bằng Dart thuần vì:
+
+- **Phải chính xác và giải thích được.** Người chơi có quyền biết vì sao bị đánh giá yếu ở đâu. Một con số tính được thì truy ngược được về dữ liệu; một câu do mô hình sinh ra thì không.
+- **Rẻ, nhanh, chạy offline.** Đúng kiến trúc local-first của sản phẩm — không cần mạng, không tốn tiền API cho mỗi lần mở app.
+- **Deterministic.** Cùng dữ liệu vào, cùng kết quả ra, mọi lúc.
+
+### Tầng 2 — Progression gate: bắt buộc rule-based, cấm LLM
+
+**Đây là ràng buộc cứng, không có ngoại lệ.** Skill Test và cổng mở cấp phải do luật quyết định, không bao giờ do mô hình.
+
+Lý do: nếu để LLM phán ai được lên cấp thì cùng một kết quả tập, hỏi hai lần ra hai đáp án. Người chơi bị từ chối lên cấp mà không ai giải thích nổi tại sao, và hai người cùng thành tích có thể nhận hai kết quả khác nhau. Một hệ thống xếp hạng mà không nhất quán thì không còn là xếp hạng.
+
+Luật phải viết ra được thành câu: *"đạt ≥ 80% trong 3 buổi gần nhất của Cấp 2 → mở Cấp 3"*. Nếu không viết được thành câu như vậy thì luật đó chưa đủ rõ để dùng.
+
+### Tầng 3 — Learning Path / Recommendation: rule-based trước, ML sau
+
+Bản đầu: `if` nhóm kỹ năng yếu là X → đề xuất bài tập nhóm X ở cấp phù hợp trình độ hiện tại. Đủ dùng và giải thích được ngay.
+
+Khi đã có dữ liệu từ nhiều người chơi, đây là chỗ có thể nâng lên mô hình ML thật (ranking, collaborative filtering) để gợi ý tốt hơn. **Đó là giai đoạn sau**, không phải việc của bản đầu — và nó cần dữ liệu nhiều người dùng, tức là cần backend chạy trước đã.
+
+### Tầng 4 — Coach Chat: đây mới thật sự cần LLM
+
+Câu như *"Tại sao tôi thua trận vừa rồi?"* đòi hỏi đọc hiểu ngôn ngữ tự nhiên và tổng hợp nhiều nguồn dữ liệu thành một câu trả lời mạch lạc. Viết `if/else` cho việc này là bất khả thi.
+
+Luồng bắt buộc:
+
+```
+Player Intelligence  (tầng 1 — Dart, đã tính xong, có kiểm thử)
+        ↓
+Tóm tắt có cấu trúc  (JSON: hạng, tỷ lệ theo 5 nhóm kỹ năng,
+                      streak, buổi tập gần đây, trận gần đây)
+        ↓
+LLM  ←  câu hỏi của người chơi + tóm tắt trên làm ngữ cảnh
+        ↓
+Câu trả lời tiếng Việt, cá nhân hoá
+```
+
+**Ranh giới:** LLM là *người diễn giải*, không phải *người tính toán*. Mọi con số trong câu trả lời phải đến từ tóm tắt đầu vào. Prompt hệ thống nói rõ: không được suy ra số liệu không có trong ngữ cảnh; thiếu dữ liệu thì nói là thiếu.
+
+**Bảo mật — API key không được nằm trong app.** Flutter build ra APK giải ngược được; key nhúng trong app là key bị lộ. Nên:
+
+```
+App Flutter  →  Supabase Edge Function  →  Claude API
+(câu hỏi +      (giữ key, kiểm tra        (claude-opus-5)
+ tóm tắt)        phiên đăng nhập,
+                 giới hạn tần suất)
+```
+
+Anthropic **không có SDK chính thức cho Dart**, nên dù muốn app cũng không gọi thẳng được một cách tử tế. Edge Function viết bằng TypeScript dùng `@anthropic-ai/sdk` — đây cũng là lý do kỹ thuật ủng hộ kiến trúc trên.
+
+Model mặc định: **`claude-opus-5`**. Nếu sau này chi phí thành vấn đề, đó là quyết định của chủ sản phẩm, không phải thứ tự ý hạ.
+
+**Khi chưa có backend:** Coach Chat hiển thị tập câu hỏi mà tầng 1 trả lời trực tiếp được (*"Tôi đang yếu kỹ năng nào?"* → `weakestSkill()`), và nói rõ phần trò chuyện tự do cần kết nối. Đây không phải kịch bản giả — mỗi câu trả lời vẫn là số liệu tính thật.
+
+### Tầng riêng — Camera/Vision: bài toán khác hẳn
+
+Nhận diện cú đánh qua camera là computer vision (phát hiện và bám vị trí bi trên bàn), **không liên quan gì đến LLM ở tầng 4**. Cần mô hình thị giác riêng. Đây là phần tốn công và rủi ro kỹ thuật cao nhất, nên làm sau cùng và **không được để nó chặn các phần còn lại** — PRD đã quy định camera chỉ là cách tự động hoá việc ghi nhận, không phải điều kiện để tập.
+
+### Thứ tự triển khai
+
+1. **Tầng 1 trước tiên.** Sai ở đây thì mọi thứ phía trên sai theo.
+2. **Tầng 2** — luật progression, viết ra thành câu và kiểm thử.
+3. **Tầng 3 rule-based.**
+4. **Tầng 4** — nối LLM qua Edge Function, dùng tầng 1 làm ngữ cảnh.
+5. **Camera/Vision** sau cùng.
 
 ---
 
@@ -503,7 +577,7 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 
 | Màn | Mức | Ghi chú |
 |---|---|---|
-| Chat với AI | Đầy đủ | **Không kịch bản.** Tập câu hỏi có sẵn mà logic thật trả lời được — `weakestSkill()`, `streakDays()`, `overdueCues()` — trả về con số tính từ dữ liệu. Xem mục 2.1 |
+| Chat với AI | Đầy đủ | **Không kịch bản.** Lượt này chưa có backend nên hiển thị tập câu hỏi mà tầng 1 trả lời trực tiếp — `weakestSkill()`, `streakDays()`, `overdueCues()` — trả về con số tính thật, và nói rõ phần trò chuyện tự do cần kết nối. Nối LLM ở lượt sau theo mục 2.2 |
 | Phân tích | Khung | |
 | Đề xuất | Khung | |
 
