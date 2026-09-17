@@ -33,8 +33,8 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
 
 - Lưu trữ cục bộ (Drift/SQLite) và đồng bộ Supabase
 - Nhận diện cú đánh bằng camera/vision
-- Coach AI thật (lượt này là kịch bản định sẵn)
-- Player Intelligence thật (phát hiện điểm yếu từ dữ liệu)
+- Nối LLM cho Coach Chat qua Supabase Edge Function (mục 2.2 tầng 4)
+- Lớp Player Intelligence đầy đủ (mục 2.2 tầng 1) — lượt này chỉ có các hàm tối thiểu mà màn hình cần
 - Ghi trận đấu chi tiết từng cú theo từng ván
 - Xác thực người dùng, nhiều thiết bị, sao lưu đám mây
 
@@ -56,6 +56,115 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
 | Phạm vi lượt này | Cả 35 màn, chia 3 mức hoàn thiện | Chủ sản phẩm muốn thấy trọn bản đồ sớm |
 | Dữ liệu | Mock trong bộ nhớ, sau repository interface | Đổi sang Drift/Supabase chỉ sửa một dòng provider |
 | Nội dung Kiến thức | **Dùng 38 mục thật** từ từ điển, không bịa mock | Nội dung đã có sẵn và có cấu trúc đồng nhất |
+| Nội dung do hệ thống sinh ra | **Phải tính từ dữ liệu bằng logic có tên, hoặc do AI thật sinh ra. Cấm viết cứng.** | Xem mục 2.1 — một huấn luyện viên giả thì vô giá trị và gây hiểu nhầm |
+
+---
+
+## 2.1 Quy tắc: không bịa, không viết cứng nội dung sinh ra
+
+Đây là ràng buộc bắt buộc, áp dụng cho mọi lượt phát triển.
+
+**Phân biệt hai loại chữ trong app:**
+
+| Loại | Ví dụ | Quy tắc |
+|---|---|---|
+| **Chữ cố định của giao diện** | Nhãn tab "Luyện tập", tiêu đề "Mục tiêu hôm nay", nút "Bắt đầu", trạng thái rỗng "Đang xây dựng" | Nằm trong `vi.dart`. Viết sẵn là **đúng** — đây là i18n bình thường, không phải bịa |
+| **Nội dung hệ thống sinh ra** | Gợi ý của Coach, Mục tiêu hôm nay, câu trả lời của Coach Chat, nội dung thông báo, kết luận thống kê, phân tích điểm yếu | **Phải tính từ dữ liệu thật** bằng một hàm có tên, hoặc do AI thật sinh ra. **Cấm viết cứng câu chữ.** |
+
+**Cụ thể, bị cấm:**
+
+- Viết sẵn câu `"Tỷ lệ vào bi của bạn giảm ở cự ly xa"` rồi đặt cạnh biểu đồ sao cho nhìn có vẻ khớp
+- Coach Chat trả lời theo kịch bản `if (câu hỏi chứa "tập gì") return "Hãy tập Đánh đứng bi"`
+- Thông báo `"Đầu cơ của bạn quá hạn bảo dưỡng"` mà không thực sự so ngày bảo dưỡng với chu kỳ
+
+**Cụ thể, bắt buộc:**
+
+- Mỗi nội dung sinh ra phải truy được về một hàm có tên và có kiểm thử, ví dụ:
+  - `weakestSkill(List<DrillSession>) → SkillCategory` — nhóm kỹ năng có tỷ lệ thành công thấp nhất
+  - `overdueCues(List<Cue>, DateTime now) → List<Cue>` — so `lastTipMaintenance + chuKỳ` với hôm nay
+  - `streakDays(List<Session>) → int` — đếm chuỗi ngày liên tiếp có buổi tập
+  - `todayGoals(Player, List<DrillSession>, List<ScheduleEntry>, DateTime) → List<Goal>`
+- Câu chữ hiển thị là **khuôn có tham số**, tham số do hàm trên tính ra. Khuôn nằm trong `vi.dart`, giá trị đến từ dữ liệu:
+  `Vi.coachWeakSkill(skill, rate)` → `'Tỷ lệ vào bi nhóm $skill của bạn là $rate%, thấp nhất trong 5 nhóm.'`
+- Nếu dữ liệu chưa đủ để kết luận, app **nói thẳng là chưa đủ dữ liệu** và mời người chơi tập thêm — không được đoán bừa để lấp chỗ trống.
+
+**Coach Chat:** xem mục 2.2 — đây là chỗ duy nhất trong sản phẩm thực sự cần LLM, và LLM ở đó chỉ được **diễn giải** số liệu đã tính, không được tự tính.
+
+**Hệ quả với dữ liệu mẫu:** dữ liệu mẫu vẫn được dựng có chủ đích (người chơi hạng G yếu Điều bi), nhưng kết luận "yếu Điều bi" phải do hàm `weakestSkill()` **tính ra** từ 24 buổi tập đó, chứ không phải một câu viết sẵn đặt cạnh. Nếu ai sửa dữ liệu mẫu, kết luận phải tự đổi theo.
+
+---
+
+## 2.2 Phân tầng AI: chỗ nào logic thuần, chỗ nào LLM
+
+Câu hỏi "dùng logic hay dùng AI" là câu hỏi sai. Đáp án là **cả hai, khác vai trò**. Bốn tầng, mỗi tầng một loại:
+
+### Tầng 1 — Player Intelligence: logic thuần, không LLM
+
+Tỷ lệ thành công, xu hướng theo thời gian, nhóm kỹ năng yếu nhất, đã đủ điều kiện lên cấp chưa. Tất cả đều là công thức thống kê rõ ràng. Viết bằng Dart thuần vì:
+
+- **Phải chính xác và giải thích được.** Người chơi có quyền biết vì sao bị đánh giá yếu ở đâu. Một con số tính được thì truy ngược được về dữ liệu; một câu do mô hình sinh ra thì không.
+- **Rẻ, nhanh, chạy offline.** Đúng kiến trúc local-first của sản phẩm — không cần mạng, không tốn tiền API cho mỗi lần mở app.
+- **Deterministic.** Cùng dữ liệu vào, cùng kết quả ra, mọi lúc.
+
+### Tầng 2 — Progression gate: bắt buộc rule-based, cấm LLM
+
+**Đây là ràng buộc cứng, không có ngoại lệ.** Skill Test và cổng mở cấp phải do luật quyết định, không bao giờ do mô hình.
+
+Lý do: nếu để LLM phán ai được lên cấp thì cùng một kết quả tập, hỏi hai lần ra hai đáp án. Người chơi bị từ chối lên cấp mà không ai giải thích nổi tại sao, và hai người cùng thành tích có thể nhận hai kết quả khác nhau. Một hệ thống xếp hạng mà không nhất quán thì không còn là xếp hạng.
+
+Luật phải viết ra được thành câu: *"đạt ≥ 80% trong 3 buổi gần nhất của Cấp 2 → mở Cấp 3"*. Nếu không viết được thành câu như vậy thì luật đó chưa đủ rõ để dùng.
+
+### Tầng 3 — Learning Path / Recommendation: rule-based trước, ML sau
+
+Bản đầu: `if` nhóm kỹ năng yếu là X → đề xuất bài tập nhóm X ở cấp phù hợp trình độ hiện tại. Đủ dùng và giải thích được ngay.
+
+Khi đã có dữ liệu từ nhiều người chơi, đây là chỗ có thể nâng lên mô hình ML thật (ranking, collaborative filtering) để gợi ý tốt hơn. **Đó là giai đoạn sau**, không phải việc của bản đầu — và nó cần dữ liệu nhiều người dùng, tức là cần backend chạy trước đã.
+
+### Tầng 4 — Coach Chat: đây mới thật sự cần LLM
+
+Câu như *"Tại sao tôi thua trận vừa rồi?"* đòi hỏi đọc hiểu ngôn ngữ tự nhiên và tổng hợp nhiều nguồn dữ liệu thành một câu trả lời mạch lạc. Viết `if/else` cho việc này là bất khả thi.
+
+Luồng bắt buộc:
+
+```
+Player Intelligence  (tầng 1 — Dart, đã tính xong, có kiểm thử)
+        ↓
+Tóm tắt có cấu trúc  (JSON: hạng, tỷ lệ theo 5 nhóm kỹ năng,
+                      streak, buổi tập gần đây, trận gần đây)
+        ↓
+LLM  ←  câu hỏi của người chơi + tóm tắt trên làm ngữ cảnh
+        ↓
+Câu trả lời tiếng Việt, cá nhân hoá
+```
+
+**Ranh giới:** LLM là *người diễn giải*, không phải *người tính toán*. Mọi con số trong câu trả lời phải đến từ tóm tắt đầu vào. Prompt hệ thống nói rõ: không được suy ra số liệu không có trong ngữ cảnh; thiếu dữ liệu thì nói là thiếu.
+
+**Bảo mật — API key không được nằm trong app.** Flutter build ra APK giải ngược được; key nhúng trong app là key bị lộ. Nên:
+
+```
+App Flutter  →  Supabase Edge Function  →  Claude API
+(câu hỏi +      (giữ key, kiểm tra        (claude-opus-5)
+ tóm tắt)        phiên đăng nhập,
+                 giới hạn tần suất)
+```
+
+Anthropic **không có SDK chính thức cho Dart**, nên dù muốn app cũng không gọi thẳng được một cách tử tế. Edge Function viết bằng TypeScript dùng `@anthropic-ai/sdk` — đây cũng là lý do kỹ thuật ủng hộ kiến trúc trên.
+
+Model mặc định: **`claude-opus-5`**. Nếu sau này chi phí thành vấn đề, đó là quyết định của chủ sản phẩm, không phải thứ tự ý hạ.
+
+**Khi chưa có backend:** Coach Chat hiển thị tập câu hỏi mà tầng 1 trả lời trực tiếp được (*"Tôi đang yếu kỹ năng nào?"* → `weakestSkill()`), và nói rõ phần trò chuyện tự do cần kết nối. Đây không phải kịch bản giả — mỗi câu trả lời vẫn là số liệu tính thật.
+
+### Tầng riêng — Camera/Vision: bài toán khác hẳn
+
+Nhận diện cú đánh qua camera là computer vision (phát hiện và bám vị trí bi trên bàn), **không liên quan gì đến LLM ở tầng 4**. Cần mô hình thị giác riêng. Đây là phần tốn công và rủi ro kỹ thuật cao nhất, nên làm sau cùng và **không được để nó chặn các phần còn lại** — PRD đã quy định camera chỉ là cách tự động hoá việc ghi nhận, không phải điều kiện để tập.
+
+### Thứ tự triển khai
+
+1. **Tầng 1 trước tiên.** Sai ở đây thì mọi thứ phía trên sai theo.
+2. **Tầng 2** — luật progression, viết ra thành câu và kiểm thử.
+3. **Tầng 3 rule-based.**
+4. **Tầng 4** — nối LLM qua Edge Function, dùng tầng 1 làm ngữ cảnh.
+5. **Camera/Vision** sau cùng.
 
 ---
 
@@ -432,7 +541,7 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 
 | Màn | Mức | Ghi chú |
 |---|---|---|
-| AI Home | Đầy đủ | Gợi ý AI · Mục tiêu hôm nay · Tiếp tục · **Lịch hôm nay** · **Streak & giờ tập** · Truy cập nhanh |
+| AI Home | Đầy đủ | Gợi ý AI · Mục tiêu hôm nay · Tiếp tục · **Lịch hôm nay** · **Streak & giờ tập** · Truy cập nhanh. Mọi kết luận **tính từ dữ liệu** theo mục 2.1 — không viết cứng câu nào |
 | Thông báo | Đọc được | Nhắc lịch · cơ quá hạn · đề xuất mới · sắp mất streak |
 
 ### 🎯 Luyện tập — 14 màn
@@ -468,7 +577,7 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 
 | Màn | Mức | Ghi chú |
 |---|---|---|
-| Chat với AI | Đầy đủ | Kịch bản định sẵn, bám sát dữ liệu mẫu |
+| Chat với AI | Đầy đủ | **Không kịch bản.** Lượt này chưa có backend nên hiển thị tập câu hỏi mà tầng 1 trả lời trực tiếp — `weakestSkill()`, `streakDays()`, `overdueCues()` — trả về con số tính thật, và nói rõ phần trò chuyện tự do cần kết nối. Nối LLM ở lượt sau theo mục 2.2 |
 | Phân tích | Khung | |
 | Đề xuất | Khung | |
 
@@ -495,7 +604,9 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 
 ## 8. Nội dung mẫu
 
-Dữ liệu mẫu được dựng **có chủ đích**, không ngẫu nhiên. Người chơi mẫu là **hạng G, mạnh Ngắm bi nhưng yếu Điều bi**. Nhờ vậy biểu đồ có hình dạng thật và lời khuyên của Coach trên AI Home khớp với số liệu phía dưới, thay vì mỗi màn một kiểu bịa.
+Dữ liệu mẫu được dựng **có chủ đích**, không ngẫu nhiên. Người chơi mẫu là **hạng G, mạnh Ngắm bi nhưng yếu Điều bi**.
+
+Nhưng theo mục 2.1, kết luận "yếu Điều bi" **không được viết sẵn ở đâu cả**. Nó phải do `weakestSkill()` tính ra từ 24 buổi tập mẫu. Phép thử: sửa dữ liệu mẫu cho người chơi yếu Phá thay vì yếu Điều bi, thì gợi ý trên AI Home, câu trả lời của Coach và biểu đồ thống kê **đều phải tự đổi theo** mà không ai sửa một dòng chữ nào. Nếu không đổi, tức là có chỗ đang viết cứng.
 
 | Loại | Số lượng | Ghi chú |
 |---|---|---|
@@ -517,6 +628,7 @@ Dữ liệu mẫu được dựng **có chủ đích**, không ngẫu nhiên. Ng
 |---|---|
 | Unit | Tính hạng từ 8 câu đánh giá · tỷ lệ thành công theo từng `MeasurementUnit` · cổng mở cấp · tính streak · phát hiện tip quá hạn · hình học bi ảo và góc cắt · **tính toàn vẹn dữ liệu Kiến thức** (đủ 38 mục, mục nào cũng có mô tả và ít nhất một bước, mọi lỗi đều có nguyên nhân) |
 | Widget | Buổi tập (bấm ✓/✗ cập nhật đúng trạng thái) · Đồng hồ (chạy/dừng/lưu) · Đánh giá (8 câu ra đúng hạng) · Mô phỏng (kéo bi → đường ngắm đổi theo) |
+| **Chống bịa** | Bài kiểm thử của mục 2.1: đổi dữ liệu mẫu sang người chơi yếu **Phá** thay vì yếu **Điều bi**, rồi khẳng định gợi ý Coach, câu trả lời Coach Chat và nhóm kỹ năng yếu nhất trên Thống kê **đều đổi theo**. Test này hỏng nghĩa là có chỗ đang viết cứng |
 | Smoke | **Một test đi qua cả 35 route**, không màn nào crash — lưới an toàn quan trọng nhất của một bản khung |
 | Tĩnh | `flutter analyze` sạch, không cảnh báo |
 
@@ -536,7 +648,7 @@ Mười bước, mỗi bước chạy được và commit riêng:
 | 6 | Nội dung | **Chuyển 38 mục từ điển sang dữ liệu có cấu trúc** · Kiến thức danh sách + chi tiết · gán `KnowledgeCategory` · nối hai chiều với 18 bài tập · Lộ trình AI |
 | 7 | Thi đấu | Trang Thi đấu · Lịch sử · Chi tiết · Ghi trận (theo ván) |
 | 8 | Hồ sơ | Hồ sơ · Cơ bi-a · Chi tiết cơ · Cài đặt |
-| 9 | Thống kê & Coach | Tổng quan có biểu đồ · Chat Coach |
+| 9 | **Lớp suy luận** & Thống kê & Coach | Trước hết viết các hàm có tên của mục 2.1 — `weakestSkill()`, `streakDays()`, `overdueCues()`, `todayGoals()` — kèm kiểm thử riêng. Sau đó Thống kê và Coach Chat **đọc kết quả từ chúng**, không tự tính lại và không viết cứng |
 | 10 | Hoàn tất | 7 màn khung còn lại + smoke test 35 route |
 
 ---
