@@ -2,7 +2,10 @@
 
 **Ngày:** 2026-09-17
 **Trạng thái:** Đã chốt, sẵn sàng lập kế hoạch triển khai
-**Nguồn yêu cầu:** `PRD_PoolCoachAI.md` (tài liệu chuẩn), `PoolCoachAI.md` (bản gốc, đã được PRD thay thế)
+**Nguồn yêu cầu:**
+- `PRD_PoolCoachAI.md` — tài liệu chuẩn
+- `PoolCoachAI.md` — bản gốc, đã được PRD thay thế
+- `Tu-Dien-Kien-Thuc-Billiard-Pool.md` — **nội dung thật của module Kiến thức**: 38 mục, cấu trúc đồng nhất 5 phần
 
 ---
 
@@ -50,6 +53,7 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
 | Hướng thiết kế | **"Nỉ & Phấn"** — xanh nỉ bàn bida + vàng đồng | Bản sắc riêng, không giống app thể thao đại trà |
 | Phạm vi lượt này | Cả 35 màn, chia 3 mức hoàn thiện | Chủ sản phẩm muốn thấy trọn bản đồ sớm |
 | Dữ liệu | Mock trong bộ nhớ, sau repository interface | Đổi sang Drift/Supabase chỉ sửa một dòng provider |
+| Nội dung Kiến thức | **Dùng 38 mục thật** từ từ điển, không bịa mock | Nội dung đã có sẵn và có cấu trúc đồng nhất |
 
 ---
 
@@ -349,7 +353,8 @@ Match           ─┘
 | `ShotResult` | thứTự · `success` · thờiĐiểm · `source` (camera/manual) |
 | `PracticeSession` | id · thờiGianBắtĐầu · `durationMinutes` · `skillCategory` · `cueId` · ghiChú |
 | `ScheduleEntry` | id · thứTrongTuần · giờBắtĐầu · thờiLượng · `skillCategory` · bật/tắt |
-| `Knowledge` | id · tiêuĐề · tómTắt · nộiDung · `skillCategory` · `relatedDrillIds[]` · `readTimeMinutes` |
+| `Knowledge` | id · số thứ tự · tiêuĐề · `category` · `description` · `steps[]` · `notes[]` · `mistakes[]` · `fixes[]` · `relatedDrillIds[]` · `readTimeMinutes` |
+| `KnowledgeMistake` | `symptom` (hiện tượng quan sát được) · `cause` (nguyên nhân) |
 | `SkillTest` → `Certification` | tiêuChíĐạt · lầnThử[] → chứngNhận · ngàyĐạt |
 
 **Thi đấu**
@@ -371,7 +376,32 @@ Match           ─┘
 
 Thống kê là dữ liệu **suy ra**, không lưu.
 
-### 6.3 Repository
+### 6.3 Kiến thức — cấu trúc và phân loại
+
+Từ điển có 38 mục, **mọi mục đều theo đúng một khuôn 5 phần**. Vì vậy `Knowledge` là thực thể có cấu trúc, không phải một khối markdown:
+
+| Trường trong từ điển | Trường trong model | Hiển thị |
+|---|---|---|
+| Mô tả | `description` | Đoạn mở đầu |
+| Hướng dẫn thực hiện | `steps[]` | Danh sách đánh số |
+| Các lưu ý để thực hiện | `notes[]` | Danh sách gạch đầu dòng |
+| Các lỗi thường gặp | `mistakes[]` — mỗi lỗi gồm `symptom` + `cause` | Thẻ đỏ, tiêu đề là **hiện tượng** |
+| Cách sửa | `fixes[]` | Thẻ xanh ngay dưới phần lỗi |
+
+Lỗi được mô tả theo **hiện tượng quan sát được** ("bi cái rẽ trái", "bi cái bị hút ngược lại") chứ không phải theo thuật ngữ kỹ thuật. Đây là dữ liệu chẩn đoán có sẵn cho Coach ở các lượt sau: người chơi tả hiện tượng → tra ra nguyên nhân → đề xuất bài tập. Lượt này chỉ hiển thị, chưa dùng để chẩn đoán.
+
+**Phân loại.** Năm nhóm kỹ năng không phủ hết nội dung từ điển — cầm cơ, tư thế, luật 9-ball, bảo trì cơ không thuộc nhóm nào. Do đó `KnowledgeCategory` gồm 9 giá trị: 5 nhóm kỹ năng sẵn có, cộng 4 nhóm mới.
+
+| Nhóm mới | Nội dung từ điển | Màu |
+|---|---|---|
+| Nền tảng | Cầm cơ · tư thế · cầu tay · ra cơ · các phương pháp ngắm | Chữ `#C6D3C6` nền `#26412E` viền `#3A6044` |
+| Chiến thuật & Tâm lý | Đọc bàn · kế hoạch dọn bàn · phòng thủ nâng cao · tâm lý thi đấu · khởi động | Chữ `#D9A441` nền `#4A3A14` viền `#6B5220` |
+| Luật chơi | 8-Ball · 9-Ball · 10-Ball · 14.1 · One Pocket | Chữ `#9FB0A3` nền `#1B3527` viền `#2F5139` |
+| Thiết bị | Chọn cơ · bảo trì cơ và dụng cụ | Chữ `#6FA8D6` nền `#1E3648` viền `#2F5578` |
+
+Nhóm kỹ năng vẫn giữ nguyên 5 giá trị và màu như mục 4.1 — `KnowledgeCategory` là tập rộng hơn, chỉ dùng cho Kiến thức, không thay `SkillCategory` của Drill.
+
+### 6.4 Repository
 
 Chín interface, mỗi cái có một bản `Mock…` in-memory ở lượt này:
 
@@ -383,8 +413,8 @@ Chín interface, mỗi cái có một bản `Mock…` in-memory ở lượt này
 
 Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ quan trọng.
 
-- **Đầy đủ (13 màn)** — tương tác thật, trạng thái thật, có kiểm thử
-- **Đọc được (15 màn)** — hiện dữ liệu mock thật, bố cục hoàn chỉnh, hành động giản lược
+- **Đầy đủ (15 màn)** — tương tác thật, trạng thái thật, có kiểm thử
+- **Đọc được (13 màn)** — hiện dữ liệu mock thật, bố cục hoàn chỉnh, hành động giản lược
 - **Khung (7 màn)** — bố cục + trạng thái rỗng + ghi chú "lượt sau"
 
 ### Khởi động — 4 màn
@@ -410,15 +440,15 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 | Trung tâm luyện tập | Đầy đủ | Cửa vào mọi nhánh luyện tập |
 | Tất cả bài tập | Đầy đủ | Tìm kiếm + lọc theo 5 kỹ năng và cấp, chạy thật |
 | Chi tiết bài tập | Đầy đủ | Mục tiêu · các bước · kiến thức liên quan · lịch sử gần nhất |
-| Chuẩn bị ghi hình | Đầy đủ | Setup bàn/camera · checklist · xác nhận "Tôi đã sẵn sàng" |
+| Chuẩn bị ghi hình | Đầy đủ | Setup bàn/camera · xác nhận "Tôi đã sẵn sàng" · **checklist khởi động lấy từ mục 23.1 của từ điển** (quy trình 3 giai đoạn, ~5 phút) |
 | Buổi tập | Đầy đủ | ✓/✗ · 7/10 · cm · giây — giao diện đổi theo đơn vị đo của bài |
 | Hoàn thành | Đầy đủ | Tính kết quả thật từ session, cập nhật tiến độ |
 | Mô phỏng góc cắt | Đầy đủ | Kéo thả bi cái/bi mục tiêu/lỗ · vẽ bi ảo · tính góc cắt |
 | Đồng hồ luyện tập | Đầy đủ | Đếm lên/xuống, gắn nhãn kỹ năng + cơ, lưu vào tổng giờ |
 | Lịch tập hằng tuần | Đọc được | |
 | Lộ trình AI | Đọc được | |
-| Kiến thức — danh sách | Đọc được | |
-| Kiến thức — chi tiết | Đọc được | Liên kết hai chiều với bài tập |
+| Kiến thức — danh sách | **Đầy đủ** | 38 bài thật · tìm kiếm · lọc theo 9 nhóm `KnowledgeCategory` |
+| Kiến thức — chi tiết | **Đầy đủ** | 5 phần có cấu trúc · lỗi→cách sửa · liên kết hai chiều với bài tập |
 | Kiểm tra kỹ năng | Khung | |
 | Chứng nhận | Khung | |
 
@@ -452,12 +482,12 @@ Không màn nào bị bỏ trống, nhưng công sức chia theo mức độ qua
 | Màn | Mức | Ghi chú |
 |---|---|---|
 | Cơ bi-a — danh sách | Đầy đủ | Cảnh báo tip quá hạn bảo dưỡng |
-| Chi tiết cơ | Đầy đủ | Loại · trọng lượng · cỡ/độ cứng tip · kỹ năng phù hợp · ngày bảo dưỡng |
+| Chi tiết cơ | Đầy đủ | Loại · trọng lượng · cỡ/độ cứng tip · kỹ năng phù hợp · ngày bảo dưỡng · **liên kết tới mục 29 "Chọn cơ" và 30 "Bảo trì cơ"** của từ điển |
 | Hồ sơ & Hạng | Đọc được | |
 | Cài đặt | Đọc được | |
 | Lịch sử | Khung | |
 
-**Tổng: 4 + 2 + 14 + 5 + 3 + 2 + 5 = 35 màn** (13 đầy đủ · 15 đọc được · 7 khung)
+**Tổng: 4 + 2 + 14 + 5 + 3 + 2 + 5 = 35 màn** (15 đầy đủ · 13 đọc được · 7 khung)
 
 ---
 
@@ -468,7 +498,7 @@ Dữ liệu mẫu được dựng **có chủ đích**, không ngẫu nhiên. Ng
 | Loại | Số lượng | Ghi chú |
 |---|---|---|
 | Bài tập | 18 | Trải đều 5 nhóm kỹ năng, mỗi bài 3 cấp. Gồm **Đánh đứng bi · Đánh trô bi · Đánh cu lê** |
-| Bài kiến thức | 10 | Liên kết hai chiều với bài tập |
+| Bài kiến thức | **38 — nội dung thật, không mock** | Chuyển từ `Tu-Dien-Kien-Thuc-Billiard-Pool.md` sang dữ liệu có cấu trúc, gán `KnowledgeCategory` và liên kết hai chiều với bài tập |
 | Buổi tập đã hoàn thành | 24 | Để biểu đồ có đường tiến bộ thật |
 | Buổi tập tự do (đồng hồ) | 9 | |
 | Trận đấu | 8 | Có ván và cú đánh chi tiết |
@@ -483,7 +513,7 @@ Dữ liệu mẫu được dựng **có chủ đích**, không ngẫu nhiên. Ng
 
 | Loại | Nội dung |
 |---|---|
-| Unit | Tính hạng từ 8 câu đánh giá · tỷ lệ thành công theo từng `MeasurementUnit` · cổng mở cấp · tính streak · phát hiện tip quá hạn · hình học bi ảo và góc cắt |
+| Unit | Tính hạng từ 8 câu đánh giá · tỷ lệ thành công theo từng `MeasurementUnit` · cổng mở cấp · tính streak · phát hiện tip quá hạn · hình học bi ảo và góc cắt · **tính toàn vẹn dữ liệu Kiến thức** (đủ 38 mục, mục nào cũng có mô tả và ít nhất một bước, mọi lỗi đều có nguyên nhân) |
 | Widget | Buổi tập (bấm ✓/✗ cập nhật đúng trạng thái) · Đồng hồ (chạy/dừng/lưu) · Đánh giá (8 câu ra đúng hạng) · Mô phỏng (kéo bi → đường ngắm đổi theo) |
 | Smoke | **Một test đi qua cả 35 route**, không màn nào crash — lưới an toàn quan trọng nhất của một bản khung |
 | Tĩnh | `flutter analyze` sạch, không cảnh báo |
@@ -501,7 +531,7 @@ Mười bước, mỗi bước chạy được và commit riêng:
 | 3 | Vòng lặp cốt lõi | Trung tâm → Bài tập → Chi tiết → Chuẩn bị → Buổi tập → Hoàn thành |
 | 4 | Onboarding | Splash → Chào mừng → Đánh giá 8 câu → Kết quả hạng |
 | 5 | Công cụ | Mô phỏng góc cắt · Đồng hồ · Lịch tập |
-| 6 | Nội dung | Kiến thức · Lộ trình AI |
+| 6 | Nội dung | **Chuyển 38 mục từ điển sang dữ liệu có cấu trúc** · Kiến thức danh sách + chi tiết · gán `KnowledgeCategory` · nối hai chiều với 18 bài tập · Lộ trình AI |
 | 7 | Thi đấu | Trang Thi đấu · Lịch sử · Chi tiết · Ghi trận (theo ván) |
 | 8 | Hồ sơ | Hồ sơ · Cơ bi-a · Chi tiết cơ · Cài đặt |
 | 9 | Thống kê & Coach | Tổng quan có biểu đồ · Chat Coach |
@@ -524,6 +554,8 @@ Mười bước, mỗi bước chạy được và commit riêng:
 | Ghi trận đấu chi tiết từng cú tương đương một luồng lớn | Lượt này ghi theo ván; ghi từng cú là một lượt riêng |
 | Thuật ngữ bida có thể khác giữa các vùng | Toàn bộ chuỗi nằm trong `vi.dart`; đổi cách gọi chỉ sửa một dòng |
 | Không có lưu trữ — đóng app là mất dữ liệu | Có chủ đích ở lượt này. Repository interface đã sẵn sàng để cắm Drift vào |
+| Chuyển 38 mục từ điển sang dữ liệu có cấu trúc là việc thủ công, dễ sai sót | Làm thành bước riêng (bước 6) với kiểm thử đếm: đủ 38 mục, mục nào cũng có `description` và ít nhất một `step`, mọi `mistake` đều có `cause` |
+| 7 mục trong từ điển dùng nhãn lỗi khác (*"theo hiện tượng cụ thể"*) | Vẫn cùng khuôn `symptom` + `cause`, chỉ khác tiêu đề — xử lý như nhau khi chuyển đổi |
 
 ---
 
