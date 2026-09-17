@@ -35,4 +35,7 @@ abstract final class Vi {
   // Trạng thái rỗng dùng chung
   static const comingSoonTitle = 'Đang xây dựng';
   static const comingSoonBody = 'Phần này sẽ có ở bản cập nhật sau.';
+
+  /// Tiền tố huy hiệu hạng, ví dụ "HẠNG G".
+  static const rankWord = 'Hạng';
 }
