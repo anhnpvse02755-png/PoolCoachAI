@@ -45,6 +45,8 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
 | Hạng mục | Quyết định | Lý do |
 |---|---|---|
 | Nền tảng | Flutter (iOS + Android) | Đa nền tảng, phù hợp cho ghi hình bằng camera ở lượt sau |
+| SDK | Flutter 3.47.0 tại `C:\Users\anhnpv\flutter` | Bản mới hơn trong hai bản có sẵn trên máy |
+| Chạy thử khi dựng | Chrome trước, Android sau | Không phải chờ cài Android SDK; đủ để đánh giá bố cục và điều hướng |
 | Ngôn ngữ giao diện | **Tiếng Việt hoàn toàn**, kể cả thuật ngữ chuyên môn | Người dùng mục tiêu là cơ thủ Việt Nam |
 | Quản lý trạng thái | `flutter_riverpod`, **không dùng codegen** | Tránh `build_runner` chạy lại liên tục khi sửa 35 màn |
 | Điều hướng | `go_router` với `StatefulShellRoute` | 5 tab giữ ngăn xếp độc lập |
@@ -541,9 +543,23 @@ Mười bước, mỗi bước chạy được và commit riêng:
 
 ## 11. Điều kiện tiên quyết & rủi ro
 
-### Chặn thật sự
+### Môi trường phát triển
 
-**Máy phát triển chưa cài Flutter SDK** — cả `flutter` lẫn `dart` đều không có trong PATH. Code viết được nhưng không build, không chạy, không test được cho đến khi cài xong. Chủ sản phẩm cần tự cài từ `https://docs.flutter.dev/get-started/install/windows`, chạy `flutter doctor`, và có thể phải bật Developer Mode của Windows.
+**Flutter SDK đã có sẵn.** Dùng bản `C:\Users\anhnpv\flutter` — Flutter **3.47.0** stable, Dart **3.13.0**. Máy còn một bản cũ hơn ở `D:\flutter` (3.44.6), **không dùng** cho dự án này.
+
+SDK không nằm trong PATH, nên mọi lệnh gọi bằng đường dẫn đầy đủ: `C:\Users\anhnpv\flutter\bin\flutter.bat`. (Thêm `C:\Users\anhnpv\flutter\bin` vào PATH là tùy chọn, không bắt buộc.)
+
+**Thiết bị chạy thử: Chrome trước, Android sau.** Trong lúc dựng 35 màn, chạy trên Chrome là đủ để đánh giá bố cục, điều hướng và màu sắc, lại không phải chờ cài gì.
+
+| Hạng mục | Trạng thái | Ảnh hưởng |
+|---|---|---|
+| Flutter 3.47.0 · Dart 3.13.0 | ✅ | `flutter analyze`, `flutter test` chạy được ngay — toàn bộ mục 9 hoạt động |
+| Chrome · Edge | ✅ | Chạy và xem app được ngay |
+| Android SDK | ❌ chưa có | Cần Android Studio khi muốn thử trên điện thoại thật. Không chặn việc dựng |
+| Visual Studio C++ | ❌ chưa có | Chỉ cần cho bản Windows desktop — ngoài phạm vi |
+| iOS | ❌ không thể | Build iOS bắt buộc phải có macOS. Giới hạn của Apple, không phải lỗi cấu hình |
+
+**Hệ quả cần lưu ý khi dựng:** vì kiểm chứng chủ yếu trên Chrome, mọi thứ phụ thuộc nền tảng phải được để dành hoặc bọc sau interface — quyền camera, thông báo hệ thống, lưu trữ thiết bị. Ở lượt này không có phần nào như vậy, nhưng cần nhớ khi thêm camera ở lượt sau. Bố cục phải được kiểm tra ở khổ hẹp cỡ điện thoại chứ không phải cửa sổ trình duyệt rộng.
 
 ### Rủi ro
 
