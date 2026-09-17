@@ -38,4 +38,35 @@ abstract final class Vi {
 
   /// Tiền tố huy hiệu hạng, ví dụ "HẠNG G".
   static const rankWord = 'Hạng';
+
+  // Tiêu đề và mô tả tạm của các màn gốc.
+  //
+  // Đây là chữ cố định của giao diện, không phải nội dung do hệ thống
+  // sinh ra — viết sẵn ở đây là đúng. Mỗi màn nói thẳng sẽ có gì ở bản
+  // sau thay vì để trắng hoặc bịa nội dung cho có.
+  static const homeTitle = 'Xin chào';
+  static const homeComing = 'Gợi ý của huấn luyện viên, mục tiêu hôm nay '
+      'và tiến độ sẽ hiện ở đây.';
+
+  static const trainingTitle = 'Trung tâm luyện tập';
+  static const trainingComing = 'Thư viện bài tập, lộ trình AI, mô phỏng '
+      'góc cắt và đồng hồ luyện tập sẽ nằm ở đây.';
+
+  static const playTitle = 'Thi đấu';
+  static const playComing = 'Ghi trận đấu, lịch sử trận và giải đấu sẽ '
+      'nằm ở đây.';
+
+  static const statsTitle = 'Thống kê';
+  static const statsComing = 'Biểu đồ tiến bộ theo từng nhóm kỹ năng, '
+      'kết hợp dữ liệu luyện tập và thi đấu.';
+
+  static const profileTitle = 'Hồ sơ';
+  static const profileComing = 'Hạng, chứng nhận, cơ bi-a và cài đặt sẽ '
+      'nằm ở đây.';
+
+  static const coachComing = 'Hỏi huấn luyện viên hôm nay nên tập gì, '
+      'hoặc vì sao trận vừa rồi thua.';
+
+  static const notificationsComing = 'Nhắc lịch tập, nhắc bảo dưỡng đầu cơ '
+      'và đề xuất mới sẽ hiện ở đây.';
 }
