@@ -688,6 +688,39 @@ SDK không nằm trong PATH, nên mọi lệnh gọi bằng đường dẫn đ�
 
 ---
 
-## 12. Bước tiếp theo
+## 12. Quan hệ với `Claude_desktop/PoolCoachAI_SPEC.md`
 
-Sau khi tài liệu này được duyệt: lập kế hoạch triển khai chi tiết theo 10 bước ở mục 10, mỗi bước có tiêu chí hoàn thành và kiểm thử cụ thể.
+Chủ sản phẩm cung cấp thêm một tài liệu kỹ thuật kèm prototype HTML. Nó **không thay thế** tài liệu này; hai bên bổ sung nhau, và những chỗ lệch đã được xử lý như sau.
+
+### Lấy từ tài liệu đó
+
+| Nội dung | Vì sao |
+|---|---|
+| **Công thức Player Intelligence** (mục 5 của tài liệu đó) — `drillRatio`, `categoryMastery` có trọng số theo độ mới, `trend`, weak/strong, `isReadyForLevelUp`, kèm hằng số và test case | Đây chính là các hàm có tên mà mục 2.1 yêu cầu mà chưa có nguồn. Deterministic, kiểm thử được, đúng tầng 1 của mục 2.2 |
+| **Recommendation engine rule-based** (mục 6) — 6 luật ưu tiên chọn kỹ năng hôm nay, cách chọn drill, output `TodayRecommendation` | Đúng tầng 3 của mục 2.2, và là nội dung thật cho khối "Mục tiêu hôm nay" trên AI Home |
+| **Phân kỳ 5 phase** | Rõ hơn thứ tự dựng ở mục 10, vốn chỉ bao phủ bản khung |
+| **Seed data trong prototype** | Drill và Knowledge thật, thay cho dữ liệu mock tự bịa |
+| **Motif "bi số"** | Badge số màu theo nhóm kỹ năng thay cho số thứ tự — chi tiết nhận diện đáng giữ |
+
+### Không lấy, và vì sao
+
+| Nội dung | Quyết định |
+|---|---|
+| **Stack React + TypeScript + Vite** | Giữ Flutter. Tài liệu đó ghi rõ stack là gợi ý, không bắt buộc. Chủ sản phẩm đã chọn Flutter và bản khung đã dựng xong trên Flutter |
+| **Design tokens của prototype** — `--ivory` nền sáng, `--rail` nâu, `--chalk` xanh dương, Fraunces + Inter | Giữ "Nỉ & Phấn" ở mục 4. Chủ sản phẩm đã chọn phương án này sau khi so ba hướng thiết kế, và Be Vietnam Pro xử lý dấu tiếng Việt tốt hơn Inter. Bộ token kia đã được cân nhắc và loại, không phải bị bỏ sót |
+
+### Sửa lại theo tài liệu đó
+
+**Nhóm kỹ năng thứ 5 là `kick`, không phải `bank`.** Tài liệu đó dùng `kick`, và chủ sản phẩm xác nhận: *A băng* là kick shot (bi cái chạm băng trước), còn bank shot là *Cân bi* (bi mục tiêu chạm băng). Code đã sửa.
+
+**Còn treo:** *Cân bi* hiện không thuộc nhóm nào. Từ điển có hẳn một mục cho nó. Quyết định khi nhập 38 bài kiến thức: xếp vào Ngắm bi, hay mở nhóm thứ 6.
+
+---
+
+## 13. Bước tiếp theo
+
+Bản khung (mục 7–10) **đã hoàn thành**: 10 nhiệm vụ, 43 kiểm thử, `flutter analyze` sạch, `flutter build web --release` chạy được.
+
+Tiếp theo là **Phase 1** theo phân kỳ của `Claude_desktop/PoolCoachAI_SPEC.md`: Training Center (Drill Library, Drill Session, Knowledge, Mô phỏng góc cắt, Đồng hồ & Lịch tập, Cơ bi-a) + Player Intelligence + AI Home rule-based.
+
+Thứ tự bắt buộc trong Phase 1, theo đúng mục 2.2: **lớp suy luận trước, màn hình sau.** `computePlayerIntelligence()` và `computeRecommendation()` là pure function trong `lib/domain/`, có kiểm thử riêng theo các case đã cho, rồi AI Home mới đọc kết quả từ chúng. Không màn nào được tự tính lại, và không câu chữ nào được viết cứng.
