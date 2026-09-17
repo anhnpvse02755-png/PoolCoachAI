@@ -9,7 +9,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: PcSkillChip(category: SkillCategory.bank),
+            body: PcSkillChip(category: SkillCategory.kick),
           ),
         ),
       );

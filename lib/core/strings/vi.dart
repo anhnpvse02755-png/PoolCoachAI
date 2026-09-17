@@ -22,14 +22,17 @@ abstract final class Vi {
   /// Tên tiếng Việt của một nhóm kỹ năng.
   ///
   /// Đây là thuật ngữ đã được cơ thủ xác nhận — "Phá" chứ không phải
-  /// "Giao bóng", "A băng" (từ tiếng Pháp *à bande*) chứ không phải
-  /// "Bi băng", "Điều bi" chứ không phải "Đi bi".
+  /// "Giao bóng", "Điều bi" chứ không phải "Đi bi".
+  ///
+  /// "A băng" (từ tiếng Pháp *à bande*) là **kick shot**: bi cái chạm
+  /// băng trước rồi mới tới bi mục tiêu. Đừng nhầm với **bank shot** —
+  /// bi mục tiêu mới là bi chạm băng — tiếng Việt gọi là *Cân bi*.
   static String skill(SkillCategory category) => switch (category) {
         SkillCategory.aiming => 'Ngắm bi',
         SkillCategory.position => 'Điều bi / Vị trí',
         SkillCategory.breakShot => 'Phá',
         SkillCategory.safety => 'Phòng thủ',
-        SkillCategory.bank => 'A băng',
+        SkillCategory.kick => 'A băng',
       };
 
   // Trạng thái rỗng dùng chung

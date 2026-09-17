@@ -332,7 +332,7 @@ Lượt sau đổi sang `DriftDrillRepository` hoặc `SupabaseDrillRepository` 
 | Điều bi / Vị trí | `#6FA8D6` | `#1E3648` | `#2F5578` |
 | Phá | `#E2685C` | `#4A2320` | `#7A3A34` |
 | Phòng thủ | `#9B8BD6` | `#322B4A` | `#4B4277` |
-| A băng | `#4FB3A5` | `#14403C` | `#226B62` |
+| A băng *(kick)* | `#4FB3A5` | `#14403C` | `#226B62` |
 
 **Hạng**
 
@@ -392,7 +392,7 @@ App phải kèm dòng chú thích: đây là bảng định nghĩa của PoolCoa
 
 Chủ sản phẩm đã sửa 9 thuật ngữ. Phát hiện quan trọng: **tiếng bida Việt Nam mượn nhiều từ tiếng Pháp**, không dịch nghĩa đen từ tiếng Anh.
 
-Toàn bộ chuỗi tiếng Việt nằm trong `core/strings/vi.dart`. Khóa trong code giữ tiếng Anh (`SkillCategory.bank`), nên đổi cách gọi chỉ sửa một dòng.
+Toàn bộ chuỗi tiếng Việt nằm trong `core/strings/vi.dart`. Khóa trong code giữ tiếng Anh (`SkillCategory.kick`), nên đổi cách gọi chỉ sửa một dòng.
 
 | Tiếng Việt | Gốc | Ghi chú |
 |---|---|---|
@@ -400,7 +400,8 @@ Toàn bộ chuỗi tiếng Việt nằm trong `core/strings/vi.dart`. Khóa tron
 | **Điều bi / Vị trí** | position | Nhóm kỹ năng 2 — *không phải "Đi bi"* |
 | **Phá** | break | Nhóm kỹ năng 3 — *không phải "Giao bóng"* |
 | Phòng thủ | safety | Nhóm kỹ năng 4 |
-| **A băng** | bank · *à bande* | Nhóm kỹ năng 5 — *không phải "Bi băng"* |
+| **A băng** | **kick** · *à bande* | Nhóm kỹ năng 5 — bi cái chạm băng **trước** rồi mới tới bi mục tiêu. *Không phải "Bi băng", và không phải bank shot* |
+| **Cân bi** · Cân băng | **bank** | Bi cái chạm bi mục tiêu **trước**, bi mục tiêu mới chạm băng vào lỗ. Ở bản này **không** là một nhóm kỹ năng riêng |
 | **Đánh đứng bi** | stop shot | Tên bài tập |
 | **Đánh trô bi** | draw · *rétro* | Tên bài tập |
 | **Đánh cu lê** | follow · *coulé* | Tên bài tập |
@@ -456,7 +457,7 @@ Match           ─┘
 
 | Thực thể | Trường chính |
 |---|---|
-| `SkillCategory` | enum `aiming · position · breakShot · safety · bank` |
+| `SkillCategory` | enum `aiming · position · breakShot · safety · kick` |
 | `Drill` | id · tên · `skillCategory` · mô tả · `steps[]` · `levels[]` · `relatedKnowledgeIds[]` |
 | `DrillLevel` | `level` (1·2·3) · nhãn độ khó · `measurementUnit` · `targetValue` · `passThreshold` |
 | `MeasurementUnit` | enum `shots` (✓/✗) · `ratio` (7/10) · `distanceCm` · `seconds` |

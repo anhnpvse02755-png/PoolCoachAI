@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 ///
 /// Khóa giữ tiếng Anh; tên tiếng Việt nằm ở [Vi.skill].
 /// Màu xem docs/superpowers/specs/2026-09-17-poolcoachai-shell-design.md mục 4.1.
+///
+/// Nhóm thứ 5 là [kick], **không phải** bank — đây là hai cú khác nhau
+/// và rất dễ nhầm:
+/// - **Kick shot** — bi cái chạm băng trước rồi mới tới bi mục tiêu.
+///   Tiếng Việt: *A băng* (từ tiếng Pháp *à bande*). Đây là nhóm này.
+/// - **Bank shot** — bi cái chạm bi mục tiêu trước, bi mục tiêu mới
+///   chạm băng vào lỗ. Tiếng Việt: *Cân bi* / *Cân băng*. Không phải
+///   một nhóm kỹ năng riêng ở bản này.
 enum SkillCategory {
   aiming(
     fg: Color(0xFFE8B44C),
@@ -25,7 +33,7 @@ enum SkillCategory {
     bg: Color(0xFF322B4A),
     borderColor: Color(0xFF4B4277),
   ),
-  bank(
+  kick(
     fg: Color(0xFF4FB3A5),
     bg: Color(0xFF14403C),
     borderColor: Color(0xFF226B62),

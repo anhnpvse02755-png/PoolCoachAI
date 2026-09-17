@@ -13,7 +13,7 @@ void main() {
       expect(Vi.skill(SkillCategory.position), 'Điều bi / Vị trí');
       expect(Vi.skill(SkillCategory.breakShot), 'Phá');
       expect(Vi.skill(SkillCategory.safety), 'Phòng thủ');
-      expect(Vi.skill(SkillCategory.bank), 'A băng');
+      expect(Vi.skill(SkillCategory.kick), 'A băng');
     });
 
     test('mỗi nhóm có một màu chữ riêng biệt', () {
