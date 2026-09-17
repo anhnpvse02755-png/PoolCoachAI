@@ -1,3 +1,5 @@
+import 'package:poolcoachai/domain/skill_category.dart';
+
 /// Toàn bộ chuỗi tiếng Việt hiển thị cho người dùng.
 ///
 /// Không widget nào được chứa chuỗi tiếng Việt viết thẳng — mọi chữ
@@ -16,6 +18,19 @@ abstract final class Vi {
   // Màn mở đè lên shell
   static const coachTitle = 'Huấn luyện viên AI';
   static const notificationsTitle = 'Thông báo';
+
+  /// Tên tiếng Việt của một nhóm kỹ năng.
+  ///
+  /// Đây là thuật ngữ đã được cơ thủ xác nhận — "Phá" chứ không phải
+  /// "Giao bóng", "A băng" (từ tiếng Pháp *à bande*) chứ không phải
+  /// "Bi băng", "Điều bi" chứ không phải "Đi bi".
+  static String skill(SkillCategory category) => switch (category) {
+        SkillCategory.aiming => 'Ngắm bi',
+        SkillCategory.position => 'Điều bi / Vị trí',
+        SkillCategory.breakShot => 'Phá',
+        SkillCategory.safety => 'Phòng thủ',
+        SkillCategory.bank => 'A băng',
+      };
 
   // Trạng thái rỗng dùng chung
   static const comingSoonTitle = 'Đang xây dựng';
