@@ -43,3 +43,6 @@ ios/Flutter/flutter_export_environment.sh
 
 # Coverage
 coverage/
+
+# Brainstorming companion
+.superpowers/
