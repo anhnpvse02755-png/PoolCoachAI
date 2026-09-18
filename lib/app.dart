@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -42,6 +43,9 @@ class _PoolCoachAppState extends State<PoolCoachApp> {
       title: Vi.appName,
       theme: AppTheme.dark(),
       routerConfig: _router,
+      locale: const Locale('vi'),
+      supportedLocales: const [Locale('vi')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       debugShowCheckedModeBanner: false,
     );
   }
