@@ -85,7 +85,7 @@ PRD mô tả trọn sản phẩm, gồm nhiều hệ thống lớn độc lập:
   - `streakDays(List<Session>) → int` — đếm chuỗi ngày liên tiếp có buổi tập
   - `todayGoals(Player, List<DrillSession>, List<ScheduleEntry>, DateTime) → List<Goal>`
 - Câu chữ hiển thị là **khuôn có tham số**, tham số do hàm trên tính ra. Khuôn nằm trong `vi.dart`, giá trị đến từ dữ liệu:
-  `Vi.coachWeakSkill(skill, rate)` → `'Tỷ lệ vào bi nhóm $skill của bạn là $rate%, thấp nhất trong 5 nhóm.'`
+  `Vi.coachWeakSkill(skill, rate)` → `'Tỷ lệ vào bi nhóm $skill của bạn là $rate%, thấp nhất trong 6 nhóm.'`
 - Nếu dữ liệu chưa đủ để kết luận, app **nói thẳng là chưa đủ dữ liệu** và mời người chơi tập thêm — không được đoán bừa để lấp chỗ trống.
 
 **Coach Chat:** xem mục 2.2 — đây là chỗ duy nhất trong sản phẩm thực sự cần LLM, và LLM ở đó chỉ được **diễn giải** số liệu đã tính, không được tự tính.
@@ -129,7 +129,7 @@ Luồng bắt buộc:
 ```
 Player Intelligence  (tầng 1 — Dart, đã tính xong, có kiểm thử)
         ↓
-Tóm tắt có cấu trúc  (JSON: hạng, tỷ lệ theo 5 nhóm kỹ năng,
+Tóm tắt có cấu trúc  (JSON: hạng, tỷ lệ theo 6 nhóm kỹ năng,
                       streak, buổi tập gần đây, trận gần đây)
         ↓
 LLM  ←  câu hỏi của người chơi + tóm tắt trên làm ngữ cảnh
@@ -324,7 +324,7 @@ Lượt sau đổi sang `DriftDrillRepository` hoặc `SupabaseDrillRepository` 
 | Cảnh báo | `#E5A93C` |
 | Thông tin | `#6FA8D6` |
 
-**5 nhóm kỹ năng** — màu cố định, dùng xuyên suốt ở bộ lọc bài tập, biểu đồ thống kê, nhãn đồng hồ luyện tập và gợi ý của Coach
+**6 nhóm kỹ năng** — màu cố định, dùng xuyên suốt ở bộ lọc bài tập, biểu đồ thống kê, nhãn đồng hồ luyện tập và gợi ý của Coach
 
 | Nhóm | Chữ | Nền | Viền |
 |---|---|---|---|
@@ -333,6 +333,7 @@ Lượt sau đổi sang `DriftDrillRepository` hoặc `SupabaseDrillRepository` 
 | Phá | `#E2685C` | `#4A2320` | `#7A3A34` |
 | Phòng thủ | `#9B8BD6` | `#322B4A` | `#4B4277` |
 | A băng *(kick)* | `#4FB3A5` | `#14403C` | `#226B62` |
+| Cân bi *(bank)* | `#D98AC0` | `#43213A` | `#6F3760` |
 
 **Hạng**
 
@@ -374,7 +375,7 @@ App phải kèm dòng chú thích: đây là bảng định nghĩa của PoolCoa
 | `PcCard` | Thẻ nền `#18301F`, viền `#27462F`, bo `12` |
 | `PcSectionHeader` | Nhãn IN HOA + nút "Xem tất cả" tùy chọn |
 | `PcStatTile` | Số lớn (JetBrains Mono, màu nhấn) + nhãn nhỏ bên dưới |
-| `PcSkillChip` | Viên thuốc màu theo 1 trong 5 nhóm kỹ năng |
+| `PcSkillChip` | Viên thuốc màu theo 1 trong 6 nhóm kỹ năng |
 | `PcRankBadge` | Huy hiệu hạng, đổi màu theo nhóm phong trào / cạnh tranh / pro |
 | `PcProgressBar` | Thanh tiến độ + nhãn ngưỡng đạt |
 | `PcShotButtons` | Hai nút ✓ / ✗ **cỡ lớn** — người chơi bấm khi một tay đang cầm cơ |
@@ -401,7 +402,7 @@ Toàn bộ chuỗi tiếng Việt nằm trong `core/strings/vi.dart`. Khóa tron
 | **Phá** | break | Nhóm kỹ năng 3 — *không phải "Giao bóng"* |
 | Phòng thủ | safety | Nhóm kỹ năng 4 |
 | **A băng** | **kick** · *à bande* | Nhóm kỹ năng 5 — bi cái chạm băng **trước** rồi mới tới bi mục tiêu. *Không phải "Bi băng", và không phải bank shot* |
-| **Cân bi** · Cân băng | **bank** | Bi cái chạm bi mục tiêu **trước**, bi mục tiêu mới chạm băng vào lỗ. Ở bản này **không** là một nhóm kỹ năng riêng |
+| **Cân bi** · Cân băng | **bank** | Nhóm kỹ năng 6 — bi cái chạm bi mục tiêu **trước**, bi mục tiêu mới chạm băng vào lỗ. *Không phải kick* |
 | **Đánh đứng bi** | stop shot | Tên bài tập |
 | **Đánh trô bi** | draw · *rétro* | Tên bài tập |
 | **Đánh cu lê** | follow · *coulé* | Tên bài tập |
@@ -457,7 +458,7 @@ Match           ─┘
 
 | Thực thể | Trường chính |
 |---|---|
-| `SkillCategory` | enum `aiming · position · breakShot · safety · kick` |
+| `SkillCategory` | enum `aiming · position · breakShot · safety · kick · bank` |
 | `Drill` | id · tên · `skillCategory` · mô tả · `steps[]` · `levels[]` · `relatedKnowledgeIds[]` |
 | `DrillLevel` | `level` (1·2·3) · nhãn độ khó · `measurementUnit` · `targetValue` · `passThreshold` |
 | `MeasurementUnit` | enum `shots` (✓/✗) · `ratio` (7/10) · `distanceCm` · `seconds` |
@@ -502,7 +503,7 @@ Từ điển có 38 mục, **mọi mục đều theo đúng một khuôn 5 phầ
 
 Lỗi được mô tả theo **hiện tượng quan sát được** ("bi cái rẽ trái", "bi cái bị hút ngược lại") chứ không phải theo thuật ngữ kỹ thuật. Đây là dữ liệu chẩn đoán có sẵn cho Coach ở các lượt sau: người chơi tả hiện tượng → tra ra nguyên nhân → đề xuất bài tập. Lượt này chỉ hiển thị, chưa dùng để chẩn đoán.
 
-**Phân loại.** Năm nhóm kỹ năng không phủ hết nội dung từ điển — cầm cơ, tư thế, luật 9-ball, bảo trì cơ không thuộc nhóm nào. Do đó `KnowledgeCategory` gồm 9 giá trị: 5 nhóm kỹ năng sẵn có, cộng 4 nhóm mới.
+**Phân loại.** Sáu nhóm kỹ năng không phủ hết nội dung từ điển — cầm cơ, tư thế, luật 9-ball, bảo trì cơ không thuộc nhóm nào. Do đó `KnowledgeCategory` gồm 10 giá trị: 6 nhóm kỹ năng sẵn có, cộng 4 nhóm mới.
 
 | Nhóm mới | Nội dung từ điển | Màu |
 |---|---|---|
@@ -611,7 +612,7 @@ Nhưng theo mục 2.1, kết luận "yếu Điều bi" **không được viết 
 
 | Loại | Số lượng | Ghi chú |
 |---|---|---|
-| Bài tập | 18 | Trải đều 5 nhóm kỹ năng, mỗi bài 3 cấp. Gồm **Đánh đứng bi · Đánh trô bi · Đánh cu lê** |
+| Bài tập | 18 | Trải đều 6 nhóm kỹ năng, mỗi bài 3 cấp. Gồm **Đánh đứng bi · Đánh trô bi · Đánh cu lê** |
 | Bài kiến thức | **38 — nội dung thật, không mock** | Chuyển từ `Tu-Dien-Kien-Thuc-Billiard-Pool.md` sang dữ liệu có cấu trúc, gán `KnowledgeCategory` và liên kết hai chiều với bài tập |
 | Buổi tập đã hoàn thành | 24 | Để biểu đồ có đường tiến bộ thật |
 | Buổi tập tự do (đồng hồ) | 9 | |
@@ -713,7 +714,7 @@ Chủ sản phẩm cung cấp thêm một tài liệu kỹ thuật kèm prototyp
 
 **Nhóm kỹ năng thứ 5 là `kick`, không phải `bank`.** Tài liệu đó dùng `kick`, và chủ sản phẩm xác nhận: *A băng* là kick shot (bi cái chạm băng trước), còn bank shot là *Cân bi* (bi mục tiêu chạm băng). Code đã sửa.
 
-**Còn treo:** *Cân bi* hiện không thuộc nhóm nào. Từ điển có hẳn một mục cho nó. Quyết định khi nhập 38 bài kiến thức: xếp vào Ngắm bi, hay mở nhóm thứ 6.
+**Đã chốt:** *Cân bi* thành **nhóm kỹ năng thứ 6** (`bank`, màu `#D98AC0`). Chủ sản phẩm quyết ngày 18/09/2026. Lý do bác hai lối kia: xếp Cân bi vào Ngắm bi hay để chung với A băng đều khiến `weakestSkill()` quy lỗi sai nhóm rồi giao sai bài tập — đúng loại nợ mà lớp suy luận sẽ khuếch đại.
 
 ---
 

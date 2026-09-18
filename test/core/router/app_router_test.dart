@@ -66,10 +66,71 @@ void main() {
       await tester.pumpWidget(const PoolCoachApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.notifications_none));
+      await tester.tap(find.byTooltip(Vi.notificationsTitle));
       await tester.pumpAndSettle();
 
       expect(find.byType(NotificationsScreen), findsOneWidget);
+    });
+
+    testWidgets('mỗi tab gốc mang thanh tiêu đề của chính nó', (tester) async {
+      await tester.pumpWidget(const PoolCoachApp());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(Vi.homeTitle),
+        ),
+        findsOneWidget,
+        reason: 'tab Trang chủ phải tự đặt tên mình lên thanh tiêu đề',
+      );
+
+      await tester.tap(find.text(Vi.tabTraining));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(Vi.trainingTitle),
+        ),
+        findsOneWidget,
+        reason: 'đổi tab thì thanh tiêu đề phải đổi theo',
+      );
+    });
+
+    testWidgets('thanh tiêu đề không mang tên app, và chỉ có một thanh',
+        (tester) async {
+      await tester.pumpWidget(const PoolCoachApp());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(Vi.appName),
+        findsNothing,
+        reason: 'tên app thuộc về màn khởi động, không phải mọi thanh tiêu đề',
+      );
+      expect(
+        find.byType(AppBar),
+        findsOneWidget,
+        reason: 'shell không được giữ thanh riêng chồng lên thanh của màn',
+      );
+    });
+
+    testWidgets('mở Coach từ tab vẫn chỉ thấy một thanh tiêu đề',
+        (tester) async {
+      await tester.pumpWidget(const PoolCoachApp());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(Vi.coachTitle),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('mỗi tab giữ ngăn xếp riêng: mở Coach từ tab Luyện tập '

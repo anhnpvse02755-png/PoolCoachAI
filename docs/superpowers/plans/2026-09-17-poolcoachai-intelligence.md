@@ -20,7 +20,7 @@
 - **Mọi chuỗi tiếng Việt nằm trong `lib/core/strings/vi.dart`.** Dữ liệu seed là ngoại lệ có chủ đích: tên bài tập và nội dung kiến thức là *dữ liệu*, không phải nhãn giao diện, nên nằm trong file seed.
 - **Thuật ngữ đã chốt, tuyệt đối không dùng lại bản cũ trong prototype:** Ngắm bi · **Điều bi / Vị trí** (không phải "Đi bi") · **Phá** (không phải "Giao bóng") · Phòng thủ · **A băng** = kick (không phải "Bi băng") · **Đánh đứng bi** (không phải "Stop shot"/"dừng bi") · **Đánh trô bi** (không phải "Draw"/"kéo bi") · **Đánh cu lê** (không phải "Follow"/"đẩy bi theo") · Chết cái · Bi ảo · Bi cái · **Cân bi** = bank.
 - **Cấm bịa.** Mọi con số hiển thị về sau phải truy được về một hàm trong kế hoạch này. Thiếu dữ liệu thì trả `null`, không đoán.
-- **Hằng số lấy nguyên từ spec**, không tự chỉnh: `MIN_SESSIONS = 3`, `RECENCY_DECAY = 0.85`, `WEAK_CUTOFF = 55`, `STRONG_CUTOFF = 75`, `READY_STREAK = 3`, trần ratio `1.2`, ngưỡng trend `±0.1`.
+- **Hằng số lấy nguyên từ spec**, không tự chỉnh: `MIN_SESSIONS = 3`, `RECENCY_DECAY = 0.85`, `WEAK_CUTOFF = 55`, `STRONG_CUTOFF = 75`, `READY_STREAK = 3`, trần ratio `1.2`, ngưỡng trend `±0.1`. **So sánh trend lấy dấu không ngặt** (`>=` / `<=`) theo quyết định của chủ sản phẩm ngày 18/09/2026: ví dụ chuẩn `8,9,9,10` của spec cho chênh lệch đúng bằng `0.1`, với dấu ngặt nó chỉ đọc ra "đi lên" nhờ nhiễu làm tròn số thực.
 - **Mỗi commit phải để `flutter analyze` sạch và `flutter test` xanh.** Hiện có 43 test.
 - Lint đang bật: `prefer_const_constructors`, `prefer_const_declarations`, `prefer_final_locals`, `avoid_print`, `require_trailing_commas`, `sort_child_properties_last`.
 
@@ -38,7 +38,9 @@ Ba lối, Task 2 phải chọn một và ghi lý do vào commit:
 | **B. Mở nhóm thứ 6 `bank` = "Cân bi"** | Đúng về chuyên môn nhất. Nhưng phá vỡ bộ 5 mà cả PRD lẫn spec đều dùng, và phải thêm màu thứ 6 |
 | **C. Giữ d8 ở `kick`, chỉ sửa tên và mô tả** | Ít việc nhất, nhưng để lại một bài sai nhóm — đúng loại nợ mà lớp suy luận sẽ khuếch đại: `weakestSkill()` sẽ quy lỗi Cân bi thành yếu A băng |
 
-**Đề xuất: A.** Nó giữ bộ 5, và Cân bi thật sự là bài toán hình học phản xạ giống ngắm bi hơn là giống kick. Nhưng đây là câu hỏi chuyên môn — hỏi chủ sản phẩm trước khi code, và ghi câu trả lời vào `vi.dart` dưới dạng chú thích.
+**ĐÃ CHỐT: lối B** — chủ sản phẩm quyết ngày 18/09/2026. `SkillCategory` nay có **sáu** giá trị, thêm `bank` = *Cân bi*, màu chữ `#D98AC0` / nền `#43213A` / viền `#6F3760`. Lý do bác A: Cân bi là một kỹ năng riêng, gộp vào nhóm nào cũng khiến `weakestSkill()` quy lỗi sai nhóm rồi giao sai bài tập. Lý do ghi trong `skill_category.dart` và `vi.dart`.
+
+**Hệ quả cho Task 2:** drill `d8` xếp `SkillCategory.bank`, `d9` giữ `kick`. Mọi chỗ trong kế hoạch này viết "5 nhóm" phải đọc là **6 nhóm**.
 
 ---
 
@@ -74,7 +76,7 @@ Kế hoạch này **không** tạo `Cue`, repository, hay bất kỳ widget nào
   - `Drill({required String id, required SkillCategory cat, required String name, required int level, required String unit, required String goal, required List<String> steps, double? passThreshold, num? target})` với getter `bool get usesAttempts => passThreshold != null`
   - `DrillLog({required String id, required String drillId, required DateTime date, required num score, int? attempts, String? notes})`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/drill_test.dart`:
 
@@ -150,7 +152,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/drill_test.dart
@@ -158,7 +160,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `package:poolcoachai/domain/drill.dart`.
 
-- [ ] **Step 3: Viết drill.dart**
+- [x] **Step 3: Viết drill.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -217,7 +219,7 @@ class Drill {
 }
 ```
 
-- [ ] **Step 4: Viết drill_log.dart**
+- [x] **Step 4: Viết drill_log.dart**
 
 ```dart
 /// Kết quả một lần thực hiện bài tập.
@@ -243,7 +245,7 @@ class DrillLog {
 }
 ```
 
-- [ ] **Step 5: Chạy test để xác nhận đạt**
+- [x] **Step 5: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -253,7 +255,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 4 test đạt, analyze sạch.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -288,11 +290,11 @@ asserting that keeps a malformed drill from silently picking one."
 | `k5` "...đánh bi băng" | **...A băng** |
 | Mọi chỗ "giao bóng" trong `goal`/`steps`/`body` | **phá** |
 
-- [ ] **Step 1: Chốt nhóm cho d8**
+- [x] **Step 1: Chốt nhóm cho d8**
 
 Hỏi chủ sản phẩm theo bảng "Quyết định phải chốt" ở đầu kế hoạch. Không tự chọn. Ghi câu trả lời thành chú thích ngay trên `d8` trong `seed_drills.dart`, kèm lý do.
 
-- [ ] **Step 2: Viết test thất bại**
+- [x] **Step 2: Viết test thất bại**
 
 Tạo `test/data/seed_test.dart`:
 
@@ -390,7 +392,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 3: Chạy test để xác nhận thất bại**
+- [x] **Step 3: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/data/seed_test.dart
@@ -398,7 +400,7 @@ void main() {
 
 Kỳ vọng: FAIL — chưa có file seed.
 
-- [ ] **Step 4: Viết knowledge_article.dart**
+- [x] **Step 4: Viết knowledge_article.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -425,13 +427,13 @@ class KnowledgeArticle {
 }
 ```
 
-- [ ] **Step 5: Viết seed_drills.dart và seed_knowledge.dart**
+- [x] **Step 5: Viết seed_drills.dart và seed_knowledge.dart**
 
 Chép 10 bài tập và 6 bài kiến thức từ `poolcoachai-reference.html` dòng 310–395 sang Dart, giữ nguyên `id`, `level`, `unit`, `passThreshold`/`target`, `goal`, `steps`, `body`. Ánh xạ nhóm: `aim`→`SkillCategory.aiming`, `position`→`.position`, `brk`→`.breakShot`, `safety`→`.safety`, `kick`→`.kick`. Đổi thuật ngữ theo bảng ở đầu Task 2.
 
 Đặt `const` cho cả hai danh sách.
 
-- [ ] **Step 6: Chạy test để xác nhận đạt**
+- [x] **Step 6: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -441,7 +443,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 8 test đạt, analyze sạch. Nếu test "không còn thuật ngữ cũ" hỏng, đó là nó làm đúng việc — sửa dữ liệu, đừng nới test.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/domain lib/data test/data
@@ -465,7 +467,7 @@ comes back."
 - Consumes: `Drill`, `DrillLog`
 - Produces: `PracticeConstants` với `minSessions`(3), `recencyDecay`(0.85), `weakCutoff`(55), `strongCutoff`(75), `readyStreak`(3), `ratioCap`(1.2), `trendThreshold`(0.1); `double? drillRatio(Drill drill, DrillLog log)`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/drill_ratio_test.dart`:
 
@@ -539,7 +541,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/drill_ratio_test.dart
@@ -547,7 +549,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `drill_ratio.dart`.
 
-- [ ] **Step 3: Viết practice_constants.dart**
+- [x] **Step 3: Viết practice_constants.dart**
 
 ```dart
 /// Hằng số của lớp suy luận.
@@ -579,7 +581,7 @@ abstract final class PracticeConstants {
 }
 ```
 
-- [ ] **Step 4: Viết drill_ratio.dart**
+- [x] **Step 4: Viết drill_ratio.dart**
 
 ```dart
 import 'package:poolcoachai/domain/drill.dart';
@@ -604,7 +606,7 @@ double? drillRatio(Drill drill, DrillLog log) {
 }
 ```
 
-- [ ] **Step 5: Chạy test để xác nhận đạt**
+- [x] **Step 5: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -614,7 +616,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 6 test đạt, analyze sạch.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -640,7 +642,7 @@ two would let the intelligence layer call a beginner weak."
   - `int? categoryMastery(List<double> ratiosOldestFirst)` — `null` khi ít hơn `minSessions`
   - `SkillTrend categoryTrend(List<double> ratiosOldestFirst)` — `notEnoughData` khi ít hơn 4
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/player_intelligence_test.dart`:
 
@@ -696,7 +698,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/player_intelligence_test.dart
@@ -704,7 +706,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `player_intelligence.dart`.
 
-- [ ] **Step 3: Viết phần đầu player_intelligence.dart**
+- [x] **Step 3: Viết phần đầu player_intelligence.dart**
 
 ```dart
 import 'dart:math' as math;
@@ -773,7 +775,7 @@ SkillTrend categoryTrend(List<double> ratiosOldestFirst) {
 }
 ```
 
-- [ ] **Step 4: Chạy test để xác nhận đạt**
+- [x] **Step 4: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -783,7 +785,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 9 test đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -813,7 +815,7 @@ confident-looking number, so the UI can say so instead of guessing."
   - `bool isReadyForLevelUp(Drill drill, List<DrillLog> logsOldestFirst)`
   - `PlayerIntelligence computePlayerIntelligence({required List<Drill> drills, required List<DrillLog> logs})`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/player_intelligence_summary_test.dart` với các case bắt buộc của spec mục 5.8:
 
@@ -982,7 +984,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/player_intelligence_summary_test.dart
@@ -990,7 +992,7 @@ void main() {
 
 Kỳ vọng: FAIL — `computePlayerIntelligence` chưa tồn tại.
 
-- [ ] **Step 3: Bổ sung vào player_intelligence.dart**
+- [x] **Step 3: Bổ sung vào player_intelligence.dart**
 
 Thêm import `drill.dart`, `drill_log.dart`, `drill_ratio.dart`, `skill_category.dart`, rồi thêm:
 
@@ -1123,7 +1125,7 @@ PlayerIntelligence computePlayerIntelligence({
 }
 ```
 
-- [ ] **Step 4: Chạy toàn bộ test và phân tích**
+- [x] **Step 4: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1133,7 +1135,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -1164,7 +1166,7 @@ Luật, theo spec mục 6.2 — duyệt bài trong nhóm theo cấp tăng dần,
 3. Đã đạt hết → chọn bài cấp cao nhất để giữ phong độ
 4. Không còn bài nào → `null`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/pick_drill_test.dart`:
 
@@ -1262,7 +1264,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/pick_drill_test.dart
@@ -1270,7 +1272,7 @@ void main() {
 
 Kỳ vọng: FAIL — `recommendation.dart` chưa tồn tại.
 
-- [ ] **Step 3: Viết recommendation.dart**
+- [x] **Step 3: Viết recommendation.dart**
 
 ```dart
 import 'package:poolcoachai/domain/drill.dart';
@@ -1311,7 +1313,7 @@ Drill? pickDrillInCategory({
 }
 ```
 
-- [ ] **Step 4: Chạy test để xác nhận đạt**
+- [x] **Step 4: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1321,7 +1323,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 5 test đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -1355,7 +1357,7 @@ Sáu luật theo spec mục 6.1, **luật khớp đầu tiên thắng**:
 | 5 | Có nhóm đang đi xuống dù chưa tới ngưỡng yếu | Ôn lại trước khi thành điểm yếu |
 | 6 | Mặc định | Nhóm có ngày log gần nhất xa nhất trong quá khứ — tránh dồn vào một hai nhóm |
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/pick_category_test.dart`. Ba case bắt buộc của spec mục 6.6 cộng ba case cho các luật còn lại:
 
@@ -1510,7 +1512,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/pick_category_test.dart
@@ -1518,7 +1520,7 @@ void main() {
 
 Kỳ vọng: FAIL — `schedule_slot.dart` và `pickCategoryForToday` chưa tồn tại.
 
-- [ ] **Step 3: Viết schedule_slot.dart**
+- [x] **Step 3: Viết schedule_slot.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -1549,7 +1551,7 @@ class ScheduleSlot {
 }
 ```
 
-- [ ] **Step 4: Viết timer_session.dart**
+- [x] **Step 4: Viết timer_session.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -1575,7 +1577,7 @@ class TimerSession {
 }
 ```
 
-- [ ] **Step 5: Bổ sung pickCategoryForToday vào recommendation.dart**
+- [x] **Step 5: Bổ sung pickCategoryForToday vào recommendation.dart**
 
 ```dart
 /// Vì sao nhóm kỹ năng này được chọn cho hôm nay.
@@ -1711,7 +1713,7 @@ bool _sameDay(DateTime a, DateTime b) =>
 
 Thêm các import cần thiết vào đầu `recommendation.dart`: `player_intelligence.dart`, `schedule_slot.dart`, `timer_session.dart`.
 
-- [ ] **Step 6: Chạy toàn bộ test và phân tích**
+- [x] **Step 6: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1721,7 +1723,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -1753,7 +1755,7 @@ than issue an unexplained instruction."
 
 **Quan trọng:** hàm này trả **dữ liệu**, không trả câu chữ. Không có chuỗi tiếng Việt nào trong `recommendation.dart`. Màn hình ở kế hoạch 3 dựng câu từ `reason`, `cat`, `drill` — đúng mục 2.1: khuôn có tham số, tham số do hàm tính.
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/compute_recommendation_test.dart`:
 
@@ -1922,7 +1924,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/compute_recommendation_test.dart
@@ -1930,7 +1932,7 @@ void main() {
 
 Kỳ vọng: FAIL — `computeRecommendation` và `streakDays` chưa tồn tại.
 
-- [ ] **Step 3: Bổ sung vào recommendation.dart**
+- [x] **Step 3: Bổ sung vào recommendation.dart**
 
 ```dart
 /// Gợi ý cho hôm nay. Đây là **dữ liệu**, không phải câu chữ.
@@ -2057,7 +2059,7 @@ TodayRecommendation computeRecommendation({
 
 Thêm import `knowledge_article.dart`.
 
-- [ ] **Step 4: Chạy toàn bộ test và phân tích**
+- [x] **Step 4: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -2067,7 +2069,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
@@ -2094,7 +2096,7 @@ different category's article to avoid an empty slot."
 
 Đây là bài kiểm thử của mục 2.1 tài liệu thiết kế, dựng thành test chạy được: **đổi dữ liệu thì kết luận phải đổi theo.**
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 Tạo `test/domain/no_fabrication_test.dart`:
 
@@ -2198,7 +2200,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/no_fabrication_test.dart
@@ -2206,7 +2208,7 @@ void main() {
 
 Kỳ vọng: 3 test đạt. Nếu test thứ hai hỏng vì hai người chơi khác nhau nhận cùng gợi ý, đó là dấu hiệu có chỗ đang viết cứng — tìm và sửa, đừng nới test.
 
-- [ ] **Step 3: Chạy toàn bộ và phân tích lần cuối**
+- [x] **Step 3: Chạy toàn bộ và phân tích lần cuối**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -2214,7 +2216,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 "$FLUTTER" analyze
 ```
 
-- [ ] **Step 4: Commit và đẩy lên**
+- [x] **Step 4: Commit và đẩy lên**
 
 ```bash
 git add test/domain

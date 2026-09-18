@@ -43,10 +43,13 @@ abstract final class AppTheme {
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.bgScreen,
       ),
+      // textMuted chứ không phải textDisabled: năm nhãn này là chữ
+      // điều hướng chính của app, cỡ 12px, nên phải qua ngưỡng tương
+      // phản 4.5:1. textDisabled chỉ đạt 4.36:1 trên nền bgDeep.
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgDeep,
         selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textDisabled,
+        unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),

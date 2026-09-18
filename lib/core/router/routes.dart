@@ -15,4 +15,11 @@ abstract final class Routes {
 
   /// Năm tab theo đúng thứ tự hiển thị trên thanh điều hướng.
   static const tabs = <String>[home, training, play, stats, profile];
+
+  /// Mọi đường dẫn đã đăng ký — nguồn sự thật duy nhất.
+  ///
+  /// Thêm route mới thì phải thêm vào đây, vì mọi kiểm thử điều hướng
+  /// đều đọc từ danh sách này. Quên thì smoke test đỏ ngay, chứ không
+  /// im lặng để lọt một màn không ai phủ.
+  static const all = <String>[...tabs, coach, notifications];
 }

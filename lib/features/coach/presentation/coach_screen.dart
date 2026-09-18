@@ -13,7 +13,7 @@ class CoachScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.coachTitle)),
       body: const PcEmptyState(
-        icon: Icons.chat_bubble_outline,
+        icon: Icons.psychology_outlined,
         title: Vi.coachTitle,
         body: Vi.coachComing,
       ),

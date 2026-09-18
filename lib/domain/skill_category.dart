@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Năm nhóm kỹ năng chính thức theo PRD.
+/// Sáu nhóm kỹ năng chính thức.
 ///
 /// Khóa giữ tiếng Anh; tên tiếng Việt nằm ở [Vi.skill].
 /// Màu xem docs/superpowers/specs/2026-09-17-poolcoachai-shell-design.md mục 4.1.
 ///
-/// Nhóm thứ 5 là [kick], **không phải** bank — đây là hai cú khác nhau
-/// và rất dễ nhầm:
+/// [kick] và [bank] là **hai nhóm riêng**, rất dễ nhầm:
 /// - **Kick shot** — bi cái chạm băng trước rồi mới tới bi mục tiêu.
-///   Tiếng Việt: *A băng* (từ tiếng Pháp *à bande*). Đây là nhóm này.
+///   Tiếng Việt: *A băng* (từ tiếng Pháp *à bande*).
 /// - **Bank shot** — bi cái chạm bi mục tiêu trước, bi mục tiêu mới
-///   chạm băng vào lỗ. Tiếng Việt: *Cân bi* / *Cân băng*. Không phải
-///   một nhóm kỹ năng riêng ở bản này.
+///   chạm băng vào lỗ. Tiếng Việt: *Cân bi* / *Cân băng*.
+///
+/// PRD bản đầu chỉ có năm nhóm và nhét Cân bi chung với A băng. Gộp như
+/// vậy khiến lớp suy luận quy lỗi sai: người chơi hỏng Cân bi sẽ bị
+/// `weakestSkill()` báo là yếu A băng rồi giao sai bài tập. Chủ sản
+/// phẩm chốt tách riêng.
 enum SkillCategory {
   aiming(
     fg: Color(0xFFE8B44C),
@@ -37,6 +40,11 @@ enum SkillCategory {
     fg: Color(0xFF4FB3A5),
     bg: Color(0xFF14403C),
     borderColor: Color(0xFF226B62),
+  ),
+  bank(
+    fg: Color(0xFFD98AC0),
+    bg: Color(0xFF43213A),
+    borderColor: Color(0xFF6F3760),
   );
 
   const SkillCategory({
