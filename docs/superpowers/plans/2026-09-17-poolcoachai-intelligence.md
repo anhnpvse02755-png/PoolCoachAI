@@ -290,11 +290,11 @@ asserting that keeps a malformed drill from silently picking one."
 | `k5` "...đánh bi băng" | **...A băng** |
 | Mọi chỗ "giao bóng" trong `goal`/`steps`/`body` | **phá** |
 
-- [ ] **Step 1: Chốt nhóm cho d8**
+- [x] **Step 1: Chốt nhóm cho d8**
 
 Hỏi chủ sản phẩm theo bảng "Quyết định phải chốt" ở đầu kế hoạch. Không tự chọn. Ghi câu trả lời thành chú thích ngay trên `d8` trong `seed_drills.dart`, kèm lý do.
 
-- [ ] **Step 2: Viết test thất bại**
+- [x] **Step 2: Viết test thất bại**
 
 Tạo `test/data/seed_test.dart`:
 
@@ -392,7 +392,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 3: Chạy test để xác nhận thất bại**
+- [x] **Step 3: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/data/seed_test.dart
@@ -400,7 +400,7 @@ void main() {
 
 Kỳ vọng: FAIL — chưa có file seed.
 
-- [ ] **Step 4: Viết knowledge_article.dart**
+- [x] **Step 4: Viết knowledge_article.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -427,13 +427,13 @@ class KnowledgeArticle {
 }
 ```
 
-- [ ] **Step 5: Viết seed_drills.dart và seed_knowledge.dart**
+- [x] **Step 5: Viết seed_drills.dart và seed_knowledge.dart**
 
 Chép 10 bài tập và 6 bài kiến thức từ `poolcoachai-reference.html` dòng 310–395 sang Dart, giữ nguyên `id`, `level`, `unit`, `passThreshold`/`target`, `goal`, `steps`, `body`. Ánh xạ nhóm: `aim`→`SkillCategory.aiming`, `position`→`.position`, `brk`→`.breakShot`, `safety`→`.safety`, `kick`→`.kick`. Đổi thuật ngữ theo bảng ở đầu Task 2.
 
 Đặt `const` cho cả hai danh sách.
 
-- [ ] **Step 6: Chạy test để xác nhận đạt**
+- [x] **Step 6: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -443,7 +443,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 8 test đạt, analyze sạch. Nếu test "không còn thuật ngữ cũ" hỏng, đó là nó làm đúng việc — sửa dữ liệu, đừng nới test.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/domain lib/data test/data
