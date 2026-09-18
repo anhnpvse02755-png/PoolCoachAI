@@ -55,13 +55,23 @@ Mô phỏng góc cắt · Đồng hồ & Lịch tập · Cơ bi-a · Thống kê
 
 ### 3.2 Cái gì xuống DB, cái gì không
 
-| Dữ liệu | Nơi ở | Vì sao |
+**Tất cả xuống DB.** Chủ sản phẩm chốt ngày 18/09/2026.
+
+| Dữ liệu | Nguồn sự thật | Ghi vào DB khi nào |
 |---|---|---|
-| 10 bài tập, 6 bài kiến thức | `lib/data/seed/`, hằng số `const` | Tĩnh, đi kèm bản build, không ai sửa lúc chạy. Đưa xuống DB là thêm migration cho thứ không bao giờ đổi |
-| `DrillLog` | Drift | Người chơi tạo ra |
-| `ScheduleSlot`, `TimerSession` | Drift (bảng dựng sẵn, **chưa màn nào dùng**) | Dựng bảng luôn để lát sau không phải migration. `pickCategoryForToday` đã nhận chúng làm tham số |
+| 10 bài tập, 6 bài kiến thức | `lib/data/seed/` trong mã | Upsert theo `id` **mỗi lần mở app** |
+| `DrillLog` | DB | Người chơi bấm lưu |
+| `ScheduleSlot`, `TimerSession` | DB (bảng dựng sẵn, **chưa màn nào dùng**) | Chưa có |
 
 Bảng dựng sẵn mà chưa dùng là cố ý và có giới hạn: **chỉ hai bảng này**, vì chữ ký hàm trong `lib/domain/` đã đòi chúng rồi.
+
+### 3.2.1 Vì sao upsert mỗi lần mở, không phải nạp một lần
+
+Bài tập nằm trong DB thì bản sửa trong mã **không tự tới được máy đã cài**. Dự án này đã dính đúng chuyện đó hai lần: đổi `d8` từ `kick` sang `bank`, và thay "Stop shot" · "Bi băng" · "Giao bóng" bằng thuật ngữ cơ thủ đã chốt. Nếu chỉ nạp lần đầu, những máy cài trước đợt sửa sẽ giữ từ sai vĩnh viễn, và không ai biết.
+
+Upsert theo `id` mỗi lần khởi động làm mã trong repo thành nguồn sự thật cho dữ liệu seed, còn DB là bản sao đọc được bằng truy vấn.
+
+Đánh đổi đã biết: **người chơi không sửa được bài seed**, vì lần mở sau sẽ bị ghi đè. Hiện app không cho sửa nên chưa mất gì. Ngày nào muốn cho sửa, bài tập tự tạo phải nằm ở bảng riêng hoặc mang cờ phân biệt — không được nới luật upsert này.
 
 ### 3.3 Đồng hồ tiêm vào, không gọi `DateTime.now()` thẳng
 
@@ -93,6 +103,25 @@ class DrillLogRows extends Table {
 }
 ```
 
+```dart
+class DrillRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get cat => text()();            // SkillCategory.name
+  TextColumn get name => text()();
+  IntColumn get level => integer()();
+  TextColumn get unit => text()();
+  TextColumn get goal => text()();
+  TextColumn get steps => text()();          // JSON: List<String>
+  RealColumn get passThreshold => real().nullable()();
+  RealColumn get target => real().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+```
+
+`KnowledgeArticleRows` tương tự, với `relatedDrillIds` cũng là JSON `List<String>`.
+
 `ScheduleSlotRows` và `TimerSessionRows` theo đúng hình dạng lớp tương ứng trong `lib/domain/`.
 
 **`schemaVersion = 1`.** Chưa có migration nào để viết, nhưng `MigrationStrategy` phải được khai báo tường minh ngay từ đầu để lát sau không ai phải đoán bản đầu tiên là gì.
@@ -108,6 +137,16 @@ DrillLogRowsCompanion toRow(DrillLog log);
 
 Lý do không dùng chung một lớp: `lib/domain/` cấm phụ thuộc vào hạ tầng. Dùng lớp Drift sinh ra làm kiểu miền sẽ kéo `package:drift` vào tầng suy luận và khoá nó vào SQLite vĩnh viễn.
 
+**Ba chỗ mất mát khi đi vòng qua SQLite, phải có test vòng chuyển đổi:**
+
+| Chỗ | Chuyện gì xảy ra |
+|---|---|
+| `Drill.target` kiểu `num?` | Cột `real` đọc lên thành `double`. `target: 25` trong seed quay về là `25.0`. `drillRatio()` chia nên không sai kết quả, nhưng so sánh bằng `==` giữa `Drill` gốc và `Drill` đọc từ DB sẽ **không** khớp |
+| `DrillLog.score` kiểu `num` | Y hệt: `8` thành `8.0` |
+| `steps`, `relatedDrillIds` | `List<String>` qua JSON. Danh sách rỗng phải quay về rỗng, **không** phải `null` |
+
+Ràng buộc "đúng một trong `passThreshold`/`target`" là `assert` trong hàm dựng `Drill`. Đọc lên từ DB vẫn đi qua hàm dựng đó, nên một hàng hỏng sẽ ném ngay lúc đọc chứ không lặng lẽ chạy tiếp. Đó là hành vi mong muốn, và nó có test.
+
 ### 4.3 Interface repository
 
 ```dart
@@ -115,9 +154,27 @@ abstract interface class DrillLogRepository {
   Stream<List<DrillLog>> watchAll();
   Future<void> add(DrillLog log);
 }
+
+abstract interface class DrillRepository {
+  Stream<List<Drill>> watchAll();
+}
+
+abstract interface class KnowledgeRepository {
+  Stream<List<KnowledgeArticle>> watchAll();
+}
 ```
 
-`watchAll()` trả **cũ nhất trước** — đúng thứ tự `categoryMastery()` đòi. Thứ tự này là một phần của hợp đồng, không phải chi tiết cài đặt, nên nó có test riêng.
+`DrillLogRepository.watchAll()` trả **cũ nhất trước** — đúng thứ tự `categoryMastery()` đòi. Thứ tự này là một phần của hợp đồng, không phải chi tiết cài đặt, nên nó có test riêng.
+
+### 4.3.1 Nạp seed lúc khởi động
+
+```dart
+Future<void> upsertSeed(AppDatabase db);
+```
+
+Chạy một lần khi mở app, **trước** khi màn hình đầu tiên đọc dữ liệu. Ghi đè theo `id`, trong một giao dịch, để app không bao giờ đọc phải bộ seed nạp dở.
+
+Hàm này là điểm nối duy nhất giữa `lib/data/seed/` và DB. Không màn hình nào, không provider nào đọc thẳng `seedDrills` nữa — đọc thẳng là quay lại có hai nguồn sự thật, đúng thứ lối C đã bị bác.
 
 ### 4.4 Drift trên web — rủi ro lớn nhất của lát này
 
@@ -136,15 +193,21 @@ Nếu WASM không chạy được trong thời gian hợp lý, đây là chỗ d
 ## 5. Provider
 
 ```dart
-drillsProvider          → List<Drill>              (seed, tĩnh)
-knowledgeProvider       → List<KnowledgeArticle>   (seed, tĩnh)
-drillLogRepositoryProvider → DrillLogRepository    (đổi một dòng là đổi backend)
-drillLogsProvider       → StreamProvider<List<DrillLog>>
-playerIntelligenceProvider → Provider<PlayerIntelligence?>
+appDatabaseProvider         → AppDatabase
+drillRepositoryProvider     → DrillRepository        (đổi một dòng là đổi backend)
+knowledgeRepositoryProvider → KnowledgeRepository
+drillLogRepositoryProvider  → DrillLogRepository
+drillsProvider              → StreamProvider<List<Drill>>
+knowledgeProvider           → StreamProvider<List<KnowledgeArticle>>
+drillLogsProvider           → StreamProvider<List<DrillLog>>
+playerIntelligenceProvider  → Provider<PlayerIntelligence?>
 todayRecommendationProvider → Provider<TodayRecommendation?>
+nowProvider                 → Provider<DateTime Function()>
 ```
 
-Hai provider cuối trả `null` khi stream **chưa có dữ liệu lần đầu** — đó là "chưa biết", khác hẳn "không có gì". Màn hình hiện trạng thái đang tải, **không** hiện số 0.
+Hai provider suy luận trả `null` khi **bất kỳ stream nguồn nào chưa có dữ liệu lần đầu** — đó là "chưa biết", khác hẳn "không có gì". Màn hình hiện trạng thái đang tải, **không** hiện số 0.
+
+Bài tập giờ cũng là stream, nên `todayRecommendationProvider` phải chờ **cả ba** nguồn (bài tập, kiến thức, log) rồi mới tính. Thiếu một nguồn mà vẫn tính là ra gợi ý dựa trên danh sách bài rỗng — tức một câu trả lời trông như thật mà sai.
 
 Đây là mục 2.1 tài liệu thiết kế áp cho tầng provider: thiếu dữ liệu thì nói thiếu, không quy về một con số trông như thật.
 
@@ -219,7 +282,8 @@ Hai route đầu nằm **trong nhánh Luyện tập** của `StatefulShellRoute`
 
 | Tầng | Kiểm cái gì |
 |---|---|
-| Drift | Ghi rồi đọc lại đúng; `watchAll()` trả cũ nhất trước; `attempts` null sống sót vòng chuyển đổi |
+| Drift | Ghi rồi đọc lại đúng; `watchAll()` trả cũ nhất trước; `attempts` null và `steps` rỗng sống sót vòng chuyển đổi; hàng vi phạm ràng buộc `passThreshold`/`target` ném ngay lúc đọc |
+| Nạp seed | Mở lần đầu ra đủ 10 bài và 6 bài đọc; **sửa một bài trong seed rồi nạp lại thì bản ghi cũ bị ghi đè**; `DrillLog` không bị đụng tới |
 | Repository | Thêm một log thì stream bắn lại |
 | Provider | Ghi đè `nowProvider` bằng ngày cố định; ghi đè repository bằng bản giả; gợi ý đổi khi log đổi |
 | Màn hình | AI Home hiện đúng câu cho từng `PickReason`; `drill` null ra trạng thái rỗng chứ không phải màn trắng |
@@ -239,6 +303,8 @@ Test dùng Drift trong bộ nhớ (`NativeDatabase.memory()`), chạy trên VM, 
 | `build_runner` sinh mã xung đột lint đang bật | Trung bình | Loại trừ `*.g.dart` khỏi analyze, đúng cách làm chuẩn của Drift |
 | Lát phình ra vì thêm màn | Trung bình | Năm màn ở mục 6.1–6.5 là toàn bộ. Màn thứ sáu nghĩa là kế hoạch sai, dừng lại |
 | `lib/domain/` bị sửa cho tiện | Thấp nhưng đắt | Nó đã đúng và đã phủ test. Muốn sửa thì dừng và hỏi |
+| Upsert seed xoá mất thứ người chơi tạo | Thấp bây giờ, cao về sau | Upsert chỉ đụng bảng bài tập và kiến thức, theo `id`. Ngày nào cho người chơi tự tạo bài, thứ họ tạo phải nằm ngoài tầm với của upsert |
+| Còn chỗ nào đọc thẳng `seedDrills` | Trung bình | Sau khi có DB, chỉ `upsertSeed()` được chạm vào seed. Chỗ khác đọc thẳng là hai nguồn sự thật |
 
 ---
 
@@ -250,3 +316,5 @@ Test dùng Drift trong bộ nhớ (`NativeDatabase.memory()`), chạy trên VM, 
 - [ ] Bài tập hoặc bài đọc thiếu thì ra trạng thái rỗng, không ra số bịa và không ra màn trắng
 - [ ] `flutter test` xanh, `flutter analyze` sạch, `flutter build web` chạy
 - [ ] Ba route mới nằm trong `Routes.all` và trong bảng smoke test
+- [ ] Sửa một bài trong `lib/data/seed/` rồi mở lại app thì bản sửa hiện ra, không cần xoá app
+- [ ] Ngoài `upsertSeed()`, không nơi nào đọc thẳng `seedDrills` hay `seedKnowledge`
