@@ -38,7 +38,9 @@ Ba lối, Task 2 phải chọn một và ghi lý do vào commit:
 | **B. Mở nhóm thứ 6 `bank` = "Cân bi"** | Đúng về chuyên môn nhất. Nhưng phá vỡ bộ 5 mà cả PRD lẫn spec đều dùng, và phải thêm màu thứ 6 |
 | **C. Giữ d8 ở `kick`, chỉ sửa tên và mô tả** | Ít việc nhất, nhưng để lại một bài sai nhóm — đúng loại nợ mà lớp suy luận sẽ khuếch đại: `weakestSkill()` sẽ quy lỗi Cân bi thành yếu A băng |
 
-**Đề xuất: A.** Nó giữ bộ 5, và Cân bi thật sự là bài toán hình học phản xạ giống ngắm bi hơn là giống kick. Nhưng đây là câu hỏi chuyên môn — hỏi chủ sản phẩm trước khi code, và ghi câu trả lời vào `vi.dart` dưới dạng chú thích.
+**ĐÃ CHỐT: lối B** — chủ sản phẩm quyết ngày 18/09/2026. `SkillCategory` nay có **sáu** giá trị, thêm `bank` = *Cân bi*, màu chữ `#D98AC0` / nền `#43213A` / viền `#6F3760`. Lý do bác A: Cân bi là một kỹ năng riêng, gộp vào nhóm nào cũng khiến `weakestSkill()` quy lỗi sai nhóm rồi giao sai bài tập. Lý do ghi trong `skill_category.dart` và `vi.dart`.
+
+**Hệ quả cho Task 2:** drill `d8` xếp `SkillCategory.bank`, `d9` giữ `kick`. Mọi chỗ trong kế hoạch này viết "5 nhóm" phải đọc là **6 nhóm**.
 
 ---
 

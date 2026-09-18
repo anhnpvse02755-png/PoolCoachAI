@@ -25,14 +25,15 @@ abstract final class Vi {
   /// "Giao bóng", "Điều bi" chứ không phải "Đi bi".
   ///
   /// "A băng" (từ tiếng Pháp *à bande*) là **kick shot**: bi cái chạm
-  /// băng trước rồi mới tới bi mục tiêu. Đừng nhầm với **bank shot** —
-  /// bi mục tiêu mới là bi chạm băng — tiếng Việt gọi là *Cân bi*.
+  /// băng trước rồi mới tới bi mục tiêu. "Cân bi" là **bank shot**: bi
+  /// mục tiêu mới là bi chạm băng. Hai nhóm riêng, không gộp.
   static String skill(SkillCategory category) => switch (category) {
         SkillCategory.aiming => 'Ngắm bi',
         SkillCategory.position => 'Điều bi / Vị trí',
         SkillCategory.breakShot => 'Phá',
         SkillCategory.safety => 'Phòng thủ',
         SkillCategory.kick => 'A băng',
+        SkillCategory.bank => 'Cân bi',
       };
 
   // Trạng thái rỗng dùng chung

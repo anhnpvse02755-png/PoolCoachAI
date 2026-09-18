@@ -36,7 +36,7 @@ void main() {
       expect(decoration.color, SkillCategory.breakShot.bg);
     });
 
-    testWidgets('dựng được cả 5 nhóm không lỗi', (tester) async {
+    testWidgets('dựng được cả 6 nhóm không lỗi', (tester) async {
       for (final category in SkillCategory.values) {
         await tester.pumpWidget(
           MaterialApp(
