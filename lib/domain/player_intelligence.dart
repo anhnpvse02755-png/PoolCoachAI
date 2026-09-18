@@ -62,8 +62,13 @@ SkillTrend categoryTrend(List<double> ratiosOldestFirst) {
   final earlier = average(ratiosOldestFirst.take(half));
   final diff = recent - earlier;
 
-  if (diff > PracticeConstants.trendThreshold) return SkillTrend.up;
-  if (diff < -PracticeConstants.trendThreshold) return SkillTrend.down;
+  // So sánh bao gồm cả mép: chênh lệch đúng bằng ngưỡng vẫn là có xu
+  // hướng. Spec viết dấu ngặt, nhưng ví dụ chuẩn của chính spec
+  // (8,9,9,10) cho chênh lệch đúng bằng 0.1 và chỉ đọc ra "đi lên" nhờ
+  // nhiễu làm tròn của số thực. Lấy dấu không ngặt thì ví dụ đó đúng
+  // theo định nghĩa, không phụ thuộc cách máy làm tròn.
+  if (diff >= PracticeConstants.trendThreshold) return SkillTrend.up;
+  if (diff <= -PracticeConstants.trendThreshold) return SkillTrend.down;
   return SkillTrend.flat;
 }
 

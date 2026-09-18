@@ -20,7 +20,7 @@
 - **Mọi chuỗi tiếng Việt nằm trong `lib/core/strings/vi.dart`.** Dữ liệu seed là ngoại lệ có chủ đích: tên bài tập và nội dung kiến thức là *dữ liệu*, không phải nhãn giao diện, nên nằm trong file seed.
 - **Thuật ngữ đã chốt, tuyệt đối không dùng lại bản cũ trong prototype:** Ngắm bi · **Điều bi / Vị trí** (không phải "Đi bi") · **Phá** (không phải "Giao bóng") · Phòng thủ · **A băng** = kick (không phải "Bi băng") · **Đánh đứng bi** (không phải "Stop shot"/"dừng bi") · **Đánh trô bi** (không phải "Draw"/"kéo bi") · **Đánh cu lê** (không phải "Follow"/"đẩy bi theo") · Chết cái · Bi ảo · Bi cái · **Cân bi** = bank.
 - **Cấm bịa.** Mọi con số hiển thị về sau phải truy được về một hàm trong kế hoạch này. Thiếu dữ liệu thì trả `null`, không đoán.
-- **Hằng số lấy nguyên từ spec**, không tự chỉnh: `MIN_SESSIONS = 3`, `RECENCY_DECAY = 0.85`, `WEAK_CUTOFF = 55`, `STRONG_CUTOFF = 75`, `READY_STREAK = 3`, trần ratio `1.2`, ngưỡng trend `±0.1`.
+- **Hằng số lấy nguyên từ spec**, không tự chỉnh: `MIN_SESSIONS = 3`, `RECENCY_DECAY = 0.85`, `WEAK_CUTOFF = 55`, `STRONG_CUTOFF = 75`, `READY_STREAK = 3`, trần ratio `1.2`, ngưỡng trend `±0.1`. **So sánh trend lấy dấu không ngặt** (`>=` / `<=`) theo quyết định của chủ sản phẩm ngày 18/09/2026: ví dụ chuẩn `8,9,9,10` của spec cho chênh lệch đúng bằng `0.1`, với dấu ngặt nó chỉ đọc ra "đi lên" nhờ nhiễu làm tròn số thực.
 - **Mỗi commit phải để `flutter analyze` sạch và `flutter test` xanh.** Hiện có 43 test.
 - Lint đang bật: `prefer_const_constructors`, `prefer_const_declarations`, `prefer_final_locals`, `avoid_print`, `require_trailing_commas`, `sort_child_properties_last`.
 

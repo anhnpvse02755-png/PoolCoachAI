@@ -45,5 +45,16 @@ void main() {
     test('chênh lệch nhỏ hơn ngưỡng là đi ngang', () {
       expect(categoryTrend([0.5, 0.5, 0.55, 0.55]), SkillTrend.flat);
     });
+
+    // Ví dụ chuẩn của spec (8,9,9,10) cho chênh lệch đúng bằng ngưỡng.
+    // Nó chỉ đọc ra "đi lên" nhờ nhiễu làm tròn, nên hai test dưới khoá
+    // hành vi tại mép bằng cặp số cho chênh lệch đúng 0.1 tuyệt đối.
+    test('chênh lệch đúng bằng ngưỡng vẫn tính là đi lên', () {
+      expect(categoryTrend([0.0, 0.0, 0.1, 0.1]), SkillTrend.up);
+    });
+
+    test('chênh lệch âm đúng bằng ngưỡng vẫn tính là đi xuống', () {
+      expect(categoryTrend([0.1, 0.1, 0.0, 0.0]), SkillTrend.down);
+    });
   });
 }
