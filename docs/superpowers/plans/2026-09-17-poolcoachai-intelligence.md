@@ -1357,7 +1357,7 @@ Sáu luật theo spec mục 6.1, **luật khớp đầu tiên thắng**:
 | 5 | Có nhóm đang đi xuống dù chưa tới ngưỡng yếu | Ôn lại trước khi thành điểm yếu |
 | 6 | Mặc định | Nhóm có ngày log gần nhất xa nhất trong quá khứ — tránh dồn vào một hai nhóm |
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/pick_category_test.dart`. Ba case bắt buộc của spec mục 6.6 cộng ba case cho các luật còn lại:
 
@@ -1512,7 +1512,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/pick_category_test.dart
@@ -1520,7 +1520,7 @@ void main() {
 
 Kỳ vọng: FAIL — `schedule_slot.dart` và `pickCategoryForToday` chưa tồn tại.
 
-- [ ] **Step 3: Viết schedule_slot.dart**
+- [x] **Step 3: Viết schedule_slot.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -1551,7 +1551,7 @@ class ScheduleSlot {
 }
 ```
 
-- [ ] **Step 4: Viết timer_session.dart**
+- [x] **Step 4: Viết timer_session.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -1577,7 +1577,7 @@ class TimerSession {
 }
 ```
 
-- [ ] **Step 5: Bổ sung pickCategoryForToday vào recommendation.dart**
+- [x] **Step 5: Bổ sung pickCategoryForToday vào recommendation.dart**
 
 ```dart
 /// Vì sao nhóm kỹ năng này được chọn cho hôm nay.
@@ -1713,7 +1713,7 @@ bool _sameDay(DateTime a, DateTime b) =>
 
 Thêm các import cần thiết vào đầu `recommendation.dart`: `player_intelligence.dart`, `schedule_slot.dart`, `timer_session.dart`.
 
-- [ ] **Step 6: Chạy toàn bộ test và phân tích**
+- [x] **Step 6: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1723,7 +1723,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/domain test/domain
