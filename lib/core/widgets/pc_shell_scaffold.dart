@@ -54,12 +54,12 @@ class PcShellScaffold extends StatelessWidget {
         onPressed: () => context.push(Routes.coach),
         child: const Icon(Icons.psychology_outlined),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: navigationShell.currentIndex,
-        onTap: _onTap,
-        items: [
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: _onTap,
+        destinations: [
           for (var i = 0; i < _icons.length; i++)
-            BottomNavigationBarItem(
+            NavigationDestination(
               icon: Icon(_icons[i]),
               label: _labels[i],
             ),

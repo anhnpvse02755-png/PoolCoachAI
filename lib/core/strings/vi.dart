@@ -36,6 +36,16 @@ abstract final class Vi {
         SkillCategory.bank => 'Cân bi',
       };
 
+  // Màn đường dẫn không tồn tại.
+  //
+  // Người dùng web gõ sai địa chỉ, hoặc mở một liên kết cũ. Không đẩy
+  // nội dung ngoại lệ ra màn hình: nó là tiếng Anh và lộ cấu trúc bên
+  // trong, chẳng giúp gì người chơi.
+  static const notFoundTitle = 'Không tìm thấy trang';
+  static const notFoundBody = 'Đường dẫn này không tồn tại. Hãy quay lại '
+      'trang chủ để tiếp tục.';
+  static const notFoundAction = 'Về trang chủ';
+
   // Trạng thái rỗng dùng chung
   static const comingSoonTitle = 'Đang xây dựng';
   static const comingSoonBody = 'Phần này sẽ có ở bản cập nhật sau.';

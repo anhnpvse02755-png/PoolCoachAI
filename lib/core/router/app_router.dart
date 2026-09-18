@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
@@ -21,6 +24,20 @@ import 'package:poolcoachai/features/training/presentation/training_screen.dart'
 /// kiểm thử thì test trước để lại vị trí điều hướng cho test sau.
 GoRouter createAppRouter() => GoRouter(
   initialLocation: Routes.home,
+  // Đường dẫn lạ thì dựng màn tiếng Việt của mình, không để go_router
+  // đổ trang lỗi mặc định — trang đó là tiếng Anh và in thẳng nội dung
+  // ngoại lệ ra trước mặt người chơi.
+  errorBuilder: (context, state) => Scaffold(
+    body: PcEmptyState(
+      icon: Icons.help_outline,
+      title: Vi.notFoundTitle,
+      body: Vi.notFoundBody,
+      action: FilledButton(
+        onPressed: () => context.go(Routes.home),
+        child: const Text(Vi.notFoundAction),
+      ),
+    ),
+  ),
   routes: [
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

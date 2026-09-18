@@ -23,4 +23,42 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('PcEmptyState dựng nút hành động khi được truyền vào',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PcEmptyState(
+            icon: Icons.help_outline,
+            title: 'Không tìm thấy',
+            body: 'Đường dẫn này không tồn tại.',
+            action: FilledButton(
+              onPressed: () {},
+              child: const Text('Về trang chủ'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Về trang chủ'), findsOneWidget);
+  });
+
+  testWidgets('PcEmptyState không có nút thì không chừa chỗ trống cho nó',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PcEmptyState(
+            icon: Icons.help_outline,
+            title: 'Không tìm thấy',
+            body: 'Đường dẫn này không tồn tại.',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(FilledButton), findsNothing);
+  });
 }

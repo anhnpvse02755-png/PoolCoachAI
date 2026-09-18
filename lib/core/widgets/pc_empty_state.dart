@@ -11,12 +11,19 @@ class PcEmptyState extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.body,
+    this.action,
     super.key,
   });
 
   final IconData icon;
   final String title;
   final String body;
+
+  /// Nút hành động tuỳ chọn, ví dụ "Về trang chủ" ở màn không tìm thấy.
+  ///
+  /// Vắng mặt thì không chừa khoảng trống nào — trạng thái rỗng bình
+  /// thường không có việc gì để người dùng bấm.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +54,10 @@ class PcEmptyState extends StatelessWidget {
                 color: AppColors.textMuted,
               ),
             ),
+            if (action != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              action!,
+            ],
           ],
         ),
       ),
