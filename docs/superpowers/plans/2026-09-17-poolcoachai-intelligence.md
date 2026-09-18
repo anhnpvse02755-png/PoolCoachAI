@@ -815,7 +815,7 @@ confident-looking number, so the UI can say so instead of guessing."
   - `bool isReadyForLevelUp(Drill drill, List<DrillLog> logsOldestFirst)`
   - `PlayerIntelligence computePlayerIntelligence({required List<Drill> drills, required List<DrillLog> logs})`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/player_intelligence_summary_test.dart` với các case bắt buộc của spec mục 5.8:
 
@@ -984,7 +984,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/player_intelligence_summary_test.dart
@@ -992,7 +992,7 @@ void main() {
 
 Kỳ vọng: FAIL — `computePlayerIntelligence` chưa tồn tại.
 
-- [ ] **Step 3: Bổ sung vào player_intelligence.dart**
+- [x] **Step 3: Bổ sung vào player_intelligence.dart**
 
 Thêm import `drill.dart`, `drill_log.dart`, `drill_ratio.dart`, `skill_category.dart`, rồi thêm:
 
@@ -1125,7 +1125,7 @@ PlayerIntelligence computePlayerIntelligence({
 }
 ```
 
-- [ ] **Step 4: Chạy toàn bộ test và phân tích**
+- [x] **Step 4: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1135,7 +1135,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
