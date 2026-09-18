@@ -1166,7 +1166,7 @@ Luật, theo spec mục 6.2 — duyệt bài trong nhóm theo cấp tăng dần,
 3. Đã đạt hết → chọn bài cấp cao nhất để giữ phong độ
 4. Không còn bài nào → `null`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/pick_drill_test.dart`:
 
@@ -1264,7 +1264,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/pick_drill_test.dart
@@ -1272,7 +1272,7 @@ void main() {
 
 Kỳ vọng: FAIL — `recommendation.dart` chưa tồn tại.
 
-- [ ] **Step 3: Viết recommendation.dart**
+- [x] **Step 3: Viết recommendation.dart**
 
 ```dart
 import 'package:poolcoachai/domain/drill.dart';
@@ -1313,7 +1313,7 @@ Drill? pickDrillInCategory({
 }
 ```
 
-- [ ] **Step 4: Chạy test để xác nhận đạt**
+- [x] **Step 4: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -1323,7 +1323,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 5 test đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
