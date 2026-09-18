@@ -76,7 +76,7 @@ Kế hoạch này **không** tạo `Cue`, repository, hay bất kỳ widget nào
   - `Drill({required String id, required SkillCategory cat, required String name, required int level, required String unit, required String goal, required List<String> steps, double? passThreshold, num? target})` với getter `bool get usesAttempts => passThreshold != null`
   - `DrillLog({required String id, required String drillId, required DateTime date, required num score, int? attempts, String? notes})`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/drill_test.dart`:
 
@@ -152,7 +152,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/drill_test.dart
@@ -160,7 +160,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `package:poolcoachai/domain/drill.dart`.
 
-- [ ] **Step 3: Viết drill.dart**
+- [x] **Step 3: Viết drill.dart**
 
 ```dart
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -219,7 +219,7 @@ class Drill {
 }
 ```
 
-- [ ] **Step 4: Viết drill_log.dart**
+- [x] **Step 4: Viết drill_log.dart**
 
 ```dart
 /// Kết quả một lần thực hiện bài tập.
@@ -245,7 +245,7 @@ class DrillLog {
 }
 ```
 
-- [ ] **Step 5: Chạy test để xác nhận đạt**
+- [x] **Step 5: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -255,7 +255,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 4 test đạt, analyze sạch.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/domain test/domain
