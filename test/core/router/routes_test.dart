@@ -13,16 +13,22 @@ void main() {
       ]);
     });
 
+    test('all gom đủ năm tab và hai màn mở đè', () {
+      expect(Routes.all, [
+        ...Routes.tabs,
+        Routes.coach,
+        Routes.notifications,
+      ]);
+    });
+
     test('mọi đường dẫn đều bắt đầu bằng dấu gạch chéo', () {
-      final all = [...Routes.tabs, Routes.coach, Routes.notifications];
-      for (final path in all) {
+      for (final path in Routes.all) {
         expect(path, startsWith('/'), reason: path);
       }
     });
 
     test('không có đường dẫn nào trùng nhau', () {
-      final all = [...Routes.tabs, Routes.coach, Routes.notifications];
-      expect(all.toSet().length, all.length);
+      expect(Routes.all.toSet().length, Routes.all.length);
     });
   });
 }

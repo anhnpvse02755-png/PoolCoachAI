@@ -6,7 +6,7 @@ import 'package:poolcoachai/core/theme/app_theme.dart';
 
 /// Widget gốc của PoolCoachAI.
 ///
-/// Router được dựng một lần trong [initState] chứ không phải mỗi lần
+/// Router được khởi tạo một lần trong `State` chứ không phải mỗi lần
 /// build — GoRouter nhớ vị trí điều hướng, dựng lại mỗi build sẽ ném
 /// người dùng về màn gốc mỗi khi widget cha vẽ lại.
 class PoolCoachApp extends StatefulWidget {
@@ -21,7 +21,20 @@ class PoolCoachApp extends StatefulWidget {
 }
 
 class _PoolCoachAppState extends State<PoolCoachApp> {
+  /// Chỉ dispose router do chính widget này dựng.
+  ///
+  /// Router truyền từ ngoài vào thuộc về người gọi — kiểm thử tự dựng
+  /// rồi tự dọn. Dispose hộ sẽ giết router ngay dưới chân người gọi.
+  late final bool _ownsRouter = widget.router == null;
   late final GoRouter _router = widget.router ?? createAppRouter();
+
+  @override
+  void dispose() {
+    if (_ownsRouter) {
+      _router.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

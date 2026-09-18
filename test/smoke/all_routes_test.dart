@@ -12,8 +12,9 @@ import 'package:poolcoachai/features/training/presentation/training_screen.dart'
 
 /// Mỗi đường dẫn đã đăng ký phải dựng ra đúng một màn hình.
 ///
-/// Các kế hoạch sau thêm route mới vào [Routes] thì cũng phải thêm một
-/// dòng vào bảng này — quên là test hỏng ngay, chứ không im lặng bỏ sót.
+/// Bảng này được đối chiếu với [Routes.all] ở test cuối, nên thêm route
+/// mới vào [Routes] mà quên thêm vào đây là đỏ ngay, chứ không im lặng
+/// để lọt một màn không ai phủ.
 const _screenForRoute = <String, Type>{
   Routes.home: HomeScreen,
   Routes.training: TrainingScreen,
@@ -28,6 +29,7 @@ void main() {
   group('smoke test mọi route', () {
     testWidgets('mở được mọi đường dẫn mà không crash', (tester) async {
       final router = createAppRouter();
+      addTearDown(router.dispose);
       await tester.pumpWidget(PoolCoachApp(router: router));
       await tester.pumpAndSettle();
 
@@ -45,6 +47,7 @@ void main() {
 
     testWidgets('mỗi đường dẫn dựng đúng màn hình của nó', (tester) async {
       final router = createAppRouter();
+      addTearDown(router.dispose);
       await tester.pumpWidget(PoolCoachApp(router: router));
       await tester.pumpAndSettle();
 
@@ -61,16 +64,10 @@ void main() {
     });
 
     test('bảng smoke test phủ hết mọi đường dẫn đã khai báo', () {
-      final declared = <String>{
-        ...Routes.tabs,
-        Routes.coach,
-        Routes.notifications,
-      };
-
       expect(
         _screenForRoute.keys.toSet(),
-        declared,
-        reason: 'thêm route vào Routes thì phải thêm vào bảng smoke test',
+        Routes.all.toSet(),
+        reason: 'thêm route vào Routes.all thì phải thêm vào bảng smoke test',
       );
     });
   });
