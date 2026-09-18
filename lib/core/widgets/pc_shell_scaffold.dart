@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/core/theme/app_colors.dart';
 
-/// Khung bọc 5 tab: thanh điều hướng dưới, chuông thông báo trên,
-/// và nút Huấn luyện viên nổi dùng được ở mọi tab.
+/// Khung bọc 5 tab: thanh điều hướng dưới và nút Huấn luyện viên nổi
+/// dùng được ở mọi tab.
 ///
 /// Nút Coach nổi trên mọi tab vì đó là điểm khác biệt của sản phẩm —
 /// người chơi phải với tới được huấn luyện viên từ bất cứ đâu, không
 /// phải đi tìm trong một tab riêng.
+///
+/// Khung này **không** giữ thanh tiêu đề. Mỗi màn tự mang thanh của
+/// mình qua [PcRootScaffold], vì màn con ở các kế hoạch sau cần tiêu đề
+/// và nút quay lại riêng — shell giữ thanh thì sẽ thành hai thanh chồng
+/// lên nhau. Màu thanh tab dưới cũng để [AppTheme] lo, không đặt lại ở
+/// đây: đặt hai nơi thì sửa một nơi sẽ âm thầm không ăn.
 class PcShellScaffold extends StatelessWidget {
   const PcShellScaffold({required this.navigationShell, super.key});
 
@@ -43,29 +48,15 @@ class PcShellScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(Vi.appName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            tooltip: Vi.notificationsTitle,
-            onPressed: () => context.push(Routes.notifications),
-          ),
-        ],
-      ),
       body: navigationShell,
       floatingActionButton: FloatingActionButton(
         tooltip: Vi.coachTitle,
         onPressed: () => context.push(Routes.coach),
-        child: const Icon(Icons.sports_bar_outlined),
+        child: const Icon(Icons.psychology_outlined),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: navigationShell.currentIndex,
         onTap: _onTap,
-        backgroundColor: AppColors.bgDeep,
-        selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textDisabled,
-        type: BottomNavigationBarType.fixed,
         items: [
           for (var i = 0; i < _icons.length; i++)
             BottomNavigationBarItem(
