@@ -1,6 +1,7 @@
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
+import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -172,4 +173,125 @@ bool _sameDay(DateTime a, DateTime b) =>
   }
 
   return (cat: oldest, reason: PickReason.rotation);
+}
+
+/// Gợi ý cho hôm nay. Đây là **dữ liệu**, không phải câu chữ.
+///
+/// Màn hình dựng câu từ các trường này. Không chuỗi tiếng Việt nào được
+/// nằm trong file này — xem mục 2.1 tài liệu thiết kế.
+class TodayRecommendation {
+  const TodayRecommendation({
+    required this.cat,
+    required this.reason,
+    required this.drill,
+    required this.article,
+    required this.readyDrillIds,
+    required this.streak,
+  });
+
+  final SkillCategory cat;
+  final PickReason reason;
+
+  /// `null` khi không còn bài nào phù hợp để gợi ý hôm nay — ví dụ
+  /// người chơi đã tập hết bài của nhóm đó rồi.
+  final Drill? drill;
+
+  /// `null` khi chưa có bài kiến thức nào thuộc nhóm này. Không thay
+  /// bằng bài nhóm khác cho có.
+  final KnowledgeArticle? article;
+
+  final List<String> readyDrillIds;
+  final int streak;
+}
+
+/// Số ngày tập liên tiếp tính tới hôm nay.
+///
+/// Cả buổi tập theo bài lẫn buổi tập tự do đều tính. Nếu hôm nay chưa
+/// tập nhưng hôm qua có, chuỗi vẫn được giữ — nó chỉ đứt khi bỏ trọn
+/// một ngày.
+int streakDays({
+  required List<DrillLog> logs,
+  required List<TimerSession> timerSessions,
+  required DateTime today,
+}) {
+  final activeDays = <String>{
+    for (final l in logs) _dayKey(l.date),
+    for (final t in timerSessions) _dayKey(t.date),
+  };
+
+  if (activeDays.isEmpty) return 0;
+
+  var cursor = DateTime(today.year, today.month, today.day);
+  if (!activeDays.contains(_dayKey(cursor))) {
+    cursor = cursor.subtract(const Duration(days: 1));
+    if (!activeDays.contains(_dayKey(cursor))) return 0;
+  }
+
+  var count = 0;
+  while (activeDays.contains(_dayKey(cursor))) {
+    count++;
+    cursor = cursor.subtract(const Duration(days: 1));
+  }
+  return count;
+}
+
+String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+/// Tính gợi ý hôm nay từ toàn bộ dữ liệu người chơi.
+TodayRecommendation computeRecommendation({
+  required List<Drill> drills,
+  required List<DrillLog> logs,
+  required List<KnowledgeArticle> knowledge,
+  required List<TimerSession> timerSessions,
+  required List<ScheduleSlot> schedule,
+  required DateTime today,
+}) {
+  final pi = computePlayerIntelligence(drills: drills, logs: logs);
+
+  final pick = pickCategoryForToday(
+    pi: pi,
+    drills: drills,
+    logs: logs,
+    timerSessions: timerSessions,
+    schedule: schedule,
+    today: today,
+  );
+
+  final loggedToday = <String>{
+    for (final l in logs)
+      if (_dayKey(l.date) == _dayKey(today)) l.drillId,
+  };
+
+  final logsByDrill = <String, List<DrillLog>>{};
+  for (final log in [...logs]..sort((a, b) => a.date.compareTo(b.date))) {
+    logsByDrill.putIfAbsent(log.drillId, () => <DrillLog>[]).add(log);
+  }
+
+  final drill = pickDrillInCategory(
+    cat: pick.cat,
+    drills: drills,
+    logsByDrillOldestFirst: logsByDrill,
+    excludeDrillIds: loggedToday,
+  );
+
+  KnowledgeArticle? article;
+  for (final a in knowledge) {
+    if (a.cat == pick.cat) {
+      article = a;
+      break;
+    }
+  }
+
+  return TodayRecommendation(
+    cat: pick.cat,
+    reason: pick.reason,
+    drill: drill,
+    article: article,
+    readyDrillIds: pi.readyDrillIds,
+    streak: streakDays(
+      logs: logs,
+      timerSessions: timerSessions,
+      today: today,
+    ),
+  );
 }

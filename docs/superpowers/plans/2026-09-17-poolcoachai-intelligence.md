@@ -1755,7 +1755,7 @@ than issue an unexplained instruction."
 
 **Quan trọng:** hàm này trả **dữ liệu**, không trả câu chữ. Không có chuỗi tiếng Việt nào trong `recommendation.dart`. Màn hình ở kế hoạch 3 dựng câu từ `reason`, `cat`, `drill` — đúng mục 2.1: khuôn có tham số, tham số do hàm tính.
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/compute_recommendation_test.dart`:
 
@@ -1924,7 +1924,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/compute_recommendation_test.dart
@@ -1932,7 +1932,7 @@ void main() {
 
 Kỳ vọng: FAIL — `computeRecommendation` và `streakDays` chưa tồn tại.
 
-- [ ] **Step 3: Bổ sung vào recommendation.dart**
+- [x] **Step 3: Bổ sung vào recommendation.dart**
 
 ```dart
 /// Gợi ý cho hôm nay. Đây là **dữ liệu**, không phải câu chữ.
@@ -2059,7 +2059,7 @@ TodayRecommendation computeRecommendation({
 
 Thêm import `knowledge_article.dart`.
 
-- [ ] **Step 4: Chạy toàn bộ test và phân tích**
+- [x] **Step 4: Chạy toàn bộ test và phân tích**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -2069,7 +2069,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: tất cả đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
