@@ -642,7 +642,7 @@ two would let the intelligence layer call a beginner weak."
   - `int? categoryMastery(List<double> ratiosOldestFirst)` — `null` khi ít hơn `minSessions`
   - `SkillTrend categoryTrend(List<double> ratiosOldestFirst)` — `notEnoughData` khi ít hơn 4
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/player_intelligence_test.dart`:
 
@@ -698,7 +698,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/player_intelligence_test.dart
@@ -706,7 +706,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `player_intelligence.dart`.
 
-- [ ] **Step 3: Viết phần đầu player_intelligence.dart**
+- [x] **Step 3: Viết phần đầu player_intelligence.dart**
 
 ```dart
 import 'dart:math' as math;
@@ -775,7 +775,7 @@ SkillTrend categoryTrend(List<double> ratiosOldestFirst) {
 }
 ```
 
-- [ ] **Step 4: Chạy test để xác nhận đạt**
+- [x] **Step 4: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -785,7 +785,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 9 test đạt, analyze sạch.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain test/domain
