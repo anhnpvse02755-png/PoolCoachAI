@@ -202,7 +202,7 @@ lib/
 │                                 PcSkillChip, PcRankBadge, PcEmptyState,
 │                                 PcProgressBar, PcShotButtons, PcLevelPill,
 │                                 PcDrillTile, PcCueCard, PcTimerRing,
-│                                 PcBottomNav, PcCoachFab
+│                                 PcShellScaffold, PcRootScaffold
 ├── domain/                       Player, Rank, SkillCategory, MeasurementUnit
 ├── data/
 │   ├── mock/                     dữ liệu mẫu tĩnh
@@ -384,8 +384,8 @@ App phải kèm dòng chú thích: đây là bảng định nghĩa của PoolCoa
 | `PcCueCard` | Thẻ cơ bi-a, có cảnh báo khi tip quá hạn bảo dưỡng |
 | `PcTimerRing` | Vòng tròn đếm giờ cho Đồng hồ luyện tập |
 | `PcEmptyState` | Icon + tiêu đề + gợi ý hành động, dùng cho các màn mức khung |
-| `PcBottomNav` | Thanh 5 tab |
-| `PcCoachFab` | Nút tròn 🎱 mở Coach, nổi trên mọi tab |
+| `PcShellScaffold` | Khung 5 tab: thanh `NavigationBar` (Material 3) và nút tròn mở Coach. Hai thứ này **nằm trong** shell, không tách thành `PcBottomNav`/`PcCoachFab` riêng — mỗi cái chỉ dùng đúng một chỗ, tách ra là trừu tượng thừa |
+| `PcRootScaffold` | Khung của một màn gốc: thanh tiêu đề mang tên màn, kèm chuông thông báo. Thanh tiêu đề thuộc về từng màn chứ không thuộc shell, để màn con không đẻ ra thanh thứ hai |
 
 ---
 

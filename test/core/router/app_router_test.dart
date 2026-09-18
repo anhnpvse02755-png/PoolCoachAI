@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
@@ -15,6 +16,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('thanh tab là NavigationBar của Material 3', (tester) async {
+      await tester.pumpWidget(const PoolCoachApp());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(
+        find.byType(BottomNavigationBar),
+        findsNothing,
+        reason: 'theme đã bật Material 3 thì thanh tab phải theo M3',
+      );
     });
 
     testWidgets('thanh tab hiện đủ 5 nhãn tiếng Việt', (tester) async {
@@ -130,6 +143,25 @@ void main() {
           matching: find.text(Vi.coachTitle),
         ),
         findsOneWidget,
+      );
+    });
+
+    testWidgets('đường dẫn không tồn tại ra màn tiếng Việt, không lộ ngoại lệ',
+        (tester) async {
+      final router = createAppRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(PoolCoachApp(router: router));
+      await tester.pumpAndSettle();
+
+      router.go('/khong-he-co-duong-dan-nay');
+      await tester.pumpAndSettle();
+
+      expect(find.text(Vi.notFoundTitle), findsOneWidget);
+      expect(
+        find.textContaining('Exception'),
+        findsNothing,
+        reason: 'không đẩy nội dung ngoại lệ ra trước mặt người dùng',
       );
     });
 
