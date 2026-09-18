@@ -2096,7 +2096,7 @@ different category's article to avoid an empty slot."
 
 Đây là bài kiểm thử của mục 2.1 tài liệu thiết kế, dựng thành test chạy được: **đổi dữ liệu thì kết luận phải đổi theo.**
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 Tạo `test/domain/no_fabrication_test.dart`:
 
@@ -2200,7 +2200,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/no_fabrication_test.dart
@@ -2208,7 +2208,7 @@ void main() {
 
 Kỳ vọng: 3 test đạt. Nếu test thứ hai hỏng vì hai người chơi khác nhau nhận cùng gợi ý, đó là dấu hiệu có chỗ đang viết cứng — tìm và sửa, đừng nới test.
 
-- [ ] **Step 3: Chạy toàn bộ và phân tích lần cuối**
+- [x] **Step 3: Chạy toàn bộ và phân tích lần cuối**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -2216,7 +2216,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 "$FLUTTER" analyze
 ```
 
-- [ ] **Step 4: Commit và đẩy lên**
+- [x] **Step 4: Commit và đẩy lên**
 
 ```bash
 git add test/domain
