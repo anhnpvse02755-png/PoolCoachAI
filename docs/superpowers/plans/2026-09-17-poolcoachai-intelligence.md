@@ -467,7 +467,7 @@ comes back."
 - Consumes: `Drill`, `DrillLog`
 - Produces: `PracticeConstants` với `minSessions`(3), `recencyDecay`(0.85), `weakCutoff`(55), `strongCutoff`(75), `readyStreak`(3), `ratioCap`(1.2), `trendThreshold`(0.1); `double? drillRatio(Drill drill, DrillLog log)`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 Tạo `test/domain/drill_ratio_test.dart`:
 
@@ -541,7 +541,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Chạy test để xác nhận thất bại**
+- [x] **Step 2: Chạy test để xác nhận thất bại**
 
 ```bash
 "C:/Users/anhnpv/flutter/bin/flutter.bat" test test/domain/drill_ratio_test.dart
@@ -549,7 +549,7 @@ void main() {
 
 Kỳ vọng: FAIL — không tìm thấy `drill_ratio.dart`.
 
-- [ ] **Step 3: Viết practice_constants.dart**
+- [x] **Step 3: Viết practice_constants.dart**
 
 ```dart
 /// Hằng số của lớp suy luận.
@@ -581,7 +581,7 @@ abstract final class PracticeConstants {
 }
 ```
 
-- [ ] **Step 4: Viết drill_ratio.dart**
+- [x] **Step 4: Viết drill_ratio.dart**
 
 ```dart
 import 'package:poolcoachai/domain/drill.dart';
@@ -606,7 +606,7 @@ double? drillRatio(Drill drill, DrillLog log) {
 }
 ```
 
-- [ ] **Step 5: Chạy test để xác nhận đạt**
+- [x] **Step 5: Chạy test để xác nhận đạt**
 
 ```bash
 FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
@@ -616,7 +616,7 @@ FLUTTER="C:/Users/anhnpv/flutter/bin/flutter.bat"
 
 Kỳ vọng: 6 test đạt, analyze sạch.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/domain test/domain
