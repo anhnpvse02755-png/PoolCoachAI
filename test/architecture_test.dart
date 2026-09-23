@@ -117,4 +117,30 @@ void main() {
           'thuật ngữ chỉ phải sửa một dòng thay vì lục khắp các màn',
     );
   });
+
+  test('lib/ không được chứa thư mục test', () {
+    final libTest = Directory('lib/test');
+    expect(
+      libTest.existsSync(),
+      isFalse,
+      reason: 'test/support/ phải nằm trong test/, không phải lib/test/ — '
+          'file test không bao giờ được ship cùng app',
+    );
+  });
+
+  test('lib/ không import package:poolcoachai/test/', () {
+    final offenders = <String>[];
+    for (final file in dartFilesIn('lib')) {
+      if (file.readAsStringSync().contains("package:poolcoachai/test/")) {
+        offenders.add(file.path.replaceAll(r'\', '/'));
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'import test từ lib/ là ship test cùng app — '
+          'test/support/ chỉ được dùng trong thư mục test/',
+    );
+  });
 }

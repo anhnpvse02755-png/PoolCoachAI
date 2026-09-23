@@ -8,7 +8,7 @@ import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
-import 'package:poolcoachai/test/support/fake_auth.dart';
+import '../support/fake_auth.dart';
 
 /// Nạp seed lúc khởi động — mục 4.3.1 của thiết kế.
 ///

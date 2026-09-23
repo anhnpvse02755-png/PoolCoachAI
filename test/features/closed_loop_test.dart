@@ -16,7 +16,7 @@ import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
-import 'package:poolcoachai/test/support/fake_auth.dart';
+import '../support/fake_auth.dart';
 
 /// Vòng khép kín: xem gợi ý → ghi kết quả → gợi ý đổi theo.
 ///

@@ -7,7 +7,7 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
-import 'package:poolcoachai/test/support/fake_auth.dart';
+import 'fake_auth.dart';
 
 /// Dữ liệu và bộ chứa provider dùng chung cho mọi widget test.
 ///

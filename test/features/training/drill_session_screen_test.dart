@@ -12,7 +12,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
-import 'package:poolcoachai/test/support/fake_auth.dart';
+import '../../support/fake_auth.dart';
 
 /// Màn nhập kết quả buổi tập — mục 6.4 của thiết kế.
 ///

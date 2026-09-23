@@ -2,10 +2,10 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 
-/// Nang cu v1 → v2 (spec muc 5.1): buoi tap cu khong co chu nen bi bo,
-/// va may co cho luu phien dang nhap.
+/// Nâng từ v1 → v2 (spec mục 5.1): buổi tập cũ không có chủ nên bị bỏ,
+/// và máy có chỗ lưu phiên đăng nhập.
 void main() {
-  test('nang tu v1 len v2 thi bo buoi tap cu va co bang phien dang nhap',
+  test('nâng từ v1 lên v2 thì bỏ buổi tập cũ và có bảng phiên đăng nhập',
       () async {
     final executor = NativeDatabase.memory(setup: (raw) {
       raw.execute(
