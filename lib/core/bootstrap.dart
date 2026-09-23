@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 
@@ -14,4 +15,10 @@ import 'package:poolcoachai/data/database/upsert_seed.dart';
 /// còn hàm này thì không.
 Future<void> loadSeed(ProviderContainer container) async {
   await upsertSeed(container.read(appDatabaseProvider));
+}
+
+/// Đọc phiên đã lưu **trước** khung hình đầu tiên, để router quyết định
+/// ngay: có phiên thì vào thẳng app, kể cả khi đang mất mạng.
+Future<void> restoreSession(ProviderContainer container) async {
+  await container.read(authRepositoryProvider).restore();
 }

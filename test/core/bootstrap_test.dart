@@ -4,9 +4,11 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/bootstrap.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/test/support/fake_auth.dart';
 
 /// Nạp seed lúc khởi động — mục 4.3.1 của thiết kế.
 ///
@@ -29,6 +31,18 @@ void main() {
     await pumpEventQueue();
 
     expect(container.read(drillsProvider).value?.length, 10);
+  });
+
+  test('khôi phục phiên trước khung đầu tiên', () async {
+    final auth = FakeAuthRepository();
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(auth)],
+    );
+    addTearDown(container.dispose);
+
+    await restoreSession(container);
+
+    expect(auth.calls, ['restore']);
   });
 
   test('main nạp seed xong mới dựng app', () {

@@ -54,9 +54,10 @@ DrillLog toDrillLog(DrillLogRow row) {
   );
 }
 
-DrillLogRowsCompanion toDrillLogRow(DrillLog log) {
+DrillLogRowsCompanion toDrillLogRow(DrillLog log, {required String userId}) {
   return DrillLogRowsCompanion(
     id: drift.Value(log.id),
+    userId: drift.Value(userId),
     drillId: drift.Value(log.drillId),
     date: drift.Value(log.date),
     score: drift.Value(log.score.toDouble()),
@@ -66,6 +67,37 @@ DrillLogRowsCompanion toDrillLogRow(DrillLog log) {
     notes: log.notes != null
         ? drift.Value(log.notes!)
         : const drift.Value.absent(),
+  );
+}
+
+/// Buổi tập dạng JSON cho `POST /items/drill_logs`.
+///
+/// Không gửi chủ: server tự điền `user_created` từ token, app không
+/// giả mạo được.
+Map<String, Object?> toRemoteDrillLog(DrillLogRow row) => {
+      'id': row.id,
+      'drill_id': row.drillId,
+      'date': row.date.toUtc().toIso8601String(),
+      'score': row.score,
+      'attempts': row.attempts,
+      'notes': row.notes,
+    };
+
+/// Buổi tập kéo từ server về, gắn cho [userId] và đánh dấu đã đồng bộ.
+DrillLogRowsCompanion fromRemoteDrillLog(
+  Map<String, Object?> json, {
+  required String userId,
+  required DateTime syncedAt,
+}) {
+  return DrillLogRowsCompanion.insert(
+    id: json['id']! as String,
+    userId: userId,
+    drillId: json['drill_id']! as String,
+    date: DateTime.parse(json['date']! as String).toLocal(),
+    score: (json['score']! as num).toDouble(),
+    attempts: drift.Value(json['attempts'] as int?),
+    notes: drift.Value(json['notes'] as String?),
+    syncedAt: drift.Value(syncedAt),
   );
 }
 

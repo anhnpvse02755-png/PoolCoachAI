@@ -21,7 +21,7 @@ void main() {
 
   group('DriftDrillLogRepository', () {
     test('watchAll trả log cũ nhất trước, bất kể thứ tự ghi vào', () async {
-      final repo = DriftDrillLogRepository(db);
+      final repo = DriftDrillLogRepository(db, userId: 'u1');
 
       await repo.add(logAt('giua', DateTime(2026, 9, 20)));
       await repo.add(logAt('moi-nhat', DateTime(2026, 9, 22)));
@@ -33,7 +33,7 @@ void main() {
     });
 
     test('ghi thêm một log thì stream bắn lại ngay, không cần gọi lại', () async {
-      final repo = DriftDrillLogRepository(db);
+      final repo = DriftDrillLogRepository(db, userId: 'u1');
       final emissions = <List<DrillLog>>[];
       final sub = repo.watchAll().listen(emissions.add);
       addTearDown(sub.cancel);
@@ -51,7 +51,7 @@ void main() {
 
     test('log ghi xuống rồi đọc lên vẫn còn nguyên sau khi đóng truy vấn',
         () async {
-      final repo = DriftDrillLogRepository(db);
+      final repo = DriftDrillLogRepository(db, userId: 'u1');
       await repo.add(
         DrillLog(
           id: 'l1',
@@ -69,6 +69,23 @@ void main() {
       expect(log.score, 22);
       expect(log.attempts, isNull);
       expect(log.notes, 'Ghi chú');
+    });
+
+    test('chỉ thấy buổi tập của đúng người', () async {
+      await DriftDrillLogRepository(db, userId: 'u1').add(logAt('cua-an', DateTime(2026, 9, 20)));
+      await DriftDrillLogRepository(db, userId: 'u2').add(logAt('cua-binh', DateTime(2026, 9, 21)));
+
+      final logs = await DriftDrillLogRepository(db, userId: 'u1').watchAll().first;
+
+      expect(logs.map((l) => l.id), ['cua-an']);
+    });
+
+    test('ghi mới thì chưa đồng bộ', () async {
+      await DriftDrillLogRepository(db, userId: 'u1').add(logAt('moi', DateTime(2026, 9, 20)));
+
+      final row = (await db.select(db.drillLogRows).get()).single;
+      expect(row.userId, 'u1');
+      expect(row.syncedAt, isNull);
     });
   });
 

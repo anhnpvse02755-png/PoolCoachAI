@@ -44,6 +44,12 @@ class DrillLogRows extends Table {
   IntColumn get attempts => integer().nullable()();
   TextColumn get notes => text().nullable()();
 
+  /// Chủ của buổi tập. Mọi truy vấn buổi tập đều lọc theo cột này.
+  TextColumn get userId => text()();
+
+  /// Lúc buổi tập lên server. Null nghĩa là **chưa đồng bộ**.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -72,6 +78,19 @@ class TimerSessionRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// ─── Phiên đăng nhập ────────────────────────────────────────────────────────
+
+/// Phiên đăng nhập trên máy này — tối đa một dòng, id luôn là 'current'.
+class AuthSessionRows extends Table {
+  TextColumn get id => text().withDefault(const Constant('current'))();
+  TextColumn get userId => text()();
+  TextColumn get displayName => text()();
+  TextColumn get refreshToken => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -80,6 +99,7 @@ class TimerSessionRows extends Table {
   DrillLogRows,
   ScheduleSlotRows,
   TimerSessionRows,
+  AuthSessionRows,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -88,14 +108,22 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
         },
-        // schemaVersion 1: no migrations needed yet
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            // Buổi tập v1 không có chủ; chủ sản phẩm chọn bỏ dữ liệu thử
+            // thay vì gán bừa cho người đăng nhập đầu tiên.
+            await m.deleteTable('drill_log_rows');
+            await m.createTable(drillLogRows);
+            await m.createTable(authSessionRows);
+          }
+        },
       );
 
   static QueryExecutor _openConnection() {
@@ -113,10 +141,19 @@ class AppDatabase extends _$AppDatabase {
 
   // ─── DrillLog watch helpers ─────────────────────────────────────────────
 
-  /// Trả log cũ nhất trước — đúng thứ tự categoryMastery() đòi.
-  Stream<List<DrillLogRow>> watchAllDrillLogs() {
+  /// Buổi tập của [userId], cũ nhất trước — đúng thứ tự categoryMastery() đòi.
+  Stream<List<DrillLogRow>> watchDrillLogsOf(String userId) {
     return (select(drillLogRows)
+          ..where((t) => t.userId.equals(userId))
           ..orderBy([(t) => OrderingTerm.asc(t.date)]))
         .watch();
+  }
+
+  /// Id các buổi tập chưa lên server, của mọi người dùng trên máy.
+  Stream<List<String>> watchPendingLogIds() {
+    final query = selectOnly(drillLogRows)
+      ..addColumns([drillLogRows.id])
+      ..where(drillLogRows.syncedAt.isNull());
+    return query.map((row) => row.read(drillLogRows.id)!).watch();
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
@@ -15,6 +16,7 @@ import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/test/support/fake_auth.dart';
 
 /// Vòng khép kín: xem gợi ý → ghi kết quả → gợi ý đổi theo.
 ///
@@ -37,6 +39,7 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         nowProvider.overrideWithValue(() => today),
+        authRepositoryProvider.overrideWithValue(FakeAuthRepository.signedIn()),
       ],
     );
     addTearDown(container.dispose);

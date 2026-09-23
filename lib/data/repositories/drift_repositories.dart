@@ -34,23 +34,27 @@ class DriftKnowledgeRepository implements KnowledgeRepository {
   }
 }
 
-/// Drift implementation of DrillLogRepository.
+/// Buổi tập của **một** người dùng trên Drift.
 ///
-/// watchAll trả cũ nhất trước — đúng thứ tự categoryMastery() đòi.
+/// watchAll trả cũ nhất trước — đúng thứ tự categoryMastery() đòi — và
+/// chỉ của [userId]: người đăng nhập sau trên cùng máy không thấy buổi
+/// của người trước.
 class DriftDrillLogRepository implements DrillLogRepository {
-  DriftDrillLogRepository(this._db);
+  DriftDrillLogRepository(this._db, {required this._userId});
 
   final AppDatabase _db;
+  final String _userId;
 
   @override
   Stream<List<DrillLog>> watchAll() {
-    return _db.watchAllDrillLogs().map(
+    return _db.watchDrillLogsOf(_userId).map(
           (rows) => rows.map(toDrillLog).toList(),
         );
   }
 
+  /// Ghi vào máy với `syncedAt` rỗng; SyncService tự thấy và đẩy lên.
   @override
   Future<void> add(DrillLog log) async {
-    await _db.into(_db.drillLogRows).insert(toDrillLogRow(log));
+    await _db.into(_db.drillLogRows).insert(toDrillLogRow(log, userId: _userId));
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
@@ -11,6 +12,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
+import 'package:poolcoachai/test/support/fake_auth.dart';
 
 /// Màn nhập kết quả buổi tập — mục 6.4 của thiết kế.
 ///
@@ -33,6 +35,7 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         nowProvider.overrideWithValue(() => today),
+        authRepositoryProvider.overrideWithValue(FakeAuthRepository.signedIn()),
       ],
     );
     addTearDown(container.dispose);
@@ -139,5 +142,20 @@ void main() {
     final logs = await db.select(db.drillLogRows).get();
     expect(logs.length, 2);
     expect(logs.map((l) => l.id).toSet().length, 2);
+  });
+
+  testWidgets('buổi tập mới mang id UUID v4', (tester) async {
+    final (db, _) = await openSession(tester, 'd1');
+
+    await fill(tester, Vi.sessionScoreLabelAttempts, '7');
+    await fill(tester, Vi.sessionAttemptsLabel, '10');
+    await tester.tap(find.text(Vi.sessionSaveAction));
+    await tester.pumpAndSettle();
+
+    final id = (await db.select(db.drillLogRows).get()).single.id;
+    expect(
+      id,
+      matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+    );
   });
 }

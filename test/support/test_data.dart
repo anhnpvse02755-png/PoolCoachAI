@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/test/support/fake_auth.dart';
 
 /// Dữ liệu và bộ chứa provider dùng chung cho mọi widget test.
 ///
@@ -51,6 +54,7 @@ ProviderContainer testContainer({
   List<KnowledgeArticle>? knowledge,
   List<DrillLog>? logs,
   DateTime? now,
+  AuthRepository? auth,
 }) {
   return ProviderContainer(
     overrides: [
@@ -60,6 +64,8 @@ ProviderContainer testContainer({
           .overrideWith((ref) => Stream.value(knowledge ?? testKnowledge)),
       drillLogsProvider
           .overrideWith((ref) => Stream.value(logs ?? const <DrillLog>[])),
+      authRepositoryProvider
+          .overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
     ],
   );
 }

@@ -11,6 +11,7 @@ Future<void> main() async {
   // nên phải cầm được đúng bộ chứa đó mà nạp.
   final container = ProviderContainer();
   await loadSeed(container);
+  await restoreSession(container);
 
   runApp(
     UncontrolledProviderScope(
