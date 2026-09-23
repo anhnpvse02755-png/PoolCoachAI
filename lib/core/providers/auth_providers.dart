@@ -8,6 +8,7 @@ import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_session_store.dart';
+import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
 final httpClientProvider = Provider<http.Client>((ref) {
@@ -59,4 +60,15 @@ final authGateProvider = Provider<AuthGate>((ref) {
   final gate = AuthGate(ref.watch(authRepositoryProvider));
   ref.onDispose(gate.dispose);
   return gate;
+});
+
+final syncServiceProvider = Provider<SyncService>((ref) {
+  final service = SyncService(
+    db: ref.watch(appDatabaseProvider),
+    auth: ref.watch(authRepositoryProvider),
+    api: ref.watch(directusClientProvider),
+    now: ref.watch(nowProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
 });
