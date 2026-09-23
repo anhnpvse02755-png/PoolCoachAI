@@ -97,7 +97,7 @@ Ghi các giá trị vào khối `env` của `.claude/settings.local.json`. Tuy�
 TZ=Asia/Ho_Chi_Minh
 KEY=
 SECRET=
-ADMIN_EMAIL=admin@poolcoachai.local
+ADMIN_EMAIL=admin@poolcoachai.example.com
 ADMIN_PASSWORD=
 PUBLIC_URL=https://poolcoachai-api.kjdybl.easypanel.host
 HOST=0.0.0.0
@@ -128,7 +128,7 @@ PASSWORD_RESET_URL_ALLOW_LIST=https://poolcoachai.kjdybl.easypanel.host/reset-pa
 
 # Mailpit giữ mọi thư. Đổi sang mail thật: sửa bốn biến SMTP rồi xoá service mailpit.
 EMAIL_TRANSPORT=smtp
-EMAIL_FROM=no-reply@poolcoachai.local
+EMAIL_FROM=no-reply@poolcoachai.example.com
 EMAIL_SMTP_HOST=test-va_mailpit
 EMAIL_SMTP_PORT=1025
 EMAIL_SMTP_SECURE=false
@@ -441,7 +441,7 @@ const login = async (email, password) =>
 
 const admin = await login(env('DIRECTUS_ADMIN_EMAIL'), env('DIRECTUS_ADMIN_PASSWORD'));
 const tag = randomBytes(4).toString('hex');
-const users = ['a', 'b'].map((n) => ({ email: `verify-${tag}-${n}@poolcoachai.local`, password: randomBytes(8).toString('hex') }));
+const users = ['a', 'b'].map((n) => ({ email: `verify-${tag}-${n}@poolcoachai.example.com`, password: randomBytes(8).toString('hex') }));
 
 try {
   // ─── Giả định 1: đăng ký công khai gán role Player ──────────────────────
@@ -459,7 +459,7 @@ try {
   const dup = await call('POST', '/users/register', { email: users[0].email, password: 'khac-hoan-toan-1' });
   note(`đăng ký email đã có → status ${dup.status}, code ${dup.code ?? '(không có)'}`);
 
-  const short = await call('POST', '/users/register', { email: `verify-${tag}-c@poolcoachai.local`, password: '1234567' });
+  const short = await call('POST', '/users/register', { email: `verify-${tag}-c@poolcoachai.example.com`, password: '1234567' });
   short.status >= 400 ? ok(`mật khẩu 7 ký tự bị từ chối → ${short.status} ${short.code}`) : fail('mật khẩu 7 ký tự vẫn được nhận');
 
   // ─── Quyền trên drill_logs ─────────────────────────────────────────────
@@ -492,7 +492,7 @@ try {
   // ─── Giả định 2 và 3: đặt lại mật khẩu ─────────────────────────────────
   const req = await call('POST', '/auth/password/request', { email: users[0].email, reset_url: RESET_URL });
   req.status === 204 || req.status === 200 ? ok('yêu cầu đặt lại mật khẩu được nhận') : fail(`yêu cầu đặt lại → ${req.status} ${req.code}`);
-  const unknown = await call('POST', '/auth/password/request', { email: `khong-co-${tag}@poolcoachai.local`, reset_url: RESET_URL });
+  const unknown = await call('POST', '/auth/password/request', { email: `khong-co-${tag}@poolcoachai.example.com`, reset_url: RESET_URL });
   note(`yêu cầu đặt lại cho email không tồn tại → ${unknown.status}`);
 
   let link = null;
@@ -4628,7 +4628,7 @@ const MAIL = need('MAILPIT_URL').replace(/\/$/, '');
 const mailAuth = 'Basic ' + Buffer.from(`${need('MAILPIT_USER')}:${need('MAILPIT_PASSWORD')}`).toString('base64');
 const shots = path.join(process.env.TMP ?? os.tmpdir(), 'pcai-e2e');
 
-const email = `e2e-${Date.now()}@poolcoachai.local`;
+const email = `e2e-${Date.now()}@poolcoachai.example.com`;
 const pass1 = randomBytes(6).toString('hex');
 const pass2 = randomBytes(6).toString('hex');
 const step = (n, msg) => console.log(`\n── Bước ${n}: ${msg}`);
