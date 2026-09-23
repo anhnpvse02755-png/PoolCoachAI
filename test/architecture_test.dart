@@ -60,6 +60,38 @@ void main() {
     );
   });
 
+  test('DB mở được trên web: có DriftWebOptions và đủ file trong web/', () {
+    // Test chạy bằng NativeDatabase nên không bao giờ đi qua nhánh web.
+    // Thiếu `web:` thì drift_flutter ném ArgumentError ngay lúc mở DB
+    // trong trình duyệt — build vẫn xanh, app thì chết ở màn đầu tiên.
+    final source = codeOnly(
+      File('lib/data/database/database.dart').readAsStringSync(),
+    );
+    final calls = RegExp(r'driftDatabase\(([\s\S]*?)\);').allMatches(source);
+
+    expect(calls, isNotEmpty, reason: 'không tìm thấy chỗ mở DB');
+    for (final call in calls) {
+      expect(
+        call[1],
+        contains('DriftWebOptions('),
+        reason: 'driftDatabase() thiếu `web:` — app vỡ trên Chrome',
+      );
+    }
+
+    final assets = RegExp(r"Uri\.parse\('([^']+)'\)")
+        .allMatches(source)
+        .map((m) => m[1]!)
+        .toList();
+    expect(assets, containsAll(['sqlite3.wasm', 'drift_worker.js']));
+    for (final asset in assets) {
+      expect(
+        File('web/$asset').existsSync(),
+        isTrue,
+        reason: 'web/$asset không có — build web sẽ không mang theo nó',
+      );
+    }
+  });
+
   test('không màn hình nào chứa chuỗi tiếng Việt viết thẳng', () {
     // Ký tự chỉ có trong tiếng Việt, đủ để bắt mọi câu thật.
     final vietnamese = RegExp(
