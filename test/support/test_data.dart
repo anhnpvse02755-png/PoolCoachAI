@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
+import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
@@ -68,4 +76,36 @@ ProviderContainer testContainer({
           .overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
     ],
   );
+}
+
+/// Cổng đã đăng nhập — cho các test màn tập vốn không quan tâm tài khoản.
+AuthGate signedInGate() =>
+    AuthGate.fixed(const SignedIn(userId: 'u1', displayName: 'An'));
+
+/// Dựng cả app với một AuthRepository giả, cổng nối thật vào nó.
+Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
+  WidgetTester tester, {
+  AuthState initial = const SignedOut(),
+  String? location,
+}) async {
+  final auth = FakeAuthRepository(initial);
+  final container = testContainer(auth: auth);
+  addTearDown(container.dispose);
+  final gate = AuthGate(auth);
+  addTearDown(gate.dispose);
+  final router = createAppRouter(auth: gate);
+  addTearDown(router.dispose);
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: PoolCoachApp(router: router),
+    ),
+  );
+  await tester.pumpAndSettle();
+  if (location != null) {
+    router.go(location);
+    await tester.pumpAndSettle();
+  }
+  return (router, auth);
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/config.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
@@ -52,4 +53,10 @@ final currentUserIdProvider = Provider<String?>((ref) {
     SignedIn(:final userId) => userId,
     SignedOut() => null,
   };
+});
+
+final authGateProvider = Provider<AuthGate>((ref) {
+  final gate = AuthGate(ref.watch(authRepositoryProvider));
+  ref.onDispose(gate.dispose);
+  return gate;
 });

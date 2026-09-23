@@ -17,6 +17,7 @@ import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import '../support/fake_auth.dart';
+import '../support/test_data.dart';
 
 /// Vòng khép kín: xem gợi ý → ghi kết quả → gợi ý đổi theo.
 ///
@@ -44,7 +45,7 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
 
     await tester.pumpWidget(

@@ -2,8 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
+import 'package:poolcoachai/features/auth/presentation/forgot_password_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/register_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/reset_password_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
@@ -14,6 +19,7 @@ import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
+import 'package:poolcoachai/domain/auth.dart';
 
 import '../support/test_data.dart';
 
@@ -51,10 +57,28 @@ const _routeCases = <String, _RouteCase>{
   Routes.articlePattern: (path: '/knowledge/k1', screen: KnowledgeScreen),
 };
 
+/// Màn tài khoản chỉ mở được khi **chưa** đăng nhập, nên đi lưới riêng.
+const _signedOutRouteCases = <String, _RouteCase>{
+  Routes.login: (path: Routes.login, screen: LoginScreen),
+  Routes.register: (path: Routes.register, screen: RegisterScreen),
+  Routes.forgotPassword: (
+    path: Routes.forgotPassword,
+    screen: ForgotPasswordScreen,
+  ),
+  Routes.resetPassword: (
+    path: '/reset-password?token=abc',
+    screen: ResetPasswordScreen,
+  ),
+};
+
 void main() {
   /// Dựng app với dữ liệu test rồi trả router để test tự lái.
-  Future<GoRouter> pumpApp(WidgetTester tester) async {
-    final router = createAppRouter();
+  Future<GoRouter> pumpApp(WidgetTester tester, {bool signedIn = true}) async {
+    final router = createAppRouter(
+      auth: signedIn
+          ? signedInGate()
+          : AuthGate.fixed(const SignedOut()),
+    );
     addTearDown(router.dispose);
     final container = testContainer();
     addTearDown(container.dispose);
@@ -100,9 +124,41 @@ void main() {
       }
     });
 
+    testWidgets('mở được mọi đường dẫn mà không crash — khi chưa đăng nhập',
+        (tester) async {
+      final router = await pumpApp(tester, signedIn: false);
+
+      for (final route in _signedOutRouteCases.values) {
+        router.go(route.path);
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'màn ${route.path} ném lỗi khi dựng',
+        );
+      }
+    });
+
+    testWidgets('mỗi đường dẫn dựng đúng màn hình của nó — khi chưa đăng nhập',
+        (tester) async {
+      final router = await pumpApp(tester, signedIn: false);
+
+      for (final route in _signedOutRouteCases.values) {
+        router.go(route.path);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byType(route.screen),
+          findsOneWidget,
+          reason: 'đường dẫn ${route.path} phải dựng ${route.screen}',
+        );
+      }
+    });
+
     test('bảng smoke test phủ hết mọi đường dẫn đã khai báo', () {
       expect(
-        _routeCases.keys.toSet(),
+        {..._routeCases.keys, ..._signedOutRouteCases.keys}.toSet(),
         Routes.all.toSet(),
         reason: 'thêm route vào Routes.all thì phải thêm vào bảng smoke test',
       );
@@ -112,9 +168,9 @@ void main() {
     // sai khuôn thì smoke test vẫn xanh trong khi route thật hỏng —
     // đúng kiểu lưới trông như có mà không bắt được gì.
     test('đường dẫn mẫu khớp đúng khuôn của route', () {
-      for (final entry in _routeCases.entries) {
+      for (final entry in {..._routeCases, ..._signedOutRouteCases}.entries) {
         final patternParts = entry.key.split('/');
-        final pathParts = entry.value.path.split('/');
+        final pathParts = Uri.parse(entry.value.path).path.split('/');
 
         expect(
           pathParts.length,

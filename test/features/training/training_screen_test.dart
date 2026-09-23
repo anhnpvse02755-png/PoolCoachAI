@@ -17,7 +17,7 @@ import '../../support/test_data.dart';
 /// về logic nào — đúng thứ mục 2.1 của thiết kế cấm.
 void main() {
   Future<void> openTraining(WidgetTester tester, List<DrillLog> logs) async {
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
     final container = testContainer(logs: logs);
     addTearDown(container.dispose);

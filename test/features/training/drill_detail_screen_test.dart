@@ -17,7 +17,7 @@ void main() {
     String drillId, {
     List<DrillLog> logs = const [],
   }) async {
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
     final container = testContainer(logs: logs);
     addTearDown(container.dispose);

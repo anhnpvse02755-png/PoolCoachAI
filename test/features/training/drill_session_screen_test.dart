@@ -13,6 +13,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 import '../../support/fake_auth.dart';
+import '../../support/test_data.dart';
 
 /// Màn nhập kết quả buổi tập — mục 6.4 của thiết kế.
 ///
@@ -40,7 +41,7 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
 
     await tester.pumpWidget(

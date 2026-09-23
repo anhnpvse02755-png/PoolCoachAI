@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
@@ -197,4 +198,57 @@ abstract final class Vi {
 
   /// Xác nhận khi bài không chấm được thành tỉ lệ.
   static const sessionSaved = 'Đã lưu kết quả buổi tập.';
+
+  // Tài khoản — spec mục 4.3.
+  static const authLoginTitle = 'Đăng nhập';
+  static const authLoginAction = 'Đăng nhập';
+  static const authEmailLabel = 'Email';
+  static const authPasswordLabel = 'Mật khẩu';
+  static const authToRegister = 'Chưa có tài khoản? Đăng ký';
+  static const authToForgot = 'Quên mật khẩu?';
+  static const authToLogin = 'Đã có tài khoản? Đăng nhập';
+  static const authSessionExpired =
+      'Phiên đăng nhập đã hết, hãy đăng nhập lại.';
+
+  static const authRegisterTitle = 'Tạo tài khoản';
+  static const authRegisterAction = 'Tạo tài khoản';
+  static const authDisplayNameLabel = 'Tên hiển thị';
+  static const authPasswordConfirmLabel = 'Nhập lại mật khẩu';
+
+  static const authForgotTitle = 'Quên mật khẩu';
+  static const authForgotHint =
+      'Nhập email bạn dùng để đăng ký. Chúng tôi sẽ gửi link đặt lại mật khẩu.';
+  static const authForgotAction = 'Gửi link';
+
+  /// Luôn cùng một câu, dù email có tài khoản hay không — để không ai
+  /// dùng màn này dò xem email nào đã đăng ký.
+  static const authForgotSent =
+      'Nếu email này có tài khoản, link đặt lại mật khẩu đã được gửi.';
+
+  static const authResetTitle = 'Đặt lại mật khẩu';
+  static const authNewPasswordLabel = 'Mật khẩu mới';
+  static const authResetAction = 'Lưu mật khẩu mới';
+  static const authResetDone =
+      'Đã đổi mật khẩu. Hãy đăng nhập bằng mật khẩu mới.';
+  static const authResetMissingToken =
+      'Link đặt lại mật khẩu không đầy đủ. Hãy mở lại link trong email.';
+
+  static const authFieldRequired = 'Không được để trống';
+  static const authEmailInvalid = 'Nhập email hợp lệ';
+  static const authPasswordTooShort = 'Mật khẩu cần ít nhất 8 ký tự';
+  static const authPasswordMismatch = 'Hai mật khẩu không khớp';
+
+  /// Một câu cho mỗi loại lỗi — không bao giờ hiện nguyên văn lỗi server.
+  static String authFailure(AuthFailure failure) => switch (failure) {
+        AuthFailure.wrongCredentials => 'Email hoặc mật khẩu không đúng.',
+        AuthFailure.emailTaken =>
+          'Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng Quên mật khẩu.',
+        AuthFailure.weakPassword => 'Mật khẩu cần ít nhất 8 ký tự.',
+        AuthFailure.network =>
+          'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.',
+        AuthFailure.resetLinkInvalid =>
+          'Link đặt lại mật khẩu đã hết hạn hoặc đã dùng. Hãy yêu cầu link mới.',
+        AuthFailure.sessionExpired => authSessionExpired,
+        AuthFailure.unknown => 'Máy chủ đang gặp lỗi. Hãy thử lại sau.',
+      };
 }

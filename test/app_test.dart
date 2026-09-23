@@ -10,7 +10,7 @@ void main() {
   group('PoolCoachApp quyền sở hữu router', () {
     testWidgets('router truyền từ ngoài vào vẫn dùng được sau khi app rời cây',
         (tester) async {
-      final router = createAppRouter();
+      final router = createAppRouter(auth: signedInGate());
       addTearDown(router.dispose);
 
       await tester.pumpWidget(
