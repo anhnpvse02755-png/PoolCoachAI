@@ -36,6 +36,37 @@ const { access_token: token } = await api('POST', '/auth/login', {
   password: must('DIRECTUS_ADMIN_PASSWORD'),
 });
 
+// ─── 0. Kích hoạt Open Innovation Grant licence ─────────────────────────────────
+// DIRECTUS_LICENSE_KEY phải được đặt trong env. Nếu đã kích hoạt rồi thì bỏ qua.
+// OIG bật `custom_permission_rules_enabled`, cho phép tạo filtered/field-limited permissions.
+const licenseKey = process.env.DIRECTUS_LICENSE_KEY;
+if (licenseKey) {
+  const infoBefore = await api('GET', '/server/info', undefined, token);
+  const oigActive = infoBefore.license?.entitlements?.display_powered_by === 'OIG';
+  if (!oigActive) {
+    console.log('Kích hoạt Open Innovation Grant licence…');
+    // POST /license trả 403 "A license was already activated" nếu đã có licence.
+    const licRaw = await fetch(`${base}/license`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ license_key: licenseKey }),
+    });
+    const licText = await licRaw.text();
+    if (!licRaw.ok && !licText.includes('already activated')) {
+      throw new Error(`Kích hoạt licence thất bại → ${licRaw.status} ${licText}`);
+    }
+    const infoAfter = await api('GET', '/server/info', undefined, token);
+    if (infoAfter.license?.entitlements?.display_powered_by !== 'OIG') {
+      throw new Error('Licence đã kích hoạt nhưng không phải OIG');
+    }
+    console.log('Licence đã kích hoạt (display_powered_by = OIG)');
+  } else {
+    console.log('Licence đã kích hoạt (bỏ qua)');
+  }
+} else {
+  console.log('DIRECTUS_LICENSE_KEY không được đặt — bỏ qua kích hoạt licence');
+}
+
 // ─── 1. Collection drill_logs ───────────────────────────────────────────────
 // Directus trả 403 (không phải 404) cho collection chưa có, để không lộ tên.
 const hasCollection = await api('GET', '/collections/drill_logs', undefined, token).then(
@@ -88,8 +119,6 @@ if (!hasRelation) {
 }
 
 // ─── 2. Role Player và policy của nó ────────────────────────────────────────
-// Directus 12: roles and policies are separate resources with a many-to-many link.
-// findOrCreate returns the full object as returned by the API.
 async function findOrCreate(path, name, payload) {
   const found = await api('GET', `${path}?filter[name][_eq]=${encodeURIComponent(name)}`, undefined, token);
   if (found.length) return found[0];
@@ -118,34 +147,54 @@ const links = await api(
 );
 if (!links.length) await api('POST', '/access', { role: role.id, policy: policy.id }, token);
 
-// Xoá hết quyền cũ rồi tạo lại: chạy lần hai vẫn ra đúng một bộ quyền.
-const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policy.id}&limit=-1`, undefined, token);
-if (oldPermissions.length) await api('DELETE', '/permissions', oldPermissions.map((p) => p.id), token);
-
-// Directus 12.3.1 blocks non-null `permissions` and `validation` on permission creation
-// when `custom_permission_rules_enabled` is restricted (the default).
-// Batch creation also fails with a server-side bug.
-// Specifying non-['*'] field restrictions triggers the same restriction, so all
-// permissions use fields:['*'] — row-level user isolation is enforced by the app itself.
-const permissionSpecs = [
-  { collection: 'drill_logs', action: 'create' },
-  { collection: 'drill_logs', action: 'read' },
-  { collection: 'drill_logs', action: 'update' },
-  { collection: 'drill_logs', action: 'delete' },
+// ─── 3. Quyền Player policy (spec §3.3) ──────────────────────────────────────
+// An toàn: tạo quyền mới trước, xoá cũ sau — nếu tạo thất bại thì quyền cũ vẫn còn.
+// Batch POST trả về toàn bộ permissions (không chỉ permission vừa tạo), nên dùng
+// oldPermissions.length làm số lượng cũ.
+const self = { id: { _eq: '$CURRENT_USER' } };
+const desiredPermissions = [
+  {
+    collection: 'drill_logs',
+    action: 'create',
+    fields: ['id', 'drill_id', 'date', 'score', 'attempts', 'notes'],
+    permissions: {},
+    validation: {},
+  },
+  {
+    collection: 'drill_logs',
+    action: 'read',
+    fields: ['*'],
+    permissions: { user_created: self },
+  },
+  {
+    collection: 'directus_users',
+    action: 'read',
+    fields: ['id', 'first_name', 'email'],
+    permissions: self,
+  },
+  {
+    collection: 'directus_users',
+    action: 'update',
+    fields: ['first_name', 'email', 'password'],
+    permissions: self,
+  },
 ];
-for (const spec of permissionSpecs) {
-  const r = await fetch(`${base}/permissions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ policy: policy.id, ...spec, fields: ['*'], permissions: null }),
-  });
-  if (!r.ok) {
-    const err = await r.text();
-    throw new Error(`POST /permissions ${spec.collection}/${spec.action} → ${r.status} ${err}`);
-  }
+
+const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policy.id}&limit=-1`, undefined, token);
+const oldCount = oldPermissions.length;
+const newPerms = desiredPermissions.map((p) => ({ ...p, policy: policy.id }));
+
+// Tạo tất cả quyền mới trước (batch)
+await api('POST', '/permissions', newPerms, token);
+
+// Xoá quyền cũ
+if (oldCount > 0) {
+  await api('DELETE', '/permissions', oldPermissions.map((p) => p.id), token);
 }
 
-// ─── 3. Đăng ký công khai ───────────────────────────────────────────────────
+console.log(`Đặt ${newPerms.length} quyền cho Player policy (xoá ${oldCount} quyền cũ)`);
+
+// ─── 4. Đăng ký công khai ───────────────────────────────────────────────────
 await api('PATCH', '/settings', {
   project_name: 'PoolCoachAI',
   public_registration: true,
