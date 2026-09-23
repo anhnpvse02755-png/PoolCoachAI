@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
@@ -9,17 +10,35 @@ import 'package:poolcoachai/features/notifications/presentation/notifications_sc
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 
+import '../../support/test_data.dart';
+
 void main() {
   group('điều hướng khung app', () {
     testWidgets('mở lên là vào tab Trang chủ', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(HomeScreen), findsOneWidget);
     });
 
     testWidgets('thanh tab là NavigationBar của Material 3', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationBar), findsOneWidget);
@@ -31,7 +50,15 @@ void main() {
     });
 
     testWidgets('thanh tab hiện đủ 5 nhãn tiếng Việt', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(Vi.tabHome), findsOneWidget);
@@ -42,7 +69,15 @@ void main() {
     });
 
     testWidgets('bấm tab Luyện tập thì chuyển màn', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(Vi.tabTraining));
@@ -53,7 +88,15 @@ void main() {
     });
 
     testWidgets('bấm tab Thi đấu rồi quay lại Trang chủ', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(Vi.tabPlay));
@@ -66,7 +109,15 @@ void main() {
     });
 
     testWidgets('nút tròn mở màn Huấn luyện viên', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(FloatingActionButton));
@@ -76,7 +127,15 @@ void main() {
     });
 
     testWidgets('chuông mở màn Thông báo', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip(Vi.notificationsTitle));
@@ -86,7 +145,15 @@ void main() {
     });
 
     testWidgets('mỗi tab gốc mang thanh tiêu đề của chính nó', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -113,7 +180,15 @@ void main() {
 
     testWidgets('thanh tiêu đề không mang tên app, và chỉ có một thanh',
         (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -130,7 +205,15 @@ void main() {
 
     testWidgets('mở Coach từ tab vẫn chỉ thấy một thanh tiêu đề',
         (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(FloatingActionButton));
@@ -150,8 +233,15 @@ void main() {
         (tester) async {
       final router = createAppRouter();
       addTearDown(router.dispose);
+      final container = testContainer();
+      addTearDown(container.dispose);
 
-      await tester.pumpWidget(PoolCoachApp(router: router));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       router.go('/khong-he-co-duong-dan-nay');
@@ -167,7 +257,15 @@ void main() {
 
     testWidgets('mỗi tab giữ ngăn xếp riêng: mở Coach từ tab Luyện tập '
         'rồi quay lại vẫn ở Luyện tập', (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(Vi.tabTraining));

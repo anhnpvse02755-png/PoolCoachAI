@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
+
+import 'support/test_data.dart';
 
 void main() {
   group('PoolCoachApp quyền sở hữu router', () {
@@ -10,7 +13,12 @@ void main() {
       final router = createAppRouter();
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(PoolCoachApp(router: router));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: testContainer(),
+          child: PoolCoachApp(router: router),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -28,7 +36,12 @@ void main() {
   group('PoolCoachApp ngôn ngữ', () {
     testWidgets('chuỗi dựng sẵn của Material ra tiếng Việt, không phải tiếng Anh',
         (tester) async {
-      await tester.pumpWidget(const PoolCoachApp());
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: testContainer(),
+          child: const PoolCoachApp(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(FloatingActionButton));

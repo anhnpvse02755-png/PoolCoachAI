@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Toàn bộ chuỗi tiếng Việt hiển thị cho người dùng.
@@ -34,6 +35,26 @@ abstract final class Vi {
         SkillCategory.safety => 'Phòng thủ',
         SkillCategory.kick => 'A băng',
         SkillCategory.bank => 'Cân bi',
+      };
+
+  /// Câu giải thích vì sao hôm nay lại là nhóm kỹ năng này.
+  ///
+  /// Khuôn câu cố định, tham số do [computeRecommendation] tính ra —
+  /// đây không phải bịa nội dung. Mục 2.1 của tài liệu thiết kế cấm
+  /// con số bịa, không cấm câu chữ có tham số.
+  ///
+  /// Sáu lý do phải ra sáu câu khác nhau. Dùng chung một câu là lớp
+  /// suy luận nói mà người chơi không nghe được gì.
+  static String pickReason(PickReason reason, String skill) =>
+      switch (reason) {
+        PickReason.scheduled => 'Lịch tập hôm nay của bạn là $skill.',
+        PickReason.streakAtRisk =>
+          'Hai hôm rồi bạn chưa tập. Quay lại nhẹ nhàng với $skill.',
+        PickReason.weakest => '$skill đang là nhóm yếu nhất của bạn.',
+        PickReason.newcomer => 'Bắt đầu với $skill — nền của mọi cú đánh.',
+        PickReason.declining =>
+          '$skill đang đi xuống. Ôn lại trước khi thành điểm yếu.',
+        PickReason.rotation => 'Đã lâu bạn chưa tập $skill.',
       };
 
   // Màn đường dẫn không tồn tại.
@@ -83,4 +104,97 @@ abstract final class Vi {
 
   static const notificationsComing = 'Nhắc lịch tập, nhắc bảo dưỡng đầu cơ '
       'và đề xuất mới sẽ hiện ở đây.';
+
+  // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
+  //
+  // Bốn khối: chuỗi ngày tập, nhóm hôm nay kèm lý do, bài tập gợi ý,
+  // bài đọc. Chữ cố định nằm ở đây; con số và tên bài do lớp suy luận
+  // đưa lên, không viết sẵn ở bất kỳ đâu.
+  static const homeStreakUnit = 'ngày tập liên tiếp';
+  static const homeTodayTitle = 'Hôm nay';
+  static const homeDrillTitle = 'Bài tập gợi ý';
+  static const homeDrillOpen = 'Mở';
+  static const homeArticleTitle = 'Bài đọc hôm nay';
+
+  /// Khi nhóm hôm nay đã tập hết bài.
+  ///
+  /// Không đổi sang bài của nhóm khác: gợi ý phải trung thành với
+  /// nhóm mà sáu luật ưu tiên đã chọn, nói thật là hết bài thì hơn.
+  static const homeDrillAllDone =
+      'Hôm nay bạn đã tập hết bài trong nhóm này rồi.';
+
+  // Màn đọc kiến thức — mục 6.5 của thiết kế.
+  static const knowledgeTitle = 'Bài đọc';
+  static const knowledgeRelatedTitle = 'Bài tập liên quan';
+
+  // Khi không đọc được dữ liệu.
+  //
+  // Không in nội dung ngoại lệ ra màn hình: nó là tiếng Anh, lộ cấu
+  // trúc bên trong và chẳng giúp gì người chơi — cùng một lý do đã
+  // khiến màn không tìm thấy phải tự viết bằng tiếng Việt.
+  static const dataErrorTitle = 'Không đọc được dữ liệu';
+  static const dataErrorBody = 'Có trục trặc khi đọc dữ liệu luyện tập. '
+      'Hãy đóng app rồi mở lại.';
+
+  // Thư viện bài tập — mục 6.2 của thiết kế.
+  static const trainingFilterAll = 'Tất cả';
+
+  /// Tỉ lệ đạt mục tiêu của lần tập gần nhất, hiện theo phần trăm.
+  ///
+  /// `1.0` là đúng mục tiêu nên hiện 100%. Đây là số do [drillRatio]
+  /// tính, **không** phải điểm thô người chơi nhập: bài đạt khi trúng
+  /// 8 trên 10 thì trúng 9 là 113% mục tiêu, không phải "9".
+  static String drillRatioPercent(double ratio) =>
+      '${(ratio * 100).round()}%';
+
+  /// Đã tập nhưng thiếu dữ liệu để chấm.
+  ///
+  /// Không quy về 0: thiếu dữ liệu khác hẳn làm kém, và 0 ở đây là
+  /// một con số bịa đặt lên màn hình.
+  static const drillRatioUnknown = 'Chưa chấm được';
+
+  // Chi tiết bài tập — mục 6.3.
+  static String drillLevel(int level) => 'Cấp $level';
+  static String drillUnitLabel(String unit) => 'Đơn vị: $unit';
+  static const drillStepsTitle = 'Các bước thực hiện';
+  static const drillHistoryTitle = 'Lịch sử tập';
+  static const drillStartAction = 'Bắt đầu tập';
+
+  /// Ngày kiểu Việt Nam: ngày trước, tháng sau, đủ bốn chữ số năm.
+  ///
+  /// Viết tay thay vì dùng intl vì app khoá cứng một ngôn ngữ; thêm
+  /// cả gói định dạng cho một khuôn ngày là đắt hơn thứ nhận lại.
+  static String shortDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  // Buổi tập — mục 6.4.
+  static String sessionTitle(String drillName) => 'Tập: $drillName';
+  static const sessionScoreLabelAttempts = 'Số lần đạt';
+  static const sessionScoreLabelTarget = 'Kết quả';
+  static const sessionScoreHintAttempts = 'VD: 7';
+  static const sessionScoreHintTarget = 'VD: 22.5';
+  static const sessionAttemptsLabel = 'Số lần thử';
+  static const sessionAttemptsHint = 'VD: 10';
+  static const sessionNotesLabel = 'Ghi chú (tùy chọn)';
+  static const sessionNotesHint = 'VD: Cú đánh hơi lệch phải...';
+  static const sessionSaveAction = 'Lưu kết quả';
+
+  // Chặn ngay tại nút lưu, kèm câu giải thích. Lưu một log méo rồi để
+  // drillRatio() trả null về sau là đẩy lỗi đi xa khỏi chỗ gây ra nó.
+  static const sessionScoreRequired = 'Nhập kết quả';
+  static const sessionScoreInvalid = 'Nhập số hợp lệ';
+  static const sessionAttemptsRequired = 'Bài này cần nhập số lần thử';
+  static const sessionAttemptsInvalid = 'Nhập số nguyên dương';
+  static const sessionSaveFailed = 'Không lưu được kết quả. Hãy thử lại.';
+
+  /// Xác nhận sau khi lưu, kèm tỉ lệ đạt của chính buổi vừa ghi.
+  ///
+  /// Nói ngay lúc còn đứng ở bàn thì người chơi biết buổi vừa rồi tốt
+  /// hay tệ; để họ tự mở màn khác xem mới biết là mất mạch.
+  static String sessionSavedRatio(String percent) =>
+      'Đã lưu. Buổi này đạt $percent mục tiêu.';
+
+  /// Xác nhận khi bài không chấm được thành tỉ lệ.
+  static const sessionSaved = 'Đã lưu kết quả buổi tập.';
 }
