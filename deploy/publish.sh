@@ -36,7 +36,7 @@ fi
 
 (
   cd "$stage"
-  git rm -rq --ignore-unmatch . >/dev/null
+  git rm -rqf --ignore-unmatch . >/dev/null
   rm -rf ./*
   cp "$root/deploy/Dockerfile" "$root/deploy/nginx.conf" .
   cp -r "$root/build/web" web
