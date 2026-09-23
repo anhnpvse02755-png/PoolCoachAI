@@ -46,3 +46,6 @@ coverage/
 
 # Brainstorming companion
 .superpowers/
+
+# Worktree cô lập do Claude Code tạo
+.claude/worktrees/

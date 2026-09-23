@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "easypanel": {
+      "type": "http",
+      "url": "${EASYPANEL_MCP_URL}"
+    }
+  }
+}
