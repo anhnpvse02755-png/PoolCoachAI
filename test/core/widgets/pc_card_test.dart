@@ -26,14 +26,14 @@ void main() {
         ),
       );
 
-      final container = tester.widget<Container>(
+      // Bây giờ dùng Material thay vì Container.
+      final material = tester.widget<Material>(
         find.descendant(
           of: find.byType(PcCard),
-          matching: find.byType(Container),
+          matching: find.byType(Material),
         ).first,
       );
-      final decoration = container.decoration! as BoxDecoration;
-      expect(decoration.color, AppColors.surface);
+      expect(material.color, AppColors.surface);
     });
 
     testWidgets('gọi onTap khi được bấm', (tester) async {

@@ -20,14 +20,19 @@ class PcCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final card = Container(
+    final content = Padding(
       padding: padding ?? const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
+      child: child,
+    );
+
+    // Dùng Material làm nền để InkWell bên trong hoạt động đúng.
+    final card = Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.border),
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       ),
-      child: child,
+      child: content,
     );
 
     if (onTap == null) return card;

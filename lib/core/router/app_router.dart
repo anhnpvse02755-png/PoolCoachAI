@@ -6,10 +6,13 @@ import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
+import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
+import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
+import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 
 /// Dựng router của app.
@@ -56,6 +59,22 @@ GoRouter createAppRouter() => GoRouter(
             GoRoute(
               path: Routes.training,
               builder: (context, state) => const TrainingScreen(),
+              routes: [
+                GoRoute(
+                  path: 'drills/:id',
+                  builder: (context, state) => DrillDetailScreen(
+                    drillId: state.pathParameters['id']!,
+                  ),
+                  routes: [
+                    GoRoute(
+                      path: 'session',
+                      builder: (context, state) => DrillSessionScreen(
+                        drillId: state.pathParameters['id']!,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
@@ -92,6 +111,13 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(
       path: Routes.notifications,
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    // Bài đọc mở đè lên shell: vào được từ AI Home và từ bài tập, nên
+    // không thuộc riêng nhánh tab nào.
+    GoRoute(
+      path: Routes.articlePattern,
+      builder: (context, state) =>
+          KnowledgeScreen(articleId: state.pathParameters['id']!),
     ),
   ],
 );
