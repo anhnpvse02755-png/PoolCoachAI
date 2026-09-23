@@ -209,6 +209,74 @@ void main() {
       expect(store.session?.refreshToken, 'r3');
     });
 
+    test('làm mới đang chạy dở mà người chơi đăng xuất thì phiên không sống lại',
+        () async {
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+      final gate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await gate.future;
+        return FakeDirectus.ok({'access_token': 'access-r2', 'expires': 900000, 'refresh_token': 'r2'});
+      };
+
+      final tokenFuture = auth.accessToken(); // refresh in flight
+      await pumpEventQueue(); // ensure refresh has started
+      await auth.signOut();
+      gate.complete();
+
+      await expectLater(tokenFuture, throwsA(AuthFailure.sessionExpired));
+      expect(auth.current, const SignedOut());
+      expect(store.session, isNull);
+    });
+
+    test('làm mới của người cũ không đè phiên người mới', () async {
+      // A signs in
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+
+      final gate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await gate.future;
+        return FakeDirectus.ok({'access_token': 'access-r2', 'expires': 900000, 'refresh_token': 'r2'});
+      };
+
+      final aToken = auth.accessToken(); // A's refresh in flight
+      await pumpEventQueue();
+      await auth.signOut(); // A signs out
+
+      // B signs in
+      server.acceptLogin(userId: 'u2', name: 'B', refresh: 'rB');
+      await auth.signIn(email: 'b@example.com', password: 'matkhau123');
+
+      gate.complete(); // A's refresh returns
+
+      await expectLater(aToken, throwsA(AuthFailure.sessionExpired));
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'B'));
+      expect(store.session?.refreshToken, 'rB');
+    });
+
+    test('401 lần thử lại nhưng máy đã có token khác thì không xoá phiên', () async {
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+      // Tab khác vừa xoay: r1 → r2 before first refresh attempt (store already updated)
+      store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r2');
+      server.routes['POST /auth/refresh'] = (req) {
+        final used = FakeDirectus.body(req)['refresh_token'];
+        // First call uses r2 (token rotated before refresh started)
+        // Retry also gets a different token r3 from another tab rotation
+        if (used == 'r2') {
+          store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r3');
+          return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+        }
+        // Second retry uses r3 but that also fails on server
+        return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      };
+
+      await expectLater(auth.accessToken(), throwsA(AuthFailure.network));
+      expect(auth.current, isA<SignedIn>());
+      expect(store.session?.refreshToken, 'r3'); // store unchanged (not cleared)
+    });
+
     test('khôi phục phiên không cần mạng', () async {
       store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r1');
       server.offline = true;

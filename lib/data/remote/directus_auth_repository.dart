@@ -26,6 +26,7 @@ class DirectusAuthRepository implements AuthRepository {
   String? _accessToken;
   DateTime? _accessExpiresAt;
   Future<String>? _refreshing;
+  int _gen = 0; // session generation: incremented on every sign-in/sign-out/_expire
 
   @override
   AuthState get current => _state;
@@ -38,6 +39,8 @@ class DirectusAuthRepository implements AuthRepository {
     _state = state;
     _changes.add(state);
   }
+
+  void _bumpGen() => _gen++;
 
   static String _normalize(String email) => email.trim().toLowerCase();
 
@@ -117,6 +120,7 @@ class DirectusAuthRepository implements AuthRepository {
       refreshToken: tokens['refresh_token']! as String,
     );
     await _sessions.write(session);
+    _bumpGen();
     _emit(SignedIn(userId: session.userId, displayName: session.displayName));
   }
 
@@ -140,17 +144,24 @@ class DirectusAuthRepository implements AuthRepository {
     return _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
   }
 
-  Future<String> _refresh({bool retried = false}) async {
+  Future<String> _refresh({bool retried = false, String? originalToken}) async {
     final saved = await _sessions.read();
     if (saved == null) {
       await _expire();
       throw AuthFailure.sessionExpired;
     }
+    final startGen = _gen;
+    originalToken ??= saved.refreshToken;
+
     try {
       final tokens = await _api.post('/auth/refresh', body: {
         'refresh_token': saved.refreshToken,
         'mode': 'json',
       }) as Map<String, Object?>;
+
+      // Drop result if session changed while network call was in flight.
+      if (_gen != startGen) throw AuthFailure.sessionExpired;
+
       _takeTokens(tokens);
       await _sessions.write(StoredSession(
         userId: saved.userId,
@@ -163,14 +174,31 @@ class DirectusAuthRepository implements AuthRepository {
       throw AuthFailure.network;
     } on DirectusError catch (e) {
       if (e.status != 401 && e.status != 403) throw AuthFailure.unknown;
+
+      // Drop result if session changed while network call was in flight.
+      if (_gen != startGen) throw AuthFailure.sessionExpired;
+
       // Một tab khác có thể vừa xoay token. Máy đã cầm token mới hơn
       // thì thử lại một lần bằng token đó, trước khi kết luận phiên chết.
       final latest = await _sessions.read();
-      if (!retried &&
-          latest != null &&
-          latest.refreshToken != saved.refreshToken) {
-        return _refresh(retried: true);
+
+      // Drop result if session changed during the 401 handling itself.
+      if (_gen != startGen) throw AuthFailure.sessionExpired;
+
+      if (!retried && latest != null && latest.refreshToken != originalToken) {
+        return _refresh(retried: true, originalToken: originalToken);
       }
+
+      // Before expiring, check if the store has moved on from the original
+      // token. If another tab rotated while we were refreshing, the session
+      // is still valid — keep it and report a transient failure so the caller
+      // retries later. Only expire if the store still holds the original
+      // (rejected) token, meaning the server genuinely rejected it.
+      final current = await _sessions.read();
+      if (current != null && current.refreshToken != originalToken) {
+        throw AuthFailure.network;
+      }
+
       await _expire();
       throw AuthFailure.sessionExpired;
     }
@@ -182,6 +210,7 @@ class DirectusAuthRepository implements AuthRepository {
     await _sessions.clear();
     _accessToken = null;
     _accessExpiresAt = null;
+    _bumpGen();
     _emit(const SignedOut(expired: true));
   }
 
@@ -201,8 +230,10 @@ class DirectusAuthRepository implements AuthRepository {
       }
     }
     await _sessions.clear();
+    _refreshing = null;
     _accessToken = null;
     _accessExpiresAt = null;
+    _bumpGen();
     _emit(const SignedOut());
   }
 
