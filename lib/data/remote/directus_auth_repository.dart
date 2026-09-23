@@ -1,0 +1,244 @@
+import 'dart:async';
+
+import 'package:poolcoachai/data/remote/directus_client.dart';
+import 'package:poolcoachai/data/repositories/auth_repository.dart';
+import 'package:poolcoachai/domain/auth.dart';
+
+/// Xác thực qua Directus: refresh token trên máy, access token trong bộ nhớ.
+class DirectusAuthRepository implements AuthRepository {
+  DirectusAuthRepository({
+    required this._api,
+    required this._sessions,
+    required this._resetUrl,
+    required this._now,
+  });
+
+  final DirectusClient _api;
+  final SessionStore _sessions;
+  final Uri _resetUrl;
+  final DateTime Function() _now;
+
+  static const _minPasswordLength = 8;
+  static const _refreshMargin = Duration(minutes: 1);
+
+  final _changes = StreamController<AuthState>.broadcast();
+  AuthState _state = const SignedOut();
+  String? _accessToken;
+  DateTime? _accessExpiresAt;
+  Future<String>? _refreshing;
+
+  @override
+  AuthState get current => _state;
+
+  @override
+  Stream<AuthState> watchSession() => _changes.stream;
+
+  void _emit(AuthState state) {
+    if (state == _state) return;
+    _state = state;
+    _changes.add(state);
+  }
+
+  static String _normalize(String email) => email.trim().toLowerCase();
+
+  @override
+  Future<void> restore() async {
+    final saved = await _sessions.read();
+    if (saved != null) {
+      _emit(SignedIn(userId: saved.userId, displayName: saved.displayName));
+    }
+  }
+
+  @override
+  Future<void> register({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
+    if (password.length < _minPasswordLength) throw AuthFailure.weakPassword;
+    final normalized = _normalize(email);
+    try {
+      await _api.post('/users/register', body: {
+        'email': normalized,
+        'password': password,
+        'first_name': displayName.trim(),
+      });
+    } on DirectusUnreachable {
+      throw AuthFailure.network;
+    } on DirectusError catch (e) {
+      throw switch (e.code) {
+        'RECORD_NOT_UNIQUE' => AuthFailure.emailTaken,
+        'FAILED_VALIDATION' => AuthFailure.weakPassword,
+        _ => AuthFailure.unknown,
+      };
+    }
+    try {
+      await signIn(email: normalized, password: password);
+    } on AuthFailure catch (f) {
+      // Directus có thể không báo email trùng khi đăng ký (chống dò
+      // email). Đăng ký "thành công" mà đăng nhập hỏng nghĩa là email
+      // đã có chủ với mật khẩu khác.
+      throw f == AuthFailure.wrongCredentials ? AuthFailure.emailTaken : f;
+    }
+  }
+
+  @override
+  Future<void> signIn({required String email, required String password}) async {
+    final Map<String, Object?> tokens;
+    try {
+      tokens = await _api.post('/auth/login', body: {
+        'email': _normalize(email),
+        'password': password,
+        'mode': 'json',
+      }) as Map<String, Object?>;
+    } on DirectusUnreachable {
+      throw AuthFailure.network;
+    } on DirectusError catch (e) {
+      throw e.status == 401 ? AuthFailure.wrongCredentials : AuthFailure.unknown;
+    }
+    _takeTokens(tokens);
+
+    final Map<String, Object?> me;
+    try {
+      me = await _api.get(
+        '/users/me',
+        token: _accessToken,
+        query: {'fields': 'id,first_name'},
+      ) as Map<String, Object?>;
+    } on DirectusUnreachable {
+      throw AuthFailure.network;
+    } on DirectusError {
+      throw AuthFailure.unknown;
+    }
+
+    final session = StoredSession(
+      userId: me['id']! as String,
+      displayName: (me['first_name'] as String?) ?? '',
+      refreshToken: tokens['refresh_token']! as String,
+    );
+    await _sessions.write(session);
+    _emit(SignedIn(userId: session.userId, displayName: session.displayName));
+  }
+
+  void _takeTokens(Map<String, Object?> tokens) {
+    _accessToken = tokens['access_token']! as String;
+    _accessExpiresAt = _now().add(
+      Duration(milliseconds: (tokens['expires']! as num).toInt()),
+    );
+  }
+
+  @override
+  Future<String> accessToken() {
+    if (_state is! SignedIn) return Future.error(AuthFailure.sessionExpired);
+    final token = _accessToken;
+    final expiresAt = _accessExpiresAt;
+    if (token != null &&
+        expiresAt != null &&
+        expiresAt.difference(_now()) > _refreshMargin) {
+      return Future.value(token);
+    }
+    return _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
+  }
+
+  Future<String> _refresh({bool retried = false}) async {
+    final saved = await _sessions.read();
+    if (saved == null) {
+      await _expire();
+      throw AuthFailure.sessionExpired;
+    }
+    try {
+      final tokens = await _api.post('/auth/refresh', body: {
+        'refresh_token': saved.refreshToken,
+        'mode': 'json',
+      }) as Map<String, Object?>;
+      _takeTokens(tokens);
+      await _sessions.write(StoredSession(
+        userId: saved.userId,
+        displayName: saved.displayName,
+        refreshToken: tokens['refresh_token']! as String,
+      ));
+      return _accessToken!;
+    } on DirectusUnreachable {
+      // Mất mạng không bao giờ là lý do đăng xuất.
+      throw AuthFailure.network;
+    } on DirectusError catch (e) {
+      if (e.status != 401 && e.status != 403) throw AuthFailure.unknown;
+      // Một tab khác có thể vừa xoay token. Máy đã cầm token mới hơn
+      // thì thử lại một lần bằng token đó, trước khi kết luận phiên chết.
+      final latest = await _sessions.read();
+      if (!retried &&
+          latest != null &&
+          latest.refreshToken != saved.refreshToken) {
+        return _refresh(retried: true);
+      }
+      await _expire();
+      throw AuthFailure.sessionExpired;
+    }
+  }
+
+  /// Tự động đăng xuất: chỉ bỏ phiên. **Không** động tới buổi tập nào —
+  /// người chơi đăng nhập lại thì mọi thứ còn nguyên (spec mục 5.4).
+  Future<void> _expire() async {
+    await _sessions.clear();
+    _accessToken = null;
+    _accessExpiresAt = null;
+    _emit(const SignedOut(expired: true));
+  }
+
+  @override
+  Future<void> signOut() async {
+    final saved = await _sessions.read();
+    if (saved != null) {
+      try {
+        await _api.post('/auth/logout', body: {
+          'refresh_token': saved.refreshToken,
+          'mode': 'json',
+        });
+      } on DirectusUnreachable {
+        // Không báo được server thì token tự hết hạn sau 30 ngày.
+      } on DirectusError {
+        // Token đã chết sẵn trên server — đúng thứ ta muốn.
+      }
+    }
+    await _sessions.clear();
+    _accessToken = null;
+    _accessExpiresAt = null;
+    _emit(const SignedOut());
+  }
+
+  @override
+  Future<void> requestPasswordReset(String email) async {
+    try {
+      await _api.post('/auth/password/request', body: {
+        'email': _normalize(email),
+        'reset_url': _resetUrl.toString(),
+      });
+    } on DirectusUnreachable {
+      throw AuthFailure.network;
+    } on DirectusError {
+      throw AuthFailure.unknown;
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    if (password.length < _minPasswordLength) throw AuthFailure.weakPassword;
+    try {
+      await _api.post('/auth/password/reset', body: {
+        'token': token,
+        'password': password,
+      });
+    } on DirectusUnreachable {
+      throw AuthFailure.network;
+    } on DirectusError catch (e) {
+      throw switch (e.status) {
+        401 || 403 => AuthFailure.resetLinkInvalid,
+        400 when e.code == 'FAILED_VALIDATION' => AuthFailure.weakPassword,
+        _ => AuthFailure.unknown,
+      };
+    }
+  }
+}
