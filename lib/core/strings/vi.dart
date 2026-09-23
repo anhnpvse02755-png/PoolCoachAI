@@ -233,6 +233,16 @@ abstract final class Vi {
   static const authResetMissingToken =
       'Link đặt lại mật khẩu không đầy đủ. Hãy mở lại link trong email.';
 
+  // Đăng xuất — spec mục 5.4.
+  static String profileSignedInAs(String name) => 'Đang đăng nhập: $name';
+  static const profileSignOut = 'Đăng xuất';
+  static const signOutPendingTitle = 'Còn buổi tập chưa đồng bộ';
+  static String signOutPendingBody(int count) =>
+      'Còn $count buổi chưa đồng bộ, đăng xuất sẽ mất.';
+  static const signOutSyncFirst = 'Đồng bộ trước';
+  static const signOutAnyway = 'Vẫn đăng xuất';
+  static const syncFailed = 'Chưa đồng bộ được. Kiểm tra mạng rồi thử lại.';
+
   static const authFieldRequired = 'Không được để trống';
   static const authEmailInvalid = 'Nhập email hợp lệ';
   static const authPasswordTooShort = 'Mật khẩu cần ít nhất 8 ký tự';
