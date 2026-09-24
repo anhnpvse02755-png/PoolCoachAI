@@ -291,6 +291,32 @@ void main() {
       expect((await row('a')).syncedAt, isNotNull);
     });
 
+    test('buổi chờ của người khác không làm lần thử lại định kỳ chạy',
+        () async {
+      sync.dispose();
+      sync = build(retryEvery: const Duration(milliseconds: 20));
+      await addLog('cua-an', userId: 'u1');
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+
+      sync.start();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(server.sent('GET', '/items/drill_logs').length, lessThanOrEqualTo(2));
+      expect(pushedIds(), isEmpty);
+    });
+
+    test('buổi mới của người khác không khởi động lượt nào', () async {
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      sync.start();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      server.requests.clear();
+
+      await addLog('cua-an', userId: 'u1');
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(server.requests, isEmpty);
+    });
+
     test('vừa đăng nhập thì kéo dữ liệu về', () async {
       auth.emit(const SignedOut());
       sync.start();

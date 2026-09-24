@@ -299,10 +299,48 @@ void main() {
       server.routes['POST /auth/logout'] = (_) => FakeDirectus.noContent();
 
       await auth.signOut();
+      await pumpEventQueue(); // báo server chạy nền, sau khi đã đăng xuất
 
       expect(FakeDirectus.body(server.sent('POST', '/auth/logout').single)['refresh_token'], 'r1');
       expect(auth.current, const SignedOut());
       expect(store.session, isNull);
+    });
+
+    test('đã SignedOut trước khi server trả lời /auth/logout', () async {
+      server.acceptLogin(refresh: 'r1');
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      final gate = Completer<void>();
+      server.routes['POST /auth/logout'] = ((_) async {
+        await gate.future;
+        return FakeDirectus.noContent();
+      });
+
+      final changes = <AuthState>[];
+      auth.watchSession().listen(changes.add);
+
+      final done = auth.signOut();
+      await pumpEventQueue();
+
+      // Server còn treo mà máy đã đăng xuất xong.
+      expect(server.sent('POST', '/auth/logout'), hasLength(1));
+      expect(auth.current, const SignedOut());
+      expect(changes, [const SignedOut()]);
+      expect(store.session, isNull);
+
+      gate.complete();
+      await done;
+    });
+
+    test('server trả lỗi lạ lúc logout cũng không ném', () async {
+      server.acceptLogin(refresh: 'r1');
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      server.routes['POST /auth/logout'] =
+          ((_) => FakeDirectus.error(500, 'INTERNAL'));
+
+      await auth.signOut();
+      await pumpEventQueue();
+
+      expect(auth.current, const SignedOut());
     });
 
     test('mất mạng vẫn đăng xuất được trên máy', () async {

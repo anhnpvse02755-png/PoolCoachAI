@@ -214,27 +214,35 @@ class DirectusAuthRepository implements AuthRepository {
     _emit(const SignedOut(expired: true));
   }
 
+  /// Đăng xuất trên máy **trước**, rồi mới báo server ở nền.
+  ///
+  /// Trạng thái phải thành [SignedOut] trước bất kỳ lần chờ mạng nào:
+  /// một lượt kéo về đang chạy chỉ biết dừng khi thấy người dùng đổi,
+  /// và nếu ta chờ `/auth/logout` (tới ~30 giây) trước, nó sẽ ghi lại
+  /// đúng những buổi tập người chơi vừa bấm xoá.
   @override
   Future<void> signOut() async {
     final saved = await _sessions.read();
-    if (saved != null) {
-      try {
-        await _api.post('/auth/logout', body: {
-          'refresh_token': saved.refreshToken,
-          'mode': 'json',
-        });
-      } on DirectusUnreachable {
-        // Không báo được server thì token tự hết hạn sau 30 ngày.
-      } on DirectusError {
-        // Token đã chết sẵn trên server — đúng thứ ta muốn.
-      }
-    }
     await _sessions.clear();
     _refreshing = null;
     _accessToken = null;
     _accessExpiresAt = null;
     _bumpGen();
     _emit(const SignedOut());
+    if (saved != null) unawaited(_revoke(saved.refreshToken));
+  }
+
+  /// Báo server bỏ refresh token. Hỏng thế nào cũng không sao: token
+  /// tự hết hạn sau 30 ngày, và máy đã quên nó rồi.
+  Future<void> _revoke(String refreshToken) async {
+    try {
+      await _api.post('/auth/logout', body: {
+        'refresh_token': refreshToken,
+        'mode': 'json',
+      });
+    } on Object {
+      // Mất mạng, token đã chết sẵn, server lỗi — đều bỏ qua.
+    }
   }
 
   @override

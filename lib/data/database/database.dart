@@ -151,11 +151,17 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  /// Id các buổi tập chưa lên server, của mọi người dùng trên máy.
-  Stream<List<String>> watchPendingLogIds() {
+  /// Buổi tập chưa lên server, của mọi người dùng trên máy — kèm chủ của
+  /// từng buổi, để bên đồng bộ chỉ để ý tới người đang đăng nhập.
+  Stream<List<({String id, String userId})>> watchPendingLogs() {
     final query = selectOnly(drillLogRows)
-      ..addColumns([drillLogRows.id])
+      ..addColumns([drillLogRows.id, drillLogRows.userId])
       ..where(drillLogRows.syncedAt.isNull());
-    return query.map((row) => row.read(drillLogRows.id)!).watch();
+    return query
+        .map((row) => (
+              id: row.read(drillLogRows.id)!,
+              userId: row.read(drillLogRows.userId)!,
+            ))
+        .watch();
   }
 }

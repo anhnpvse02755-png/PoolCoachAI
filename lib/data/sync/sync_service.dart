@@ -40,7 +40,8 @@ class SyncService {
 
   Future<SyncOutcome>? _running;
   bool _again = false;
-  Set<String> _seenPending = {};
+  /// Buổi chờ đẩy trên máy, của mọi người — id → chủ của buổi.
+  Map<String, String> _seenPending = {};
 
   /// Buổi server từ chối hoặc không mã hoá được thành JSON. Vẫn nằm chờ
   /// (không xoá, vẫn tính là chưa đồng bộ) và mỗi lượt vẫn thử lại, nhưng
@@ -49,7 +50,7 @@ class SyncService {
   final Set<String> _rejected = {};
   Timer? _timer;
   StreamSubscription<AuthState>? _authSub;
-  StreamSubscription<List<String>>? _pendingSub;
+  StreamSubscription<List<({String id, String userId})>>? _pendingSub;
 
   /// Tự đồng bộ: ngay lúc gọi, khi vừa đăng nhập, khi có buổi tập mới,
   /// và định kỳ khi vẫn còn buổi nằm chờ.
@@ -57,19 +58,25 @@ class SyncService {
     _authSub = _auth.watchSession().listen((state) {
       if (state is SignedIn) unawaited(syncNow());
     });
-    _pendingSub = _db.watchPendingLogIds().listen((ids) {
-      final fresh = ids.any(
-          (id) => !_seenPending.contains(id) && !_rejected.contains(id));
-      _seenPending = ids.toSet();
+    _pendingSub = _db.watchPendingLogs().listen((rows) {
+      final fresh = rows.any(
+          (r) => !_seenPending.containsKey(r.id) && _worthPushing(r.id, r.userId));
+      _seenPending = {for (final r in rows) r.id: r.userId};
       if (fresh) unawaited(syncNow());
     });
     _timer = Timer.periodic(_retryEvery, (_) {
-      if (_seenPending.any((id) => !_rejected.contains(id))) {
+      if (_seenPending.entries.any((e) => _worthPushing(e.key, e.value))) {
         unawaited(syncNow());
       }
     });
     unawaited(syncNow());
   }
+
+  /// Buổi chờ này có đáng khởi động một lượt không: phải của người đang
+  /// đăng nhập (buổi của người khác chỉ đẩy khi chính họ quay lại), và
+  /// chưa bị server từ chối trong lần chạy này.
+  bool _worthPushing(String id, String userId) =>
+      _stillSignedInAs(userId) && !_rejected.contains(id);
 
   /// Một lượt đẩy rồi kéo. Gọi khi đang chạy thì chạy thêm đúng một lượt
   /// sau lượt hiện tại, để buổi vừa ghi không phải chờ tới lần thử lại.
