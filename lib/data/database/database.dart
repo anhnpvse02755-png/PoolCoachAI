@@ -130,11 +130,13 @@ class AppDatabase extends _$AppDatabase {
     // Trên web, drift chạy SQLite bằng WebAssembly trong một worker.
     // Hai file nằm trong web/ và phải khớp phiên bản đang khoá:
     // sqlite3.wasm theo package sqlite3, drift_worker.js theo drift.
+    // Đường dẫn tuyệt đối: app dùng URL dạng đường dẫn, tương đối thì
+    // mở /training/drills/d1 sẽ đi tìm /training/drills/sqlite3.wasm.
     return driftDatabase(
       name: 'poolcoachai_db',
       web: DriftWebOptions(
-        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-        driftWorker: Uri.parse('drift_worker.js'),
+        sqlite3Wasm: Uri.parse('/sqlite3.wasm'),
+        driftWorker: Uri.parse('/drift_worker.js'),
       ),
     );
   }

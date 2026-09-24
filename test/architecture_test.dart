@@ -82,14 +82,24 @@ void main() {
         .allMatches(source)
         .map((m) => m[1]!)
         .toList();
-    expect(assets, containsAll(['sqlite3.wasm', 'drift_worker.js']));
+    expect(assets, containsAll(['/sqlite3.wasm', '/drift_worker.js']),
+        reason: 'phải là đường dẫn tuyệt đối: app dùng URL dạng đường dẫn, '
+            'nên đường dẫn tương đối bị hiểu theo trang đang mở, và mở '
+            'thẳng /training/drills/d1 sẽ tải nhầm index.html thay cho wasm');
     for (final asset in assets) {
       expect(
-        File('web/$asset').existsSync(),
+        File('web$asset').existsSync(),
         isTrue,
-        reason: 'web/$asset không có — build web sẽ không mang theo nó',
+        reason: 'web$asset không có — build web sẽ không mang theo nó',
       );
     }
+  });
+
+  test('app dùng URL dạng đường dẫn, để link trong email mở đúng màn', () {
+    final main = codeOnly(File('lib/main.dart').readAsStringSync());
+    expect(main, contains('usePathUrlStrategy()'),
+        reason: 'link đặt lại mật khẩu có dạng /reset-password?token=…; '
+            'ở dạng hash, Directus chèn ?token vào trước dấu #');
   });
 
   test('không màn hình nào chứa chuỗi tiếng Việt viết thẳng', () {
