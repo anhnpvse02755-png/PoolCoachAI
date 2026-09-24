@@ -292,16 +292,14 @@ void main() {
       now = now.add(const Duration(minutes: 20));
       server.requests.clear();
 
-      // Deferred store: clear() blocks until we release it.
+      // Deferred store: clear() and write() block until we release them.
       final deferredStore = DeferredInMemorySessionStore();
-      // Copy the session data (store.session is the same object still held
-      // by the outer auth/repository, which we are not touching here).
-      final sessionCopy = StoredSession(
+      // Fresh copy so deferredStore is completely independent of store.
+      deferredStore.session = StoredSession(
         userId: store.session!.userId,
         displayName: store.session!.displayName,
         refreshToken: store.session!.refreshToken,
       );
-      deferredStore.session = sessionCopy;
       final deferredAuth = DirectusAuthRepository(
         api: DirectusClient(
           client: server.client,
@@ -321,9 +319,16 @@ void main() {
         );
       };
 
-      // Start a refresh (in flight).
-      deferredAuth.accessToken();
+      // Capture the refresh future BEFORE starting signOut so we can register
+      // the expectLater expectation before either future resolves.
+      final tokenFuture = deferredAuth.accessToken();
       await pumpEventQueue();
+
+      // Attach the expectation early — before releasing any gates.
+      final tokenExpectation = expectLater(
+        tokenFuture,
+        throwsA(AuthFailure.sessionExpired),
+      );
 
       // Start signOut; it blocks inside clear().
       final signOutFuture = deferredAuth.signOut();
@@ -332,39 +337,82 @@ void main() {
       // Release the refresh response while signOut is still awaiting clear().
       refreshGate.complete();
 
-      // Let the refresh's write proceed. It will pass its gen check (gen was
-      // bumped AFTER signOut's clear was queued, but the write runs before the
-      // gen bump completes). Then complete clear so signOutFuture can finish.
+      // Let the refresh's write proceed, then let signOut's clear proceed.
       deferredStore.releaseWrite();
       deferredStore.releaseClear();
 
-      // Both should settle: tokenFuture (refresh done) then signOutFuture (clear done).
-      // We do NOT await tokenFuture here — if signOutFuture completes first, _state
-      // becomes SignedOut and a subsequent accessToken() throws synchronously from
-      // the _state guard (line 136), which the test framework reports as an
-      // uncaught exception rather than a test failure. The session state assertions
-      // below are sufficient to prove the session is gone.
+      // Wait for both.
       await signOutFuture;
       await pumpEventQueue();
 
-      // Session is gone — no silent re-sign-in.
+      // Session is gone — no silent re-sign-in on restore().
       expect(deferredStore.session, isNull);
       expect(deferredAuth.current, const SignedOut());
+
+      // Now await the token expectation — the refresh was rejected by the gen
+      // check because signOut bumped _gen before clear() ran.
+      await tokenExpectation;
     });
 
-    // _expire cannot be triggered deterministically: the race window between
-    // _bumpGen() and _sessions.clear() is a single synchronous statement, and
-    // the microtask scheduler drains all queued completions before any
-    // user-controlled gate can intervene. The fix is validated by the signOut
-    // race test above, and by the new gen re-check in _refresh() (line ~169).
-    test(
-        '_expire bắt đầu chờ clear thì refresh đang chạy không khôi phục '
-        'phiên đã chết', () async {
-      // This test is a placeholder documenting the race. It is skipped because
-      // the precise interleaving required is not achievable with the current
-      // DeferredInMemorySessionStore and pumpEventQueue.
-    },
-    skip: 'Race window not deterministically achievable with pumpEventQueue');
+    test('_expire chạy trong lúc refresh đang chờ ghi thì phiên đã chết không khôi phục',
+        () async {
+      server.acceptLogin(refresh: 'r1', expiresMs: 15 * 60 * 1000);
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.requests.clear();
+
+      final deferredStore = DeferredInMemorySessionStore();
+      deferredStore.session = StoredSession(
+        userId: store.session!.userId,
+        displayName: store.session!.displayName,
+        refreshToken: store.session!.refreshToken,
+      );
+      final deferredAuth = DirectusAuthRepository(
+        api: DirectusClient(
+          client: server.client,
+          baseUrl: FakeDirectus.baseUrl,
+        ),
+        sessions: deferredStore,
+        resetUrl: resetUrl,
+        now: () => now,
+      );
+      await deferredAuth.restore();
+
+      final refreshGate = Completer<void>();
+      // Hold the refresh response; it will be the second refresh that
+      // triggers _expire (after the 401 path falls through to it).
+      server.routes['POST /auth/refresh'] = (_) async {
+        await refreshGate.future;
+        return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      };
+
+      // Capture the refresh future BEFORE starting signOut.
+      final tokenFuture = deferredAuth.accessToken();
+      await pumpEventQueue();
+
+      // Register expectation early.
+      final tokenExpectation = expectLater(
+        tokenFuture,
+        throwsA(AuthFailure.sessionExpired),
+      );
+
+      // Start signOut; it bumps gen and blocks inside clear().
+      final signOutFuture = deferredAuth.signOut();
+      await pumpEventQueue();
+
+      // Release the held refresh handler (returns 401), then let signOut's clear run.
+      refreshGate.complete();
+      deferredStore.releaseClear();
+
+      await signOutFuture;
+      await pumpEventQueue();
+
+      // The 401 from the held refresh triggers _expire. But signOut already
+      // ran: bump happened first, clear completed, session is gone. Verify.
+      expect(deferredStore.session, isNull);
+      expect(deferredAuth.current, const SignedOut());
+      await tokenExpectation;
+    });
 
     test('401 lần thử lại nhưng máy đã có token khác thì không xoá phiên', () async {
       await signedIn();
