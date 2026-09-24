@@ -141,7 +141,19 @@ class DirectusAuthRepository implements AuthRepository {
         expiresAt.difference(_now()) > _refreshMargin) {
       return Future.value(token);
     }
-    return _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
+    return _refreshing ??= _genStableRefresh();
+  }
+
+  /// Like _refresh() but stable: the whenComplete cleanup only nulls
+  /// _refreshing if that slot still holds this same future — not if a later
+  /// call's refresh has already replaced it.
+  Future<String> _genStableRefresh() {
+    late final Future<String> f;
+    f = _refresh().whenComplete(() {
+      if (identical(_refreshing, f)) _refreshing = null;
+    });
+    _refreshing = f; // assign before return so identical() is true when wc fires
+    return f;
   }
 
   Future<String> _refresh({bool retried = false, String? originalToken}) async {

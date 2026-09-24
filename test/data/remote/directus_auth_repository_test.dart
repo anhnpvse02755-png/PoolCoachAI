@@ -330,27 +330,25 @@ void main() {
         throwsA(AuthFailure.sessionExpired),
       );
 
-      // Start signOut; it blocks inside clear().
-      final signOutFuture = deferredAuth.signOut();
+      // Start signOut; it bumps gen, then blocks inside clear().
+      deferredAuth.signOut();
       await pumpEventQueue();
 
-      // Release the refresh response while signOut is still awaiting clear().
+      // Release the refresh response so the refresh handler returns.
       refreshGate.complete();
 
-      // Let the refresh's write proceed, then let signOut's clear proceed.
+      // Release write() FIRST — it queues a microtask (pending write to r2).
+      // Then pump: gen bumps to 2 while write is queued. Then release clear().
+      // Fixed: write fires with gen=1, but gen check (gen != 1) rejects it.
+      // Buggy: write fires with gen=2, gen check passes, session = r2 → FAIL.
       deferredStore.releaseWrite();
+      await pumpEventQueue();
       deferredStore.releaseClear();
-
-      // Wait for both.
-      await signOutFuture;
       await pumpEventQueue();
 
-      // Session is gone — no silent re-sign-in on restore().
+      // Session must be gone — no silent re-sign-in on restore().
       expect(deferredStore.session, isNull);
       expect(deferredAuth.current, const SignedOut());
-
-      // Now await the token expectation — the refresh was rejected by the gen
-      // check because signOut bumped _gen before clear() ran.
       await tokenExpectation;
     });
 
@@ -412,6 +410,175 @@ void main() {
       expect(deferredStore.session, isNull);
       expect(deferredAuth.current, const SignedOut());
       await tokenExpectation;
+    });
+
+    // A/B/C stale whenComplete race: refresh A is in flight; user signs out and
+    // signs back in; accessToken() starts refresh B; A completes (its stale
+    // whenComplete nulls _refreshing, clearing the deduplication guard); the
+    // second accessToken() starts refresh C concurrently; B gets 401 and enters
+    // _expire() (clear blocked); C's 200 is released; pump drains C's write
+    // (B's _expire gen bump is still waiting on clear); after drain, release
+    // clear; pump; _expire completes. Without the identity fix in accessToken(),
+    // C races past B through the cleared _refreshing, and the B → _expire
+    // concurrent write can land after _expire's gen bump if the timing allows.
+    //
+    // With the identity fix, the stale whenComplete never clears _refreshing
+    // while B is still running, so C is de-duplicated and no concurrent write
+    // reaches the store during _expire's window.
+    test('signOut rồi signIn rồi accessToken: refresh cũ không đè refresh mới', () async {
+      server.acceptLogin(refresh: 'r1', expiresMs: 15 * 60 * 1000);
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.requests.clear();
+
+      // Block the first refresh (A) so it stays in flight.
+      final refreshAGate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await refreshAGate.future;
+        return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      };
+
+      // Start refresh A (in flight).
+      final aFuture = auth.accessToken();
+      await pumpEventQueue();
+
+      // A will reject with sessionExpired once signOut bumps gen and A's
+      // blocked 401 handler runs its gen check. Register the expectation
+      // before signOut (which triggers the rejection) so it is not uncaught.
+      final aExpect = expectLater(aFuture, throwsA(AuthFailure.sessionExpired));
+
+      // User signs out.
+      await auth.signOut();
+      await pumpEventQueue();
+
+      // New sign-in with new refresh token r2.
+      server.acceptLogin(refresh: 'r2', expiresMs: 15 * 60 * 1000);
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.requests.clear();
+
+      // Set up deferred store whose write() is held — blocks B (and any
+      // concurrent refresh) from completing until we release the gate.
+      final deferredStore = DeferredInMemorySessionStore();
+      deferredStore.session = StoredSession(
+        userId: store.session!.userId,
+        displayName: store.session!.displayName,
+        refreshToken: store.session!.refreshToken,
+      );
+      final deferredAuth = DirectusAuthRepository(
+        api: DirectusClient(
+          client: server.client,
+          baseUrl: FakeDirectus.baseUrl,
+        ),
+        sessions: deferredStore,
+        resetUrl: resetUrl,
+        now: () => now,
+      );
+      await deferredAuth.restore();
+
+      // Set up the C handler (success, r2) BEFORE starting B — so B's HTTP
+      // call (which fires immediately, before C can register its own handler
+      // via ??=) hits the correct success response and does not go through
+      // the stale A handler (401).
+      final refreshCGate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await refreshCGate.future;
+        return FakeDirectus.ok(
+          {'access_token': 'access-r2', 'expires': 900000, 'refresh_token': 'r2'},
+        );
+      };
+
+      // Start refresh B (blocked on deferredStore.writeGate).
+      // Its HTTP call fires IMMEDIATELY upon accessToken() (since _refreshing
+      // is null), using the C handler we just registered.
+      final bFuture = deferredAuth.accessToken();
+      await pumpEventQueue();
+
+      // A completes — with the identity fix: whenComplete does NOT clear
+      // _refreshing (still holds f_B). Without the fix: clears it.
+      refreshAGate.complete();
+      await pumpEventQueue();
+      await aExpect;
+
+      // Start refresh C — _refreshing holds f_B, so ??= doesn't fire.
+      deferredAuth.accessToken();
+      await pumpEventQueue();
+
+      // Release C's gate (already succeeded via B's HTTP call — no-op for requests).
+      refreshCGate.complete();
+      await pumpEventQueue();
+
+      // Release B's write gate — both B and C's pending write() calls run.
+      deferredStore.releaseWrite();
+      await pumpEventQueue();
+
+      // Assertions.
+      expect(await bFuture, 'access-r2');
+      expect(
+        server.sent('POST', '/auth/refresh').length,
+        1,
+        reason: 'only one /auth/refresh for the current session r2',
+      );
+      expect(deferredAuth.current, isA<SignedIn>());
+    });
+
+    test('refresh A đang chạy thì signOut rồi signIn rồi accessToken() phải reuse refresh B chứ không gửi refresh mới', () async {
+      server.acceptLogin(refresh: 'r1', expiresMs: 15 * 60 * 1000);
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.requests.clear();
+
+      // Block refresh A on a separate server gate so we control when it completes.
+      // B must start BEFORE A completes, so _refreshing holds B when A's
+      // whenComplete fires — proving the identity check is what protects B.
+      final gateAServer = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await gateAServer.future;
+        return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      };
+
+      // Start A (blocked on gateAServer).
+      final aFuture = auth.accessToken();
+      await pumpEventQueue();
+
+      // A will reject with sessionExpired once signOut bumps gen and the blocked
+      // 401 handler fires its gen check. Register expectation before signOut.
+      final aExpect = expectLater(aFuture, throwsA(AuthFailure.sessionExpired));
+
+      // User signs out.
+      await auth.signOut();
+      await pumpEventQueue();
+
+      // Sign-in with r2.
+      server.acceptLogin(refresh: 'r2', expiresMs: 15 * 60 * 1000);
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.requests.clear();
+
+      // Set up B's handler (r2 → access-r2).
+      server.routes['POST /auth/refresh'] = (_) => FakeDirectus.ok(
+            {'access_token': 'access-r2', 'expires': 900000, 'refresh_token': 'r2'},
+          );
+
+      // Start B and capture its future BEFORE A completes.
+      final bFuture = auth.accessToken();
+      await pumpEventQueue();
+
+      // NOW let A complete. Its whenComplete fires with stale f_A.
+      // With the identity fix: identical(_refreshing, f_A) is FALSE (holds f_B).
+      // The whenComplete does nothing. B is protected.
+      // Without the fix: identical() would be true, _refreshing = null,
+      // and B's future would become orphaned — the next accessToken() sends a
+      // third request.
+      gateAServer.complete();
+      await pumpEventQueue();
+      await aExpect;
+
+      // B must succeed with access-r2.
+      expect(await bFuture, 'access-r2');
+      // Exactly one /auth/refresh for the current session r2.
+      expect(server.sent('POST', '/auth/refresh'), hasLength(1));
+      expect(auth.current, isA<SignedIn>());
     });
 
     test('401 lần thử lại nhưng máy đã có token khác thì không xoá phiên', () async {
