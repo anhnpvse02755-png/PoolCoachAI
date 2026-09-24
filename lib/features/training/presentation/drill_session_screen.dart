@@ -151,7 +151,11 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return Vi.sessionScoreRequired;
                       }
-                      if (double.tryParse(value) == null) {
+                      // "Infinity", "1e999", "NaN" đều qua được
+                      // double.tryParse, nhưng không lên server được
+                      // (JSON không có số vô hạn) — chặn ngay ở đây.
+                      final parsed = double.tryParse(value);
+                      if (parsed == null || !parsed.isFinite || parsed < 0) {
                         return Vi.sessionScoreInvalid;
                       }
                       return null;

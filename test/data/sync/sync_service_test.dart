@@ -27,13 +27,19 @@ void main() {
         retryEvery: retryEvery,
       );
 
-  Future<void> addLog(String id, {String userId = 'u1', DateTime? syncedAt}) =>
+  Future<void> addLog(
+    String id, {
+    String userId = 'u1',
+    DateTime? syncedAt,
+    double score = 7,
+    DateTime? date,
+  }) =>
       db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
             id: id,
             userId: userId,
             drillId: 'd1',
-            date: DateTime(2026, 9, 22, 18),
-            score: 7,
+            date: date ?? DateTime(2026, 9, 22, 18),
+            score: score,
             syncedAt: Value(syncedAt),
           ));
 
@@ -121,6 +127,83 @@ void main() {
         expect(req.body, isNot(contains('cua-an')));
       }
       expect((await row('cua-an')).syncedAt, isNull);
+    });
+  });
+
+  group('một buổi hỏng không chặn cả hàng', () {
+    final remote = [
+      {
+        'id': 'tu-may-khac',
+        'drill_id': 'd1',
+        'date': '2026-09-21T11:00:00.000Z',
+        'score': 9,
+        'attempts': 10,
+        'notes': null,
+      },
+    ];
+
+    test('server từ chối buổi 1 thì vẫn đẩy buổi 2 và vẫn kéo về', () async {
+      await addLog('hong', date: DateTime(2026, 9, 22, 8));
+      await addLog('tot', date: DateTime(2026, 9, 22, 9));
+      server
+        ..routes['POST /items/drill_logs'] = ((req) {
+          final body = FakeDirectus.body(req);
+          if (body['id'] == 'hong') {
+            return FakeDirectus.error(400, 'FAILED_VALIDATION');
+          }
+          return FakeDirectus.ok(body);
+        })
+        ..routes['GET /items/drill_logs'] = ((_) => FakeDirectus.ok(remote));
+
+      expect(await sync.syncNow(), SyncOutcome.failed);
+
+      expect(pushedIds(), ['hong', 'tot']);
+      expect((await row('hong')).syncedAt, isNull);
+      expect((await row('tot')).syncedAt, now);
+      expect((await row('tu-may-khac')).syncedAt, now);
+    });
+
+    test('điểm vô hạn thì báo failed, không ném, không chặn buổi sau',
+        () async {
+      await addLog('vo-han',
+          score: double.infinity, date: DateTime(2026, 9, 22, 8));
+      await addLog('tot', date: DateTime(2026, 9, 22, 9));
+
+      expect(await sync.syncNow(), SyncOutcome.failed);
+
+      expect(pushedIds(), ['tot']);
+      expect((await row('vo-han')).syncedAt, isNull);
+      expect((await row('tot')).syncedAt, now);
+      expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
+    });
+
+    test('server lỗi 5xx thì dừng lượt, không đánh dấu từ chối', () async {
+      await addLog('a');
+      server.routes['POST /items/drill_logs'] =
+          ((_) => FakeDirectus.error(503, 'SERVICE_UNAVAILABLE'));
+
+      expect(await sync.syncNow(), SyncOutcome.failed);
+      expect(server.sent('GET', '/items/drill_logs'), isEmpty);
+    });
+
+    test('lỗi bất ngờ thì syncNow trả failed, không bao giờ ném', () async {
+      server.routes['GET /items/drill_logs'] =
+          ((_) => FakeDirectus.ok({'khong': 'phai danh sach'}));
+
+      expect(await sync.syncNow(), SyncOutcome.failed);
+    });
+
+    test('buổi bị từ chối không làm lần thử lại định kỳ chạy mãi', () async {
+      sync.dispose();
+      sync = build(retryEvery: const Duration(milliseconds: 20));
+      await addLog('vo-han', score: double.infinity);
+
+      sync.start();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      // Lượt lúc start (và có thể một lượt dồn từ stream) — không phải
+      // mười mấy lượt, mỗi 20 ms một lượt.
+      expect(server.sent('GET', '/items/drill_logs').length, lessThanOrEqualTo(2));
     });
   });
 

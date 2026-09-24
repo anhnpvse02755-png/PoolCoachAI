@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/converters.dart';
@@ -40,6 +41,12 @@ class SyncService {
   Future<SyncOutcome>? _running;
   bool _again = false;
   Set<String> _seenPending = {};
+
+  /// Buổi server từ chối hoặc không mã hoá được thành JSON. Vẫn nằm chờ
+  /// (không xoá, vẫn tính là chưa đồng bộ) và mỗi lượt vẫn thử lại, nhưng
+  /// không tự khởi động lượt nào: nếu không, lần thử lại định kỳ quay mãi.
+  /// Chỉ sống trong bộ nhớ — mở lại app là thử lại từ đầu.
+  final Set<String> _rejected = {};
   Timer? _timer;
   StreamSubscription<AuthState>? _authSub;
   StreamSubscription<List<String>>? _pendingSub;
@@ -51,12 +58,15 @@ class SyncService {
       if (state is SignedIn) unawaited(syncNow());
     });
     _pendingSub = _db.watchPendingLogIds().listen((ids) {
-      final fresh = ids.any((id) => !_seenPending.contains(id));
+      final fresh = ids.any(
+          (id) => !_seenPending.contains(id) && !_rejected.contains(id));
       _seenPending = ids.toSet();
       if (fresh) unawaited(syncNow());
     });
     _timer = Timer.periodic(_retryEvery, (_) {
-      if (_seenPending.isNotEmpty) unawaited(syncNow());
+      if (_seenPending.any((id) => !_rejected.contains(id))) {
+        unawaited(syncNow());
+      }
     });
     unawaited(syncNow());
   }
@@ -85,9 +95,11 @@ class SyncService {
     final who = _auth.current;
     if (who is! SignedIn) return SyncOutcome.signedOut;
     try {
-      await _push(who.userId);
+      final anyRejected = await _push(who.userId);
+      // Buổi bị từ chối không phải lý do bỏ kéo về: dữ liệu từ máy khác
+      // vẫn phải về. Nhưng lượt này vẫn là failed, vì còn buổi nằm chờ.
       await _pull(who.userId);
-      return SyncOutcome.done;
+      return anyRejected ? SyncOutcome.failed : SyncOutcome.done;
     } on AuthFailure catch (failure) {
       return switch (failure) {
         AuthFailure.network => SyncOutcome.offline,
@@ -100,6 +112,10 @@ class SyncService {
       return SyncOutcome.failed;
     } on _UserChanged {
       return SyncOutcome.signedOut;
+    } on Object {
+      // Server trả hình dạng lạ, hay bất cứ gì chưa lường: lượt này hỏng,
+      // nhưng syncNow() không bao giờ ném — nó chạy từ timer và từ nút bấm.
+      return SyncOutcome.failed;
     }
   }
 
@@ -116,25 +132,53 @@ class SyncService {
     return token;
   }
 
-  Future<void> _push(String userId) async {
+  /// Trả `true` nếu có buổi bị từ chối trong lượt này.
+  Future<bool> _push(String userId) async {
     final pending = await (_db.select(_db.drillLogRows)
           ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.date)]))
         .get();
 
+    var anyRejected = false;
     for (final row in pending) {
+      final Map<String, Object?> body;
+      try {
+        body = toRemoteDrillLog(row);
+        // Mã hoá thử trước khi gửi: điểm vô hạn nằm được trong SQLite
+        // nhưng JSON thì không, và lỗi đó không được chặn cả hàng.
+        jsonEncode(body);
+      } on Object {
+        _rejected.add(row.id);
+        anyRejected = true;
+        continue;
+      }
+
       final token = await _tokenFor(userId);
       try {
-        await _api.post('/items/drill_logs',
-            token: token, body: toRemoteDrillLog(row));
+        await _api.post('/items/drill_logs', token: token, body: body);
       } on DirectusError catch (e) {
-        // Đã lên từ lần trước mà chưa kịp đánh dấu — không phải lỗi.
-        if (e.code != _duplicateCode) rethrow;
+        if (e.code == _duplicateCode) {
+          // Đã lên từ lần trước mà chưa kịp đánh dấu — không phải lỗi.
+        } else if (_rejectsRow(e)) {
+          _rejected.add(row.id);
+          anyRejected = true;
+          continue;
+        } else {
+          rethrow;
+        }
       }
+      _rejected.remove(row.id);
       await (_db.update(_db.drillLogRows)..where((t) => t.id.equals(row.id)))
           .write(DrillLogRowsCompanion(syncedAt: Value(_now())));
     }
+    return anyRejected;
   }
+
+  /// Server chê chính **buổi này** (4xx) — bỏ qua nó, đẩy buổi kế.
+  /// 401 là chuyện phiên chứ không phải chuyện buổi tập, và 5xx là server
+  /// đang ốm: cả hai dừng lượt như cũ.
+  static bool _rejectsRow(DirectusError e) =>
+      e.status >= 400 && e.status < 500 && e.status != 401;
 
   Future<void> _pull(String userId) async {
     final token = await _tokenFor(userId);

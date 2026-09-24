@@ -114,6 +114,22 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
   });
 
+  // Dart đọc được "Infinity" và "1e999" thành số vô hạn: SQLite cất
+  // được, nhưng JSON thì không — buổi đó sẽ không bao giờ lên server.
+  for (final bad in ['1e999', 'Infinity', '-1', 'NaN']) {
+    testWidgets('kết quả "$bad" thì chặn, không ghi gì xuống', (tester) async {
+      final (db, _) = await openSession(tester, 'd1');
+
+      await fill(tester, Vi.sessionScoreLabelAttempts, bad);
+      await fill(tester, Vi.sessionAttemptsLabel, '10');
+      await tester.tap(find.text(Vi.sessionSaveAction));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Vi.sessionScoreInvalid), findsOneWidget);
+      expect(await db.select(db.drillLogRows).get(), isEmpty);
+    });
+  }
+
   testWidgets('lưu xong nói ngay buổi này đạt bao nhiêu phần mục tiêu',
       (tester) async {
     await openSession(tester, 'd1');
