@@ -157,12 +157,14 @@ class DirectusAuthRepository implements AuthRepository {
   }
 
   Future<String> _refresh({bool retried = false, String? originalToken}) async {
+    // Lấy thế hệ trước lần chờ đầu tiên: mọi kết luận của lượt này (ghi
+    // phiên, hay đăng xuất vì hết hạn) chỉ có hiệu lực nếu phiên chưa đổi.
+    final startGen = _gen;
     final saved = await _sessions.read();
     if (saved == null) {
-      await _expire();
+      await _expire(ifGen: startGen);
       throw AuthFailure.sessionExpired;
     }
-    final startGen = _gen;
     originalToken ??= saved.refreshToken;
 
     try {
@@ -175,15 +177,13 @@ class DirectusAuthRepository implements AuthRepository {
       if (_gen != startGen) throw AuthFailure.sessionExpired;
 
       _takeTokens(tokens);
-      // Re-check after the post await: another call may have bumped the
-      // generation and started clearing the store while this refresh was
-      // in flight.
-      if (_gen != startGen) throw AuthFailure.sessionExpired;
       await _sessions.write(StoredSession(
         userId: saved.userId,
         displayName: saved.displayName,
         refreshToken: tokens['refresh_token']! as String,
       ));
+      // Đăng xuất chen vào lúc đang ghi: token này thuộc phiên đã bỏ.
+      if (_gen != startGen) throw AuthFailure.sessionExpired;
       return _accessToken!;
     } on DirectusUnreachable {
       // Mất mạng không bao giờ là lý do đăng xuất.
@@ -215,16 +215,22 @@ class DirectusAuthRepository implements AuthRepository {
         throw AuthFailure.network;
       }
 
-      await _expire();
+      await _expire(ifGen: startGen);
       throw AuthFailure.sessionExpired;
     }
   }
 
   /// Tự động đăng xuất: chỉ bỏ phiên. **Không** động tới buổi tập nào —
   /// người chơi đăng nhập lại thì mọi thứ còn nguyên (spec mục 5.4).
-  Future<void> _expire() async {
+  ///
+  /// [ifGen] là thế hệ lượt refresh bắt đầu. Một lượt cũ về muộn — sau khi
+  /// người chơi đã đăng xuất rồi đăng nhập lại — không được đá phiên mới.
+  Future<void> _expire({required int ifGen}) async {
+    if (_gen != ifGen) return;
     _bumpGen();
+    final mine = _gen;
     await _sessions.clear();
+    if (_gen != mine) return;
     _accessToken = null;
     _accessExpiresAt = null;
     _emit(const SignedOut(expired: true));
