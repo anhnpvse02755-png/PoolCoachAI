@@ -203,6 +203,26 @@ void main() {
       expect(find.text(Vi.authResetDone), findsOneWidget);
     });
 
+    testWidgets('đang đăng nhập mà đặt lại xong thì đăng xuất, về Đăng nhập',
+        (tester) async {
+      final (_, auth) = await pumpAuthApp(
+        tester,
+        initial: const SignedIn(userId: 'u1', displayName: 'An'),
+        location: '${Routes.resetPassword}?token=abc',
+      );
+
+      await fill(tester, Vi.authNewPasswordLabel, 'matkhau123');
+      await fill(tester, Vi.authPasswordConfirmLabel, 'matkhau123');
+      await tester.tap(button(Vi.authResetAction));
+      await tester.pumpAndSettle();
+
+      // Đăng xuất thường, không phải signOutAndForget: buổi tập vẫn giữ.
+      expect(auth.calls, ['reset:abc', 'signOut']);
+      expect(auth.current, const SignedOut());
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text(Vi.authResetDone), findsOneWidget);
+    });
+
     testWidgets('link đã dùng thì bảo xin link mới', (tester) async {
       final (_, auth) = await pumpAuthApp(tester, location: '${Routes.resetPassword}?token=abc');
       auth.nextFailure = AuthFailure.resetLinkInvalid;

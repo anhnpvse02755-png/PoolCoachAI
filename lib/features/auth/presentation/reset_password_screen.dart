@@ -41,13 +41,19 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       _error = null;
     });
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .resetPassword(token: token, password: _password.text);
+      final auth = ref.read(authRepositoryProvider);
+      await auth.resetPassword(token: token, password: _password.text);
       if (!mounted) return;
+      // Messenger nằm trên router: báo trước, để câu vẫn hiện dù đăng
+      // xuất làm router rời màn này.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(Vi.authResetDone)),
       );
+      // Đang đăng nhập (mở link trên máy đang dùng) thì router sẽ đẩy
+      // /login về Trang chủ. Đăng xuất để người chơi thật sự vào lại
+      // bằng mật khẩu mới — kiểu thường, không xoá buổi tập nào.
+      if (auth.current is SignedIn) await auth.signOut();
+      if (!mounted) return;
       context.go(Routes.login);
     } on AuthFailure catch (failure) {
       if (mounted) setState(() => _error = Vi.authFailure(failure));
