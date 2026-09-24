@@ -1,6 +1,13 @@
 // Dựng cấu hình Directus cho PoolCoachAI. Chạy lại bao nhiêu lần cũng ra cùng một kết quả.
 //
-//   DIRECTUS_URL=… DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… node deploy/directus/bootstrap.mjs
+//   DIRECTUS_URL=… DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… \
+//   DIRECTUS_LICENSE_KEY=… node deploy/directus/bootstrap.mjs
+//
+// DIRECTUS_LICENSE_KEY là khoá Open Innovation Grant (OIG). Script tự gửi nó
+// qua POST /license — nó KHÔNG phải biến môi trường của Directus. Chỉ cần ở
+// lần chạy đầu: server đã có licence OIG thì bỏ trống cũng được. Không có
+// licence OIG thì Directus không cho tạo permission có lọc, nên script dừng
+// ngay từ đầu, trước khi tạo bất cứ thứ gì.
 //
 // Schema sống trong file này chứ không chỉ trên server: PoolOS mất toàn bộ
 // cấu hình khi server bị xoá, vì nó chưa từng được ghi lại ở đâu khác.
@@ -37,34 +44,39 @@ const { access_token: token } = await api('POST', '/auth/login', {
 });
 
 // ─── 0. Kích hoạt Open Innovation Grant licence ─────────────────────────────────
-// DIRECTUS_LICENSE_KEY phải được đặt trong env. Nếu đã kích hoạt rồi thì bỏ qua.
 // OIG bật `custom_permission_rules_enabled`, cho phép tạo filtered/field-limited permissions.
+// Thiếu nó thì permission ở bước 3 hỏng giữa chừng, để lại cấu hình dở dang —
+// nên kiểm trước, rồi mới tạo gì thì tạo.
 const licenseKey = process.env.DIRECTUS_LICENSE_KEY;
-if (licenseKey) {
-  const infoBefore = await api('GET', '/server/info', undefined, token);
-  const oigActive = infoBefore.license?.entitlements?.display_powered_by === 'OIG';
-  if (!oigActive) {
-    console.log('Kích hoạt Open Innovation Grant licence…');
-    // POST /license trả 403 "A license was already activated" nếu đã có licence.
-    const licRaw = await fetch(`${base}/license`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ license_key: licenseKey }),
-    });
-    const licText = await licRaw.text();
-    if (!licRaw.ok && !licText.includes('already activated')) {
-      throw new Error(`Kích hoạt licence thất bại → ${licRaw.status} ${licText}`);
-    }
-    const infoAfter = await api('GET', '/server/info', undefined, token);
-    if (infoAfter.license?.entitlements?.display_powered_by !== 'OIG') {
-      throw new Error('Licence đã kích hoạt nhưng không phải OIG');
-    }
-    console.log('Licence đã kích hoạt (display_powered_by = OIG)');
-  } else {
-    console.log('Licence đã kích hoạt (bỏ qua)');
+const infoBefore = await api('GET', '/server/info', undefined, token);
+const oigActive = infoBefore.license?.entitlements?.display_powered_by === 'OIG';
+if (!oigActive && !licenseKey) {
+  console.error(
+    'Server chưa có licence OIG và DIRECTUS_LICENSE_KEY không được đặt. ' +
+      'Đặt DIRECTUS_LICENSE_KEY (khoá Open Innovation Grant) rồi chạy lại. ' +
+      'Chưa tạo gì trên server.',
+  );
+  process.exit(1);
+}
+if (!oigActive) {
+  console.log('Kích hoạt Open Innovation Grant licence…');
+  // POST /license trả 403 "A license was already activated" nếu đã có licence.
+  const licRaw = await fetch(`${base}/license`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ license_key: licenseKey }),
+  });
+  const licText = await licRaw.text();
+  if (!licRaw.ok && !licText.includes('already activated')) {
+    throw new Error(`Kích hoạt licence thất bại → ${licRaw.status} ${licText}`);
   }
+  const infoAfter = await api('GET', '/server/info', undefined, token);
+  if (infoAfter.license?.entitlements?.display_powered_by !== 'OIG') {
+    throw new Error('Licence đã kích hoạt nhưng không phải OIG');
+  }
+  console.log('Licence đã kích hoạt (display_powered_by = OIG)');
 } else {
-  console.log('DIRECTUS_LICENSE_KEY không được đặt — bỏ qua kích hoạt licence');
+  console.log('Licence đã kích hoạt (bỏ qua)');
 }
 
 // ─── 1. Collection drill_logs ───────────────────────────────────────────────
