@@ -17,11 +17,13 @@ void main() {
     testWidgets('mở lên là vào tab Trang chủ', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -32,11 +34,13 @@ void main() {
     testWidgets('thanh tab là NavigationBar của Material 3', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -52,11 +56,13 @@ void main() {
     testWidgets('thanh tab hiện đủ 5 nhãn tiếng Việt', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -71,11 +77,13 @@ void main() {
     testWidgets('bấm tab Luyện tập thì chuyển màn', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -90,11 +98,13 @@ void main() {
     testWidgets('bấm tab Thi đấu rồi quay lại Trang chủ', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -111,11 +121,13 @@ void main() {
     testWidgets('nút tròn mở màn Huấn luyện viên', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -129,11 +141,13 @@ void main() {
     testWidgets('chuông mở màn Thông báo', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -147,11 +161,13 @@ void main() {
     testWidgets('mỗi tab gốc mang thanh tiêu đề của chính nó', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -182,11 +198,13 @@ void main() {
         (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -207,11 +225,13 @@ void main() {
         (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -231,10 +251,10 @@ void main() {
 
     testWidgets('đường dẫn không tồn tại ra màn tiếng Việt, không lộ ngoại lệ',
         (tester) async {
-      final router = createAppRouter();
-      addTearDown(router.dispose);
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -259,11 +279,13 @@ void main() {
         'rồi quay lại vẫn ở Luyện tập', (tester) async {
       final container = testContainer();
       addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const PoolCoachApp(),
+          child: PoolCoachApp(router: router),
         ),
       );
       await tester.pumpAndSettle();

@@ -31,6 +31,17 @@ abstract final class Routes {
   /// Đường dẫn một bài kiến thức.
   static String article(String id) => '/knowledge/$id';
 
+  // Tài khoản — mở khi chưa đăng nhập.
+  static const login = '/login';
+  static const register = '/register';
+  static const forgotPassword = '/forgot-password';
+
+  /// Mở từ link trong email; vào được cả khi đã hay chưa đăng nhập.
+  static const resetPassword = '/reset-password';
+
+  /// Đã đăng nhập thì không vào lại mấy màn này.
+  static const signedOutOnly = <String>[login, register, forgotPassword];
+
   /// Năm tab theo đúng thứ tự hiển thị trên thanh điều hướng.
   static const tabs = <String>[home, training, play, stats, profile];
 
@@ -50,5 +61,9 @@ abstract final class Routes {
     drillPattern,
     drillSessionPattern,
     articlePattern,
+    login,
+    register,
+    forgotPassword,
+    resetPassword,
   ];
 }

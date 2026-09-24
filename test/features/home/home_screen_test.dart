@@ -20,7 +20,7 @@ void main() {
     List<KnowledgeArticle>? knowledge,
     List<DrillLog>? logs,
   }) async {
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
     final container = testContainer(
       drills: drills,

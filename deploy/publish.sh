@@ -2,12 +2,13 @@
 # Build web rồi đẩy bundle lên nhánh deploy-easypanel mà Easypanel
 # (project test-va, service poolcoachai) build từ đó.
 #
-#   FLUTTER=/c/Users/anhnpv/flutter/bin/flutter.bat deploy/publish.sh
+#   FLUTTER=/c/Users/anhnpv/flutter/bin/flutter.bat DART=/c/Users/anhnpv/flutter/bin/dart.bat deploy/publish.sh
 #
 # Chỉ chạy từ một commit sạch: nhánh deploy ghi lại hash nguồn.
 set -euo pipefail
 
 FLUTTER="${FLUTTER:-flutter}"
+DART="${DART:-dart}"
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
 
@@ -16,6 +17,10 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 src="$(git rev-parse --short HEAD)"
+
+# *.g.dart bị git bỏ qua: bản checkout sạch không có, build sẽ hỏi.
+"$FLUTTER" pub get
+"$DART" run build_runner build --delete-conflicting-outputs
 
 "$FLUTTER" build web --release
 

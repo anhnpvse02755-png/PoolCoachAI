@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
+import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/features/auth/presentation/forgot_password_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/register_screen.dart';
+import 'package:poolcoachai/features/auth/presentation/reset_password_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
@@ -25,8 +31,10 @@ import 'package:poolcoachai/features/training/presentation/training_screen.dart'
 /// trạng thái**: nó nhớ đang đứng ở đâu. Một router dùng chung toàn
 /// chương trình khiến hai màn hình không thể tồn tại độc lập, và trong
 /// kiểm thử thì test trước để lại vị trí điều hướng cho test sau.
-GoRouter createAppRouter() => GoRouter(
+GoRouter createAppRouter({required AuthGate auth}) => GoRouter(
   initialLocation: Routes.home,
+  refreshListenable: auth,
+  redirect: (context, state) => authRedirect(auth.state, state.uri),
   // Đường dẫn lạ thì dựng màn tiếng Việt của mình, không để go_router
   // đổ trang lỗi mặc định — trang đó là tiếng Anh và in thẳng nội dung
   // ngoại lệ ra trước mặt người chơi.
@@ -119,5 +127,38 @@ GoRouter createAppRouter() => GoRouter(
       builder: (context, state) =>
           KnowledgeScreen(articleId: state.pathParameters['id']!),
     ),
+    GoRoute(
+      path: Routes.login,
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: Routes.register,
+      builder: (context, state) => const RegisterScreen(),
+    ),
+    GoRoute(
+      path: Routes.forgotPassword,
+      builder: (context, state) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      path: Routes.resetPassword,
+      builder: (context, state) =>
+          ResetPasswordScreen(token: state.uri.queryParameters['token']),
+    ),
   ],
 );
+
+/// Ai được vào đâu — tách riêng để test không phải dựng router.
+///
+/// Chưa đăng nhập thì chỉ vào được ba màn tài khoản; đã đăng nhập thì
+/// không vào lại chúng. Link đặt lại mật khẩu mở được ở cả hai trạng
+/// thái, vì người ta có thể bấm nó trên máy vẫn đang đăng nhập.
+String? authRedirect(AuthState auth, Uri location) {
+  final path = location.path;
+  if (path == Routes.resetPassword) return null;
+  final onAuthPage = Routes.signedOutOnly.contains(path);
+  return switch (auth) {
+    SignedOut() when !onAuthPage => Routes.login,
+    SignedIn() when onAuthPage => Routes.home,
+    _ => null,
+  };
+}

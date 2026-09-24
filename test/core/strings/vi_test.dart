@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 
 void main() {
@@ -74,6 +75,16 @@ void main() {
         Vi.pickReason(PickReason.rotation, 'Phá'),
         'Đã lâu bạn chưa tập Phá.',
       );
+    });
+  });
+
+  group('Vi.authFailure', () {
+    test('mỗi lỗi tài khoản có một câu riêng, không rỗng', () {
+      final texts = AuthFailure.values.map(Vi.authFailure).toList();
+      for (final t in texts) {
+        expect(t.trim(), isNotEmpty);
+      }
+      expect(texts.toSet().length, AuthFailure.values.length);
     });
   });
 }

@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/converters.dart';
@@ -28,7 +28,7 @@ void main() {
   }
 
   Future<DrillLog> roundTripLog(DrillLog log) async {
-    await db.into(db.drillLogRows).insertOnConflictUpdate(toDrillLogRow(log));
+    await db.into(db.drillLogRows).insert(toDrillLogRow(log, userId: 'u1'));
     final row = await (db.select(db.drillLogRows)
           ..where((t) => t.id.equals(log.id)))
         .getSingle();
@@ -225,6 +225,37 @@ void main() {
       expect(back.date, DateTime(2026, 9, 20, 14, 30));
       expect(back.notes, 'Hơi lệch phải');
     });
+  });
+
+  test('buổi tập đi lên server rồi về máy vẫn nguyên, kể cả chữ tiếng Việt',
+      () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
+          id: 'x',
+          userId: 'u1',
+          drillId: 'd1',
+          date: DateTime(2026, 9, 23, 10, 30),
+          score: 7,
+          attempts: const Value(10),
+          notes: const Value('Cú đánh hơi lệch phải'),
+        ));
+    final original = (await db.select(db.drillLogRows).get()).single;
+
+    final json = toRemoteDrillLog(original);
+    expect(json.containsKey('user_created'), isFalse);
+
+    await db.delete(db.drillLogRows).go();
+    await db.into(db.drillLogRows).insert(
+          fromRemoteDrillLog(json, userId: 'u1', syncedAt: DateTime(2026, 9, 23, 11)),
+        );
+    final back = (await db.select(db.drillLogRows).get()).single;
+
+    expect(back.date, original.date);
+    expect(back.score, 7);
+    expect(back.attempts, 10);
+    expect(back.notes, 'Cú đánh hơi lệch phải');
+    expect(back.syncedAt, isNotNull);
   });
 
   group('vòng chuyển đổi KnowledgeArticle', () {

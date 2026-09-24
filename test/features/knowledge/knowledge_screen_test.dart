@@ -13,7 +13,7 @@ import '../../support/test_data.dart';
 void main() {
   /// Mở app rồi đi tới [path], trả router để test tự dọn.
   Future<void> openAt(WidgetTester tester, String path) async {
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
     final container = testContainer();
     addTearDown(container.dispose);

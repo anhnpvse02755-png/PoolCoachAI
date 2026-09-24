@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +11,7 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
+import 'package:uuid/uuid.dart';
 
 /// Màn nhập kết quả buổi tập — mục 6.4 của thiết kế.
 class DrillSessionScreen extends ConsumerStatefulWidget {
@@ -29,7 +28,6 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
   final _scoreController = TextEditingController();
   final _attemptsController = TextEditingController();
   final _notesController = TextEditingController();
-  final _random = Random();
   bool _saving = false;
 
   @override
@@ -39,14 +37,6 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
     _notesController.dispose();
     super.dispose();
   }
-
-  /// Id của log, duy nhất cả khi hai buổi rơi vào cùng một mốc thời gian.
-  ///
-  /// Đồng hồ được tiêm nên trong kiểm thử nó đứng yên: lấy mốc thời
-  /// gian làm id sẽ khiến buổi thứ hai ghi đè buổi thứ nhất, và bài
-  /// test đếm log vẫn xanh trong khi dữ liệu đã mất.
-  String _newLogId(DateTime now) =>
-      '${now.microsecondsSinceEpoch}-${_random.nextInt(0xffffff)}';
 
   Future<void> _save(Drill drill) async {
     if (!_formKey.currentState!.validate()) return;
@@ -62,7 +52,9 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
           ? int.parse(_attemptsController.text)
           : null;
       final log = DrillLog(
-        id: _newLogId(now),
+        // UUID v4: duy nhất giữa mọi người dùng trên server chung, và
+        // không trùng nhau kể cả khi đồng hồ tiêm vào đứng yên trong test.
+        id: const Uuid().v4(),
         drillId: drill.id,
         date: now,
         score: num.parse(_scoreController.text),
@@ -159,7 +151,11 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return Vi.sessionScoreRequired;
                       }
-                      if (double.tryParse(value) == null) {
+                      // "Infinity", "1e999", "NaN" đều qua được
+                      // double.tryParse, nhưng không lên server được
+                      // (JSON không có số vô hạn) — chặn ngay ở đây.
+                      final parsed = double.tryParse(value);
+                      if (parsed == null || !parsed.isFinite || parsed < 0) {
                         return Vi.sessionScoreInvalid;
                       }
                       return null;

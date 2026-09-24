@@ -82,14 +82,24 @@ void main() {
         .allMatches(source)
         .map((m) => m[1]!)
         .toList();
-    expect(assets, containsAll(['sqlite3.wasm', 'drift_worker.js']));
+    expect(assets, containsAll(['/sqlite3.wasm', '/drift_worker.js']),
+        reason: 'phải là đường dẫn tuyệt đối: app dùng URL dạng đường dẫn, '
+            'nên đường dẫn tương đối bị hiểu theo trang đang mở, và mở '
+            'thẳng /training/drills/d1 sẽ tải nhầm index.html thay cho wasm');
     for (final asset in assets) {
       expect(
-        File('web/$asset').existsSync(),
+        File('web$asset').existsSync(),
         isTrue,
-        reason: 'web/$asset không có — build web sẽ không mang theo nó',
+        reason: 'web$asset không có — build web sẽ không mang theo nó',
       );
     }
+  });
+
+  test('app dùng URL dạng đường dẫn, để link trong email mở đúng màn', () {
+    final main = codeOnly(File('lib/main.dart').readAsStringSync());
+    expect(main, contains('usePathUrlStrategy()'),
+        reason: 'link đặt lại mật khẩu có dạng /reset-password?token=…; '
+            'ở dạng hash, Directus chèn ?token vào trước dấu #');
   });
 
   test('không màn hình nào chứa chuỗi tiếng Việt viết thẳng', () {
@@ -115,6 +125,32 @@ void main() {
       isEmpty,
       reason: 'mọi chữ hiển thị phải đi qua Vi, để đổi cách gọi một '
           'thuật ngữ chỉ phải sửa một dòng thay vì lục khắp các màn',
+    );
+  });
+
+  test('lib/ không được chứa thư mục test', () {
+    final libTest = Directory('lib/test');
+    expect(
+      libTest.existsSync(),
+      isFalse,
+      reason: 'test/support/ phải nằm trong test/, không phải lib/test/ — '
+          'file test không bao giờ được ship cùng app',
+    );
+  });
+
+  test('lib/ không import package:poolcoachai/test/', () {
+    final offenders = <String>[];
+    for (final file in dartFilesIn('lib')) {
+      if (file.readAsStringSync().contains("package:poolcoachai/test/")) {
+        offenders.add(file.path.replaceAll(r'\', '/'));
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'import test từ lib/ là ship test cùng app — '
+          'test/support/ chỉ được dùng trong thư mục test/',
     );
   });
 }

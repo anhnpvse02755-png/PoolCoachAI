@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
@@ -11,6 +12,8 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
+import '../../support/fake_auth.dart';
+import '../../support/test_data.dart';
 
 /// Màn nhập kết quả buổi tập — mục 6.4 của thiết kế.
 ///
@@ -33,11 +36,12 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         nowProvider.overrideWithValue(() => today),
+        authRepositoryProvider.overrideWithValue(FakeAuthRepository.signedIn()),
       ],
     );
     addTearDown(container.dispose);
 
-    final router = createAppRouter();
+    final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
 
     await tester.pumpWidget(
@@ -110,6 +114,22 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
   });
 
+  // Dart đọc được "Infinity" và "1e999" thành số vô hạn: SQLite cất
+  // được, nhưng JSON thì không — buổi đó sẽ không bao giờ lên server.
+  for (final bad in ['1e999', 'Infinity', '-1', 'NaN']) {
+    testWidgets('kết quả "$bad" thì chặn, không ghi gì xuống', (tester) async {
+      final (db, _) = await openSession(tester, 'd1');
+
+      await fill(tester, Vi.sessionScoreLabelAttempts, bad);
+      await fill(tester, Vi.sessionAttemptsLabel, '10');
+      await tester.tap(find.text(Vi.sessionSaveAction));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Vi.sessionScoreInvalid), findsOneWidget);
+      expect(await db.select(db.drillLogRows).get(), isEmpty);
+    });
+  }
+
   testWidgets('lưu xong nói ngay buổi này đạt bao nhiêu phần mục tiêu',
       (tester) async {
     await openSession(tester, 'd1');
@@ -139,5 +159,20 @@ void main() {
     final logs = await db.select(db.drillLogRows).get();
     expect(logs.length, 2);
     expect(logs.map((l) => l.id).toSet().length, 2);
+  });
+
+  testWidgets('buổi tập mới mang id UUID v4', (tester) async {
+    final (db, _) = await openSession(tester, 'd1');
+
+    await fill(tester, Vi.sessionScoreLabelAttempts, '7');
+    await fill(tester, Vi.sessionAttemptsLabel, '10');
+    await tester.tap(find.text(Vi.sessionSaveAction));
+    await tester.pumpAndSettle();
+
+    final id = (await db.select(db.drillLogRows).get()).single.id;
+    expect(
+      id,
+      matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+    );
   });
 }
