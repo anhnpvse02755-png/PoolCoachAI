@@ -163,6 +163,10 @@ class DirectusAuthRepository implements AuthRepository {
       if (_gen != startGen) throw AuthFailure.sessionExpired;
 
       _takeTokens(tokens);
+      // Re-check after the post await: another call may have bumped the
+      // generation and started clearing the store while this refresh was
+      // in flight.
+      if (_gen != startGen) throw AuthFailure.sessionExpired;
       await _sessions.write(StoredSession(
         userId: saved.userId,
         displayName: saved.displayName,
@@ -207,10 +211,10 @@ class DirectusAuthRepository implements AuthRepository {
   /// Tự động đăng xuất: chỉ bỏ phiên. **Không** động tới buổi tập nào —
   /// người chơi đăng nhập lại thì mọi thứ còn nguyên (spec mục 5.4).
   Future<void> _expire() async {
+    _bumpGen();
     await _sessions.clear();
     _accessToken = null;
     _accessExpiresAt = null;
-    _bumpGen();
     _emit(const SignedOut(expired: true));
   }
 
@@ -223,11 +227,11 @@ class DirectusAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() async {
     final saved = await _sessions.read();
-    await _sessions.clear();
     _refreshing = null;
     _accessToken = null;
     _accessExpiresAt = null;
     _bumpGen();
+    await _sessions.clear();
     _emit(const SignedOut());
     if (saved != null) unawaited(_revoke(saved.refreshToken));
   }
