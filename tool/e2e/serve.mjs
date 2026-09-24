@@ -29,4 +29,4 @@ http.createServer((req, res) => {
     'Cache-Control': 'no-cache',
   });
   fs.createReadStream(file).pipe(res);
-}).listen(Number(port), '127.0.0.1', () => console.log(`http://127.0.0.1:${port}/`));
+}).listen(Number(port), 'localhost', () => console.log(`http://localhost:${port}/`));
