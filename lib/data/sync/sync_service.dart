@@ -8,11 +8,16 @@ import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
-enum SyncOutcome { done, offline, signedOut, failed }
+enum SyncOutcome { done, offline, signedOut, failed, stopped }
 
 /// Đổi người đăng nhập giữa một lượt đồng bộ — bỏ lượt đó.
 class _UserChanged implements Exception {
   const _UserChanged();
+}
+
+/// Service bị dispose giữa lượt.
+class _Stopped implements Exception {
+  const _Stopped();
 }
 
 /// Đẩy buổi tập chưa đồng bộ lên Directus, rồi kéo buổi tập về máy.
@@ -38,6 +43,8 @@ class SyncService {
   /// Mã Directus khi `POST` một id đã có — đã kiểm trên server thật.
   static const _duplicateCode = 'RECORD_NOT_UNIQUE';
 
+  bool _started = false;
+  bool _disposed = false;
   Future<SyncOutcome>? _running;
   bool _again = false;
   /// Buổi chờ đẩy trên máy, của mọi người — id → chủ của buổi.
@@ -55,6 +62,8 @@ class SyncService {
   /// Tự đồng bộ: ngay lúc gọi, khi vừa đăng nhập, khi có buổi tập mới,
   /// và định kỳ khi vẫn còn buổi nằm chờ.
   void start() {
+    if (_started || _disposed) return;
+    _started = true;
     _authSub = _auth.watchSession().listen((state) {
       if (state is SignedIn) unawaited(syncNow());
     });
@@ -81,6 +90,7 @@ class SyncService {
   /// Một lượt đẩy rồi kéo. Gọi khi đang chạy thì chạy thêm đúng một lượt
   /// sau lượt hiện tại, để buổi vừa ghi không phải chờ tới lần thử lại.
   Future<SyncOutcome> syncNow() {
+    if (_disposed) return Future.value(SyncOutcome.stopped);
     final running = _running;
     if (running != null) {
       _again = true;
@@ -90,39 +100,45 @@ class SyncService {
   }
 
   Future<SyncOutcome> _loop() async {
-    SyncOutcome outcome;
+    ({SyncOutcome outcome, bool reachedEnd}) pass;
     do {
       _again = false;
-      outcome = await _once();
-    } while (_again && outcome == SyncOutcome.done);
-    return outcome;
+      pass = await _once();
+      // Lượt đi hết đẩy + kéo (kể cả khi có buổi bị từ chối) thì chạy lại
+      // ngay cho buổi vừa ghi. Lượt đứt giữa chừng (mạng, phiên, 5xx) thì
+      // chờ lần thử lại định kỳ.
+    } while (_again && pass.reachedEnd && !_disposed);
+    return pass.outcome;
   }
 
-  Future<SyncOutcome> _once() async {
+  Future<({SyncOutcome outcome, bool reachedEnd})> _once() async {
+    if (_disposed) return (outcome: SyncOutcome.stopped, reachedEnd: false);
     final who = _auth.current;
-    if (who is! SignedIn) return SyncOutcome.signedOut;
+    if (who is! SignedIn) return (outcome: SyncOutcome.signedOut, reachedEnd: true);
     try {
       final anyRejected = await _push(who.userId);
       // Buổi bị từ chối không phải lý do bỏ kéo về: dữ liệu từ máy khác
       // vẫn phải về. Nhưng lượt này vẫn là failed, vì còn buổi nằm chờ.
       await _pull(who.userId);
-      return anyRejected ? SyncOutcome.failed : SyncOutcome.done;
+      return (outcome: anyRejected ? SyncOutcome.failed : SyncOutcome.done, reachedEnd: true);
     } on AuthFailure catch (failure) {
-      return switch (failure) {
+      return (outcome: switch (failure) {
         AuthFailure.network => SyncOutcome.offline,
         AuthFailure.sessionExpired => SyncOutcome.signedOut,
         _ => SyncOutcome.failed,
-      };
+      }, reachedEnd: false);
     } on DirectusUnreachable {
-      return SyncOutcome.offline;
+      return (outcome: SyncOutcome.offline, reachedEnd: false);
     } on DirectusError {
-      return SyncOutcome.failed;
+      return (outcome: SyncOutcome.failed, reachedEnd: false);
     } on _UserChanged {
-      return SyncOutcome.signedOut;
+      return (outcome: SyncOutcome.signedOut, reachedEnd: false);
+    } on _Stopped {
+      return (outcome: SyncOutcome.stopped, reachedEnd: false);
     } on Object {
       // Server trả hình dạng lạ, hay bất cứ gì chưa lường: lượt này hỏng,
       // nhưng syncNow() không bao giờ ném — nó chạy từ timer và từ nút bấm.
-      return SyncOutcome.failed;
+      return (outcome: SyncOutcome.failed, reachedEnd: false);
     }
   }
 
@@ -139,6 +155,11 @@ class SyncService {
     return token;
   }
 
+  /// Ném [_Stopped] nếu service đã bị dispose.
+  void _checkAlive() {
+    if (_disposed) throw const _Stopped();
+  }
+
   /// Trả `true` nếu có buổi bị từ chối trong lượt này.
   Future<bool> _push(String userId) async {
     final pending = await (_db.select(_db.drillLogRows)
@@ -148,6 +169,7 @@ class SyncService {
 
     var anyRejected = false;
     for (final row in pending) {
+      _checkAlive();
       final Map<String, Object?> body;
       try {
         body = toRemoteDrillLog(row);
@@ -163,6 +185,7 @@ class SyncService {
       final token = await _tokenFor(userId);
       try {
         await _api.post('/items/drill_logs', token: token, body: body);
+        _checkAlive();
       } on DirectusError catch (e) {
         if (e.code == _duplicateCode) {
           // Đã lên từ lần trước mà chưa kịp đánh dấu — không phải lỗi.
@@ -193,6 +216,7 @@ class SyncService {
       'limit': '-1',
       'fields': 'id,drill_id,date,score,attempts,notes',
     }) as List<Object?>;
+    _checkAlive();
 
     // Người đổi trong lúc chờ server thì bỏ kết quả: ghi vào là dựng lại
     // dữ liệu mà người cũ vừa xoá khi đăng xuất.
@@ -215,6 +239,7 @@ class SyncService {
   }
 
   void dispose() {
+    _disposed = true;
     _timer?.cancel();
     _authSub?.cancel();
     _pendingSub?.cancel();

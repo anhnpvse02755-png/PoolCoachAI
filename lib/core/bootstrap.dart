@@ -22,3 +22,9 @@ Future<void> loadSeed(ProviderContainer container) async {
 Future<void> restoreSession(ProviderContainer container) async {
   await container.read(authRepositoryProvider).restore();
 }
+
+/// Bật đồng bộ nền suốt đời app. Gọi **sau** [restoreSession]: lượt đầu
+/// cần biết ai đang đăng nhập. Màn hình chỉ đọc Drift.
+void startSync(ProviderContainer container) {
+  container.read(syncServiceProvider);
+}

@@ -62,13 +62,15 @@ final authGateProvider = Provider<AuthGate>((ref) {
   return gate;
 });
 
+/// Service đã chạy sẵn: dựng lại (provider rebuild) thì bản mới cũng tự
+/// chạy, không có lúc nào đồng bộ nằm im mà không ai hay.
 final syncServiceProvider = Provider<SyncService>((ref) {
   final service = SyncService(
     db: ref.watch(appDatabaseProvider),
     auth: ref.watch(authRepositoryProvider),
     api: ref.watch(directusClientProvider),
     now: ref.watch(nowProvider),
-  );
+  )..start();
   ref.onDispose(service.dispose);
   return service;
 });

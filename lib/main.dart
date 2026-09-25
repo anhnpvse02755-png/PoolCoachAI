@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/bootstrap.dart';
-import 'package:poolcoachai/core/providers/auth_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +17,7 @@ Future<void> main() async {
   final container = ProviderContainer();
   await loadSeed(container);
   await restoreSession(container);
-
-  // Đồng bộ chạy nền suốt đời app; màn hình chỉ đọc Drift.
-  container.read(syncServiceProvider).start();
+  startSync(container);
 
   runApp(
     UncontrolledProviderScope(

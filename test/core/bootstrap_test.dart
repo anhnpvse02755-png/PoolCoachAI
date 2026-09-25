@@ -60,4 +60,17 @@ void main() {
       reason: 'nạp seed phải xong trước khi màn hình đầu tiên đọc dữ liệu',
     );
   });
+
+  test('main khôi phục phiên và bật đồng bộ trước khi dựng app', () {
+    final source = File('lib/main.dart').readAsStringSync();
+    final restoreAt = source.indexOf('await restoreSession(');
+    final syncAt = source.indexOf('startSync(');
+    final runAt = source.indexOf('runApp(');
+
+    expect(restoreAt, isNonNegative);
+    expect(restoreAt, lessThan(runAt),
+        reason: 'router phải biết đã đăng nhập hay chưa ngay khung đầu');
+    expect(syncAt, greaterThan(restoreAt),
+        reason: 'đồng bộ chỉ có nghĩa sau khi biết người đang đăng nhập');
+  });
 }

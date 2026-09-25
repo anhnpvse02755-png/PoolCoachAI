@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
@@ -193,6 +194,30 @@ void main() {
       expect(await sync.syncNow(), SyncOutcome.failed);
     });
 
+    test('buổi mới ghi trong lượt có buổi bị từ chối thì đi luôn, không chờ 30 giây',
+        () async {
+      await addLog('xau');
+      final gate = Completer<void>();
+      server.routes['POST /items/drill_logs'] = (req) async {
+        final id = FakeDirectus.body(req)['id'];
+        if (id == 'xau') {
+          await gate.future;
+          return FakeDirectus.error(400, 'FAILED_VALIDATION');
+        }
+        return FakeDirectus.ok(jsonDecode(req.body));
+      };
+
+      final first = sync.syncNow();
+      await pumpEventQueue();
+      await addLog('moi');
+      final second = sync.syncNow(); // đang chạy → hẹn thêm một lượt
+      gate.complete();
+
+      await first;
+      await second;
+      expect(pushedIds(), contains('moi'));
+    });
+
     test('buổi bị từ chối không làm lần thử lại định kỳ chạy mãi', () async {
       sync.dispose();
       sync = build(retryEvery: const Duration(milliseconds: 20));
@@ -315,6 +340,39 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       expect(server.requests, isEmpty);
+    });
+
+    test('start hai lần không nhân đôi lượt chạy', () async {
+      await addLog('a');
+      sync
+        ..start()
+        ..start();
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      await sync.syncNow();
+
+      // Với guard → 3 GET (lượt khởi đầu + 1 từ periodic timer). Không có
+      // guard → 5 GET (cả hai start() đều chạy lượt, thêm một lượt dồn nữa).
+      expect(pushedIds(), ['a']);
+      expect(server.sent('GET', '/items/drill_logs').length, equals(3));
+    });
+
+    test('dispose giữa lượt thì không ghi gì thêm vào máy', () async {
+      final gate = Completer<void>();
+      server.routes['GET /items/drill_logs'] = (_) async {
+        await gate.future;
+        return FakeDirectus.ok([
+          {'id': 'tu-server', 'drill_id': 'd1', 'date': '2026-09-22T11:00:00.000Z', 'score': 5},
+        ]);
+      };
+
+      final pass = sync.syncNow();
+      await pumpEventQueue();
+      sync.dispose();
+      gate.complete();
+
+      expect(await pass, SyncOutcome.stopped);
+      expect(await db.select(db.drillLogRows).get(), isEmpty);
+      expect(await sync.syncNow(), SyncOutcome.stopped);
     });
 
     test('vừa đăng nhập thì kéo dữ liệu về', () async {
