@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -27,6 +28,7 @@ void main() {
   Future<(AppDatabase, FakeAuthRepository, FakeDirectus)> openProfile(
     WidgetTester tester, {
     int pending = 0,
+    int unsyncable = 0,
   }) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -34,6 +36,11 @@ void main() {
     for (var i = 0; i < pending; i++) {
       await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
             id: 'p$i', userId: 'u1', drillId: 'd1', date: today, score: 7));
+    }
+    for (var i = 0; i < unsyncable; i++) {
+      await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
+            id: 'u$i', userId: 'u1', drillId: 'd1', date: today,
+            score: double.infinity));
     }
     await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
           id: 'da-len', userId: 'u1', drillId: 'd1', date: today, score: 7,
@@ -143,5 +150,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(auth.calls, isEmpty);
+  });
+
+  testWidgets('có buổi không đồng bộ được thì Hồ sơ báo, bấm Bỏ thì xoá sau khi xác nhận',
+      (tester) async {
+    final (db, auth, _) = await openProfile(tester, unsyncable: 2);
+
+    expect(find.text(Vi.unsyncableTitle(2)), findsOneWidget);
+    await tester.tap(find.text(Vi.unsyncableDiscard));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.unsyncableConfirmBody(2)), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, Vi.unsyncableConfirm));
+    await tester.pumpAndSettle();
+
+    final left = await db.select(db.drillLogRows).get();
+    expect(left.where((r) => !r.score.isFinite), isEmpty);
+    expect(left.map((r) => r.id), contains('da-len'));
+    expect(find.text(Vi.unsyncableTitle(2)), findsNothing);
+    expect(auth.calls, isEmpty);
+  });
+
+  testWidgets('Huỷ ở hộp xác nhận thì không xoá gì', (tester) async {
+    final (db, _, _) = await openProfile(tester, unsyncable: 1);
+
+    await tester.tap(find.text(Vi.unsyncableDiscard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.cancel));
+    await tester.pumpAndSettle();
+
+    expect((await db.select(db.drillLogRows).get()).where((r) => !r.score.isFinite),
+        hasLength(1));
+  });
+
+  testWidgets('không có buổi lỗi thì không hiện gì', (tester) async {
+    await openProfile(tester);
+    expect(find.text(Vi.unsyncableDiscard), findsNothing);
+  });
+
+  testWidgets('hộp thoại đăng xuất: Đồng bộ trước là nút chính', (tester) async {
+    await openProfile(tester, pending: 1);
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, Vi.signOutSyncFirst), findsOneWidget);
+    expect(find.widgetWithText(TextButton, Vi.signOutAnyway), findsOneWidget);
   });
 }

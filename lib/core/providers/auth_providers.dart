@@ -8,6 +8,7 @@ import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_session_store.dart';
+import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
@@ -54,6 +55,13 @@ final currentUserIdProvider = Provider<String?>((ref) {
     SignedIn(:final userId) => userId,
     SignedOut() => null,
   };
+});
+
+/// Số buổi của người đang đăng nhập không bao giờ đồng bộ được.
+final unsyncableCountProvider = StreamProvider<int>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return Stream.value(0);
+  return watchUnsyncableCount(ref.watch(appDatabaseProvider), userId);
 });
 
 final authGateProvider = Provider<AuthGate>((ref) {

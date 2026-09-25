@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
@@ -66,16 +67,72 @@ class ProfileScreen extends ConsumerWidget {
       SignedOut() => '',
     };
 
+    final unsyncable = ref.watch(unsyncableCountProvider).value ?? 0;
+
     return PcRootScaffold(
       title: Vi.profileTitle,
-      body: PcEmptyState(
-        icon: Icons.person_outline,
-        title: Vi.profileSignedInAs(name),
-        body: Vi.profileComing,
-        action: OutlinedButton.icon(
-          onPressed: () => _signOut(context, ref),
-          icon: const Icon(Icons.logout),
-          label: const Text(Vi.profileSignOut),
+      body: Column(
+        children: [
+          if (unsyncable > 0) _UnsyncableNotice(count: unsyncable),
+          Expanded(
+            child: PcEmptyState(
+              icon: Icons.person_outline,
+              title: Vi.profileSignedInAs(name),
+              body: Vi.profileComing,
+              action: OutlinedButton.icon(
+                onPressed: () => _signOut(context, ref),
+                icon: const Icon(Icons.logout),
+                label: const Text(Vi.profileSignOut),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnsyncableNotice extends ConsumerWidget {
+  const _UnsyncableNotice({required this.count});
+
+  final int count;
+
+  Future<void> _discard(BuildContext context, WidgetRef ref) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(Vi.unsyncableTitle(count)),
+        content: Text(Vi.unsyncableConfirmBody(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(Vi.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(Vi.unsyncableConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await discardUnsyncableLogs(ref.read(appDatabaseProvider), userId);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      margin: const EdgeInsets.all(AppSpacing.md),
+      child: ListTile(
+        leading: const Icon(Icons.warning_amber_outlined),
+        title: Text(Vi.unsyncableTitle(count)),
+        subtitle: const Text(Vi.unsyncableBody),
+        isThreeLine: true,
+        trailing: TextButton(
+          onPressed: () => _discard(context, ref),
+          child: const Text(Vi.unsyncableDiscard),
         ),
       ),
     );

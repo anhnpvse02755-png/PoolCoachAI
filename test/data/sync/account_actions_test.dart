@@ -30,6 +30,16 @@ void main() {
             syncedAt: Value(synced ? DateTime(2026, 9, 22) : null),
           ));
 
+  Future<void> insertLog(String id,
+          {required String userId, required double score}) =>
+      db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
+            id: id,
+            userId: userId,
+            drillId: 'd1',
+            date: DateTime(2026, 9, 22, 18),
+            score: score,
+          ));
+
   test('chỉ đếm buổi chưa đồng bộ của đúng người', () async {
     await addLog('a', 'u1');
     await addLog('b', 'u1', synced: true);
@@ -104,5 +114,28 @@ void main() {
         .get();
     expect(left, isEmpty);
     expect(auth.current, const SignedOut());
+  });
+
+  group('buổi không đồng bộ được', () {
+    test('chỉ đếm buổi chờ có điểm vô hạn của đúng người', () async {
+      await insertLog('ok', userId: 'u1', score: 7);
+      await insertLog('vo-han', userId: 'u1', score: double.infinity);
+      await insertLog('am-vo-han', userId: 'u1', score: double.negativeInfinity);
+      await insertLog('nguoi-khac', userId: 'u2', score: double.infinity);
+
+      expect(await watchUnsyncableCount(db, 'u1').first, 2);
+    });
+
+    test('bỏ đi thì chỉ xoá buổi lỗi của đúng người, buổi khác còn nguyên',
+        () async {
+      await insertLog('ok', userId: 'u1', score: 7);
+      await insertLog('vo-han', userId: 'u1', score: double.infinity);
+      await insertLog('nguoi-khac', userId: 'u2', score: double.infinity);
+
+      await discardUnsyncableLogs(db, 'u1');
+
+      final ids = (await db.select(db.drillLogRows).get()).map((r) => r.id).toSet();
+      expect(ids, {'ok', 'nguoi-khac'});
+    });
   });
 }

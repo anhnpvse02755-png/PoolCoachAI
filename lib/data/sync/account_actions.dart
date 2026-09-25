@@ -12,6 +12,28 @@ Future<int> pendingLogCount(AppDatabase db, String userId) async {
   return (await query.getSingle()).read(count) ?? 0;
 }
 
+/// Buổi chờ không bao giờ lên được server: điểm vô hạn nằm được trong
+/// SQLite nhưng JSON thì không. Máy chặn buổi mới như vậy từ lúc nhập,
+/// nhưng buổi ghi trước đó vẫn có thể còn trên máy.
+bool isUnsyncable(DrillLogRow row) => !row.score.isFinite;
+
+Stream<int> watchUnsyncableCount(AppDatabase db, String userId) {
+  return (db.select(db.drillLogRows)
+        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+      .watch()
+      .map((rows) => rows.where(isUnsyncable).length);
+}
+
+/// Người chơi bấm bỏ: xoá các buổi đó khỏi máy. Chỉ gọi sau khi họ xác nhận.
+Future<void> discardUnsyncableLogs(AppDatabase db, String userId) async {
+  final rows = await (db.select(db.drillLogRows)
+        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+      .get();
+  final ids = rows.where(isUnsyncable).map((r) => r.id).toList();
+  if (ids.isEmpty) return;
+  await (db.delete(db.drillLogRows)..where((t) => t.id.isIn(ids))).go();
+}
+
 /// Đăng xuất do **người chơi bấm**: xoá buổi tập của họ khỏi máy, để
 /// người dùng sau trên cùng máy không thấy.
 ///

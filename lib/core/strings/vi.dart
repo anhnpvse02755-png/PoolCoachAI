@@ -243,6 +243,17 @@ abstract final class Vi {
   static const signOutAnyway = 'Vẫn đăng xuất';
   static const syncFailed = 'Chưa đồng bộ được. Kiểm tra mạng rồi thử lại.';
 
+  static const cancel = 'Huỷ';
+  static String unsyncableTitle(int count) =>
+      'Có $count buổi tập không đồng bộ được';
+  static const unsyncableBody =
+      'Điểm của các buổi này không hợp lệ nên máy chủ không nhận. '
+      'Chúng chỉ nằm trên máy này và sẽ mất khi đăng xuất.';
+  static const unsyncableDiscard = 'Bỏ các buổi này';
+  static const unsyncableConfirm = 'Bỏ';
+  static String unsyncableConfirmBody(int count) =>
+      'Xoá $count buổi lỗi khỏi máy? Không lấy lại được.';
+
   static const authFieldRequired = 'Không được để trống';
   static const authEmailInvalid = 'Nhập email hợp lệ';
   static const authPasswordTooShort = 'Mật khẩu cần ít nhất 8 ký tự';
