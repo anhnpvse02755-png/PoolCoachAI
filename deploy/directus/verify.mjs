@@ -52,7 +52,9 @@ try {
   note(`đăng ký email đã có → status ${dup.status}, code ${dup.code ?? '(không có)'}`);
 
   const short = await call('POST', '/users/register', { email: `verify-${tag}-c@poolcoachai.example.com`, password: '1234567' });
-  short.status >= 400 ? ok(`mật khẩu 7 ký tự bị từ chối → ${short.status} ${short.code}`) : fail('mật khẩu 7 ký tự vẫn được nhận');
+  short.status === 400 && short.code === 'FAILED_VALIDATION'
+    ? ok('mật khẩu 7 ký tự bị từ chối → 400 FAILED_VALIDATION')
+    : fail(`mật khẩu 7 ký tự → ${short.status} ${short.code} (cần 400 FAILED_VALIDATION)`);
 
   // ─── Quyền trên drill_logs ─────────────────────────────────────────────
   const logId = randomUUID();
@@ -92,8 +94,9 @@ try {
   if (bId) {
     const forged = { id: randomUUID(), drill_id: 'd1', date: '2026-09-23T04:00:00.000Z', score: 5, attempts: 3, notes: null, user_created: bId };
     const forgedRes = await call('POST', '/items/drill_logs', forged, a.access_token);
-    note(`tạo với user_created giả mạo → status ${forgedRes.status}, code ${forgedRes.code}`);
-    if (forgedRes.status === 200 || forgedRes.status === 201) {
+    if (forgedRes.status === 403) {
+      ok('server từ chối tạo với user_created giả mạo → 403');
+    } else if (forgedRes.status === 200 || forgedRes.status === 201) {
       // Check who actually owns the record
       const checkOwner = await call('GET', `/items/drill_logs/${forged.id}?fields=id,user_created`, undefined, admin.access_token);
       checkOwner.data?.user_created === bId
@@ -102,7 +105,7 @@ try {
         ? ok('server bỏ qua user_created, A sở hữu bản ghi')
         : ok(`server bỏ qua user_created, user_created = ${checkOwner.data?.user_created ?? '(null)'}`);
     } else {
-      forgedRes.status === 403 ? ok('server từ chối tạo với user_created giả mạo → 403') : fail(`tạo với user_created giả mạo → ${forgedRes.status} không phải 403`);
+      fail(`tạo với user_created giả mạo → ${forgedRes.status} ${forgedRes.code}`);
     }
   } else {
     fail('không lấy được id của B từ admin');
