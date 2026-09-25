@@ -48,10 +48,12 @@ const { access_token: token } = await api('POST', '/auth/login', {
 // Thiếu nó thì permission ở bước 3 hỏng giữa chừng, để lại cấu hình dở dang —
 // nên kiểm trước, rồi mới tạo gì thì tạo.
 
-// Licence OIG đang chạy? Đọc đúng trường server dùng để nói nguồn licence
-// (đã kiểm trên Directus 12.3.1 ngày 2026-09-25), không suy từ một
-// entitlement phụ như display_powered_by.
-const isOig = (info) => info.license?.source === 'settings';
+// /server/info chỉ expose một số entitlement qua `display_powered_by` (không phải
+// custom_permission_rules_enabled — flag thực sự cần thiết). `license.source` chỉ
+// ghi nguồn gốc licence ('env', 'settings', hoặc null), không mang thông tin tier.
+// Vì thế check kết hợp: source != null để xác nhận licence thực sự được load
+// (không phải Core fallback), cộng display_powered_by === 'OIG' để xác nhận tier.
+const isOig = (info) => info.license?.source != null && info.license?.entitlements?.display_powered_by === 'OIG';
 
 const licenseKey = process.env.DIRECTUS_LICENSE_KEY;
 const infoBefore = await api('GET', '/server/info', undefined, token);
