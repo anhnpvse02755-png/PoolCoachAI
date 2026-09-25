@@ -48,16 +48,22 @@ const { access_token: token } = await api('POST', '/auth/login', {
 // Thiếu nó thì permission ở bước 3 hỏng giữa chừng, để lại cấu hình dở dang —
 // nên kiểm trước, rồi mới tạo gì thì tạo.
 
-// /server/info chỉ expose một số entitlement qua `display_powered_by` (không phải
-// custom_permission_rules_enabled — flag thực sự cần thiết). `license.source` chỉ
-// ghi nguồn gốc licence ('env', 'settings', hoặc null), không mang thông tin tier.
-// Vì thế check kết hợp: source != null để xác nhận licence thực sự được load
-// (không phải Core fallback), cộng display_powered_by === 'OIG' để xác nhận tier.
-const isOig = (info) => info.license?.source != null && info.license?.entitlements?.display_powered_by === 'OIG';
+// /server/info chỉ expose display_powered_by — không phải custom_permission_rules_enabled,
+// flag thực sự cần ở bước 3. Route admin GET /license có đầy đủ entitlement,
+// kể cả custom_permission_rules_enabled, nên dùng nó thay vì /server/info.
+async function canUseCustomPermissionRules() {
+  try {
+    const lic = await api('GET', '/license', undefined, token);
+    return lic?.status === 'active'
+      && lic?.entitlements?.custom_permission_rules_enabled?.default === true;
+  } catch (e) {
+    throw new Error(`Kiểm tra licence thất bại → ${e.message}`);
+  }
+}
 
 const licenseKey = process.env.DIRECTUS_LICENSE_KEY;
-const infoBefore = await api('GET', '/server/info', undefined, token);
-if (!isOig(infoBefore) && !licenseKey) {
+const activeBefore = await canUseCustomPermissionRules();
+if (!activeBefore && !licenseKey) {
   console.error(
     'Server chưa có licence OIG và DIRECTUS_LICENSE_KEY không được đặt. ' +
       'Đặt DIRECTUS_LICENSE_KEY (khoá Open Innovation Grant) rồi chạy lại. ' +
@@ -65,7 +71,7 @@ if (!isOig(infoBefore) && !licenseKey) {
   );
   process.exit(1);
 }
-if (!isOig(infoBefore)) {
+if (!activeBefore) {
   console.log('Kích hoạt Open Innovation Grant licence…');
   // POST /license trả 403 "A license was already activated" nếu đã có licence.
   const licRaw = await fetch(`${base}/license`, {
@@ -77,11 +83,13 @@ if (!isOig(infoBefore)) {
   if (!licRaw.ok && !licText.includes('already activated')) {
     throw new Error(`Kích hoạt licence thất bại → ${licRaw.status} ${licText}`);
   }
-  const infoAfter = await api('GET', '/server/info', undefined, token);
-  if (!isOig(infoAfter)) {
-    throw new Error('Licence đã kích hoạt nhưng không phải OIG');
+  const activeAfter = await canUseCustomPermissionRules();
+  if (!activeAfter) {
+    const licInfo = await api('GET', '/license', undefined, token).catch(() => null);
+    const name = licInfo?.name ?? 'không rõ';
+    throw new Error(`Licence đã kích hoạt (${name}) nhưng custom_permission_rules chưa bật`);
   }
-  console.log('Licence đã kích hoạt (OIG)');
+  console.log(`Licence đã kích hoạt (${(await api('GET', '/license', undefined, token)).name})`);
 } else {
   console.log('Licence đã kích hoạt (bỏ qua)');
 }

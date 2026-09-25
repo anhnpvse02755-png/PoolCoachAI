@@ -137,3 +137,50 @@ Xong. Role Player = 4f764dee-c713-4fd0-9e93-169c8e9b859a, policy = 1192dfa0-c432
 ```
 
 Commit `2f1c8a4` on `fix/accounts-sync-followups`.
+
+---
+
+## Fix round 2 (controller ruling)
+
+Controller queried the admin-only `GET /license` on live. Its response exposes
+`entitlements.custom_permission_rules_enabled.default`, the exact capability needed at step 3.
+bootstrap.mjs already holds the admin token.
+
+**Change:** Replaced `isOig(info)` with an async `canUseCustomPermissionRules()` that calls
+`GET /license` (admin) and checks `status === 'active' && entitlements.custom_permission_rules_enabled.default === true`.
+If the route itself fails, throws a clear Vietnamese error — does not silently proceed.
+Both before and after activation calls use the same helper. The "đã kích hoạt" log line now
+includes the licence `name` (not a secret).
+
+```js
+async function canUseCustomPermissionRules() {
+  try {
+    const lic = await api('GET', '/license', undefined, token);
+    return lic?.status === 'active'
+      && lic?.entitlements?.custom_permission_rules_enabled?.default === true;
+  } catch (e) {
+    throw new Error(`Kiểm tra licence thất bại → ${e.message}`);
+  }
+}
+```
+
+Comment rewritten: `/server/info` exposes only `display_powered_by`; `GET /license` (admin)
+exposes `custom_permission_rules_enabled` — exactly what step 3 needs.
+
+### Live re-run
+
+Command (env loaded from settings.local.json, DIRECTUS_LICENSE_KEY deleted):
+
+**bootstrap.mjs:**
+```
+Licence đã kích hoạt (bỏ qua)
+Đặt 4 quyền cho Player policy (xoá 4 quyền cũ)
+Xong. Role Player = 4f764dee-c713-4fd0-9e93-169c8e9b859a, policy = 1192dfa0-c432-4716-ae39-ecfa7b6790bb
+```
+
+**verify.mjs** — all 20 checks passed (tag: `d58ab09c`):
+```
+Tất cả kiểm tra đều qua
+```
+
+Commit `??` on `fix/accounts-sync-followups`.
