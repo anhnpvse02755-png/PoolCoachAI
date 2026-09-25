@@ -242,6 +242,8 @@ abstract final class Vi {
   static const signOutSyncFirst = 'Đồng bộ trước';
   static const signOutAnyway = 'Vẫn đăng xuất';
   static const syncFailed = 'Chưa đồng bộ được. Kiểm tra mạng rồi thử lại.';
+  static const syncBlockedByUnsyncable =
+      'Còn buổi tập không đồng bộ được. Xem mục cảnh báo ở Hồ sơ để bỏ chúng.';
 
   static const cancel = 'Huỷ';
   static String unsyncableTitle(int count) =>

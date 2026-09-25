@@ -42,11 +42,17 @@ class ProfileScreen extends ConsumerWidget {
       if (choice == null) return;
       if (choice == _SignOutChoice.syncFirst) {
         await ref.read(syncServiceProvider).syncNow();
-        if (await pendingLogCount(db, userId) > 0) {
+        final left = await pendingLogCount(db, userId);
+        if (left > 0) {
+          // Chỉ còn buổi không bao giờ lên được thì mạng không phải lý do:
+          // thử lại mãi cũng vậy, phải chỉ người chơi tới chỗ bỏ chúng.
+          final unsyncable = await unsyncableLogCount(db, userId);
           if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(Vi.syncFailed)),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(left == unsyncable
+                ? Vi.syncBlockedByUnsyncable
+                : Vi.syncFailed),
+          ));
           return;
         }
       }

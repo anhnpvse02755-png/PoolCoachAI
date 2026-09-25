@@ -141,6 +141,40 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), hasLength(2));
   });
 
+  // Buổi điểm vô hạn không bao giờ lên được: báo "kiểm tra mạng" là sai
+  // nguyên nhân, người chơi thử mãi không xong. Chỉ đường tới chỗ bỏ chúng.
+  testWidgets('Đồng bộ trước mà chỉ còn buổi không đồng bộ được thì chỉ tới cảnh báo',
+      (tester) async {
+    final (db, auth, server) = await openProfile(tester, pending: 1, unsyncable: 1);
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.signOutSyncFirst));
+    await tester.pumpAndSettle();
+
+    expect(server.sent('POST', '/items/drill_logs'), hasLength(1)); // buổi thường đã lên
+    expect(find.text(Vi.syncBlockedByUnsyncable), findsOneWidget);
+    expect(find.text(Vi.syncFailed), findsNothing);
+    expect(auth.calls, isEmpty);
+    expect((await db.select(db.drillLogRows).get()).where((r) => !r.score.isFinite),
+        hasLength(1));
+  });
+
+  testWidgets('Đồng bộ trước mất mạng, còn cả buổi thường lẫn buổi lỗi thì vẫn báo mạng',
+      (tester) async {
+    final (_, auth, server) = await openProfile(tester, pending: 1, unsyncable: 1);
+    server.offline = true;
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.signOutSyncFirst));
+    await tester.pumpAndSettle();
+
+    expect(find.text(Vi.syncFailed), findsOneWidget);
+    expect(find.text(Vi.syncBlockedByUnsyncable), findsNothing);
+    expect(auth.calls, isEmpty);
+  });
+
   testWidgets('bỏ qua hộp thoại thì không làm gì', (tester) async {
     final (_, auth, _) = await openProfile(tester, pending: 1);
 

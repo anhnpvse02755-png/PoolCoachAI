@@ -17,18 +17,23 @@ Future<int> pendingLogCount(AppDatabase db, String userId) async {
 /// nhưng buổi ghi trước đó vẫn có thể còn trên máy.
 bool isUnsyncable(DrillLogRow row) => !row.score.isFinite;
 
-Stream<int> watchUnsyncableCount(AppDatabase db, String userId) {
-  return (db.select(db.drillLogRows)
-        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
-      .watch()
-      .map((rows) => rows.where(isUnsyncable).length);
-}
+SimpleSelectStatement<$DrillLogRowsTable, DrillLogRow> _pendingOf(
+        AppDatabase db, String userId) =>
+    db.select(db.drillLogRows)
+      ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull());
+
+Stream<int> watchUnsyncableCount(AppDatabase db, String userId) =>
+    _pendingOf(db, userId)
+        .watch()
+        .map((rows) => rows.where(isUnsyncable).length);
+
+/// Như [watchUnsyncableCount] nhưng đọc một lần.
+Future<int> unsyncableLogCount(AppDatabase db, String userId) async =>
+    (await _pendingOf(db, userId).get()).where(isUnsyncable).length;
 
 /// Người chơi bấm bỏ: xoá các buổi đó khỏi máy. Chỉ gọi sau khi họ xác nhận.
 Future<void> discardUnsyncableLogs(AppDatabase db, String userId) async {
-  final rows = await (db.select(db.drillLogRows)
-        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
-      .get();
+  final rows = await _pendingOf(db, userId).get();
   final ids = rows.where(isUnsyncable).map((r) => r.id).toList();
   if (ids.isEmpty) return;
   await (db.delete(db.drillLogRows)..where((t) => t.id.isIn(ids))).go();
