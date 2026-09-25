@@ -347,13 +347,23 @@ void main() {
       sync
         ..start()
         ..start();
-      await Future<void>.delayed(const Duration(milliseconds: 35));
-      await sync.syncNow();
+      // Chờ tới khi mọi thứ lắng xuống, không chờ theo đồng hồ thật:
+      // retryEvery ở đây là 30 giây nên timer định kỳ không chen vào.
+      await pumpEventQueue();
 
-      // Với guard → 3 GET (lượt khởi đầu + 1 từ periodic timer). Không có
-      // guard → 5 GET (cả hai start() đều chạy lượt, thêm một lượt dồn nữa).
+      // 2 GET: lượt của start(), và một lượt dồn do lần phát đầu tiên của
+      // luồng buổi chờ (thấy 'a' là buổi mới). 'a' chỉ lên một lần.
       expect(pushedIds(), ['a']);
-      expect(server.sent('GET', '/items/drill_logs').length, equals(3));
+      expect(server.sent('GET', '/items/drill_logs'), hasLength(2));
+
+      // Hai điều trên đúng cả khi bỏ guard: lượt thừa của start() thứ hai
+      // dồn vào lượt đang chạy. Chỗ lộ ra là nó nghe phiên lần nữa: một lần
+      // đăng nhập gọi syncNow() hai lần, lần sau dồn thêm một lượt.
+      server.requests.clear();
+      auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
+      await pumpEventQueue();
+
+      expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
     });
 
     test('dispose giữa lượt thì không ghi gì thêm vào máy', () async {

@@ -595,23 +595,25 @@ void main() {
         () async {
       await signedIn();
       now = now.add(const Duration(minutes: 20));
-      // Tab khác vừa xoay: r1 → r2 before first refresh attempt (store already updated)
+      // Tab khác đã xoay r1 → r2 trước khi lượt này bắt đầu: máy đang cầm r2.
       store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r2');
       server.routes['POST /auth/refresh'] = (req) {
         final used = FakeDirectus.body(req)['refresh_token'];
-        // First call uses r2 (token rotated before refresh started)
-        // Retry also gets a different token r3 from another tab rotation
+        // Lần gửi đầu dùng r2 và bị từ chối; trong lúc đó tab khác lại
+        // xoay sang r3, nên lượt này thử r3 đúng một lần.
         if (used == 'r2') {
           store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r3');
           return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
         }
-        // Second retry uses r3 but that also fails on server
+        // Lần thử lại bằng r3 cũng bị từ chối, và máy vẫn cầm r3: phiên chết.
         return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
       };
 
       await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
       expect(auth.current, const SignedOut(expired: true));
       expect(store.session, isNull);
+      // r2 rồi r3, không lần thứ ba: hết hạn ngay trên token vừa bị từ chối.
+      expect(server.sent('POST', '/auth/refresh'), hasLength(2));
     });
 
     test('tab khác đã đăng xuất (máy hết phiên) thì SignedOut thường, không expired',
