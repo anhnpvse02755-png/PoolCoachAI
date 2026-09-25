@@ -775,6 +775,113 @@ void main() {
       expect(deferred.session?.refreshToken, 'rB');
     });
 
+    // Drift trên web là một DB chung cho mọi tab. Tab 2 đăng xuất An rồi
+    // đăng nhập Bình: tab 1 (vẫn SignedIn(An)) làm mới sẽ đọc phiên của
+    // Bình. Dùng nó là đẩy buổi tập của An bằng token của Bình.
+    group('phiên trên máy là của người khác', () {
+      const binh =
+          StoredSession(userId: 'u2', displayName: 'Bình', refreshToken: 'rB');
+
+      void expectBinhUntouched() {
+        expect(store.session?.userId, 'u2');
+        expect(store.session?.displayName, 'Bình');
+        expect(store.session?.refreshToken, 'rB');
+      }
+
+      test('lúc bắt đầu làm mới thì đăng xuất, không gửi token của họ, '
+          'không xoá phiên của họ', () async {
+        await signedIn(); // An, r1
+        now = now.add(const Duration(minutes: 20));
+        store.session = binh; // tab khác vừa đăng nhập Bình
+        server.routes['POST /auth/refresh'] = (_) => FakeDirectus.ok(
+            {'access_token': 'access-rB2', 'expires': 900000, 'refresh_token': 'rB2'});
+
+        await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+        expect(auth.current, const SignedOut());
+        expect(server.sent('POST', '/auth/refresh'), isEmpty);
+        expectBinhUntouched();
+      });
+
+      test('sau 401 thì đăng xuất, không thử token của họ, không xoá phiên của họ',
+          () async {
+        await signedIn(); // An, r1
+        now = now.add(const Duration(minutes: 20));
+        server.routes['POST /auth/refresh'] = (req) {
+          if (FakeDirectus.body(req)['refresh_token'] == 'r1') {
+            store.session = binh; // tab khác đổi người trong lúc chờ server
+            return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+          }
+          return FakeDirectus.ok(
+              {'access_token': 'access-rB2', 'expires': 900000, 'refresh_token': 'rB2'});
+        };
+
+        await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+        expect(auth.current, const SignedOut());
+        expect(server.sent('POST', '/auth/refresh'), hasLength(1));
+        expectBinhUntouched();
+      });
+
+      // Đã thử đủ số token cho một lượt: nếu kiểm "hết lượt" trước, An vẫn
+      // đăng nhập và chỉ nhận network, dù máy đã là của Bình.
+      test('sau 401 cuối lượt vẫn đăng xuất ngay, không báo network', () async {
+        await signedIn(); // An, r1
+        now = now.add(const Duration(minutes: 20));
+        server.routes['POST /auth/refresh'] = (req) {
+          store.session = switch (FakeDirectus.body(req)['refresh_token']) {
+            'r1' => const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r2'),
+            'r2' => const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r3'),
+            _ => binh,
+          };
+          return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+        };
+
+        await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+        expect(auth.current, const SignedOut());
+        expect(
+          server
+              .sent('POST', '/auth/refresh')
+              .map((r) => FakeDirectus.body(r)['refresh_token']),
+          ['r1', 'r2', 'r3'],
+        );
+        expectBinhUntouched();
+      });
+    });
+
+    // signIn(Bình) đang chờ ghi phiên, trạng thái vẫn là SignedIn(An). Ai
+    // xin token lúc này đang làm việc cho An — không được nhận token của Bình,
+    // và cũng không được đi làm mới phiên An rồi ghi đè phiên Bình.
+    test('đang ghi phiên của lần đăng nhập mới thì người cũ không nhận token mới',
+        () async {
+      final deferred = DeferredInMemorySessionStore()
+        ..session =
+            const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r1');
+      store = deferred;
+      auth = build();
+      await auth.restore(); // SignedIn(An)
+
+      server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
+      server.routes['POST /auth/refresh'] = (_) => FakeDirectus.ok(
+          {'access_token': 'access-cu', 'expires': 900000, 'refresh_token': 'r-cu'});
+
+      final b = auth.signIn(email: 'binh@example.com', password: 'matkhau123');
+      await pumpEventQueue(); // signIn đang đứng trong write()
+      expect(auth.current, const SignedIn(userId: 'u1', displayName: 'An'));
+
+      final old = auth.accessToken();
+      final oldDone = expectLater(old, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue();
+
+      deferred.releaseWrite();
+      await b;
+      await oldDone;
+      await pumpEventQueue();
+
+      expect(server.sent('POST', '/auth/refresh'), isEmpty);
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'Bình'));
+      expect(deferred.session?.refreshToken, 'rB');
+      expect(await auth.accessToken(), 'access-rB');
+    });
+
     test('khôi phục phiên không cần mạng', () async {
       store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r1');
       server.offline = true;

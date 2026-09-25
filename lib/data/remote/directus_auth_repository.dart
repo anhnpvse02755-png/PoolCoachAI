@@ -27,6 +27,9 @@ class DirectusAuthRepository implements AuthRepository {
   DateTime? _accessExpiresAt;
   Future<String>? _refreshing;
   int _gen = 0; // session generation: incremented on every sign-in/sign-out/_expire
+  // signIn đã đổi thế hệ và đang chờ ghi phiên người mới, trạng thái vẫn
+  // là người cũ. Ai xin token lúc này đang làm việc cho người cũ.
+  bool _committingSignIn = false;
 
   @override
   AuthState get current => _state;
@@ -93,6 +96,10 @@ class DirectusAuthRepository implements AuthRepository {
     // về muộn thấy thế hệ đã đổi và bỏ kết quả, không đè token mới.
     _bumpGen();
     _refreshing = null;
+    // Token của phiên cũ cũng hết hiệu lực luôn: không để ai còn cầm nó
+    // trong lúc phiên đang đổi chủ.
+    _accessToken = null;
+    _accessExpiresAt = null;
 
     final Map<String, Object?> tokens;
     try {
@@ -131,21 +138,38 @@ class DirectusAuthRepository implements AuthRepository {
     // đầu giữa chừng (lúc chờ /users/me, còn đọc phiên cũ) mà về trong lúc
     // ta chờ ghi phiên sẽ thấy thế hệ đã đổi, không đè token hay phiên mới.
     _bumpGen();
-    _takeTokens(tokens);
-    await _sessions.write(session);
+    // Token người mới chỉ vào tay cùng lúc với SignedIn(người mới), không
+    // chờ gì giữa hai việc: trong lúc chờ ghi, trạng thái vẫn là người cũ,
+    // và ai xin token lúc đó sẽ đẩy dữ liệu người cũ bằng token người mới.
+    // Cũng không cho họ đi làm mới phiên người cũ: lần ghi của lượt đó sẽ
+    // đè phiên người mới vừa ghi.
+    final accessToken = tokens['access_token']! as String;
+    final accessExpiresAt = _expiresAt(tokens);
+    _committingSignIn = true;
+    try {
+      await _sessions.write(session);
+    } finally {
+      _committingSignIn = false;
+    }
+    _accessToken = accessToken;
+    _accessExpiresAt = accessExpiresAt;
     _emit(SignedIn(userId: session.userId, displayName: session.displayName));
   }
 
+  DateTime _expiresAt(Map<String, Object?> tokens) => _now().add(
+        Duration(milliseconds: (tokens['expires']! as num).toInt()),
+      );
+
   void _takeTokens(Map<String, Object?> tokens) {
     _accessToken = tokens['access_token']! as String;
-    _accessExpiresAt = _now().add(
-      Duration(milliseconds: (tokens['expires']! as num).toInt()),
-    );
+    _accessExpiresAt = _expiresAt(tokens);
   }
 
   @override
   Future<String> accessToken() {
-    if (_state is! SignedIn) return Future.error(AuthFailure.sessionExpired);
+    if (_state is! SignedIn || _committingSignIn) {
+      return Future.error(AuthFailure.sessionExpired);
+    }
     final token = _accessToken;
     final expiresAt = _accessExpiresAt;
     if (token != null &&
@@ -180,10 +204,22 @@ class DirectusAuthRepository implements AuthRepository {
       if (_gen != startGen) throw AuthFailure.sessionExpired;
     }
 
+    // Phiên trên máy dùng chung với mọi tab (Drift web là một DB). Phiên
+    // của người khác nghĩa là tab khác đã đổi người: không được dùng token
+    // của họ, cũng không được xoá phiên của họ.
+    bool foreign(StoredSession s) {
+      final who = _state;
+      return who is! SignedIn || who.userId != s.userId;
+    }
+
     final tried = <String>{};
     var saved = await _sessions.read();
     stillCurrent();
     while (true) {
+      if (saved != null && foreign(saved)) {
+        _dropForeign(ifGen: startGen);
+        throw AuthFailure.sessionExpired;
+      }
       if (saved == null) {
         // Máy hết phiên mà server chưa từ chối gì: tab khác đã đăng xuất.
         await _expire(ifGen: startGen, expired: false);
@@ -208,6 +244,10 @@ class DirectusAuthRepository implements AuthRepository {
         // thì thử token đó; còn cầm đúng token vừa bị từ chối thì phiên chết.
         final latest = await _sessions.read();
         stillCurrent();
+        if (latest != null && foreign(latest)) {
+          _dropForeign(ifGen: startGen);
+          throw AuthFailure.sessionExpired;
+        }
         if (latest == null || latest.refreshToken == used) {
           await _expire(ifGen: startGen, expired: latest != null);
           throw AuthFailure.sessionExpired;
@@ -258,6 +298,18 @@ class DirectusAuthRepository implements AuthRepository {
     _accessToken = null;
     _accessExpiresAt = null;
     _emit(SignedOut(expired: expired));
+  }
+
+  /// Tự động đăng xuất vì tab khác đã đăng nhập người khác: như [_expire]
+  /// (đổi thế hệ, bỏ token, [SignedOut] thường vì server chưa từ chối gì),
+  /// nhưng **không** xoá phiên trên máy — đó là phiên hợp lệ của tab kia.
+  /// Không động tới buổi tập nào (spec mục 5.4).
+  void _dropForeign({required int ifGen}) {
+    if (_gen != ifGen) return;
+    _bumpGen();
+    _accessToken = null;
+    _accessExpiresAt = null;
+    _emit(const SignedOut());
   }
 
   /// Đăng xuất trên máy **trước**, rồi mới báo server ở nền.
