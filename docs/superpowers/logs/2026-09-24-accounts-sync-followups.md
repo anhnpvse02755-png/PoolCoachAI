@@ -90,3 +90,16 @@ low-risk at the time. Items fixed before the merge are not listed.
   which forces a later expiry. Unreachable through the UI, because
   authRedirect keeps signed-in users off /login and /register.
 - No test pins `_refreshing = null` in signIn on its own.
+- Two overlapping `signIn` calls share one `_committingSignIn` flag: the
+  first one's `finally` reopens the commit window for the second. The login
+  screen makes an overlap practically unreachable; a counter would close it.
+- `_dropForeign`'s generation guard has no test; both call sites run
+  synchronously after `stillCurrent()`, so it cannot fire today.
+- A refresh that succeeds in one tab can overwrite a newer session another
+  tab just stored for a different user; that tab is then signed out by the
+  foreign-session check. No token leaks and no logs are lost.
+- When a sync pass for the old user ends early because the account changed,
+  the new user's first sync waits for the next trigger or the 30 s timer.
+- `signIn` does not re-check the generation after its write, so a sign-out
+  during the commit could leave `SignedIn` with a cleared store.
+  Unreachable through the UI.
