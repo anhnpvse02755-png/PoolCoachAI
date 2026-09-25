@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
@@ -128,6 +129,23 @@ void main() {
         throwsA(AuthFailure.network),
       );
     });
+
+    test('/users/me hỏng thì không giữ token nào', () async {
+      server.acceptLogin(refresh: 'r1');
+      server.routes['GET /users/me'] = (_) => FakeDirectus.error(500, 'INTERNAL');
+
+      await expectLater(
+        auth.signIn(email: 'an@example.com', password: 'matkhau123'),
+        throwsA(AuthFailure.unknown),
+      );
+      // Nếu token đã bị giữ, một lần restore() sau đó sẽ trả luôn token của
+      // lần đăng nhập hỏng thay vì làm mới.
+      store.session = const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r0');
+      await auth.restore();
+      server.routes['POST /auth/refresh'] = (_) => FakeDirectus.ok(
+          {'access_token': 'access-r0b', 'expires': 900000, 'refresh_token': 'r0b'});
+      expect(await auth.accessToken(), 'access-r0b');
+    });
   });
 
   group('đăng ký', () {
@@ -159,9 +177,34 @@ void main() {
       );
     });
 
-    test('server báo email trùng thì emailTaken', () async {
+    test('đăng ký lại sau khi lần trước hỏng mạng giữa chừng thì vào được tài khoản',
+        () async {
+      // Lần 1: tài khoản đã tạo, đăng nhập được, nhưng /users/me mất mạng.
+      server.routes['POST /users/register'] = (_) => FakeDirectus.noContent();
+      server.acceptLogin(userId: 'u1', name: 'An', refresh: 'r1');
+      server.routes['GET /users/me'] =
+          (req) => throw http.ClientException('offline', req.url);
+      await expectLater(
+        auth.register(displayName: 'An', email: 'an@example.com', password: 'matkhau123'),
+        throwsA(AuthFailure.network),
+      );
+      expect(auth.current, const SignedOut());
+
+      // Lần 2: server báo email đã có — nhưng đó chính là tài khoản vừa tạo.
       server.routes['POST /users/register'] =
           (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+      server.acceptLogin(userId: 'u1', name: 'An', refresh: 'r1');
+
+      await auth.register(displayName: 'An', email: 'an@example.com', password: 'matkhau123');
+
+      expect(auth.current, const SignedIn(userId: 'u1', displayName: 'An'));
+    });
+
+    test('server báo email trùng và mật khẩu không khớp thì emailTaken', () async {
+      server.routes['POST /users/register'] =
+          (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+      server.routes['POST /auth/login'] =
+          (_) => FakeDirectus.error(401, 'INVALID_CREDENTIALS');
 
       await expectLater(
         auth.register(displayName: 'An', email: 'an@example.com', password: 'matkhau123'),
@@ -424,6 +467,44 @@ void main() {
         ['r1', 'r2'],
       );
       expect(auth.current, isA<SignedIn>());
+    });
+
+    // Lượt A bắt đầu làm mới, giữ token mới (chưa bump gen). Người chơi
+    // đăng nhập lại trong lúc A đang chờ /users/me. A về muộn không đè
+    // token mới vì bump gen đã xảy ra giữa lúc A nhận kết quả refresh và
+    // lúc nó ghi phiên.
+    test('đăng nhập lại khi đang đăng nhập: lượt làm mới cũ không đè token mới',
+        () async {
+      await signedIn(); // u1, r1
+      now = now.add(const Duration(minutes: 20));
+      final gate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await gate.future;
+        return FakeDirectus.ok(
+            {'access_token': 'access-cu', 'expires': 900000, 'refresh_token': 'r-cu'});
+      };
+      final old = auth.accessToken();
+      final oldDone = expectLater(old, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue();
+
+      // Lượt cũ phải về đúng lúc signIn đang chờ /users/me — chỗ mã cũ đã
+      // giữ token mới nhưng chưa đổi thế hệ.
+      server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
+      final meGate = Completer<void>();
+      server.routes['GET /users/me'] = (_) async {
+        await meGate.future;
+        return FakeDirectus.ok({'id': 'u2', 'first_name': 'Bình'});
+      };
+      final b = auth.signIn(email: 'binh@example.com', password: 'matkhau123');
+      await pumpEventQueue(); // /auth/login xong, đang chờ /users/me
+      gate.complete();
+      await pumpEventQueue(); // lượt cũ về
+      meGate.complete();
+      await b;
+      await oldDone;
+
+      expect(await auth.accessToken(), 'access-rB');
+      expect(store.session?.refreshToken, 'rB');
     });
 
     // Lượt cũ bị 401 và đã qua mọi lần kiểm thế hệ, rồi đứng ở lần đọc

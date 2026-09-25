@@ -69,11 +69,13 @@ class DirectusAuthRepository implements AuthRepository {
     } on DirectusUnreachable {
       throw AuthFailure.network;
     } on DirectusError catch (e) {
-      throw switch (e.code) {
-        'RECORD_NOT_UNIQUE' => AuthFailure.emailTaken,
-        'FAILED_VALIDATION' => AuthFailure.weakPassword,
-        _ => AuthFailure.unknown,
-      };
+      // Email đã có chủ — có thể chính là người này, từ lần đăng ký trước
+      // hỏng mạng sau khi tài khoản đã tạo. Đăng nhập thử bên dưới quyết định.
+      if (e.code != 'RECORD_NOT_UNIQUE') {
+        throw e.code == 'FAILED_VALIDATION'
+            ? AuthFailure.weakPassword
+            : AuthFailure.unknown;
+      }
     }
     try {
       await signIn(email: normalized, password: password);
@@ -87,6 +89,11 @@ class DirectusAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
+    // Phiên cũ (nếu có) hết hiệu lực ngay từ đây: một lượt làm mới của nó
+    // về muộn thấy thế hệ đã đổi và bỏ kết quả, không đè token mới.
+    _bumpGen();
+    _refreshing = null;
+
     final Map<String, Object?> tokens;
     try {
       tokens = await _api.post('/auth/login', body: {
@@ -99,13 +106,14 @@ class DirectusAuthRepository implements AuthRepository {
     } on DirectusError catch (e) {
       throw e.status == 401 ? AuthFailure.wrongCredentials : AuthFailure.unknown;
     }
-    _takeTokens(tokens);
 
+    // Chưa giữ token cho tới khi biết là của ai: /users/me hỏng thì lần
+    // đăng nhập này coi như chưa từng có.
     final Map<String, Object?> me;
     try {
       me = await _api.get(
         '/users/me',
-        token: _accessToken,
+        token: tokens['access_token']! as String,
         query: {'fields': 'id,first_name'},
       ) as Map<String, Object?>;
     } on DirectusUnreachable {
@@ -119,7 +127,10 @@ class DirectusAuthRepository implements AuthRepository {
       displayName: (me['first_name'] as String?) ?? '',
       refreshToken: tokens['refresh_token']! as String,
     );
+    _takeTokens(tokens);
     await _sessions.write(session);
+    // Lần nữa sau khi ghi: lượt làm mới bắt đầu giữa chừng (đọc phiên cũ)
+    // cũng không được ghi đè phiên vừa lưu.
     _bumpGen();
     _emit(SignedIn(userId: session.userId, displayName: session.displayName));
   }
