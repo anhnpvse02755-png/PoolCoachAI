@@ -98,12 +98,18 @@ try {
       ok('server từ chối tạo với user_created giả mạo → 403');
     } else if (forgedRes.status === 200 || forgedRes.status === 201) {
       // Check who actually owns the record
+      // Chỉ đạt khi chủ đúng là A. Chủ rỗng hay lạ cũng là hỏng: nghĩa là
+      // server không tự gán người tạo, và quy tắc "chỉ thấy buổi của mình"
+      // dựa trên user_created không còn đứng được.
       const checkOwner = await call('GET', `/items/drill_logs/${forged.id}?fields=id,user_created`, undefined, admin.access_token);
-      checkOwner.data?.user_created === bId
-        ? fail('user_created giả mạo thành công — B sở hữu bản ghi')
-        : checkOwner.data?.user_created === aId
-        ? ok('server bỏ qua user_created, A sở hữu bản ghi')
-        : ok(`server bỏ qua user_created, user_created = ${checkOwner.data?.user_created ?? '(null)'}`);
+      const owner = checkOwner.data?.user_created;
+      if (owner === bId) {
+        fail('user_created giả mạo thành công — B sở hữu bản ghi');
+      } else if (aId && owner === aId) {
+        ok('server bỏ qua user_created, A sở hữu bản ghi');
+      } else {
+        fail(`server bỏ qua user_created nhưng chủ không phải A: user_created = ${owner ?? '(null)'}`);
+      }
     } else {
       fail(`tạo với user_created giả mạo → ${forgedRes.status} ${forgedRes.code}`);
     }
