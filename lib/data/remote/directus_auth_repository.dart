@@ -127,11 +127,12 @@ class DirectusAuthRepository implements AuthRepository {
       displayName: (me['first_name'] as String?) ?? '',
       refreshToken: tokens['refresh_token']! as String,
     );
+    // Lần nữa, ngay trước khi giữ token và chưa chờ gì: lượt làm mới bắt
+    // đầu giữa chừng (lúc chờ /users/me, còn đọc phiên cũ) mà về trong lúc
+    // ta chờ ghi phiên sẽ thấy thế hệ đã đổi, không đè token hay phiên mới.
+    _bumpGen();
     _takeTokens(tokens);
     await _sessions.write(session);
-    // Lần nữa sau khi ghi: lượt làm mới bắt đầu giữa chừng (đọc phiên cũ)
-    // cũng không được ghi đè phiên vừa lưu.
-    _bumpGen();
     _emit(SignedIn(userId: session.userId, displayName: session.displayName));
   }
 
@@ -167,67 +168,77 @@ class DirectusAuthRepository implements AuthRepository {
     return f;
   }
 
-  Future<String> _refresh({bool retried = false, String? originalToken}) async {
+  /// Mỗi lượt làm mới thử tối đa ngần này refresh token khác nhau.
+  static const _maxRefreshTokens = 3;
+
+  Future<String> _refresh() async {
     // Lấy thế hệ trước lần chờ đầu tiên: mọi kết luận của lượt này (ghi
     // phiên, hay đăng xuất vì hết hạn) chỉ có hiệu lực nếu phiên chưa đổi.
+    // Kiểm lại sau **mỗi** lần chờ — lượt cũ về muộn luôn là sessionExpired.
     final startGen = _gen;
-    final saved = await _sessions.read();
-    if (saved == null) {
-      await _expire(ifGen: startGen);
-      throw AuthFailure.sessionExpired;
-    }
-    originalToken ??= saved.refreshToken;
-
-    try {
-      final tokens = await _api.post('/auth/refresh', body: {
-        'refresh_token': saved.refreshToken,
-        'mode': 'json',
-      }) as Map<String, Object?>;
-
-      // Drop result if session changed while network call was in flight.
+    void stillCurrent() {
       if (_gen != startGen) throw AuthFailure.sessionExpired;
+    }
 
+    final tried = <String>{};
+    var saved = await _sessions.read();
+    stillCurrent();
+    while (true) {
+      if (saved == null) {
+        // Máy hết phiên mà server chưa từ chối gì: tab khác đã đăng xuất.
+        await _expire(ifGen: startGen, expired: false);
+        throw AuthFailure.sessionExpired;
+      }
+      final used = saved.refreshToken;
+      tried.add(used);
+
+      final Map<String, Object?> tokens;
+      try {
+        tokens = await _api.post('/auth/refresh', body: {
+          'refresh_token': used,
+          'mode': 'json',
+        }) as Map<String, Object?>;
+      } on DirectusUnreachable {
+        // Mất mạng không bao giờ là lý do đăng xuất.
+        throw AuthFailure.network;
+      } on DirectusError catch (e) {
+        if (e.status != 401 && e.status != 403) throw AuthFailure.unknown;
+        stillCurrent();
+        // Một tab khác có thể vừa xoay token. Máy đang cầm token chưa thử
+        // thì thử token đó; còn cầm đúng token vừa bị từ chối thì phiên chết.
+        final latest = await _sessions.read();
+        stillCurrent();
+        if (latest == null || latest.refreshToken == used) {
+          await _expire(ifGen: startGen, expired: latest != null);
+          throw AuthFailure.sessionExpired;
+        }
+        if (tried.contains(latest.refreshToken) ||
+            tried.length >= _maxRefreshTokens) {
+          // Các tab đang xoay token liên tục — để lần sau thử lại.
+          throw AuthFailure.network;
+        }
+        saved = latest;
+        continue;
+      }
+
+      final rotated = tokens['refresh_token']! as String;
+      if (_gen != startGen) {
+        // Server vừa xoay token cho một phiên đã bỏ: token mới này không ai
+        // giữ, báo server bỏ luôn thay vì để nó sống 30 ngày.
+        unawaited(_revoke(rotated));
+        throw AuthFailure.sessionExpired;
+      }
       _takeTokens(tokens);
       await _sessions.write(StoredSession(
         userId: saved.userId,
         displayName: saved.displayName,
-        refreshToken: tokens['refresh_token']! as String,
+        refreshToken: rotated,
       ));
-      // Đăng xuất chen vào lúc đang ghi: token này thuộc phiên đã bỏ.
-      if (_gen != startGen) throw AuthFailure.sessionExpired;
+      if (_gen != startGen) {
+        unawaited(_revoke(rotated));
+        throw AuthFailure.sessionExpired;
+      }
       return _accessToken!;
-    } on DirectusUnreachable {
-      // Mất mạng không bao giờ là lý do đăng xuất.
-      throw AuthFailure.network;
-    } on DirectusError catch (e) {
-      if (e.status != 401 && e.status != 403) throw AuthFailure.unknown;
-
-      // Drop result if session changed while network call was in flight.
-      if (_gen != startGen) throw AuthFailure.sessionExpired;
-
-      // Một tab khác có thể vừa xoay token. Máy đã cầm token mới hơn
-      // thì thử lại một lần bằng token đó, trước khi kết luận phiên chết.
-      final latest = await _sessions.read();
-
-      // Drop result if session changed during the 401 handling itself.
-      if (_gen != startGen) throw AuthFailure.sessionExpired;
-
-      if (!retried && latest != null && latest.refreshToken != originalToken) {
-        return _refresh(retried: true, originalToken: originalToken);
-      }
-
-      // Before expiring, check if the store has moved on from the original
-      // token. If another tab rotated while we were refreshing, the session
-      // is still valid — keep it and report a transient failure so the caller
-      // retries later. Only expire if the store still holds the original
-      // (rejected) token, meaning the server genuinely rejected it.
-      final current = await _sessions.read();
-      if (current != null && current.refreshToken != originalToken) {
-        throw AuthFailure.network;
-      }
-
-      await _expire(ifGen: startGen);
-      throw AuthFailure.sessionExpired;
     }
   }
 
@@ -236,7 +247,9 @@ class DirectusAuthRepository implements AuthRepository {
   ///
   /// [ifGen] là thế hệ lượt refresh bắt đầu. Một lượt cũ về muộn — sau khi
   /// người chơi đã đăng xuất rồi đăng nhập lại — không được đá phiên mới.
-  Future<void> _expire({required int ifGen}) async {
+  /// [expired] chỉ true khi server thật sự từ chối phiên: màn Đăng nhập
+  /// dựa vào nó để nói "phiên hết hạn".
+  Future<void> _expire({required int ifGen, required bool expired}) async {
     if (_gen != ifGen) return;
     _bumpGen();
     final mine = _gen;
@@ -244,7 +257,7 @@ class DirectusAuthRepository implements AuthRepository {
     if (_gen != mine) return;
     _accessToken = null;
     _accessExpiresAt = null;
-    _emit(const SignedOut(expired: true));
+    _emit(SignedOut(expired: expired));
   }
 
   /// Đăng xuất trên máy **trước**, rồi mới báo server ở nền.

@@ -61,6 +61,50 @@ class GatedReadSessionStore extends InMemorySessionStore {
   }
 }
 
+/// Như [GatedReadSessionStore] nhưng trả phiên **lúc đọc xong**, không
+/// phải lúc bắt đầu — mô phỏng lần đọc thấy thay đổi xảy ra trong lúc chờ.
+class LiveGatedReadSessionStore extends InMemorySessionStore {
+  Completer<void>? gate;
+  int skip = 0;
+
+  @override
+  Future<StoredSession?> read() async {
+    final g = gate;
+    if (g != null) {
+      if (skip > 0) {
+        skip--;
+      } else {
+        gate = null;
+        await g.future;
+      }
+    }
+    return session;
+  }
+}
+
+/// Lệnh chạy đúng thứ tự gọi, như hàng đợi của Drift; [clearGate] giữ
+/// lệnh clear() — và mọi lệnh gọi sau nó — cho tới khi mở.
+class SerialGatedSessionStore extends InMemorySessionStore {
+  final clearGate = Completer<void>();
+  Future<void> _tail = Future.value();
+
+  Future<T> _enqueue<T>(Future<T> Function() op) {
+    final result = _tail.then((_) => op());
+    _tail = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  @override
+  Future<StoredSession?> read() => _enqueue(super.read);
+  @override
+  Future<void> write(StoredSession s) => _enqueue(() => super.write(s));
+  @override
+  Future<void> clear() => _enqueue(() async {
+        await clearGate.future;
+        await super.clear();
+      });
+}
+
 void main() {
   late FakeDirectus server;
   late InMemorySessionStore store;
@@ -507,9 +551,9 @@ void main() {
       expect(store.session?.refreshToken, 'rB');
     });
 
-    // Lượt cũ bị 401 và đã qua mọi lần kiểm thế hệ, rồi đứng ở lần đọc
-    // phiên cuối cùng. Trong lúc đó người chơi đăng xuất và đăng nhập tài
-    // khoản khác: lượt cũ không được tự đăng xuất tài khoản mới.
+    // Lượt cũ bị 401 rồi đứng ở lần đọc phiên sau 401 — lần đọc cuối cùng
+    // trước khi quyết định hết hạn. Trong lúc đó người chơi đăng xuất và
+    // đăng nhập tài khoản khác: lượt cũ không được tự đăng xuất tài khoản mới.
     test('lượt làm mới cũ bị 401 về muộn không đá phiên của lần đăng nhập mới',
         () async {
       final gated = GatedReadSessionStore();
@@ -529,11 +573,8 @@ void main() {
       final aDone = expectLater(a, throwsA(AuthFailure.sessionExpired));
       await pumpEventQueue();
 
-      // Lần đọc thứ nhất sau 401 (tìm token mới hơn) đi qua; lần thứ hai
-      // (kiểm trước khi hết hạn) chụp r1 rồi đứng chờ.
-      gated
-        ..skip = 1
-        ..gate = Completer<void>();
+      // Lần đọc sau 401 (tìm token mới hơn) chụp r1 rồi đứng chờ.
+      gated.gate = Completer<void>();
       final held = gated.gate!;
       gate401.complete();
       await pumpEventQueue();
@@ -550,7 +591,8 @@ void main() {
       expect(gated.session?.refreshToken, 'r2');
     });
 
-    test('401 lần thử lại nhưng máy đã có token khác thì không xoá phiên', () async {
+    test('token mới hơn cũng bị từ chối thì hết hạn ngay, không tốn thêm lượt network',
+        () async {
       await signedIn();
       now = now.add(const Duration(minutes: 20));
       // Tab khác vừa xoay: r1 → r2 before first refresh attempt (store already updated)
@@ -567,9 +609,170 @@ void main() {
         return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
       };
 
-      await expectLater(auth.accessToken(), throwsA(AuthFailure.network));
-      expect(auth.current, isA<SignedIn>());
-      expect(store.session?.refreshToken, 'r3'); // store unchanged (not cleared)
+      await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+      expect(auth.current, const SignedOut(expired: true));
+      expect(store.session, isNull);
+    });
+
+    test('tab khác đã đăng xuất (máy hết phiên) thì SignedOut thường, không expired',
+        () async {
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+      store.session = null; // tab khác xoá phiên trên máy dùng chung
+
+      await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+      expect(auth.current, const SignedOut());
+    });
+
+    test('401 mà tab khác vừa đăng xuất thì SignedOut thường, không expired',
+        () async {
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+      server.routes['POST /auth/refresh'] = (_) {
+        store.session = null; // tab khác đăng xuất trong lúc chờ server
+        return FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      };
+
+      await expectLater(auth.accessToken(), throwsA(AuthFailure.sessionExpired));
+      expect(auth.current, const SignedOut());
+    });
+
+    test('lượt làm mới cũ về muộn sau khi đổi người thì báo sessionExpired, không network',
+        () async {
+      // Mã cũ đọc phiên ba lần: lấy r1, tìm token mới hơn sau 401 (có kiểm
+      // thế hệ), rồi đọc lần ba trước khi hết hạn — lần này **không** kiểm
+      // thế hệ. Giữ đúng lần thứ ba, và trả giá trị **lúc đọc xong** (phiên
+      // của Bình), để mã cũ thấy token "khác" và báo network.
+      final gated = LiveGatedReadSessionStore();
+      store = gated;
+      auth = build();
+      server.acceptLogin(refresh: 'r1');
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.routes['POST /auth/refresh'] =
+          (_) => FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+      gated
+        ..skip = 2
+        ..gate = Completer<void>();
+      final held = gated.gate!;
+
+      final a = auth.accessToken();
+      final aDone = expectLater(a, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue();
+      // Mã mới chỉ đọc hai lần nên cổng còn nguyên: gỡ đi, kẻo lần đọc của
+      // signOut dưới đây đứng chờ mãi. Với mã cũ cổng đã được dùng rồi.
+      gated.gate = null;
+      await auth.signOut();
+      server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
+      await auth.signIn(email: 'binh@example.com', password: 'matkhau123');
+      held.complete();
+      await aDone;
+
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'Bình'));
+    });
+
+    test('đăng xuất lúc làm mới đang về: báo server bỏ cả token vừa xoay', () async {
+      await signedIn(); // r1
+      now = now.add(const Duration(minutes: 20));
+      final gate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await gate.future;
+        return FakeDirectus.ok(
+            {'access_token': 'access-r2', 'expires': 900000, 'refresh_token': 'r2'});
+      };
+      server.routes['POST /auth/logout'] = (_) => FakeDirectus.noContent();
+
+      final t = auth.accessToken();
+      final tDone = expectLater(t, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue();
+      await auth.signOut();
+      gate.complete();
+      await tDone;
+      await pumpEventQueue();
+
+      final revoked = server
+          .sent('POST', '/auth/logout')
+          .map((r) => FakeDirectus.body(r)['refresh_token'])
+          .toSet();
+      expect(revoked, {'r1', 'r2'});
+    });
+
+    test('đăng nhập chen vào lúc tự đăng xuất đang xoá phiên thì phiên mới sống',
+        () async {
+      final serial = SerialGatedSessionStore();
+      store = serial;
+      auth = build();
+      server.acceptLogin(refresh: 'r1');
+      await auth.signIn(email: 'an@example.com', password: 'matkhau123');
+      now = now.add(const Duration(minutes: 20));
+      server.routes['POST /auth/refresh'] =
+          (_) => FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+
+      final a = auth.accessToken();
+      final aDone = expectLater(a, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue(); // _expire đang đứng trong clear()
+
+      server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
+      final b = auth.signIn(email: 'binh@example.com', password: 'matkhau123');
+      await pumpEventQueue(); // write của Bình xếp hàng sau clear
+      serial.clearGate.complete();
+      await b;
+      await aDone;
+      await pumpEventQueue();
+
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'Bình'));
+      expect(serial.session?.refreshToken, 'rB');
+      // Nếu _expire lỡ chạy tiếp, nó xoá access token của Bình: lần xin
+      // token này sẽ đi làm mới và dính 401 thay vì trả ngay.
+      expect(await auth.accessToken(), 'access-rB');
+    });
+
+    // signIn giữ token của người mới rồi mới chờ ghi phiên. Một lượt làm mới
+    // bắt đầu sau lần đổi thế hệ đầu (lúc signIn còn chờ /users/me) mà về
+    // đúng lúc signIn đang chờ ghi thì không được đè token và phiên mới.
+    test('lượt làm mới về lúc đăng nhập mới đang ghi phiên thì không đè phiên mới',
+        () async {
+      final deferred = DeferredInMemorySessionStore()
+        ..session =
+            const StoredSession(userId: 'u1', displayName: 'An', refreshToken: 'r1');
+      store = deferred;
+      auth = build();
+      await auth.restore(); // An, chưa có access token: xin token là làm mới
+
+      server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
+      final meGate = Completer<void>();
+      server.routes['GET /users/me'] = (_) async {
+        await meGate.future;
+        return FakeDirectus.ok({'id': 'u2', 'first_name': 'Bình'});
+      };
+      final refreshGate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await refreshGate.future;
+        return FakeDirectus.ok(
+            {'access_token': 'access-cu', 'expires': 900000, 'refresh_token': 'r-cu'});
+      };
+
+      final b = auth.signIn(email: 'binh@example.com', password: 'matkhau123');
+      await pumpEventQueue(); // /auth/login xong, đang chờ /users/me
+
+      // Vẫn SignedIn(An): lượt này bắt đầu sau lần đổi thế hệ đầu của signIn.
+      final old = auth.accessToken();
+      final oldDone = expectLater(old, throwsA(AuthFailure.sessionExpired));
+      await pumpEventQueue(); // đang chờ /auth/refresh
+
+      meGate.complete();
+      await pumpEventQueue(); // signIn đã giữ token của Bình, đang chờ ghi
+      refreshGate.complete();
+      await pumpEventQueue(); // lượt cũ về trong lúc signIn còn chờ ghi
+
+      deferred.releaseWrite();
+      await b;
+      await oldDone;
+      await pumpEventQueue();
+
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'Bình'));
+      expect(await auth.accessToken(), 'access-rB');
+      expect(deferred.session?.refreshToken, 'rB');
     });
 
     test('khôi phục phiên không cần mạng', () async {
