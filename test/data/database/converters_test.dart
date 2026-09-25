@@ -229,8 +229,6 @@ void main() {
 
   test('buổi tập đi lên server rồi về máy vẫn nguyên, kể cả chữ tiếng Việt',
       () async {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
     await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
           id: 'x',
           userId: 'u1',

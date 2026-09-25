@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 
+import 'support/fake_auth.dart';
 import 'support/test_data.dart';
 
 void main() {
@@ -38,7 +39,9 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         UncontrolledProviderScope(
-          container: testContainer(),
+          // Không truyền router: app tự dựng router từ authGateProvider,
+          // nên phải đăng nhập rõ ràng — không dựa vào mặc định của testContainer.
+          container: testContainer(auth: FakeAuthRepository.signedIn()),
           child: const PoolCoachApp(),
         ),
       );
