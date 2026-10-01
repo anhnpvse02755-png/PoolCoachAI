@@ -1,6 +1,12 @@
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
+import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
+import 'package:poolcoachai/domain/table_geometry/scratch.dart';
+import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
+import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 
 /// Toàn bộ chuỗi tiếng Việt hiển thị cho người dùng.
 ///
@@ -274,4 +280,148 @@ abstract final class Vi {
         AuthFailure.sessionExpired => authSessionExpired,
         AuthFailure.unknown => 'Máy chủ đang gặp lỗi. Hãy thử lại sau.',
       };
+
+  // Mô phỏng góc cắt — docs/superpowers/specs/2026-10-01-poolcoachai-cut-angle-simulator-design.md.
+  // Câu nào có số thì số do lõi table_geometry tính ra; ở đây chỉ ghép chữ.
+  static const simTitle = 'Mô phỏng góc cắt';
+  static const simCardBody = 'Đặt bi, xem bi ảo, góc cắt và đường đi bi cái.';
+  static const simHint = 'Kéo bi để đặt lại, chạm vào lỗ để chọn lỗ khác.';
+  static const simStrokeLabel = 'Kiểu đánh';
+  static const simPowerLabel = 'Lực';
+  static const simSpinLabel = 'Áp phê';
+  static const simNoPocket = 'Không lỗ nào đánh được từ vị trí này.';
+  static const simBankWarning =
+      'Bi cái dội băng — cần canh lực chính xác hơn bình thường.';
+  static const simSpinNoRail = 'Áp phê chỉ đổi đường bi cái sau khi chạm băng.';
+
+  /// PRD §6.6 — không được bỏ.
+  static const simDisclaimer = 'Lực và đầu cơ là gợi ý định hướng dựa trên '
+      'hình học, không phải kết quả đo vật lý chính xác — dùng để tham khảo, '
+      'người chơi vẫn cần tự canh lực thực tế.';
+
+  static String get simMiscue => 'Lệch ${simTips(miscueTips)} đầu cơ dễ trượt cơ.';
+
+  static String simStroke(Stroke stroke) => switch (stroke) {
+        Stroke.stun => 'Đánh đứng bi',
+        Stroke.draw => 'Đánh trô bi',
+        Stroke.follow => 'Đánh cu lê',
+      };
+
+  static String simPowerPreset(double power) => switch (power.round()) {
+        40 => 'Nhẹ 40%',
+        70 => 'Vừa 70%',
+        95 => 'Mạnh 95%',
+        final n => '$n%',
+      };
+
+  /// 0.5 → "0.5", 1 → "1": người chơi nói "lệch 1 đầu cơ", không "1.0".
+  static String simTips(double tips) =>
+      tips == tips.roundToDouble() ? '${tips.round()}' : '$tips';
+
+  static String _side(SpinSide side) => switch (side) {
+        SpinSide.left => 'trái',
+        SpinSide.right => 'phải',
+      };
+
+  static String simSpinChip(SideSpin spin) => switch (spin.side) {
+        null => 'Không',
+        SpinSide.left => 'Trái ${simTips(spin.tips)}',
+        SpinSide.right => 'Phải ${simTips(spin.tips)}',
+      };
+
+  static String _spinLong(SideSpin spin) => switch (spin.side) {
+        null => 'không áp phê',
+        final side => 'áp phê ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
+      };
+
+  static String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  static String simPocket(Pocket pocket) => switch (pocket) {
+        Pocket.topLeft => 'góc trên trái',
+        Pocket.topMiddle => 'giữa trên',
+        Pocket.topRight => 'góc trên phải',
+        Pocket.bottomLeft => 'góc dưới trái',
+        Pocket.bottomMiddle => 'giữa dưới',
+        Pocket.bottomRight => 'góc dưới phải',
+      };
+
+  static String simBand(DifficultyBand band) => switch (band) {
+        DifficultyBand.easy => 'Dễ',
+        DifficultyBand.medium => 'Vừa',
+        DifficultyBand.hard => 'Khó',
+        DifficultyBand.veryHard => 'Rất khó',
+        DifficultyBand.extreme => 'Cực khó',
+        DifficultyBand.impossible => 'Không đánh được',
+      };
+
+  static String simUnmakeable(UnmakeableReason reason) => switch (reason) {
+        UnmakeableReason.overlap => 'Hai bi đang chồng lên nhau.',
+        UnmakeableReason.ghostOffTable =>
+          'Bi ảo nằm ngoài mặt bàn — bi mục tiêu sát băng, lỗ này không đánh được.',
+        UnmakeableReason.tooThin =>
+          'Góc cắt quá lớn (>${maxCutAngle.round()}°).',
+        UnmakeableReason.cueBlocked => 'Đường bi cái tới bi ảo bị bi khác chắn.',
+        UnmakeableReason.objectBlocked =>
+          'Đường bi mục tiêu vào lỗ bị bi khác chắn.',
+      };
+
+  static String simPocketLine(Pocket pocket) => 'Lỗ: ${simPocket(pocket)}';
+  static String simAngleLine(double angle) => 'Góc cắt: ${angle.round()}°';
+  static String simBandLine(DifficultyBand band) => 'Độ khó: ${simBand(band)}';
+  static String simStrokeLine(Stroke stroke) => 'Kiểu đánh: ${simStroke(stroke)}';
+  static String simPowerLine(double power) => 'Lực: ${power.round()}%';
+  static String simSpinLine(SideSpin spin) => switch (spin.side) {
+        null => 'Áp phê: không',
+        final side => 'Áp phê: ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
+      };
+  static String simScratch(Pocket pocket) =>
+      'Bi cái rơi lỗ ${simPocket(pocket)} (chết cái).';
+
+  static String simAdvice(Advice advice) => switch (advice) {
+        AddSpinToAvoid(:final from, :final to, :final pocket) =>
+          _avoidText(from, to, pocket),
+        NoSpinAvoids(:final pocket) => 'Bi cái chết cái ở lỗ '
+            '${simPocket(pocket)}, áp phê không cứu được — đổi lực hoặc kiểu đánh.',
+        OverhitRisk(:final margin, :final fromPower, :final pocket, :final saferSpin) =>
+          'Nếu đánh quá lực khoảng +${margin.round()}% (từ ~${fromPower.round()}%), '
+              'bi cái có thể rơi lỗ ${simPocket(pocket)} (chết cái).'
+              '${saferSpin == null ? '' : ' ${_capitalize(_spinLong(saferSpin))} thì vẫn an toàn tới 100%.'}',
+        SpinCeiling(:final side, :final maxSafeTips, :final pocket) =>
+          'Đừng áp phê ${_side(side)} quá ${simTips(maxSafeTips)} đầu cơ — '
+              'bi cái sẽ rơi lỗ ${simPocket(pocket)}.',
+      };
+
+  /// Chọn câu theo chiều đổi: thêm đầu cơ, bớt đầu cơ, hay đổi phía.
+  static String _avoidText(SideSpin from, SideSpin to, Pocket pocket) {
+    final at = 'lỗ ${simPocket(pocket)}';
+    if (to.isNone) {
+      return 'Áp phê đang chọn làm bi cái chết cái ở $at — đánh không áp phê '
+          'thì tránh được.';
+    }
+    if (from.isNone || (from.side == to.side && to.tips > from.tips)) {
+      return 'Ít áp phê thì bi cái chết cái ở $at — nên ${_spinLong(to)} để '
+          'đổi góc bật tránh lỗ.';
+    }
+    if (from.side == to.side) {
+      return 'Áp phê nhiều quá, bi cái chết cái ở $at — giảm còn ${_spinLong(to)}.';
+    }
+    return 'Áp phê ${_side(from.side!)} làm bi cái chết cái ở $at — nên đổi '
+        'sang ${_spinLong(to)}.';
+  }
+
+  /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây.
+  static String simSummary(ShotResult? shot, CueBallPath? path) {
+    const head = 'Bàn mô phỏng.';
+    return switch (shot) {
+      null => '$head $simNoPocket',
+      Unmakeable(:final reason) => '$head ${simUnmakeable(reason)}',
+      Makeable(:final geometry) => [
+          '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
+              '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
+          if (path?.bankUsed ?? false) 'Dội băng.',
+          if (path?.scratch != null) 'Chết cái.',
+        ].join(' '),
+    };
+  }
 }

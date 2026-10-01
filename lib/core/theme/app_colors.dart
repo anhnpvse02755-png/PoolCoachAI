@@ -24,4 +24,13 @@ abstract final class AppColors {
   static const danger = Color(0xFFE2685C);
   static const warning = Color(0xFFE5A93C);
   static const info = Color(0xFF6FA8D6);
+
+  // Bàn mô phỏng
+  static const tableFelt = Color(0xFF1E6B47);
+  static const tableRail = Color(0xFF4A2E1B);
+  static const cuePath = Color(0xFF3CC8B4); // màu ngọc, PRD §6.5
+  static const railHit = Color(0xFFF2D04B); // chấm vàng điểm chạm băng
+  static const aimLine = Color(0xFFF5F1E6);
+  static const ballCue = Color(0xFFF7F3E8);
+  static const ballObject = Color(0xFFC0392B);
 }
