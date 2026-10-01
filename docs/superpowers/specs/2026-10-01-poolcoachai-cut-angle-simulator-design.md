@@ -146,7 +146,7 @@ Nếu đoạn thẳng `ghost → E₀` ra khỏi `bounds`:
 
 1. **Đoạn 1:** đường **thẳng** từ `ghost` tới điểm chạm `hit` — giao điểm đầu tiên với `bounds`.
 2. Phản xạ hướng đi tại `hit` (trục chạm đổi dấu), rồi xoay thêm theo áp phê (mục 4.6).
-3. **Đoạn 2:** đi tiếp quãng còn lại `|E₀ − ghost| − |hit − ghost|` từ `hit`, áp hiệu ứng cong của kiểu đánh như 4.4 với độ cong tỉ lệ quãng còn lại.
+3. **Đoạn 2:** đi tiếp quãng còn lại `|E₀ − ghost| − |hit − ghost|` từ `hit`, áp hiệu ứng cong của kiểu đánh như 4.4 với độ cong tỉ lệ quãng còn lại. Riêng **đánh trô bi**, đoạn 2 là đường **thẳng** tới cùng điểm dừng: xoáy trô gần như hết trước khi tới băng (chủ dự án chốt sau khi xem trên Chrome, 2026-10-01). Cu lê giữ đường cong.
 4. Nếu đoạn 2 chạm băng thứ hai: bi cái dừng tại điểm chạm đó (PRD §8: tối đa một lần dội).
 
 `CueBallPath { segments, end, railHit? }` — `segments` là danh sách sealed `Straight | Curve`; dội băng là `railHit != null`. Hai đoạn **không bao giờ** gộp thành một đường cong.

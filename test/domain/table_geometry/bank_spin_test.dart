@@ -132,6 +132,36 @@ void main() {
     }
   });
 
+  // Chủ dự án duyệt trên Chrome: xoáy trô gần như hết trước khi tới
+  // băng, nên sau dội băng bi cái đi thẳng. Cu lê vẫn giữ đường cong.
+  test('trô dội băng thì đoạn sau là đường thẳng theo hướng bật', () {
+    var drawBanks = 0;
+    var followCurves = 0;
+    for (final g in shots) {
+      for (final p in [40.0, 70.0, 95.0]) {
+        final draw = simulateCueBall(g, stroke: Stroke.draw, power: p);
+        if (draw.bankUsed && draw.scratch == null && draw.segments.length == 2) {
+          drawBanks++;
+          final second = draw.segments[1];
+          final where = '${g.cue}→${g.object} $p';
+          expect(second, isA<Straight>(), reason: where);
+          expect(second.start, draw.railHit, reason: where);
+          final heading = (second.end - second.start).normalized;
+          expect(heading.dot(draw.reboundDir!), closeTo(1, 1e-9),
+              reason: where);
+        }
+        final follow = simulateCueBall(g, stroke: Stroke.follow, power: p);
+        if (follow.bankUsed &&
+            follow.segments.length == 2 &&
+            follow.segments[1] is Curve) {
+          followCurves++;
+        }
+      }
+    }
+    expect(drawBanks, greaterThan(10));
+    expect(followCurves, greaterThan(10));
+  });
+
   test('không chạm băng thì áp phê không đổi đường đi', () {
     for (final g in shots) {
       final plain = simulateCueBall(g, stroke: Stroke.follow, power: 40);

@@ -177,7 +177,12 @@ CueBallPath simulateCueBall(
     final turn = _reflect(dir, wall).signedAngleTo(rebound);
     final straight2 = _reflect(along, wall).rotated(turn) * f;
     final bend2 = _reflect(roll, wall).rotated(turn) * f;
-    final second = _leg(hit, straight2, bend2, table);
+    // Chủ dự án duyệt trên Chrome: xoáy trô gần như hết trước khi tới
+    // băng, nên sau dội băng bi cái đi thẳng tới cùng điểm dừng. Cu lê
+    // vẫn còn xoáy lên nên giữ đường cong.
+    final second = stroke == Stroke.draw
+        ? Straight(hit, hit + straight2 + bend2)
+        : _leg(hit, straight2, bend2, table);
     if (table.contains(second.end)) {
       segments.add(second);
     } else {
