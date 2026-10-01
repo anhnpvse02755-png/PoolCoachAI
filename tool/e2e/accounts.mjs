@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { launch, sleep } from './cdp.mjs';
+import { registerThrowaway, deleteUserByEmail } from './throwaway_user.mjs';
 
 const APP = (process.argv[2] ?? 'https://poolcoachai.kjdybl.easypanel.host').replace(/\/$/, '');
 const need = (n) => process.env[n] ?? (() => { throw new Error(`Thiếu ${n}`); })();
@@ -50,15 +51,7 @@ const one = await launch({ port: 9333, name: 'may-1' });
 const two = await launch({ port: 9334, name: 'may-2' });
 try {
   step(1, 'Máy 1 đăng ký và ghi buổi 7/10');
-  await one.goto(APP);
-  await one.waitForText('Đăng nhập');
-  await one.click('Chưa có tài khoản');
-  await one.type('Tên hiển thị', 'Người thử E2E');
-  await one.type('Email', email);
-  await one.type('Nhập lại mật khẩu', pass1);
-  await one.type('Mật khẩu', pass1);
-  await one.click('Tạo tài khoản');
-  await one.waitForText('Xin chào');
+  await registerThrowaway(one, APP, { email, password: pass1 });
   await record(one, 7);
   await one.shot(path.join(shots, '1-may1-ghi-7.png'));
 
@@ -115,22 +108,5 @@ try {
 } finally {
   await one.close();
   await two.close();
-  if (process.env.DIRECTUS_URL && process.env.DIRECTUS_ADMIN_PASSWORD) {
-    // Dọn dẹp hỏng thì chỉ cảnh báo: không được che lỗi thật của bài chạy.
-    try {
-      const base = process.env.DIRECTUS_URL.replace(/\/$/, '');
-      const login = await (await fetch(`${base}/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: process.env.DIRECTUS_ADMIN_EMAIL, password: process.env.DIRECTUS_ADMIN_PASSWORD }),
-      })).json();
-      const token = login.data.access_token;
-      const users = await (await fetch(`${base}/users?filter[email][_eq]=${encodeURIComponent(email)}&fields=id`, { headers: { Authorization: `Bearer ${token}` } })).json();
-      for (const u of users.data) {
-        await fetch(`${base}/users/${u.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-      }
-      console.log('Đã xoá user thử');
-    } catch (cleanupError) {
-      console.warn(`Cảnh báo: không xoá được user thử ${email}: ${cleanupError}`);
-    }
-  }
+  await deleteUserByEmail(email);
 }
