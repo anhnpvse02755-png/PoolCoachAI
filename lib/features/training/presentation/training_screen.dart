@@ -87,6 +87,18 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
 
           return Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: PcCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.adjust),
+                    title: const Text(Vi.simTitle),
+                    subtitle: const Text(Vi.simCardBody),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.go(Routes.simulator),
+                  ),
+                ),
+              ),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.all(8),

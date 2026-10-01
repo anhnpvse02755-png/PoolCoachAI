@@ -19,6 +19,7 @@ import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 
 /// Dựng router của app.
@@ -68,6 +69,10 @@ GoRouter createAppRouter({required AuthGate auth}) => GoRouter(
               path: Routes.training,
               builder: (context, state) => const TrainingScreen(),
               routes: [
+                GoRoute(
+                  path: 'simulator',
+                  builder: (context, state) => const SimulatorScreen(),
+                ),
                 GoRoute(
                   path: 'drills/:id',
                   builder: (context, state) => DrillDetailScreen(

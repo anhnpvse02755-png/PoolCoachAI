@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 
 import '../../support/test_data.dart';
 
@@ -84,5 +85,14 @@ void main() {
 
     expect(find.text(Vi.drillRatioUnknown), findsOneWidget);
     expect(find.textContaining('%'), findsNothing);
+  });
+
+  testWidgets('thẻ Mô phỏng góc cắt mở đúng màn', (tester) async {
+    await openTraining(tester, const []);
+
+    await tester.tap(find.text(Vi.simTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SimulatorScreen), findsOneWidget);
   });
 }

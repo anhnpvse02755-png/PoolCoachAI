@@ -20,6 +20,9 @@ abstract final class Routes {
   // chỗ đang dở.
   static const drillPattern = '$training/drills/:id';
   static const drillSessionPattern = '$drillPattern/session';
+
+  /// Mô phỏng góc cắt — trong nhánh Luyện tập như các màn bài tập.
+  static const simulator = '$training/simulator';
   static const articlePattern = '/knowledge/:id';
 
   /// Đường dẫn chi tiết một bài tập.
@@ -60,6 +63,7 @@ abstract final class Routes {
     notifications,
     drillPattern,
     drillSessionPattern,
+    simulator,
     articlePattern,
     login,
     register,

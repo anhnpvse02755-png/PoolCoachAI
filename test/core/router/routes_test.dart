@@ -20,6 +20,7 @@ void main() {
         Routes.notifications,
         Routes.drillPattern,
         Routes.drillSessionPattern,
+        Routes.simulator,
         Routes.articlePattern,
         Routes.login,
         Routes.register,
