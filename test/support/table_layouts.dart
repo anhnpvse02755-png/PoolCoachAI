@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -38,4 +39,21 @@ ShotGeometry geometryFor(
     Makeable(:final geometry) => geometry,
     Unmakeable(:final reason) => throw StateError('bố cục test hỏng: $reason'),
   };
+}
+
+/// Lưới bố cục tất định phủ khắp bàn, mỗi cặp bi lấy lỗ tự chọn.
+///
+/// Dùng cho test tính chất: một bất biến phải đúng ở mọi chỗ trên bàn,
+/// không chỉ ở vài bố cục dựng tay.
+Iterable<ShotGeometry> gridShots() sync* {
+  for (var cx = 20.0; cx <= 234; cx += 42) {
+    for (var cy = 15.0; cy <= 112; cy += 32) {
+      for (var ox = 30.0; ox <= 224; ox += 38) {
+        for (var oy = 20.0; oy <= 107; oy += 29) {
+          final g = bestPocket(cue: Vec2(cx, cy), object: Vec2(ox, oy));
+          if (g != null) yield g;
+        }
+      }
+    }
+  }
 }
