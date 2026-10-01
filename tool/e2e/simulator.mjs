@@ -56,8 +56,16 @@ async function drag(fromCm, toCm) {
 }
 
 async function capture(name) {
-  console.log(`${name}: ${await summary()}`);
+  const label = await summary();
+  console.log(`${name}: ${label}`);
   await tab.shot(path.join(shots, `${name}.png`));
+  return label;
+}
+
+// 5–8 là để chủ app so áp phê: bi cái phải chạm băng thì áp phê mới đổi gì.
+async function captureBank(name) {
+  const label = await capture(name);
+  if (!label?.includes('Dội băng')) throw new Error(`${name}: bi cái không dội băng — không so được áp phê`);
 }
 
 try {
@@ -75,15 +83,17 @@ try {
   await capture('4-cu-le-95');
 
   await tab.click('Đánh đứng bi');
-  await drag([170, 50], [127, 100]);
-  await capture('5-dung-bi-95-bi-xuong-duoi');
+  // (150,25): góc cắt ~31° vào góc trên phải; đứng bi 95% dội băng dọc mà
+  // không chết cái — tìm bằng bestPocket + simulateCueBall, không đoán.
+  await drag([170, 50], [150, 25]);
+  await captureBank('5-dung-bi-95-cat-31-doi-bang');
   await tab.click('Phải 1');
-  await capture('6-ap-phe-phai-1');
+  await captureBank('6-ap-phe-phai-1');
   await tab.click('Trái 2');
-  await capture('7-ap-phe-trai-2');
+  await captureBank('7-ap-phe-trai-2');
   await tab.click('Vừa 70%');
   await tab.click('Đánh trô bi');
-  await capture('8-tro-70-ap-phe-trai-2');
+  await captureBank('8-tro-70-ap-phe-trai-2');
 
   const errors = tab.errors.filter((e) => !/favicon/i.test(e));
   if (errors.length) throw new Error(`Lỗi trong console:\n${errors.join('\n')}`);
