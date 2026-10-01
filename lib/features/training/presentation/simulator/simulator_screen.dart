@@ -134,52 +134,71 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     return PcRootScaffold(
       title: Vi.simTitle,
       // Bàn nằm ngoài vùng cuộn: kéo dọc trên bàn là kéo bi, không cuộn trang.
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: AspectRatio(
-              aspectRatio: TableLayout.aspectRatio(_table),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final layout =
-                      TableLayout(size: constraints.biggest, table: _table);
-                  return Semantics(
-                    label: Vi.simSummary(shot, path),
-                    child: GestureDetector(
-                      key: SimulatorScreen.tableKey,
-                      dragStartBehavior: DragStartBehavior.down,
-                      onPanStart: (d) => _onPanStart(d, layout),
-                      onPanUpdate: (d) => _onPanUpdate(d, layout),
-                      onPanEnd: (_) => _dragging = null,
-                      onTapUp: (d) => _onTapUp(d, layout),
-                      child: CustomPaint(
-                        size: constraints.biggest,
-                        painter: TablePainter(scene),
-                      ),
+      body: LayoutBuilder(
+        builder: (context, bodyConstraints) {
+          // Trên Chrome desktop, cửa sổ ngang hơn dọc: bàn cao theo chiều
+          // rộng mà không trần thì tràn RenderFlex và bảng điều khiển biến
+          // mất. Ghim chiều cao bàn theo cái nhỏ hơn giữa "vừa bề ngang" và
+          // "tối đa 55% chiều cao thân màn" — còn lại luôn dành cho bảng.
+          final aspectRatio = TableLayout.aspectRatio(_table);
+          final maxTableHeight = bodyConstraints.maxHeight * 0.55;
+          final widthLimitedHeight = bodyConstraints.maxWidth / aspectRatio;
+          final tableHeight = widthLimitedHeight < maxTableHeight
+              ? widthLimitedHeight
+              : maxTableHeight;
+          final tableWidth = tableHeight * aspectRatio;
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Center(
+                  child: SizedBox(
+                    width: tableWidth,
+                    height: tableHeight,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final layout = TableLayout(
+                            size: constraints.biggest, table: _table);
+                        return Semantics(
+                          label: Vi.simSummary(shot, path),
+                          child: GestureDetector(
+                            key: SimulatorScreen.tableKey,
+                            dragStartBehavior: DragStartBehavior.down,
+                            onPanStart: (d) => _onPanStart(d, layout),
+                            onPanUpdate: (d) => _onPanUpdate(d, layout),
+                            onPanEnd: (_) => _dragging = null,
+                            onTapUp: (d) => _onTapUp(d, layout),
+                            child: CustomPaint(
+                              size: constraints.biggest,
+                              painter: TablePainter(scene),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: SimulatorPanel(
-                shot: shot,
-                path: path,
-                advice: advice,
-                stroke: _stroke,
-                power: _power,
-                spin: _spin,
-                onStroke: (v) => setState(() => _stroke = v),
-                onPower: (v) => setState(() => _power = v),
-                onSpin: (v) => setState(() => _spin = v),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: SimulatorPanel(
+                    shot: shot,
+                    path: path,
+                    advice: advice,
+                    stroke: _stroke,
+                    power: _power,
+                    spin: _spin,
+                    onStroke: (v) => setState(() => _stroke = v),
+                    onPower: (v) => setState(() => _power = v),
+                    onSpin: (v) => setState(() => _spin = v),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

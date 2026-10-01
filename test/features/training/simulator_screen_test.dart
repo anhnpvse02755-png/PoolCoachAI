@@ -135,12 +135,33 @@ void main() {
       (tester) async {
     await openSimulator(tester);
 
+    // Thả đúng tâm bi cái thì hướng đẩy ra dùng nhánh mặc định (1,0) của
+    // _separate — gần như chắc chắn không thẳng hàng với lỗ nào, nên góc
+    // cắt nhảy lên ~90° (quá mỏng) cho cả sáu lỗ dù _separate có chạy
+    // đúng hay không — "findsNothing" cho overlap không phân biệt được gì.
+    // Thả gần bi cái nhưng đúng trên tia bi cái→một lỗ cụ thể thì sau khi
+    // tách, bi mục tiêu nằm đúng trên đường đó, góc cắt ~0 — một cú thật
+    // đánh được, nên thiếu _separate (bi vẫn chồng) mới lộ ra khác biệt.
+    const towardPocket = Pocket.bottomRight;
+    final toward =
+        (table.pocketPosition(towardPocket) - SimulatorScreen.initialCue)
+            .normalized;
+    final dropTarget = SimulatorScreen.initialCue + toward * 1.0;
+
     final from = onTable(tester, SimulatorScreen.initialObject);
-    await tester.dragFrom(
-        from, onTable(tester, SimulatorScreen.initialCue) - from);
+    await tester.dragFrom(from, onTable(tester, dropTarget) - from);
     await tester.pumpAndSettle();
 
     expect(find.text(Vi.simUnmakeable(UnmakeableReason.overlap)), findsNothing);
+    expect(find.text(Vi.simNoPocket), findsNothing);
+    expect(
+      Pocket.values.any(
+        (p) => find.text(Vi.simPocketLine(p)).evaluate().isNotEmpty,
+      ),
+      isTrue,
+      reason: 'phải có một dòng Lỗ: ... nghĩa là bestPocket tính ra lỗ thật, '
+          'chứng tỏ hai bi đã được tách nhau chứ không còn chồng lên nhau',
+    );
   });
 
   testWidgets('áp phê mà không chạm băng thì nói thẳng là không đổi đường đi',
@@ -171,5 +192,44 @@ void main() {
     expect(find.bySemanticsLabel(Vi.simSummary(Makeable(initial), path)),
         findsOneWidget);
     handle.dispose();
+  });
+
+  testWidgets(
+      'màn hình ngang Chrome desktop không tràn, bảng điều khiển vẫn bấm được',
+      (tester) async {
+    // Chrome là nền chạy được duy nhất, và cửa sổ desktop thường ngang hơn
+    // là dọc — 1280x720 lộ ra lỗi mà khung portrait của các test trên
+    // không bao giờ thấy: bàn cao vô hạn theo bề ngang, đẩy tràn RenderFlex.
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    final container = testContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: PoolCoachApp(router: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    router.go(Routes.simulator);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+
+    final tableBox = find.byKey(SimulatorScreen.tableKey);
+    final topLeft = tester.getTopLeft(tableBox);
+    final bottomRight = tester.getBottomRight(tableBox);
+    expect(topLeft.dx, greaterThanOrEqualTo(0));
+    expect(topLeft.dy, greaterThanOrEqualTo(0));
+    expect(bottomRight.dx, lessThanOrEqualTo(1280));
+    expect(bottomRight.dy, lessThanOrEqualTo(720));
+
+    await tapText(tester, Vi.simStroke(Stroke.draw));
+    expect(find.text(Vi.simStrokeLine(Stroke.draw)), findsOneWidget);
   });
 }
