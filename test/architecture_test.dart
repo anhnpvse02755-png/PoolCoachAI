@@ -153,4 +153,19 @@ void main() {
           'test/support/ chỉ được dùng trong thư mục test/',
     );
   });
+
+  test('lõi hình học bàn không phụ thuộc Flutter', () {
+    final offenders = [
+      for (final file in dartFilesIn('lib/domain/table_geometry'))
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'Planner và test dùng thẳng lõi này; kéo Flutter vào thì lõi '
+          'không còn là logic thuần, và mọi phép tính phải chạy qua widget',
+    );
+  });
 }
