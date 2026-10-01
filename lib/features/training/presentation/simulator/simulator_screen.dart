@@ -41,6 +41,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   /// Chạm trong bán kính này quanh điểm lỗ là chọn lỗ đó, cm.
   static const _pocketTapRadius = 10.0;
 
+  /// Lề quanh bàn — kích thước bàn tính trên phần còn lại sau lề này.
+  static const _tablePadding = EdgeInsets.fromLTRB(16, 16, 16, 8);
+
   Vec2 _cue = SimulatorScreen.initialCue;
   Vec2 _object = SimulatorScreen.initialObject;
   Pocket? _pocketOverride;
@@ -140,9 +143,17 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           // rộng mà không trần thì tràn RenderFlex và bảng điều khiển biến
           // mất. Ghim chiều cao bàn theo cái nhỏ hơn giữa "vừa bề ngang" và
           // "tối đa 55% chiều cao thân màn" — còn lại luôn dành cho bảng.
+          //
+          // Trần tính trên phần còn lại sau Padding của bàn: tính theo cả bề
+          // ngang thì SizedBox bị ép hẹp mà giữ chiều cao, bàn méo tỉ lệ.
           final aspectRatio = TableLayout.aspectRatio(_table);
-          final maxTableHeight = bodyConstraints.maxHeight * 0.55;
-          final widthLimitedHeight = bodyConstraints.maxWidth / aspectRatio;
+          final availableWidth = (bodyConstraints.maxWidth -
+                  _tablePadding.horizontal)
+              .clamp(0.0, double.infinity);
+          final maxTableHeight = (bodyConstraints.maxHeight * 0.55 -
+                  _tablePadding.vertical)
+              .clamp(0.0, double.infinity);
+          final widthLimitedHeight = availableWidth / aspectRatio;
           final tableHeight = widthLimitedHeight < maxTableHeight
               ? widthLimitedHeight
               : maxTableHeight;
@@ -151,7 +162,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: _tablePadding,
                 child: Center(
                   child: SizedBox(
                     width: tableWidth,

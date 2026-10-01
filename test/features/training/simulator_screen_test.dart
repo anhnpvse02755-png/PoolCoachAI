@@ -232,4 +232,36 @@ void main() {
     await tapText(tester, Vi.simStroke(Stroke.draw));
     expect(find.text(Vi.simStrokeLine(Stroke.draw)), findsOneWidget);
   });
+
+  // Bàn nằm trong Padding 16 px hai bên: tính kích thước theo cả bề ngang
+  // thân màn thì SizedBox bị ép hẹp lại mà vẫn giữ chiều cao cũ — băng dưới
+  // vẽ dày hơn hẳn. Tỉ lệ khung bàn phải đúng tỉ lệ của TableLayout.
+  for (final size in const [Size(1200, 1800), Size(1280, 720)]) {
+    testWidgets(
+        'khung bàn giữ đúng tỉ lệ TableLayout ở '
+        '${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      final container = testContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      router.go(Routes.simulator);
+      await tester.pumpAndSettle();
+
+      final box = tester.getSize(find.byKey(SimulatorScreen.tableKey));
+      expect(box.width / box.height,
+          closeTo(TableLayout.aspectRatio(TableSpec.nineFoot), 0.01));
+    });
+  }
 }
