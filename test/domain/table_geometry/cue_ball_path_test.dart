@@ -114,6 +114,108 @@ void main() {
         }
       }
     });
+
+    // Review finding 2: lấy mẫu `n = ceil(controlLength/step)` theo chu vi
+    // đa giác điều khiển không chặn được tốc độ thật của đường cong, nên
+    // có thể nhảy qua vùng lỗ giữa hai mẫu. Dò lại bằng mẫu dày 2000
+    // điểm/đoạn — độc lập với cách `_truncateAtScratch` tự chọn bước —
+    // để xác nhận không bỏ sót điểm nào trong vùng chết cái.
+    test(
+        'chết cái: lấy mẫu dày không thấy điểm nào lọt vùng lỗ mà '
+        'simulateCueBall bỏ sót (review finding 2)', () {
+      const samples = 2000;
+      for (final g in shots) {
+        for (final stroke in Stroke.values) {
+          for (final p in powerPresets) {
+            final path = run(g, stroke, p: p);
+            if (path.scratch != null) continue;
+            final where = '${g.cue}→${g.object} $stroke $p';
+            for (final seg in path.segments) {
+              for (var k = 0; k <= samples; k++) {
+                final t = k / samples;
+                final point = seg.pointAt(t);
+                for (final pocket in Pocket.values) {
+                  final dist =
+                      point.distanceTo(table.pocketPosition(pocket));
+                  if (dist <= table.captureRadius(pocket)) {
+                    fail('$where lọt vùng lỗ $pocket tại t=$t '
+                        '(cách tâm lỗ $dist cm)');
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+
+  group(
+      'Fix round 1 — dội băng không được triệt tiêu trô/cu lê '
+      '(review finding 1)', () {
+    test(
+        'reviewer probe: cú thẳng kéo mạnh bật băng rồi vẫn trôi tiếp, '
+        'không chết ngay tại điểm chạm băng', () {
+      final g = geometryFor(const Vec2(100, 60), Pocket.topRight, 0);
+      final path = simulateCueBall(g, stroke: Stroke.draw, power: 95);
+
+      expect(path.bankUsed, isTrue);
+      expect(path.scratch, isNull);
+      expect(path.segments.length, 2);
+
+      final second = path.segments[1];
+      expect(second.start.distanceTo(second.end), greaterThan(0));
+
+      final hit = path.railHit!;
+      final end = path.end;
+      if (hit.x == table.minX || hit.x == table.maxX) {
+        expect((end.x - hit.x).abs(), greaterThan(1));
+      } else {
+        expect((end.y - hit.y).abs(), greaterThan(1));
+      }
+    });
+
+    test(
+        'lưới bố cục: không đoạn nào dài 0 (trừ đứng bi cú thẳng dừng tại '
+        'bi ảo), và bi cái dội băng không dừng ngay trên băng vừa chạm',
+        () {
+      for (final g in gridShots()) {
+        for (final stroke in Stroke.values) {
+          for (final p in powerPresets) {
+            for (final spin in SideSpin.all) {
+              final path =
+                  simulateCueBall(g, stroke: stroke, power: p, spin: spin);
+              final where = '${g.cue}→${g.object} $stroke $p $spin';
+
+              final isStunStopsAtGhost = path.segments.length == 1 &&
+                  !path.bankUsed &&
+                  path.segments.single.start
+                          .distanceTo(path.segments.single.end) <
+                      1e-9;
+              if (!isStunStopsAtGhost) {
+                for (final seg in path.segments) {
+                  expect(seg.start.distanceTo(seg.end), greaterThan(0),
+                      reason: where);
+                }
+              }
+
+              if (path.bankUsed && path.scratch == null) {
+                final hit = path.railHit!;
+                final end = path.end;
+                if (hit.x == table.minX || hit.x == table.maxX) {
+                  expect((end.x - hit.x).abs(), greaterThan(1e-9),
+                      reason: where);
+                }
+                if (hit.y == table.minY || hit.y == table.maxY) {
+                  expect((end.y - hit.y).abs(), greaterThan(1e-9),
+                      reason: where);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
   });
 
   test('SideSpin: bảy mức, 2 đầu cơ là nguy cơ trượt cơ', () {

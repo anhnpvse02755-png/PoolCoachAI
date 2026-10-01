@@ -168,8 +168,16 @@ CueBallPath simulateCueBall(
     segments.add(Straight(ghost, hit));
 
     final remaining = total - ghost.distanceTo(hit);
-    final second =
-        _leg(hit, rebound * remaining, roll * (remaining / total), table);
+    final f = remaining / total;
+    // Áp phê bật thêm một góc `turn` so với phản xạ thuần tuý (0 khi
+    // không xoáy biên). Cả thành phần tiếp tuyến [along] lẫn thành phần
+    // trô/cu lê [roll] phải phản xạ qua băng rồi xoay cùng góc đó — chứ
+    // không phải giữ nguyên [roll] như cũ — nếu không thành phần cong
+    // sẽ ngược hướng với cú bật và triệt tiêu lẫn nhau.
+    final turn = _reflect(dir, wall).signedAngleTo(rebound);
+    final straight2 = _reflect(along, wall).rotated(turn) * f;
+    final bend2 = _reflect(roll, wall).rotated(turn) * f;
+    final second = _leg(hit, straight2, bend2, table);
     if (table.contains(second.end)) {
       segments.add(second);
     } else {
@@ -281,13 +289,16 @@ typedef _Cut = ({List<PathSegment> segments, Pocket? pocket, int index});
 
 /// Cắt đường đi tại điểm đầu tiên tâm bi cái lọt vùng một lỗ.
 ///
-/// Lấy mẫu mỗi bước ≤ R/2 theo độ dài đa giác điều khiển, vốn không
-/// ngắn hơn đường cong — nên không lọt qua vùng lỗ giữa hai mẫu.
+/// Lấy mẫu mỗi bước ≤ R/2. Với đoạn cong, tốc độ |B'(t)| bị chặn trên
+/// bởi 3 lần cạnh dài nhất của đa giác điều khiển (tổng trọng số
+/// Bernstein bậc hai luôn bằng 3), nên chia đủ bước theo chặn đó —
+/// chặn độ dài cung thật chứ không phải chu vi đa giác — để mỗi đoạn
+/// mẫu không dài hơn bước, không lọt qua vùng lỗ giữa hai mẫu.
 _Cut _truncateAtScratch(List<PathSegment> segments, TableSpec table) {
   final step = table.radius / 2;
   for (var i = 0; i < segments.length; i++) {
     final seg = segments[i];
-    final n = math.max(1, (_controlLength(seg) / step).ceil());
+    final n = _sampleCount(seg, step);
     for (var k = 1; k <= n; k++) {
       final t = k / n;
       final p = seg.pointAt(t);
@@ -306,8 +317,18 @@ _Cut _truncateAtScratch(List<PathSegment> segments, TableSpec table) {
   return (segments: segments, pocket: null, index: -1);
 }
 
-double _controlLength(PathSegment seg) => switch (seg) {
-      Straight(:final start, :final end) => start.distanceTo(end),
-      Curve(:final p0, :final p1, :final p2, :final p3) =>
-        p0.distanceTo(p1) + p1.distanceTo(p2) + p2.distanceTo(p3),
+/// Số bước lấy mẫu để mỗi bước trên [seg] không dài hơn [step] cm.
+int _sampleCount(PathSegment seg, double step) => switch (seg) {
+      Straight(:final start, :final end) =>
+        math.max(1, (start.distanceTo(end) / step).ceil()),
+      Curve(:final p0, :final p1, :final p2, :final p3) => math.max(
+          1,
+          (3 *
+                  math.max(
+                    p0.distanceTo(p1),
+                    math.max(p1.distanceTo(p2), p2.distanceTo(p3)),
+                  ) /
+                  step)
+              .ceil(),
+        ),
     };
