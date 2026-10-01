@@ -124,8 +124,8 @@ void main() {
     expect(bandFor(30), DifficultyBand.hard);
     expect(bandFor(45), DifficultyBand.veryHard);
     expect(bandFor(60), DifficultyBand.extreme);
-    expect(bandFor(85), DifficultyBand.extreme);
-    expect(bandFor(85.1), DifficultyBand.impossible);
+    expect(bandFor(maxCutAngle), DifficultyBand.extreme);
+    expect(bandFor(maxCutAngle + 0.1), DifficultyBand.impossible);
     expect(bandOf(const Unmakeable(UnmakeableReason.tooThin)),
         DifficultyBand.impossible);
   });
