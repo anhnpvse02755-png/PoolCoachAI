@@ -176,10 +176,22 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     });
   }
 
+  /// Hết ném thì tắt công tắc *Xem nếu không bù ném*: không thì công tắc
+  /// khoá mà vẫn hiện bật, và đường đỏ tự hiện lại khi có ném trở lại mà
+  /// người chơi không bấm gì.
+  void _dropUncompensatedIfNoThrow() {
+    final shot = _shot();
+    if (shot is! Makeable ||
+        !SimulatorScreen.canShowUncompensated(shot.geometry, _spin)) {
+      _showUncompensated = false;
+    }
+  }
+
   /// Đổi một nút chỉnh: tính lại cú đánh ngay, gợi ý tính dần.
   void _change(VoidCallback update) {
     setState(() {
       update();
+      _dropUncompensatedIfNoThrow();
       _startAdvice();
     });
   }
@@ -209,6 +221,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       }
       // Kéo bi là bố cục mới: quay về tự chọn lỗ.
       _pocketOverride = null;
+      _dropUncompensatedIfNoThrow();
       // Lúc kéo chỉ tính cú đang xem; gợi ý chờ tới khi thả tay.
       _job = null;
       _advice = null;

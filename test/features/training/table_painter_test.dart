@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -18,31 +19,47 @@ void main() {
     recorder.endRecording().dispose();
   }
 
-  test('vẽ đủ mọi lớp: đường đỏ, chạm băng, chết cái, không lỗi', () {
-    for (final (object, degrees, power) in [
-      // Cu lê cắt có áp phê, bật đường đỏ: đủ lớp 1–8.
-      (const Vec2(170, 70), 25.0, 45.0),
-      // Cu lê thẳng sát lỗ: chết cái, lỗ tô đỏ, không vòng điểm dừng.
-      (const Vec2(240, 14), 0.0, 90.0),
-    ]) {
-      final g = geometryFor(object, Pocket.topRight, degrees);
-      final aimed = aimShot(
-          cue: g.cue,
-          object: g.object,
-          pocket: g.pocket,
-          stroke: Stroke.follow,
-          spin: const SideSpin(SpinSide.right, 1),
-          power: power);
-      paint(SimulatorScene(
+  /// Dò cú đánh cho bố cục rồi vẽ nó với đường đỏ và vòng nguy cơ bật.
+  AimedShot paintShot(ShotGeometry g, Stroke stroke, double power) {
+    final aimed = aimShot(
         cue: g.cue,
         object: g.object,
         pocket: g.pocket,
-        geometry: g,
-        aimed: aimed,
-        showUncompensated: true,
-        riskPocket: Pocket.bottomLeft,
-      ));
-    }
+        stroke: stroke,
+        spin: const SideSpin(SpinSide.right, 1),
+        power: power);
+    paint(SimulatorScene(
+      cue: g.cue,
+      object: g.object,
+      pocket: g.pocket,
+      geometry: g,
+      aimed: aimed,
+      showUncompensated: true,
+      riskPocket: Pocket.bottomLeft,
+    ));
+    return aimed;
+  }
+
+  // Mỗi cảnh phải thật sự đi qua nhánh mà tên test hứa: lõi đổi mà cảnh
+  // không còn chạm băng hay chết cái nữa thì test phải đỏ, không âm thầm
+  // xanh với nhánh không ai vẽ tới.
+  test('vẽ đủ lớp 1–8: đường đỏ, chạm băng, Bi ảo dời, điểm dừng', () {
+    // Đứng bi cắt 40° có áp phê, lực nhẹ: bi cái dội băng rồi dừng trên
+    // bàn, ném đủ lớn để Bi ảo lệch khỏi chỗ hình học.
+    final g = geometryFor(const Vec2(170, 70), Pocket.topRight, 40);
+    final aimed = paintShot(g, Stroke.stun, 30);
+    expect(aimed.uncompensated, isNotNull, reason: 'lớp 8: đường đỏ');
+    expect(aimed.trace.cueRailCount, greaterThan(0), reason: 'lớp 6');
+    expect(aimed.trace.contactCue!.distanceTo(g.ghost), greaterThan(0.1),
+        reason: 'lớp 3: chấm Bi ảo hình học');
+    expect(aimed.trace.cuePocket, isNull, reason: 'lớp 7: vòng điểm dừng');
+  });
+
+  test('chết cái: lỗ tô đỏ, không vòng điểm dừng', () {
+    // Cu lê thẳng sát lỗ, lực mạnh: bi cái theo bi mục tiêu rơi lỗ.
+    final g = geometryFor(const Vec2(240, 14), Pocket.topRight, 0);
+    final aimed = paintShot(g, Stroke.follow, 90);
+    expect(aimed.trace.cuePocket, isNotNull);
   });
 
   test('không đánh được thì chỉ vẽ bàn và hai bi', () {

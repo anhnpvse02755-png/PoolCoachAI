@@ -314,6 +314,41 @@ void main() {
     expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
   });
 
+  testWidgets('hết ném thì công tắc tắt hẳn, có ném lại không tự bật',
+      (tester) async {
+    await openSimulator(tester);
+    // Cú thẳng 0°: chỉ còn áp phê tạo ném.
+    final toward = (table.pocketPosition(Pocket.bottomRight) -
+            SimulatorScreen.initialCue)
+        .normalized;
+    final drop = SimulatorScreen.initialCue + toward * 1.0;
+    final from = onTable(tester, SimulatorScreen.initialObject);
+    await tester.dragFrom(from, onTable(tester, drop) - from);
+    await tester.pumpAndSettle();
+    expect(sceneOf(tester).geometry!.angle.round(), 0);
+
+    const spin = SideSpin(SpinSide.right, 1);
+    await tapText(tester, Vi.simSpinChip(spin));
+    final toggle = find.byKey(SimulatorPanel.compensateToggleKey);
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+    expect(sceneOf(tester).showUncompensated, isTrue);
+
+    // Bỏ áp phê: hết ném, công tắc khoá và phải đọc là tắt.
+    await tapText(tester, Vi.simSpinChip(const SideSpin.none()));
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+    expect(sceneOf(tester).showUncompensated, isFalse);
+
+    // Áp phê lại: có ném nhưng người chơi chưa bấm, đường đỏ không tự về.
+    await tapText(tester, Vi.simSpinChip(spin));
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNotNull);
+    expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+    expect(sceneOf(tester).showUncompensated, isFalse);
+  });
+
   testWidgets('dòng ngắm dày/mỏng đúng chiều với aimOffsetDeg của lõi',
       (tester) async {
     const spin = SideSpin(SpinSide.right, 1);
