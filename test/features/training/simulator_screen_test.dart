@@ -443,6 +443,51 @@ void main() {
     expect(find.text(Vi.simComputing), findsNothing);
   });
 
+  testWidgets('dựng lại mà đầu vào không đổi thì không dò lại cú đánh',
+      (tester) async {
+    var calls = 0;
+    AimedShot counting({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) {
+      calls++;
+      return aimShot(
+          cue: cue,
+          object: object,
+          pocket: pocket,
+          stroke: stroke,
+          spin: spin,
+          power: power,
+          elevation: elevation,
+          table: table,
+          compensate: compensate,
+          withUncompensated: withUncompensated);
+    }
+
+    await openWithAim(tester, counting);
+    // Gợi ý chống chết cái tính xong là một lần setState: dựng lại bàn.
+    expect(find.text(Vi.simComputing), findsNothing);
+    expect(calls, 1);
+    final first = sceneOf(tester).aimed;
+
+    // Đổi khung màn: dựng lại toàn bộ, đầu vào cú đánh vẫn y nguyên.
+    tester.view.physicalSize = const Size(1100, 1800);
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    expect(identical(sceneOf(tester).aimed, first), isTrue);
+
+    await tapText(tester, Vi.simStroke(Stroke.draw));
+    expect(calls, 2);
+  });
+
   testWidgets('lệch 2 đầu cơ thì cảnh báo trượt cơ', (tester) async {
     await openSimulator(tester);
 

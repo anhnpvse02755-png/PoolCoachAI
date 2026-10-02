@@ -128,6 +128,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   List<Advice>? _advice;
   ScratchAdviceJob? _job;
 
+  /// Cú đã dò gần nhất và đúng đầu vào của nó. Gợi ý tính xong, bật tắt
+  /// công tắc, đổi khung màn đều dựng lại màn mà không đổi cú đánh: dùng
+  /// lại kết quả thay vì dò và mô phỏng lại từ đầu.
+  (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool)? _aimKey;
+
+  /// null khi lõi quá maxSimTime cho cú này.
+  AimedShot? _aimed;
+
   @override
   void initState() {
     super.initState();
@@ -265,6 +273,31 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }
   }
 
+  /// Cú đã dò cho [g]; null khi lõi quá maxSimTime.
+  AimedShot? _aimFor(ShotGeometry g, bool showRed) {
+    final key =
+        (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
+    if (key == _aimKey) return _aimed;
+    _aimKey = key;
+    try {
+      return _aimed = widget.aim(
+        cue: g.cue,
+        object: g.object,
+        pocket: g.pocket,
+        stroke: _stroke,
+        spin: _spin,
+        power: _power,
+        elevation: _elevation,
+        table: _table,
+        withUncompensated: showRed,
+      );
+    } on SimulationTimeout {
+      // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
+      // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi.
+      return _aimed = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shot = _shot();
@@ -277,27 +310,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final showRed = canToggle && _showUncompensated;
     // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
     // khi nó thật sự được vẽ.
-    AimedShot? aimed;
-    var cannotSimulate = false;
-    if (geometry != null) {
-      try {
-        aimed = widget.aim(
-          cue: geometry.cue,
-          object: geometry.object,
-          pocket: geometry.pocket,
-          stroke: _stroke,
-          spin: _spin,
-          power: _power,
-          elevation: _elevation,
-          table: _table,
-          withUncompensated: showRed,
-        );
-      } on SimulationTimeout {
-        // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
-        // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi.
-        cannotSimulate = true;
-      }
-    }
+    final aimed = geometry == null ? null : _aimFor(geometry, showRed);
+    final cannotSimulate = geometry != null && aimed == null;
     final scene = SimulatorScene(
       cue: _cue,
       object: _object,
