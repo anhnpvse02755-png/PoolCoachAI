@@ -299,6 +299,9 @@ abstract final class Vi {
       'hình học, không phải kết quả đo vật lý chính xác — dùng để tham khảo, '
       'người chơi vẫn cần tự canh lực thực tế.';
 
+  /// Gắn sau mức áp phê mà lời khuyên gợi ý, khi mức đó dễ trượt cơ.
+  static const simMiscueClause = ' (dễ Trượt cơ)';
+
   static String get simMiscue => 'Lệch ${simTips(miscueTips)} đầu cơ dễ trượt cơ.';
 
   static String simStroke(Stroke stroke) => switch (stroke) {
@@ -386,11 +389,14 @@ abstract final class Vi {
         OverhitRisk(:final margin, :final fromPower, :final pocket, :final saferSpin) =>
           'Nếu đánh quá lực khoảng +${margin.round()}% (từ ~${fromPower.round()}%), '
               'bi cái có thể rơi lỗ ${simPocket(pocket)} (chết cái).'
-              '${saferSpin == null ? '' : ' ${_capitalize(_spinLong(saferSpin))} thì vẫn an toàn tới 100%.'}',
+              '${saferSpin == null ? '' : ' ${_capitalize(_spinAdvised(saferSpin))} thì vẫn an toàn tới 100%.'}',
         SpinCeiling(:final side, :final maxSafeTips, :final pocket) =>
           'Đừng áp phê ${_side(side)} quá ${simTips(maxSafeTips)} đầu cơ — '
               'bi cái sẽ rơi lỗ ${simPocket(pocket)}.',
       };
+
+  static String _spinAdvised(SideSpin spin) =>
+      '${_spinLong(spin)}${spin.risksMiscue ? simMiscueClause : ''}';
 
   /// Chọn câu theo chiều đổi: thêm đầu cơ, bớt đầu cơ, hay đổi phía.
   static String _avoidText(SideSpin from, SideSpin to, Pocket pocket) {
@@ -400,14 +406,14 @@ abstract final class Vi {
           'thì tránh được.';
     }
     if (from.isNone || (from.side == to.side && to.tips > from.tips)) {
-      return 'Ít áp phê thì bi cái chết cái ở $at — nên ${_spinLong(to)} để '
+      return 'Ít áp phê thì bi cái chết cái ở $at — nên ${_spinAdvised(to)} để '
           'đổi góc bật tránh lỗ.';
     }
     if (from.side == to.side) {
-      return 'Áp phê nhiều quá, bi cái chết cái ở $at — giảm còn ${_spinLong(to)}.';
+      return 'Áp phê nhiều quá, bi cái chết cái ở $at — giảm còn ${_spinAdvised(to)}.';
     }
     return 'Áp phê ${_side(from.side!)} làm bi cái chết cái ở $at — nên đổi '
-        'sang ${_spinLong(to)}.';
+        'sang ${_spinAdvised(to)}.';
   }
 
   /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây.

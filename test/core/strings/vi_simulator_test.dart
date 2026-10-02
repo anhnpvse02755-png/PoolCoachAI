@@ -55,6 +55,33 @@ void main() {
     );
   });
 
+  // Mức đầu cơ gợi ý mà dễ trượt cơ thì câu khuyên phải nói luôn, không đợi
+  // người chơi chọn mức đó mới thấy cảnh báo.
+  test('lời khuyên gợi ý mức dễ trượt cơ thì kèm cảnh báo Trượt cơ', () {
+    expect(const SideSpin(SpinSide.right, 2).risksMiscue, isTrue);
+    expect(
+      Vi.simAdvice(const AddSpinToAvoid(from: none, to: right2, pocket: Pocket.topRight)),
+      'Ít áp phê thì bi cái chết cái ở lỗ góc trên phải — nên áp phê phải '
+      'lệch 2 đầu cơ (dễ Trượt cơ) để đổi góc bật tránh lỗ.',
+    );
+    expect(
+      Vi.simAdvice(const AddSpinToAvoid(from: left1, to: right2, pocket: Pocket.topMiddle)),
+      'Áp phê trái làm bi cái chết cái ở lỗ giữa trên — nên đổi sang áp phê '
+      'phải lệch 2 đầu cơ (dễ Trượt cơ).',
+    );
+    expect(
+      Vi.simAdvice(const OverhitRisk(
+        margin: 12,
+        fromPower: 82,
+        pocket: Pocket.topRight,
+        saferSpin: right2,
+      )),
+      'Nếu đánh quá lực khoảng +12% (từ ~82%), bi cái có thể rơi lỗ góc trên '
+      'phải (chết cái). Áp phê phải lệch 2 đầu cơ (dễ Trượt cơ) thì vẫn an '
+      'toàn tới 100%.',
+    );
+  });
+
   test('cảnh báo dư lực ghép số tính ra', () {
     expect(
       Vi.simAdvice(const OverhitRisk(
