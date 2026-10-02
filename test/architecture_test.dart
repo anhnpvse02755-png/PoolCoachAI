@@ -168,4 +168,21 @@ void main() {
           'không còn là logic thuần, và mọi phép tính phải chạy qua widget',
     );
   });
+
+  test('lõi vật lý bàn không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/table_physics');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'màn mô phỏng và Planner dùng chung lõi này; kéo Flutter vào '
+          'thì không còn chạy và đo hiệu năng được trên Dart VM thuần',
+    );
+  });
 }
