@@ -1,6 +1,6 @@
 # PRD — Run-out Planner & Position Play Engine (PoolCoachAI)
 
-> Bổ sung cho `PoolCoachAI_SPEC.md`, thuộc module **Training Center → Cut Angle Simulator** (mục 4.3 trong spec chính). Tài liệu này mô tả một tính năng cụ thể: từ vị trí bi cái + các bi mục tiêu trên bàn, tính ra thứ tự đánh, lỗ, lực, đầu cơ, và vị trí bi cái nên dừng lại cho từng bước, để chạy hết bàn. Toàn bộ là logic thuần (deterministic, rule-based) — không dùng AI/LLM.
+> Bổ sung cho `PoolCoachAI_SPEC.md`, thuộc module **Training Center → Cut Angle Simulator** (mục 4.3 trong spec chính). Tài liệu này mô tả một tính năng cụ thể: từ vị trí bi cái + các bi mục tiêu trên bàn, tính ra thứ tự đánh, lỗ, lực, đầu cơ, và vị trí bi cái nên dừng lại cho từng bước, để chạy hết bàn. Toàn bộ là logic thuần (deterministic, rule-based) — không dùng AI/LLM. Đường đi của bi lấy từ **mô phỏng vật lý tất định**, lõi chung với màn Mô phỏng góc cắt (`docs/superpowers/specs/2026-10-02-poolcoachai-table-physics-design.md`) *(sửa 2026-10-02: mô phỏng vật lý)*.
 
 ---
 
@@ -8,7 +8,7 @@
 
 Cut Angle Simulator (mục 4.3) hiện chỉ xử lý 1 cú đánh đơn lẻ. Tính năng này mở rộng thành **Run-out Planner**: nhập toàn bộ bố cục bàn, hệ thống tự lên kế hoạch đánh hết bi theo đúng luật của loại bàn đang chơi, kèm gợi ý cụ thể cho từng bước (lực, đầu cơ, vị trí bi cái nên dừng).
 
-Mục tiêu là công cụ **huấn luyện tư duy vị trí (position play)**, không phải một solver vật lý chính xác tuyệt đối. Mọi gợi ý phải nêu rõ đây là ước lượng hình học, người chơi vẫn cần tự canh lực thực tế.
+Mục tiêu là công cụ **huấn luyện tư duy vị trí (position play)**. Đường đi bi được mô phỏng theo vật lý (trượt rồi lăn, xoáy, nảy băng, ném), nhưng hằng số là ước lượng chỉnh bằng mắt, không đo trên bàn thật. Mọi gợi ý phải nêu rõ người chơi vẫn cần tự canh lực thực tế *(sửa 2026-10-02: mô phỏng vật lý)*.
 
 ## 2. Luật theo loại bàn
 
@@ -30,7 +30,7 @@ Người chơi chọn loại bàn trước khi nhập bi; thuật toán tương 
 
 Ngoài ra, khi so sánh vị trí để lại cho cú kế tiếp (bi N+1) và cú kế-kế-tiếp (bi N+2, ước lượng): **ưu tiên cân bằng độ khó giữa 2 vị trí hơn là tối ưu 1 vị trí thật đẹp còn 1 vị trí rất khó.** Dùng `max(diff_N+1, diff_N+2)` để chấm điểm, không dùng tổng — vì hai vị trí ở mức khá tốt hơn một vị trí đẹp + một vị trí khó (minimax thay vì trung bình/tổng).
 
-**Lực và xoáy quá tay cũng là một loại rủi ro, không chỉ là chuyện kỹ thuật khó:** đánh quá mạnh hoặc xoáy quá nhiều (nhất là trô) làm tăng nguy cơ **chết cái (scratch)** và tăng sai số thực hiện. Vì vậy, ngoài thứ tự ưu tiên trên, thuật toán còn: (a) loại thẳng mọi phương án có đường đi lướt qua miệng lỗ nào (nguy cơ chết cái), và (b) cộng thêm điểm phạt tỉ lệ với % lực — không chỉ phạt "có xoáy hay không" mà phạt cả mức độ lực dùng.
+**Lực và xoáy quá tay cũng là một loại rủi ro, không chỉ là chuyện kỹ thuật khó:** đánh quá mạnh hoặc xoáy quá nhiều (nhất là trô) làm tăng nguy cơ **chết cái (scratch)** và tăng sai số thực hiện. Vì vậy, ngoài thứ tự ưu tiên trên, thuật toán còn: (a) loại thẳng mọi phương án mà bi cái rơi lỗ trong mô phỏng (chết cái) *(sửa 2026-10-02: mô phỏng vật lý)*, và (b) cộng thêm điểm phạt tỉ lệ với % lực — không chỉ phạt "có xoáy hay không" mà phạt cả mức độ lực dùng.
 
 ## 4. Data model bổ sung
 
@@ -41,31 +41,36 @@ interface Pocket { x: number; y: number; }
 type StrokeType = 'center' | 'follow' | 'draw';
 // center = tâm bi; follow = Cu lê (xoáy trên, 12h) — kéo bi cái TIẾN thêm theo hướng bi mục tiêu;
 // draw = Trô (xoáy dưới, 6h) — kéo bi cái LÙI lại. (Quy ước tên gọi theo người dùng, không theo thuật ngữ tiếng Anh gốc.)
-// Bi cái LĂN THẲNG theo hợp vector (thành phần tiếp tuyến + thành phần xoáy dọc) — KHÔNG mô phỏng bằng
-// đường cong "bẻ sang" nhân tạo. Đây là điểm quan trọng: đường cong trước đây không sát thực tế và ngầm
-// khiến thuật toán coi trô/cu lê "rẻ" ngang với dội băng, trong khi thực tế đi thẳng rồi dội băng dễ kiểm
-// soát lực hơn nhiều so với dùng xoáy mạnh để đổi hướng.
+// center hiển thị là "Đánh đứng bi": bi cái tới bi mục tiêu ở trạng thái trượt, không xoáy dọc
+// (lõi tự dò điểm đặt cơ dưới tâm cho đúng khoảng cách).
+// (sửa 2026-10-02: mô phỏng vật lý) Đường đi bi cái lấy từ mô phỏng vật lý: sau va chạm bi cái rời đi
+// theo tiếp tuyến, xoáy trô/cu lê làm nó CONG theo parabol cho tới khi lăn đều, rồi chạy THẲNG. Đường
+// cong là cong thật do ma sát khăn, không phải đường "bẻ sang" vẽ tay.
 
 const STROKE_CANDIDATES: StrokeType[] = ['center', 'follow', 'draw'];
 const POWER_CANDIDATES = [30, 45, 60, 75, 90]; // % lực, các mức thử khi tìm phương án tốt nhất
 const POWER_JITTER = 15; // % dùng để đo "vùng điều tốt" chịu sai số lực
-const STROKE_SPIN = {center: 0, follow: 0.55, draw: -0.55}; // hệ số thành phần xoáy dọc theo hướng ux,uy
-const RAIL_LOSS = 0.15;   // mỗi lần chạm băng hao ~15% quãng đường còn lại
-const MAX_RAILS = 2;      // mô phỏng tối đa 2 lần chạm băng trong 1 cú đánh
-const POCKET_DANGER = 20; // bi cái đi qua trong bán kính này quanh tâm lỗ -> coi là nguy cơ chết cái
+// (sửa 2026-10-02: mô phỏng vật lý) Bỏ STROKE_SPIN, RAIL_LOSS, MAX_RAILS, POCKET_DANGER. Hằng số vật lý
+// (ma sát khăn, nảy băng, ném, vận tốc bi cái ở lực 100%...) nằm ở mục 3 của spec lõi vật lý.
+// Đơn vị: cm, bàn 254 × 127.
 
 interface ShotGeometry {
-  ghost: {x:number,y:number};   // điểm bi ma (nơi tâm bi cái cần chạm tới)
+  ghost: {x:number,y:number};   // điểm bi ảo hình học (nơi tâm bi cái cần chạm tới nếu không có ném)
   ux: number; uy: number;        // hướng bi mục tiêu -> lỗ (đơn vị)
   angle: number;                  // góc cắt (độ)
 }
 
-interface LandingCurve {
-  pts: {x:number,y:number}[];     // đường đi GẤP KHÚC THẲNG: [ghost, điểm chạm băng 1, điểm chạm băng 2..., end]
-  end: {x:number,y:number};        // điểm bi cái thực sự dừng lại
-  hits: {x:number,y:number}[];     // các điểm chạm băng dọc đường đi (rỗng nếu không chạm băng)
-  bankUsed: boolean;                // = hits.length > 0
-  scratch: boolean;                 // đường đi có lướt qua miệng lỗ nào không (POCKET_DANGER)
+// (sửa 2026-10-02: mô phỏng vật lý) Thay LandingCurve bằng ShotTrace của lõi vật lý.
+interface ShotTrace {
+  cueBefore: {x:number,y:number}[];  // bi cái từ lúc đánh tới lúc chạm bi mục tiêu
+  cueAfter: {x:number,y:number}[];   // bi cái sau va chạm tới khi dừng/rơi lỗ — cong chỗ cong, thẳng chỗ thẳng
+  objectPath: {x:number,y:number}[]; // bi mục tiêu sau va chạm
+  contactCue: {x:number,y:number} | null; // tâm bi cái lúc chạm (bi ảo đã bù ném)
+  rails: {x:number,y:number}[];      // mọi điểm bi cái chạm băng sau va chạm, theo thứ tự
+  cuePocket: number | null;          // bi cái rơi lỗ nào (chết cái), null nếu không
+  objectPocket: number | null;       // bi mục tiêu vào lỗ nào, null nếu không vào
+  cueEnd: {x:number,y:number};       // điểm bi cái dừng = phần tử cuối của cueAfter
+  bankUsed: boolean;                 // = rails.length > 0
 }
 
 interface PlanStep {
@@ -76,9 +81,11 @@ interface PlanStep {
   power: number;                    // % lực (từ POWER_CANDIDATES)
   bankUsed: boolean;
   cbFrom: {x:number,y:number};      // vị trí bi cái TRƯỚC cú đánh này
+  elevation: 'normal';              // độ dốc cơ — Planner luôn dùng Thường (5°) (sửa 2026-10-02)
   ghost: {x:number,y:number};
-  landingCurve: LandingCurve;
-  landingPos: {x:number,y:number} | null; // = landingCurve.end; null chỉ khi hoàn toàn không tìm được phương án nào (edge case)
+  aimOffsetDeg: number;             // ngắm dày(+)/mỏng(−) hơn bi ảo hình học để bù ném (sửa 2026-10-02)
+  trace: ShotTrace;                 // (sửa 2026-10-02: thay landingCurve)
+  landingPos: {x:number,y:number} | null; // = trace.cueEnd; null chỉ khi hoàn toàn không tìm được phương án nào (edge case)
   nextBallHint: number | null;
   safety?: true;
   message?: string;                 // chỉ có khi safety = true
@@ -86,7 +93,7 @@ interface PlanStep {
 ```
 
 **Bất biến bắt buộc (invariant) — phải có unit test cho điều này:**
-`plan[i].landingPos` (điểm bi cái dừng lại sau bước i) phải **bằng chính xác** `plan[i+1].cbFrom` (điểm bắt đầu của bước i+1). Cách đảm bảo: dùng thẳng `cand.end` làm `cb` cho vòng lặp kế tiếp, không tính lại.
+`plan[i].landingPos` (điểm bi cái dừng lại sau bước i) phải **bằng chính xác** `plan[i+1].cbFrom` (điểm bắt đầu của bước i+1). Cách đảm bảo: dùng thẳng `cand.trace.cueEnd` làm `cb` cho vòng lặp kế tiếp, không tính lại.
 
 ## 5. Thuật toán
 
@@ -95,52 +102,42 @@ interface PlanStep {
 - **9-bi/10-bi**: bi hiện tại = bi có số nhỏ nhất còn lại trên bàn (cố định, không được đổi).
 - **8-bi**: bi hiện tại = bi có góc cắt khả thi dễ nhất trong TẤT CẢ bi còn lại (tìm kiếm toàn bộ tổ hợp bi × lỗ).
 
-Trong cả 2 trường hợp: với bi đã chọn, thử cả 6 lỗ, loại lỗ nào góc cắt > 85° hoặc đường bi cái→bi ma hoặc bi→lỗ bị bi khác (còn trên bàn, kể cả bi chưa tới lượt trong chế độ 9/10-bi) chắn ngang. Chọn lỗ có góc cắt nhỏ nhất trong các lỗ hợp lệ. Nếu không lỗ nào hợp lệ → bước này là **safety** (dừng lập kế hoạch tại đây, không đoán tiếp vì kết quả cú safety không xác định trước được).
+Trong cả 2 trường hợp: với bi đã chọn, thử cả 6 lỗ, loại lỗ nào góc cắt > 85° hoặc đường bi cái→bi ảo hoặc bi→lỗ bị bi khác (còn trên bàn, kể cả bi chưa tới lượt trong chế độ 9/10-bi) chắn ngang. Chọn lỗ có góc cắt nhỏ nhất trong các lỗ hợp lệ. Nếu không lỗ nào hợp lệ → bước này là **safety** (dừng lập kế hoạch tại đây, không đoán tiếp vì kết quả cú safety không xác định trước được).
 
-### 5.2 Mô phỏng thuận đường đi bi cái — ĐƯỜNG THẲNG, có xoáy dọc và dội băng nhiều lần
+### 5.2 Mô phỏng đường đi bi — vật lý tất định *(sửa 2026-10-02: mô phỏng vật lý)*
 
-Với hình học `g` (ghost, ux, uy, hướng tiếp tuyến `tx,ty` = thành phần vận tốc bi cái còn lại sau va chạm, độ lớn `sinT = sin(góc cắt)`):
+Planner không tự tính đường đi. Với mỗi tổ hợp, nó gọi lõi vật lý chung:
 
 ```
-function simulateWithRail(g, stroke, power, bounds):
-  s = STROKE_SPIN[stroke]                       // 0 / +0.55 / -0.55
-  cosT = sqrt(1 - sinT²)
-  v = tangent*sinT + (ux,uy)*s*cosT              // hợp vector: tiếp tuyến + xoáy dọc theo hướng bi mục tiêu
-  nếu |v| gần 0 -> bi cái gần như đứng yên tại ghost (tâm bi cắt dày), dừng ở đây
-
-  dir = normalize(v)
-  remain = 260 * (power/100) * min(1, |v|)       // quãng đường còn lại để đi
-  pts = [ghost]; hits = []; rails = 0; pos = ghost
-
-  lặp trong khi remain > 1:
-    rail = tia từ pos theo dir, tìm điểm chạm biên bàn gần nhất
-    nếu không có biên trong tầm remain:
-      pos = pos + dir*remain; pts.push(pos); DỪNG
-    hit = điểm chạm băng
-    pts.push(hit)
-    nếu rails >= MAX_RAILS: pos = hit; DỪNG        // hết lượt dội cho phép, dừng tại băng
-    hits.push(hit); rails++
-    remain = (remain - khoảng_cách_tới_hit) * (1 - RAIL_LOSS)   // hao lực mỗi lần dội
-    dir = phản xạ dir qua trục vừa chạm (góc tới = góc phản xạ)
-    pos = hit
-
-  scratch = có đoạn nào trong pts đi qua trong bán kính POCKET_DANGER quanh 1 miệng lỗ không
-  return {pts, end: pts.cuối, hits, bankUsed: hits.length>0, scratch}
+aimed = aimShot(cue = cb, object = bi đang đánh, pocket = lỗ đã chọn ở 5.1,
+                stroke, power, spin = không áp phê, elevation = Thường)
+trace = aimed.trace
 ```
 
-Quan trọng: đây là đường đi **THẲNG giữa các lần chạm băng** — không có đoạn nào bị uốn cong nhân tạo theo stroke. Hiệu ứng `stroke` chỉ ảnh hưởng tới **hướng ban đầu** (qua thành phần xoáy dọc cộng vào vector vận tốc), không phải một đường cong vẽ thêm sau đó.
+Lõi làm những việc sau (chi tiết ở spec lõi vật lý, mục 4):
+
+- Tích phân từng bước 1 ms vị trí, vận tốc và xoáy 3 chiều của bi cái và bi mục tiêu.
+- Bi cái **trượt rồi lăn**: đoạn trượt cong theo parabol do xoáy trô/cu lê, đoạn lăn thẳng và chậm dần.
+- Băng: nảy có hao lực, góc bật phụ thuộc xoáy. **Không giới hạn số băng** — bi tự dừng vì mất lực.
+- Va chạm bi–bi có **ném**. `aimShot` dò hướng cơ để bi mục tiêu vẫn vào giữa lỗ (bù ném) và báo `aimOffsetDeg`.
+- Đánh đứng bi: lõi dò điểm đặt cơ dưới tâm để bi cái tới nơi đúng lúc hết xoáy dọc.
+- Chết cái = bi cái **thật sự rơi lỗ** trong mô phỏng.
+- Tất định: cùng đầu vào thì cùng kết quả.
+
+Đường đi là chuỗi điểm của mô phỏng: **cong chỗ cong, thẳng chỗ thẳng**. Không có đường cong nào vẽ tay hay cộng thêm bằng công thức.
 
 ### 5.3 Chấm điểm phương án (Priority 2, 3, 4 — theo đúng thứ tự mục 3)
 
 Với mỗi tổ hợp `(stroke, power)` trong `STROKE_CANDIDATES × POWER_CANDIDATES`:
 
 ```
-curve = simulateWithRail(g, stroke, power, bounds)
-nếu curve.scratch -> LOẠI (nguy cơ chết cái)
-nếu đường đi bị bi khác chắn -> LOẠI tổ hợp này
+trace = aimShot(...).trace                         // mục 5.2 (sửa 2026-10-02)
+nếu trace.cuePocket != null -> LOẠI (chết cái)
+nếu trace.objectPocket != lỗ đã chọn -> LOẠI (bi mục tiêu không vào)
+nếu cueBefore / cueAfter / objectPath bị bi khác chắn -> LOẠI tổ hợp này
 
-E = curve.end
-railCount = curve.hits.length
+E = trace.cueEnd
+railCount = trace.rails.length                    // số lần bi cái chạm băng sau va chạm
 bankPenalty = railCount==0 ? 0 : (railCount==1 ? 2 : 7)     // dội băng gần như KHÔNG bị phạt
 techPenalty = stroke==center ? 0 : (stroke==follow ? 3 : 10) // cu lê (12h) nhẹ hơn trô (6h) nhiều
 powerPenalty = (power/100) * 4                               // lực càng lớn càng dễ sai số/chết cái
@@ -184,7 +181,7 @@ lặp qua từng bi (theo 5.1):
     - 9/10-bi: nextBall/nextNextBall = bi kế tiếp/kế-kế-tiếp theo đúng thứ tự số
     - 8-bi: nextBall/nextNextBall = ước lượng bằng góc dễ nhất trong các bi còn lại (không phải tối ưu toàn cục)
   đẩy PlanStep với cbFrom = cb (giá trị TRƯỚC khi cập nhật)
-  cb = cand.end        // bắt buộc: bước sau dùng ĐÚNG điểm này, không tính lại
+  cb = cand.trace.cueEnd   // bắt buộc: bước sau dùng ĐÚNG điểm này, không tính lại (sửa 2026-10-02)
 ```
 
 ### 5.5 Gợi ý "đánh dư dày / dư mỏng" để nếu trượt vẫn khó cho đối thủ
@@ -235,9 +232,9 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 - Panel thông tin bước hiện tại: tên bi, lỗ, góc cắt, lực, đầu cơ. Panel "XEM TRƯỚC" (viền đứt nét) cho bước kế tiếp với cùng thông tin nhưng nhạt hơn.
 
 ### 6.5 Vẽ đường đi bi cái — bắt buộc thể hiện đúng vật lý đã chọn
-- Đường ngắm (bi cái → điểm bi ma): nét đứt trắng.
-- Đường bi cái sau va chạm: nét đứt màu ngọc (teal), vẽ theo **`landingCurve.pts`** — một đường GẤP KHÚC THẲNG (không phải đường cong), nối lần lượt ghost → (các điểm chạm băng nếu có) → điểm dừng cuối. Mỗi điểm chạm băng trong `landingCurve.hits` đánh dấu 1 chấm vàng nhỏ.
-- **Không vẽ đường cong "bẻ sang" theo đầu cơ** — hiệu ứng trô/cu lê chỉ thể hiện qua hướng đi ban đầu (đã tính trong `pts`), không phải một đoạn cong vẽ thêm.
+- Đường bi cái tới bi mục tiêu (`trace.cueBefore`): nét đứt trắng *(sửa 2026-10-02: Planner không dùng áp phê nên đường này gần như thẳng tới bi ảo đã bù ném)*.
+- Đường bi cái sau va chạm: nét đứt màu ngọc (teal), vẽ đúng chuỗi điểm **`trace.cueAfter`** của mô phỏng — cong chỗ cong (đoạn trượt có xoáy), thẳng chỗ thẳng (đoạn lăn), qua các điểm chạm băng tới điểm dừng. Mỗi điểm trong `trace.rails` đánh dấu 1 chấm vàng nhỏ *(sửa 2026-10-02: mô phỏng vật lý)*.
+- **Không vẽ đường cong tự chế** — mọi chỗ cong trên màn phải là cong của mô phỏng vật lý, không vẽ thêm bằng công thức.
 - Khi `bankUsed = true`, hiển thị trong panel: *"Bi cái chạm băng N lần rồi tới vùng điều — mỗi lần chạm hao khoảng 15% lực, lực X% đã tính phần hao này."* (thông tin, không phải cảnh báo — dội băng không phải điều đáng ngại).
 - Khi `power ≥ 85%` hoặc `stroke = draw` (trô), hiển thị cảnh báo riêng: *"Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái hoặc sai số lớn hơn bình thường."*
 - Khi có bi kế tiếp, hiển thị gợi ý từ `missSafetyAdvice` (mục 5.5): *"Nếu trượt: nên đánh dư [dày/mỏng] một chút — bi sẽ khó cho đối thủ hơn."* Vẽ 2 điểm "nếu trượt" (dư dày/dư mỏng) lên bàn, tô đậm điểm ứng với hướng được khuyến nghị.
@@ -246,8 +243,8 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 
 Ngoài các đường ở 6.5, với **bước đang xem** (không áp dụng cho bước xem trước) phải vẽ thêm, theo thứ tự từ dưới lên trên:
 
-1. **Vùng điều tốt** (vẽ dưới cùng, không che bi/đường): lưới ô ~12px phủ mặt bàn; với mỗi ô, giả sử bi cái đứng ở đó (sau khi bi hiện tại đã vào lỗ), tính góc cắt dễ nhất để đánh bi kế tiếp (dùng đúng `bestAngleFrom`, cùng tập bi cản đường như lúc chấm điểm). Tô **xanh nhạt** nếu góc ≤ 35° (`ZONE_GOOD`), **vàng nhạt** nếu ≤ 55° (`ZONE_FAIR`), bỏ trống nếu xấu hơn/không có đường/đè lên bi khác. Chỉ vẽ khi có bi kế tiếp.
-2. Đường bi mục tiêu → lỗ (nét liền), lỗ được chọn (vòng vàng lớn), vị trí bi ma (vòng nét đứt cỡ bi).
+1. **Vùng điều tốt** (vẽ dưới cùng, không che bi/đường): lưới ô ~5 cm phủ mặt bàn *(sửa 2026-10-02: đơn vị cm)*; với mỗi ô, giả sử bi cái đứng ở đó (sau khi bi hiện tại đã vào lỗ), tính góc cắt dễ nhất để đánh bi kế tiếp (dùng đúng `bestAngleFrom`, cùng tập bi cản đường như lúc chấm điểm). Tô **xanh nhạt** nếu góc ≤ 35° (`ZONE_GOOD`), **vàng nhạt** nếu ≤ 55° (`ZONE_FAIR`), bỏ trống nếu xấu hơn/không có đường/đè lên bi khác. Chỉ vẽ khi có bi kế tiếp.
+2. Đường bi mục tiêu → lỗ (nét liền), lỗ được chọn (vòng vàng lớn), vị trí bi ảo (vòng nét đứt cỡ bi).
 3. Vị trí bi cái sẽ dừng (vòng trắng nét đứt cỡ bi thật) + **thanh phạm vi sai số lực**: mô phỏng lại với lực −15% và +15% (`POWER_JITTER`, cùng đầu cơ), nối 2 điểm dừng đó qua điểm dừng chuẩn bằng một thanh vàng bo tròn, hai đầu có vòng nhỏ.
 4. Chú giải (legend) dưới canvas giải thích từng lớp màu/ký hiệu.
 
@@ -270,9 +267,9 @@ Luôn hiển thị: *"Lực và đầu cơ là gợi ý định hướng dựa t
    (ví dụ bi 3 trước bi 1), khác thứ tự số.
 
 4. Dội băng: với 1 bố cục mà bi cái cần đi xa để tới vị trí tốt cho bi kế tiếp, ít nhất 1 bước
-   trong kế hoạch phải có bankUsed = true, và landingCurve.hits không rỗng với mỗi điểm chạm nằm
-   đúng trên biên bàn (bằng bounds.xmin/xmax/ymin/ymax ở 1 trong 2 tọa độ). landingCurve.pts phải
-   là một đường gấp khúc thẳng đi qua đúng các điểm đó theo thứ tự.
+   trong kế hoạch phải có bankUsed = true, và trace.rails không rỗng với mỗi điểm chạm nằm
+   đúng trên biên bàn (bằng bounds.xmin/xmax/ymin/ymax ở 1 trong 2 tọa độ). trace.cueAfter phải
+   đi qua đúng các điểm đó theo thứ tự *(sửa 2026-10-02: đường đi là chuỗi điểm mô phỏng, có thể cong)*.
 
 5. Ưu tiên robustness hơn khoảng cách: dựng 1 bố cục có 2 tổ hợp (stroke, power) khả thi mà
    tổ hợp A cho vị trí gần bi kế tiếp hơn tổ hợp B nhưng A không chịu được sai số lực ±15%
@@ -286,8 +283,8 @@ Luôn hiển thị: *"Lực và đầu cơ là gợi ý định hướng dựa t
    tới vị trí tốt tương đương hoặc kém hơn một chút — thuật toán phải chọn phương án đánh thẳng + dội
    băng, KHÔNG chọn trô, vì bankPenalty (tối đa 7) luôn nhỏ hơn techPenalty của trô (10).
 
-8. Chết cái: dựng 1 bố cục mà 1 tổ hợp (stroke, power) có đường đi lướt qua miệng 1 lỗ nào đó trong
-   bán kính POCKET_DANGER — tổ hợp đó phải bị loại (curve.scratch = true), không được chọn dù điểm số
+8. Chết cái: dựng 1 bố cục mà 1 tổ hợp (stroke, power) làm bi cái rơi lỗ trong mô phỏng
+   (trace.cuePocket != null) — tổ hợp đó phải bị loại, không được chọn dù điểm số
    vị trí của nó tốt hơn các tổ hợp còn lại.
 
 9. Gợi ý dư dày/mỏng: với 1 cú cắt mỏng (góc cắt > 60°), errDeg tính ra phải lớn hơn rõ rệt so với
@@ -296,7 +293,7 @@ Luôn hiển thị: *"Lực và đầu cơ là gợi ý định hướng dựa t
 ```
 
 ## 8. Ngoài phạm vi (không làm ở bản này)
-- Không tính toán physics thật (ma sát lăn chi tiết, mất năng lượng khi va bi/va băng, hiệu ứng xoáy 3 chiều thật, squirt/swerve khi dùng áp phê) — đây vẫn là công cụ minh họa hình học.
+- *(sửa 2026-10-02: mô phỏng vật lý)* Bi thứ ba trở lên không tham gia va chạm trong mô phỏng — chỉ dùng để kiểm chắn đường trên `cueBefore`, `cueAfter`, `objectPath`. Không mô phỏng massé, bi nảy khỏi mặt bàn, hay bi va mép miệng lỗ.
 - Không tối ưu toàn cục (global optimization) cho toàn bộ trình tự bi trong chế độ 8-bi — chỉ dùng lookahead 2 bước (N+1, N+2), không giải toàn bộ bài toán tối ưu thứ tự.
 - `missSafetyAdvice` (mục 5.5) là gợi ý định tính, không mô phỏng quỹ đạo trượt thật (không tính bi mục tiêu nảy băng, không tính bi cái sau cú trượt) — nếu cần chính xác hơn, đây là hạng mục riêng cần bàn thêm.
 - Chưa đưa đầu cơ có áp phê (side-spin: 3h/9h, trô áp phê, cu lê áp phê — đã có ở Cut Angle Simulator 1 cú đánh) vào candidate set của Run-out Planner nhiều bi; nếu thêm, cần tăng `techPenalty` cho các biến thể này cao hơn cả trô, vì càng nhiều thông số xoáy càng nhiều sai số cộng dồn.
