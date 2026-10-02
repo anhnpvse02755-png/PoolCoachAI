@@ -1,11 +1,14 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/cushion.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
 
 import '../../support/table_layouts.dart';
@@ -101,6 +104,57 @@ void main() {
     expect(spy.lines,
         contains((layout.toCanvas(g.cue), layout.toCanvas(g.ghost))));
     expect(spy.arcs.map((r) => r.center), contains(layout.toCanvas(g.ghost)));
+  });
+
+  test('chấm chạm băng chỉ cho bi cái sau va chạm, khớp dòng số lần chạm',
+      () {
+    final g = geometryFor(const Vec2(170, 70), Pocket.topRight, 30);
+    final table = TableSpec.nineFoot;
+    RailHit hit(ShotBall ball, double y, {required bool after}) => RailHit(
+        ball: ball,
+        pos: Vec2(table.minX, y),
+        rail: Rail.left,
+        afterContact: after);
+    final aimed = AimedShot(
+      trace: ShotTrace(
+        cueBefore: [g.cue, g.ghost],
+        cueAfter: [g.ghost, const Vec2(100, 100)],
+        objectPath: [g.object, const Vec2(200, 40)],
+        contactCue: g.ghost,
+        rails: [
+          hit(ShotBall.cue, 20, after: false),
+          hit(ShotBall.object, 30, after: true),
+          hit(ShotBall.cue, 40, after: true),
+          hit(ShotBall.cue, 50, after: true),
+        ],
+        cuePocket: null,
+        objectPocket: null,
+        cueEnd: const Vec2(100, 100),
+      ),
+      uncompensated: null,
+      aimOffsetDeg: 0,
+      verticalOffset: 0,
+      stunReached: true,
+      converged: false,
+    );
+    final spy = _SpyCanvas();
+    TablePainter(SimulatorScene(
+      cue: g.cue,
+      object: g.object,
+      pocket: g.pocket,
+      geometry: g,
+      aimed: aimed,
+    )).paint(spy, size);
+    final layout = TableLayout(size: size);
+    final dots = [
+      for (final (c, color) in spy.circles)
+        if (color.toARGB32() == AppColors.railHit.toARGB32()) c,
+    ];
+    expect(dots.length, aimed.trace.cueRailCount);
+    expect(dots, [
+      layout.toCanvas(Vec2(table.minX, 40)),
+      layout.toCanvas(Vec2(table.minX, 50)),
+    ]);
   });
 
   test('cú cắt có ném dời Bi ảo khỏi chỗ hình học', () {

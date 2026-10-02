@@ -218,9 +218,11 @@ class TablePainter extends CustomPainter {
         s,
       );
 
-      // 6. Mỗi lần bi cái chạm băng: chấm vàng.
+      // 6. Mỗi lần bi cái chạm băng sau va chạm: chấm vàng. Cú dò không
+      // hội tụ có thể dội băng trước khi chạm bi; chấm đó không dòng nào
+      // giải thích, vì "Bi cái chạm băng N lần" chỉ đếm sau va chạm.
       for (final hit in trace.rails) {
-        if (hit.ball != ShotBall.cue) continue;
+        if (hit.ball != ShotBall.cue || !hit.afterContact) continue;
         canvas.drawCircle(layout.toCanvas(hit.pos), _railDot * s,
             Paint()..color = AppColors.railHit);
       }
