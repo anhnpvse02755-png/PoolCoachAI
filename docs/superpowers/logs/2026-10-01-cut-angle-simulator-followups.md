@@ -72,3 +72,50 @@ merge are not listed, except where noted.
   lines; the vertical-drag test cannot tell a drag from a scroll (Task 9)
 - Scenarios with the same shot share one semantics label; only the
   screenshots tell spin and stroke apart (Task 10)
+
+## Update 2026-10-02 — the simulator moved onto the table physics core
+
+Plan: `docs/superpowers/plans/2026-10-02-poolcoachai-table-physics.md`.
+
+### Closed
+
+- Drag frame time on mobile Chrome is now measured by `tool/e2e/simulator.mjs`
+  (gate: median ≤ 17 ms, p95 ≤ 20 ms). Measured:
+  `Khung hình lúc kéo (giả lập điện thoại): {"n":140,"median":16.69999999999891,"p95":16.900000000001455,"max":17}`
+  `Khung hình lúc kéo, CPU chậm 4 lần (tham khảo): {"n":33,"median":50.20000000000073,"p95":116.79999999999927,"max":116.79999999999927}`
+  The first run failed p95 (33.2 ms). Fix (a), computing the uncompensated
+  trace only while it is drawn (3d7b859), made it pass.
+  Dragging runs only `aimShot`; `scratchAdvice` runs after the finger lifts,
+  sliced across frames by `ScratchAdviceJob`, with "Đang tính…" meanwhile.
+- The áp phê effects spec was written and built: squirt, swerve, CIT/SIT throw
+  and the post-contact curve come from the physics core.
+- The banked trô reading is moot: `cue_ball_path.dart` and its
+  straight-after-rail rule are gone; the trace is whatever the physics does.
+- `scratchMargin` now always reaches exactly 100 % (coarse scan clamps to 100),
+  tested with a start power of 87 %.
+- The grid scratch-invariant test now requires at least one scratch.
+- Stale `_dragging` after a cancelled pan: `onPanCancel` now ends the drag.
+- Scenarios with the same shot no longer share one label: the semantics label
+  carries the elevation, the throw compensation, the rail count and the toggle.
+
+### Obsolete with `cue_ball_path.dart`
+
+- Curve-clamp tangent conflict, `_truncateAtScratch` never sampling t = 0,
+  `Straight.pointAt(1)`, the second-rail zero-vector edge, the dense-sampling
+  guard, the first-segment comparison in the áp phê test, and the corner-hit
+  branches of `outwardAt`/`grazing` (Tasks 4–5 of the previous plan).
+
+### Owner's tuning at the eye check
+
+Constants changed: none. The owner said "tiếp tục" after seeing the
+screenshots. Plan deviations 1, 2, 3 and 9 accepted. The red uncompensated
+path stays drawn under the object path.
+
+### Still open
+
+- Run `tool/e2e/simulator.mjs` against the live URL after deploy.
+- 68 of 6,816 grid shots with 2 tips on a Dốc cue at 30 % from across the
+  table do not converge; the screen draws the best attempt and says
+  "Bi mục tiêu không vào lỗ". Revisit if the owner meets one in practice.
+- `aimShot` measured 6–8 ms in Node (dart2js -O2); on a real phone the drag
+  frame may exceed 16 ms even if emulated Chrome passes.
