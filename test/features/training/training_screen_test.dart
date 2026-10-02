@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 
@@ -95,4 +99,41 @@ void main() {
 
     expect(find.byType(SimulatorScreen), findsOneWidget);
   });
+
+  // Mô phỏng không cần dữ liệu bài tập, nên thẻ không được biến mất khi
+  // danh sách bài đang tải hay tải lỗi.
+  for (final (name, drills) in <(String, Stream<List<Drill>>)>[
+    ('đang tải', StreamController<List<Drill>>().stream),
+    ('tải lỗi', Stream<List<Drill>>.error(StateError('mất mạng'))),
+  ]) {
+    testWidgets('thẻ Mô phỏng góc cắt vẫn hiện khi danh sách bài $name',
+        (tester) async {
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      final base = testContainer();
+      addTearDown(base.dispose);
+      final container = ProviderContainer(
+        parent: base,
+        overrides: [drillsProvider.overrideWith((ref) => drills)],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
+      await tester.pump();
+      router.go(Routes.training);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text(Vi.simTitle), findsOneWidget);
+
+      await tester.tap(find.text(Vi.simTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(SimulatorScreen), findsOneWidget);
+    });
+  }
 }

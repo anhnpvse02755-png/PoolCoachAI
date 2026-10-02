@@ -58,8 +58,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       final drill = drillById[log.drillId];
       if (drill == null) continue;
       final ratio = drillRatio(drill, log);
-      result[log.drillId] =
-          ratio == null ? const _NotScorable() : _Scored(ratio);
+      result[log.drillId] = ratio == null
+          ? const _NotScorable()
+          : _Scored(ratio);
     }
     return result;
   }
@@ -71,94 +72,111 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
 
     return PcRootScaffold(
       title: Vi.trainingTitle,
-      body: drillsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => const PcEmptyState(
-          icon: Icons.cloud_off,
-          title: Vi.dataErrorTitle,
-          body: Vi.dataErrorBody,
-        ),
-        data: (drills) {
-          final logs = logsAsync.hasValue ? logsAsync.value! : <DrillLog>[];
-          final latest = _latestByDrill(drills, logs);
-          final filtered = _filter == null
-              ? drills
-              : drills.where((d) => d.cat == _filter).toList();
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: PcCard(
-                  child: ListTile(
-                    leading: const Icon(Icons.adjust),
-                    title: const Text(Vi.simTitle),
-                    subtitle: const Text(Vi.simCardBody),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.go(Routes.simulator),
-                  ),
-                ),
+      // Mô phỏng không cần dữ liệu bài tập: thẻ nằm ngoài `when` để vẫn
+      // hiện khi danh sách đang tải hay tải lỗi.
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: PcCard(
+              child: ListTile(
+                leading: const Icon(Icons.adjust),
+                title: const Text(Vi.simTitle),
+                subtitle: const Text(Vi.simCardBody),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go(Routes.simulator),
               ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(8),
-                child: Row(
+            ),
+          ),
+          Expanded(
+            child: drillsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => const PcEmptyState(
+                icon: Icons.cloud_off,
+                title: Vi.dataErrorTitle,
+                body: Vi.dataErrorBody,
+              ),
+              data: (drills) {
+                final logs = logsAsync.hasValue
+                    ? logsAsync.value!
+                    : <DrillLog>[];
+                final latest = _latestByDrill(drills, logs);
+                final filtered = _filter == null
+                    ? drills
+                    : drills.where((d) => d.cat == _filter).toList();
+
+                return Column(
                   children: [
-                    FilterChip(
-                      label: const Text(Vi.trainingFilterAll),
-                      selected: _filter == null,
-                      onSelected: (_) => setState(() => _filter = null),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text(Vi.trainingFilterAll),
+                            selected: _filter == null,
+                            onSelected: (_) => setState(() => _filter = null),
+                          ),
+                          const SizedBox(width: 8),
+                          // Cả sáu nhóm, gồm Cân bi — nhóm thứ sáu mở riêng
+                          // chứ không gộp vào A băng.
+                          ...SkillCategory.values.map(
+                            (cat) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(Vi.skill(cat)),
+                                selected: _filter == cat,
+                                onSelected: (_) =>
+                                    setState(() => _filter = cat),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    // Cả sáu nhóm, gồm Cân bi — nhóm thứ sáu mở riêng
-                    // chứ không gộp vào A băng.
-                    ...SkillCategory.values.map(
-                      (cat) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(Vi.skill(cat)),
-                          selected: _filter == cat,
-                          onSelected: (_) => setState(() => _filter = cat),
-                        ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final drill = filtered[index];
+                          final result =
+                              latest[drill.id] ?? const _NeverTrained();
+
+                          return PcCard(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                child: Text('${drill.level}'),
+                              ),
+                              title: Text(drill.name),
+                              subtitle: Text(drill.unit),
+                              trailing: switch (result) {
+                                _NeverTrained() => const Icon(
+                                  Icons.play_circle_outline,
+                                ),
+                                _NotScorable() => Text(
+                                  Vi.drillRatioUnknown,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                _Scored(:final ratio) => Text(
+                                  Vi.drillRatioPercent(ratio),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium,
+                                ),
+                              },
+                              onTap: () => context.go(Routes.drill(drill.id)),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final drill = filtered[index];
-                    final result = latest[drill.id] ?? const _NeverTrained();
-
-                    return PcCard(
-                      child: ListTile(
-                        leading: CircleAvatar(child: Text('${drill.level}')),
-                        title: Text(drill.name),
-                        subtitle: Text(drill.unit),
-                        trailing: switch (result) {
-                          _NeverTrained() =>
-                            const Icon(Icons.play_circle_outline),
-                          _NotScorable() => Text(
-                              Vi.drillRatioUnknown,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          _Scored(:final ratio) => Text(
-                              Vi.drillRatioPercent(ratio),
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                        },
-                        onTap: () => context.go(Routes.drill(drill.id)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
