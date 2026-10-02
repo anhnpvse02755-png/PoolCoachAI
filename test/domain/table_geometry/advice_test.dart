@@ -4,6 +4,7 @@ import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 import '../../support/table_layouts.dart';
 
@@ -275,5 +276,32 @@ void main() {
       scratchAdvice(g, stroke: Stroke.follow, power: 60, spin: none)
           .map(describe),
     );
+  });
+
+  test('ScratchAdviceJob: lần mô phỏng quá giờ coi như bi cái không rơi lỗ, '
+      'job vẫn xong', () {
+    final g = geometryFor(const Vec2(240, 14), Pocket.topRight, 0);
+    // Lực trên 80 % thì lõi quá giờ; áp phê phải 2 rơi lỗ ở mọi lực khác.
+    Pocket? fake(SideSpin s, double p) {
+      if (p > 80) throw SimulationTimeout(ShotInput(
+          cue: g.cue, object: g.object, aimAngle: 0, power: p));
+      return s == right2 ? pocket : null;
+    }
+
+    final job = ScratchAdviceJob(g,
+        stroke: Stroke.follow, power: 60, spin: right1, lookup: fake);
+    List<Advice>? result;
+    for (var i = 0; i < 1000 && result == null; i++) {
+      result = job.step();
+    }
+    expect(result, isNotNull, reason: 'job phải xong dù lõi quá giờ');
+    Pocket? asNone(SideSpin s, double p) => p > 80 ? null : fake(s, p);
+    expect(
+      result!.map(describe),
+      chooseAdvice(
+              power: 60, chosen: right1, outcomes: outcomesWith(asNone, 60))
+          .map(describe),
+    );
+    expect(result, isNotEmpty, reason: 'phải có SpinCeiling từ áp phê phải 2');
   });
 }

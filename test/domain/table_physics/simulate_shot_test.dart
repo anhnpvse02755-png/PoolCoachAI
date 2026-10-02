@@ -62,6 +62,31 @@ void main() {
     expect(b.objectPocket, a.objectPocket);
   });
 
+  test('chạy quá maxSimTime thì ném SimulationTimeout', () {
+    // Bàn dài hàng trăm mét: bi cái lăn thẳng không chạm băng, không gần
+    // lỗ, nên chỉ ma sát lăn hãm nó — lâu hơn maxSimTime nhiều. Không đổi
+    // hằng số nào và không cần cửa riêng cho test.
+    const long = TableSpec(length: 50000);
+    final rollSpeed = maxCueSpeed * 5 / 7;
+    expect(rollSpeed / (muRoll * gravity), greaterThan(2 * maxSimTime),
+        reason: 'bi phải còn lăn khi hết maxSimTime');
+    expect(rollSpeed * rollSpeed / (2 * muRoll * gravity),
+        lessThan(long.length - 300),
+        reason: 'bi không được chạm băng cuối bàn');
+    const input = ShotInput(
+      cue: Vec2(200, 63.5),
+      object: Vec2(100, 63.5),
+      aimAngle: 0,
+      power: 100,
+      table: long,
+    );
+    expect(
+        () => simulateShot(input),
+        throwsA(isA<SimulationTimeout>()
+            .having((e) => e.input, 'input', same(input))));
+    expect(() => simulateCuePocket(input), throwsA(isA<SimulationTimeout>()));
+  });
+
   group('cueEnd là đúng đối tượng cuối của đường bi cái', () {
     test('có va chạm', () {
       final t = simulateShot(shot(const Vec2(60, 90), const Vec2(150, 50)));

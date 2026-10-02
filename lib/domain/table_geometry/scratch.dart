@@ -260,6 +260,7 @@ class ScratchAdviceJob {
     required this.spin,
     this.elevation = CueElevation.normal,
     this.table = TableSpec.nineFoot,
+    this.lookup,
   });
 
   final ShotGeometry g;
@@ -268,6 +269,9 @@ class ScratchAdviceJob {
   final SideSpin spin;
   final CueElevation elevation;
   final TableSpec table;
+
+  /// Thay mô phỏng thật (cho test); null là `cuePocketAt` trên [g].
+  final CuePocketLookup? lookup;
 
   final _cache = <(SideSpin, double), Pocket?>{};
 
@@ -283,12 +287,24 @@ class ScratchAdviceJob {
         outcomes: outcomesWith(_lookup, power),
       );
     } on _Missing catch (m) {
-      _cache[m.key] = cuePocketAt(g,
-          stroke: stroke,
-          power: m.key.$2,
-          spin: m.key.$1,
-          elevation: elevation,
-          table: table);
+      _cache[m.key] = _simulate(m.key.$1, m.key.$2);
+      return null;
+    }
+  }
+
+  /// Lõi quá `maxSimTime` thì coi như bi cái không rơi lỗ: ném tiếp ra
+  /// khỏi [step] thì chuỗi khung hình của màn hình dừng và "Đang tính…"
+  /// treo mãi. Một mức lực thiếu cảnh báo còn hơn mất cả lời khuyên.
+  Pocket? _simulate(SideSpin s, double p) {
+    try {
+      return (lookup ??
+          (s, p) => cuePocketAt(g,
+              stroke: stroke,
+              power: p,
+              spin: s,
+              elevation: elevation,
+              table: table))(s, p);
+    } on SimulationTimeout {
       return null;
     }
   }
