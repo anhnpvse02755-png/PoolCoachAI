@@ -10,6 +10,28 @@ import 'package:poolcoachai/features/training/presentation/simulator/table_paint
 
 import '../../support/table_layouts.dart';
 
+/// Canvas ghi lại các nét cần soi; mọi lệnh vẽ khác bỏ qua.
+class _SpyCanvas implements Canvas {
+  final lines = <(Offset, Offset)>[];
+  final circles = <(Offset, Color)>[];
+  final arcs = <Rect>[];
+
+  @override
+  void drawLine(Offset p1, Offset p2, Paint paint) => lines.add((p1, p2));
+
+  @override
+  void drawCircle(Offset c, double radius, Paint paint) =>
+      circles.add((c, paint.color));
+
+  @override
+  void drawArc(Rect rect, double startAngle, double sweepAngle,
+          bool useCenter, Paint paint) =>
+      arcs.add(rect);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
 void main() {
   const size = Size(540, 286);
 
@@ -64,6 +86,21 @@ void main() {
 
   test('không đánh được thì chỉ vẽ bàn và hai bi', () {
     paint(const SimulatorScene(cue: Vec2(80, 90), object: Vec2(170, 50)));
+  });
+
+  test('không mô phỏng được: vẫn vẽ đường ngắm và Bi ảo hình học', () {
+    final g = geometryFor(const Vec2(170, 70), Pocket.topRight, 30);
+    final spy = _SpyCanvas();
+    TablePainter(SimulatorScene(
+      cue: g.cue,
+      object: g.object,
+      pocket: g.pocket,
+      geometry: g,
+    )).paint(spy, size);
+    final layout = TableLayout(size: size);
+    expect(spy.lines,
+        contains((layout.toCanvas(g.cue), layout.toCanvas(g.ghost))));
+    expect(spy.arcs.map((r) => r.center), contains(layout.toCanvas(g.ghost)));
   });
 
   test('cú cắt có ném dời Bi ảo khỏi chỗ hình học', () {

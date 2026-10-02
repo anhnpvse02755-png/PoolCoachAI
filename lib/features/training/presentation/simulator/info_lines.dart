@@ -19,10 +19,12 @@ const stunOffsetShownTips = 0.25;
 ///
 /// Hàm thuần, tách khỏi widget để test thẳng từng ngưỡng. Mọi số đều lấy
 /// từ [aimed] và lõi; ở đây chỉ chọn dòng nào hiện. [advice] null nghĩa
-/// là gợi ý chống chết cái đang tính.
+/// là gợi ý chống chết cái đang tính. [cannotSimulate] là lõi chạy quá
+/// `maxSimTime` cho cú này ([aimed] khi đó null).
 List<String> simulatorInfoLines({
   required ShotResult? shot,
   required AimedShot? aimed,
+  bool cannotSimulate = false,
   required List<Advice>? advice,
   required Stroke stroke,
   required double power,
@@ -46,6 +48,7 @@ List<String> simulatorInfoLines({
         Vi.simPowerLine(power),
         Vi.simSpinLine(spin),
         Vi.simElevationLine(elevation),
+        if (cannotSimulate) Vi.simCannotSimulate,
         if (aimed != null &&
             Vi.simSaysThickness(geometry.angle) &&
             aimed.aimOffsetDeg.abs() >= aimOffsetShownDeg)

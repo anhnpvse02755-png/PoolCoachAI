@@ -5,6 +5,7 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_theme.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
@@ -13,6 +14,7 @@ import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
@@ -398,6 +400,47 @@ void main() {
     for (final a in advice) {
       expect(find.text(Vi.simAdvice(a)), findsOneWidget);
     }
+  });
+
+  /// Mở thẳng màn mô phỏng với [aim] thay cho `aimShot` thật.
+  Future<void> openWithAim(WidgetTester tester, AimShotFn aim) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      home: SimulatorScreen(aim: aim),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('lõi quá maxSimTime: chỉ vẽ hình học, báo một dòng, không vỡ',
+      (tester) async {
+    AimedShot timesOut({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) =>
+        throw SimulationTimeout(
+            ShotInput(cue: cue, object: object, aimAngle: 0, power: power));
+
+    await openWithAim(tester, timesOut);
+
+    expect(tester.takeException(), isNull);
+    final scene = sceneOf(tester);
+    expect(scene.geometry, isNotNull);
+    expect(scene.aimed, isNull);
+    expect(find.text(Vi.simCannotSimulate), findsOneWidget);
+    expect(find.text(Vi.simPocketLine(initial.pocket)), findsOneWidget);
+    // Gợi ý vẫn chạy xong trên lõi thật.
+    expect(find.text(Vi.simComputing), findsNothing);
   });
 
   testWidgets('lệch 2 đầu cơ thì cảnh báo trượt cơ', (tester) async {

@@ -50,7 +50,8 @@ class SimulatorScene {
   final Pocket? pocket;
   final ShotGeometry? geometry;
 
-  /// Cú đánh đã dò và mô phỏng; null khi không đánh được.
+  /// Cú đánh đã dò và mô phỏng; null khi không đánh được, hoặc khi lõi
+  /// không mô phỏng được (khi đó chỉ vẽ hình học của [geometry]).
   final AimedShot? aimed;
 
   /// Công tắc *Xem nếu không bù ném* đang bật (và đang có ném).
@@ -128,11 +129,9 @@ class TablePainter extends CustomPainter {
     }
 
     final g = scene.geometry;
-    if (g != null && aimed != null && trace != null) {
-      List<Offset> px(List<Vec2> pts) =>
-          [for (final p in pts) layout.toCanvas(p)];
-
-      // 1. Đường ngắm hình học (bi cái → Bi ảo hình học): vạch mờ.
+    // 1. Đường ngắm hình học (bi cái → Bi ảo hình học): vạch mờ. Vẽ cả
+    // khi lõi không mô phỏng được cú này (quá maxSimTime): còn hình học.
+    if (g != null) {
       canvas.drawLine(
         layout.toCanvas(scene.cue),
         layout.toCanvas(g.ghost),
@@ -140,6 +139,21 @@ class TablePainter extends CustomPainter {
           ..color = AppColors.aimLine.withValues(alpha: 0.35)
           ..strokeWidth = 1,
       );
+      if (trace == null) {
+        _dashedCircle(
+          canvas,
+          layout.toCanvas(g.ghost),
+          table.radius * s,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = AppColors.aimLine,
+        );
+      }
+    }
+    if (g != null && aimed != null && trace != null) {
+      List<Offset> px(List<Vec2> pts) =>
+          [for (final p in pts) layout.toCanvas(p)];
 
       // 2. Bi cái tới bi mục tiêu: nét đứt trắng — thấy bi cái bị lệch
       // do áp phê và swerve.

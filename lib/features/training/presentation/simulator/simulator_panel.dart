@@ -12,6 +12,7 @@ class SimulatorPanel extends StatelessWidget {
   const SimulatorPanel({
     required this.shot,
     required this.aimed,
+    this.cannotSimulate = false,
     required this.advice,
     required this.stroke,
     required this.power,
@@ -32,6 +33,9 @@ class SimulatorPanel extends StatelessWidget {
   /// null khi không lỗ nào đánh được.
   final ShotResult? shot;
   final AimedShot? aimed;
+
+  /// Lõi không mô phỏng được cú này: [aimed] null mà vẫn có cú đánh.
+  final bool cannotSimulate;
 
   /// null khi gợi ý chống chết cái đang tính.
   final List<Advice>? advice;
@@ -102,6 +106,7 @@ class SimulatorPanel extends StatelessWidget {
                 for (final line in simulatorInfoLines(
                   shot: shot,
                   aimed: aimed,
+                  cannotSimulate: cannotSimulate,
                   advice: advice,
                   stroke: stroke,
                   power: power,

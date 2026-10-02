@@ -452,6 +452,8 @@ abstract final class Vi {
 
   static const simNoAimOffset = 'Không cần bù ném';
   static const simShowingUncompensated = 'Đang xem đường không bù ném.';
+  static const simCannotSimulate =
+      'Không mô phỏng được cú này — chỉ vẽ đường ngắm.';
 
   /// Độ bù ném cho nhãn tóm tắt: làm tròn ra 0° thì nói là không cần.
   static String _aimSummary(double deg) =>
@@ -464,6 +466,7 @@ abstract final class Vi {
     AimedShot? aimed, {
     required CueElevation elevation,
     bool showingUncompensated = false,
+    bool cannotSimulate = false,
   }) {
     const head = 'Bàn mô phỏng.';
     return switch (shot) {
@@ -473,6 +476,7 @@ abstract final class Vi {
           '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
           '${simElevationLine(elevation)}.',
+          if (cannotSimulate) simCannotSimulate,
           if (aimed != null && simSaysThickness(geometry.angle))
             '${_aimSummary(aimed.aimOffsetDeg)}.',
           if (aimed != null && aimed.trace.cueRailCount > 0)

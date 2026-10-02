@@ -173,6 +173,14 @@ void main() {
       }
     });
 
+    test('lõi không mô phỏng được: nói thẳng, không có số nào của lõi', () {
+      expect(
+          Vi.simSummary(const Makeable(g), null,
+              elevation: CueElevation.normal, cannotSimulate: true),
+          'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
+          'Thường. ${Vi.simCannotSimulate}');
+    });
+
     test('không đánh được thì chỉ nói lý do', () {
       expect(Vi.simSummary(null, null, elevation: CueElevation.normal),
           'Bàn mô phỏng. Không lỗ nào đánh được từ vị trí này.');

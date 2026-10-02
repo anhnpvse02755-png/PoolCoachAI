@@ -12,17 +12,37 @@ import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
 
 enum _Ball { cue, object }
+
+/// Cùng chữ ký với `aimShot`, để test thay lõi (vd lõi quá giờ).
+typedef AimShotFn = AimedShot Function({
+  required Vec2 cue,
+  required Vec2 object,
+  required Pocket pocket,
+  required Stroke stroke,
+  SideSpin spin,
+  required double power,
+  CueElevation elevation,
+  TableSpec table,
+  bool compensate,
+  bool withUncompensated,
+});
 
 /// Mô phỏng góc cắt — spec 2026-10-01 mục 5, chạy trên lõi vật lý của
 /// spec 2026-10-02 mục 6.
 ///
 /// State cục bộ: không có gì để lưu hay chia sẻ, rời màn là mất.
 class SimulatorScreen extends StatefulWidget {
-  const SimulatorScreen({super.key});
+  const SimulatorScreen({super.key, this.aim = aimShot});
+
+  /// Lõi dò và mô phỏng cú đánh; test thay để ép lõi quá giờ hay đếm
+  /// số lần gọi.
+  @visibleForTesting
+  final AimShotFn aim;
 
   /// Khoá của bàn, để test quy đổi toạ độ bàn ra điểm chạm trên màn.
   static const tableKey = Key('simulator-table');
@@ -257,19 +277,27 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final showRed = canToggle && _showUncompensated;
     // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
     // khi nó thật sự được vẽ.
-    final aimed = geometry == null
-        ? null
-        : aimShot(
-            cue: geometry.cue,
-            object: geometry.object,
-            pocket: geometry.pocket,
-            stroke: _stroke,
-            spin: _spin,
-            power: _power,
-            elevation: _elevation,
-            table: _table,
-            withUncompensated: showRed,
-          );
+    AimedShot? aimed;
+    var cannotSimulate = false;
+    if (geometry != null) {
+      try {
+        aimed = widget.aim(
+          cue: geometry.cue,
+          object: geometry.object,
+          pocket: geometry.pocket,
+          stroke: _stroke,
+          spin: _spin,
+          power: _power,
+          elevation: _elevation,
+          table: _table,
+          withUncompensated: showRed,
+        );
+      } on SimulationTimeout {
+        // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
+        // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi.
+        cannotSimulate = true;
+      }
+    }
     final scene = SimulatorScene(
       cue: _cue,
       object: _object,
@@ -320,7 +348,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                         return Semantics(
                           label: Vi.simSummary(shot, aimed,
                               elevation: _elevation,
-                              showingUncompensated: showRed),
+                              showingUncompensated: showRed,
+                              cannotSimulate: cannotSimulate),
                           child: GestureDetector(
                             key: SimulatorScreen.tableKey,
                             dragStartBehavior: DragStartBehavior.down,
@@ -346,6 +375,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                   child: SimulatorPanel(
                     shot: shot,
                     aimed: aimed,
+                    cannotSimulate: cannotSimulate,
                     advice: _advice,
                     stroke: _stroke,
                     power: _power,
