@@ -267,7 +267,7 @@ double? topspinAtContact(ShotInput input) {
   var x0 = start;
   var e0 = error(x0);
   // Vẫn trượt (swerve, cắt rất mỏng): xoay dần về phía tâm bi mục tiêu
-  // từng nửa độ tới khi chạm.
+  // từng nửa bước tối đa (maxStep / 2) tới khi chạm.
   for (var k = 1; e0 == null && probes < maxAimIterations; k++) {
     x0 = start + thicker * k * maxStep / 2;
     e0 = error(x0);
