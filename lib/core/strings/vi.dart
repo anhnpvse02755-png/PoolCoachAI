@@ -1,12 +1,12 @@
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
 
 /// Toàn bộ chuỗi tiếng Việt hiển thị cho người dùng.
 ///
@@ -290,9 +290,6 @@ abstract final class Vi {
   static const simPowerLabel = 'Lực';
   static const simSpinLabel = 'Áp phê';
   static const simNoPocket = 'Không lỗ nào đánh được từ vị trí này.';
-  static const simBankWarning =
-      'Bi cái dội băng — cần canh lực chính xác hơn bình thường.';
-  static const simSpinNoRail = 'Áp phê chỉ đổi đường bi cái sau khi chạm băng.';
 
   /// PRD §6.6 — không được bỏ.
   static const simDisclaimer = 'Lực và đầu cơ là gợi ý định hướng dựa trên '
@@ -448,8 +445,21 @@ abstract final class Vi {
         'sang ${_spinAdvised(to)}.';
   }
 
-  /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây.
-  static String simSummary(ShotResult? shot, CueBallPath? path) {
+  static const simNoAimOffset = 'Không cần bù ném';
+  static const simShowingUncompensated = 'Đang xem đường không bù ném.';
+
+  /// Độ bù ném cho nhãn tóm tắt: làm tròn ra 0° thì nói là không cần.
+  static String _aimSummary(double deg) =>
+      _rounded(deg.abs(), 0.5) == '0' ? simNoAimOffset : simAimOffset(deg);
+
+  /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây — nên
+  /// có đủ số lần chạm băng, độ bù ném và độ dốc cơ để phân biệt từng cảnh.
+  static String simSummary(
+    ShotResult? shot,
+    AimedShot? aimed, {
+    required CueElevation elevation,
+    bool showingUncompensated = false,
+  }) {
     const head = 'Bàn mô phỏng.';
     return switch (shot) {
       null => '$head $simNoPocket',
@@ -457,8 +467,13 @@ abstract final class Vi {
       Makeable(:final geometry) => [
           '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
-          if (path?.bankUsed ?? false) 'Dội băng.',
-          if (path?.scratch != null) 'Chết cái.',
+          '${simElevationLine(elevation)}.',
+          if (aimed != null)
+            '${_aimSummary(aimed.aimOffsetDeg)}.',
+          if (aimed != null && aimed.trace.cueRailCount > 0)
+            simRailCount(aimed.trace.cueRailCount),
+          if (aimed?.trace.cuePocket != null) 'Chết cái.',
+          if (showingUncompensated) simShowingUncompensated,
         ].join(' '),
     };
   }

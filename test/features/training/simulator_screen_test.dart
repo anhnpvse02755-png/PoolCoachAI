@@ -5,20 +5,24 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
+import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
 
+import '../../support/table_layouts.dart';
 import '../../support/test_data.dart';
 
-/// Mô phỏng góc cắt — spec 2026-10-01 mục 5. Mọi con số mong đợi lấy
-/// từ chính lõi table_geometry, không viết tay.
+/// Mô phỏng góc cắt — spec 2026-10-01 mục 5 và 2026-10-02 mục 6. Mọi con
+/// số mong đợi lấy từ chính lõi, không viết tay.
 void main() {
   const table = TableSpec.nineFoot;
   final initial = bestPocket(
@@ -230,16 +234,135 @@ void main() {
     });
   });
 
-  testWidgets('áp phê mà không chạm băng thì nói thẳng là không đổi đường đi',
-      (tester) async {
-    final path = simulateCueBall(initial, stroke: Stroke.stun, power: 70);
-    expect(path.bankUsed, isFalse,
-        reason: 'bố cục mở màn phải không dội băng để test này có nghĩa');
+  /// Cảnh mà bàn đang vẽ — lấy thẳng từ painter, không đoán.
+  SimulatorScene sceneOf(WidgetTester tester) => (tester
+          .widget<CustomPaint>(find.descendant(
+              of: find.byKey(SimulatorScreen.tableKey),
+              matching: find.byType(CustomPaint)))
+          .painter! as TablePainter)
+      .scene;
+
+  AimedShot aimedFor(ShotGeometry g,
+          {Stroke stroke = Stroke.stun,
+          SideSpin spin = const SideSpin.none(),
+          CueElevation elevation = CueElevation.normal}) =>
+      aimShot(
+          cue: g.cue,
+          object: g.object,
+          pocket: g.pocket,
+          stroke: stroke,
+          spin: spin,
+          power: powerPresets[1],
+          elevation: elevation);
+
+  testWidgets('có nút Độ dốc cơ và đủ năm mức lực', (tester) async {
     await openSimulator(tester);
 
-    await tapText(tester, Vi.simSpinChip(const SideSpin(SpinSide.right, 1)));
+    for (final p in powerPresets) {
+      expect(find.text(Vi.simPowerPreset(p)), findsOneWidget);
+    }
+    expect(find.text(Vi.simElevation(CueElevation.normal)), findsOneWidget);
+    expect(find.text(Vi.simElevation(CueElevation.steep)), findsOneWidget);
 
-    expect(find.text(Vi.simSpinNoRail), findsOneWidget);
+    await tapText(tester, Vi.simElevation(CueElevation.steep));
+    expect(find.text(Vi.simElevationLine(CueElevation.steep)), findsOneWidget);
+  });
+
+  testWidgets('công tắc bù ném hiện và ẩn đường đỏ', (tester) async {
+    await openSimulator(tester);
+    expect(sceneOf(tester).showUncompensated, isFalse);
+
+    final toggle = find.byKey(SimulatorPanel.compensateToggleKey);
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(sceneOf(tester).showUncompensated, isTrue);
+    expect(sceneOf(tester).aimed!.uncompensated, isNotNull);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(sceneOf(tester).showUncompensated, isFalse);
+  });
+
+  test('công tắc bù ném chỉ mở khi có ném: có áp phê hoặc góc cắt khác 0', () {
+    final straight =
+        geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 0);
+    final cut = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 20);
+    const none = SideSpin.none();
+    expect(SimulatorScreen.canShowUncompensated(straight, none), isFalse);
+    expect(
+        SimulatorScreen.canShowUncompensated(
+            straight, const SideSpin(SpinSide.left, 0.5)),
+        isTrue);
+    expect(SimulatorScreen.canShowUncompensated(cut, none), isTrue);
+  });
+
+  testWidgets('bắn thẳng không áp phê thì công tắc bị khoá', (tester) async {
+    await openSimulator(tester);
+    // Thả bi mục tiêu sát bi cái, đúng trên tia bi cái → lỗ góc dưới
+    // phải: sau khi tách, hai bi thẳng hàng với lỗ, góc cắt 0°.
+    final toward = (table.pocketPosition(Pocket.bottomRight) -
+            SimulatorScreen.initialCue)
+        .normalized;
+    final drop = SimulatorScreen.initialCue + toward * 1.0;
+    final from = onTable(tester, SimulatorScreen.initialObject);
+    await tester.dragFrom(from, onTable(tester, drop) - from);
+    await tester.pumpAndSettle();
+
+    expect(sceneOf(tester).geometry!.angle.round(), 0);
+    final toggle = find.byKey(SimulatorPanel.compensateToggleKey);
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+  });
+
+  testWidgets('dòng ngắm dày/mỏng đúng chiều với aimOffsetDeg của lõi',
+      (tester) async {
+    const spin = SideSpin(SpinSide.right, 1);
+    final expected = aimedFor(initial, spin: spin).aimOffsetDeg;
+    expect(expected.abs(), greaterThanOrEqualTo(aimOffsetShownDeg),
+        reason: 'bố cục mở màn có áp phê phải đủ bù để dòng này hiện');
+    await openSimulator(tester);
+
+    await tapText(tester, Vi.simSpinChip(spin));
+
+    expect(find.text(Vi.simAimOffset(expected)), findsOneWidget);
+  });
+
+  testWidgets('dòng Đánh đứng bi chỉ hiện khi đánh đứng bi và đủ ngưỡng',
+      (tester) async {
+    final b = aimedFor(initial).verticalOffset;
+    expect(b.abs(), greaterThanOrEqualTo(stunOffsetShownTips * tipWidth),
+        reason: 'bố cục mở màn đủ xa để phải đặt cơ dưới tâm');
+    await openSimulator(tester);
+    expect(find.text(Vi.simStunOffset(b)), findsOneWidget);
+
+    await tapText(tester, Vi.simStroke(Stroke.follow));
+    expect(find.text(Vi.simStunOffset(b)), findsNothing);
+  });
+
+  testWidgets('gợi ý chống chết cái hiện Đang tính… khi kéo, cập nhật khi thả',
+      (tester) async {
+    await openSimulator(tester);
+    expect(find.text(Vi.simComputing), findsNothing);
+
+    final gesture = await tester
+        .startGesture(onTable(tester, SimulatorScreen.initialObject));
+    await gesture.moveBy(const Offset(30, 10));
+    await tester.pump();
+    await gesture.moveBy(const Offset(30, 10));
+    await tester.pump();
+    expect(find.text(Vi.simComputing), findsOneWidget);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.simComputing), findsNothing);
+
+    final scene = sceneOf(tester);
+    final g = scene.geometry!;
+    final advice = scratchAdvice(g,
+        stroke: Stroke.stun, power: powerPresets[1], spin: const SideSpin.none());
+    for (final a in advice) {
+      expect(find.text(Vi.simAdvice(a)), findsOneWidget);
+    }
   });
 
   testWidgets('lệch 2 đầu cơ thì cảnh báo trượt cơ', (tester) async {
@@ -254,8 +377,9 @@ void main() {
     final handle = tester.ensureSemantics();
     await openSimulator(tester);
 
-    final path = simulateCueBall(initial, stroke: Stroke.stun, power: 70);
-    expect(find.bySemanticsLabel(Vi.simSummary(Makeable(initial), path)),
+    expect(
+        find.bySemanticsLabel(Vi.simSummary(Makeable(initial), aimedFor(initial),
+            elevation: CueElevation.normal)),
         findsOneWidget);
     handle.dispose();
   });

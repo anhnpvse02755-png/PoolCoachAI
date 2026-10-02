@@ -1,13 +1,12 @@
 import 'dart:math' as math;
 
-// `Curve` ở đây là PathSegment của lõi, không phải animation curve —
-// ẩn tên đó khỏi material.dart để khỏi đụng độ.
-import 'package:flutter/material.dart' hide Curve;
+import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 /// Quy đổi giữa cm trên mặt bàn và pixel trên canvas.
 ///
@@ -39,7 +38,8 @@ class SimulatorScene {
     required this.object,
     this.pocket,
     this.geometry,
-    this.path,
+    this.aimed,
+    this.showUncompensated = false,
     this.riskPocket,
   });
 
@@ -49,13 +49,18 @@ class SimulatorScene {
   /// Lỗ đang dùng (tự chọn hoặc người chơi chạm).
   final Pocket? pocket;
   final ShotGeometry? geometry;
-  final CueBallPath? path;
+
+  /// Cú đánh đã dò và mô phỏng; null khi không đánh được.
+  final AimedShot? aimed;
+
+  /// Công tắc *Xem nếu không bù ném* đang bật (và đang có ném).
+  final bool showUncompensated;
 
   /// Lỗ có nguy cơ chết cái khi dư lực — vẽ vòng nét đứt.
   final Pocket? riskPocket;
 }
 
-/// Vẽ bàn theo PRD §6.5.
+/// Vẽ bàn theo spec 2026-10-02 mục 6.2, từ dưới lên.
 class TablePainter extends CustomPainter {
   TablePainter(this.scene);
 
@@ -65,12 +70,19 @@ class TablePainter extends CustomPainter {
   static const _dash = 2.0; // cm
   static const _gap = 1.5; // cm
   static const _railDot = 1.2; // cm
+  static const _ghostDot = 0.8; // cm
+
+  /// Bi ảo đã bù lệch khỏi Bi ảo hình học quá mức này (cm) thì chấm thêm
+  /// chỗ hình học, để thấy bù ném dời điểm chạm bao nhiêu.
+  static const _ghostShift = 0.1;
 
   @override
   void paint(Canvas canvas, Size size) {
     final layout = TableLayout(size: size);
     final table = layout.table;
     final s = layout.scale;
+    final aimed = scene.aimed;
+    final trace = aimed?.trace;
 
     canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.tableRail);
     canvas.drawRect(
@@ -88,7 +100,7 @@ class TablePainter extends CustomPainter {
         c,
         r,
         Paint()
-          ..color = scene.path?.scratch == pocket
+          ..color = trace?.cuePocket == pocket
               ? AppColors.danger
               : AppColors.bgDeep,
       );
@@ -116,43 +128,99 @@ class TablePainter extends CustomPainter {
     }
 
     final g = scene.geometry;
-    if (g != null) {
-      final aim = Paint()
-        ..color = AppColors.aimLine
-        ..strokeWidth = 1.5;
-      _dashedPolyline(
-          canvas, [layout.toCanvas(scene.cue), layout.toCanvas(g.ghost)], aim, s);
+    if (g != null && aimed != null && trace != null) {
+      List<Offset> px(List<Vec2> pts) =>
+          [for (final p in pts) layout.toCanvas(p)];
+
+      // 1. Đường ngắm hình học (bi cái → Bi ảo hình học): vạch mờ.
       canvas.drawLine(
-        layout.toCanvas(g.object),
-        layout.toCanvas(table.pocketPosition(g.pocket)),
+        layout.toCanvas(scene.cue),
+        layout.toCanvas(g.ghost),
         Paint()
-          ..color = AppColors.textMuted
+          ..color = AppColors.aimLine.withValues(alpha: 0.35)
           ..strokeWidth = 1,
       );
-      // Bi ảo: chỉ có viền.
-      canvas.drawCircle(
-        layout.toCanvas(g.ghost),
-        table.radius * s,
+
+      // 2. Bi cái tới bi mục tiêu: nét đứt trắng — thấy bi cái bị lệch
+      // do áp phê và swerve.
+      _dashedPolyline(
+        canvas,
+        px(trace.cueBefore),
         Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5
-          ..color = AppColors.aimLine,
+          ..color = AppColors.aimLine
+          ..strokeWidth = 1.5,
+        s,
       );
 
-      final path = scene.path;
-      if (path != null) {
-        final teal = Paint()
+      // 3. Bi ảo đã bù: vòng nét đứt; lệch xa Bi ảo hình học thì chấm
+      // mờ chỗ hình học.
+      final contact = trace.contactCue;
+      if (contact != null) {
+        _dashedCircle(
+          canvas,
+          layout.toCanvas(contact),
+          table.radius * s,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = AppColors.aimLine,
+        );
+        if (contact.distanceTo(g.ghost) > _ghostShift) {
+          canvas.drawCircle(layout.toCanvas(g.ghost), _ghostDot * s,
+              Paint()..color = AppColors.aimLine.withValues(alpha: 0.4));
+        }
+      }
+
+      // 8. Bật công tắc: đường bi mục tiêu nếu không bù ném, đỏ mờ. Vẽ
+      // trước đường thật để không che nó.
+      final red = aimed.uncompensated;
+      if (scene.showUncompensated && red != null) {
+        _polyline(
+          canvas,
+          px(red.objectPath),
+          Paint()
+            ..color = AppColors.danger.withValues(alpha: 0.55)
+            ..strokeWidth = 2,
+        );
+      }
+
+      // 4. Bi mục tiêu: nét liền.
+      _polyline(
+        canvas,
+        px(trace.objectPath),
+        Paint()
+          ..color = AppColors.textSecondary
+          ..strokeWidth = 1.5,
+      );
+
+      // 5. Bi cái sau va chạm: nét đứt màu ngọc, đúng chuỗi điểm của
+      // mô phỏng — chỗ cong là cong thật.
+      _dashedPolyline(
+        canvas,
+        px(trace.cueAfter),
+        Paint()
           ..color = AppColors.cuePath
-          ..strokeWidth = 2;
-        for (final seg in path.segments) {
-          _dashedPolyline(
-              canvas, _sample(seg).map(layout.toCanvas).toList(), teal, s);
-        }
-        final hit = path.railHit;
-        if (hit != null) {
-          canvas.drawCircle(layout.toCanvas(hit), _railDot * s,
-              Paint()..color = AppColors.railHit);
-        }
+          ..strokeWidth = 2,
+        s,
+      );
+
+      // 6. Mỗi lần bi cái chạm băng: chấm vàng.
+      for (final hit in trace.rails) {
+        if (hit.ball != ShotBall.cue) continue;
+        canvas.drawCircle(layout.toCanvas(hit.pos), _railDot * s,
+            Paint()..color = AppColors.railHit);
+      }
+
+      // 7. Điểm dừng bi cái: vòng trắng cỡ bi. Chết cái thì lỗ đã tô đỏ.
+      if (trace.cuePocket == null) {
+        canvas.drawCircle(
+          layout.toCanvas(trace.cueEnd),
+          table.radius * s,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = AppColors.ballCue,
+        );
       }
     }
 
@@ -162,10 +230,14 @@ class TablePainter extends CustomPainter {
         Paint()..color = AppColors.ballCue);
   }
 
-  List<Vec2> _sample(PathSegment seg) => switch (seg) {
-        Straight() => [seg.start, seg.end],
-        Curve() => [for (var i = 0; i <= 24; i++) seg.pointAt(i / 24)],
-      };
+  void _polyline(Canvas canvas, List<Offset> points, Paint paint) {
+    if (points.length < 2) return;
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final p in points.skip(1)) {
+      path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(path, paint..style = PaintingStyle.stroke);
+  }
 
   void _dashedPolyline(
       Canvas canvas, List<Offset> points, Paint paint, double scale) {

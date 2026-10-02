@@ -1,60 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
-import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 
-/// Phần dưới bàn: chọn kiểu đánh/lực/áp phê, bảng thông tin, disclaimer.
+/// Phần dưới bàn: nút chỉnh, công tắc bù ném, bảng thông tin, disclaimer.
 class SimulatorPanel extends StatelessWidget {
   const SimulatorPanel({
     required this.shot,
-    required this.path,
+    required this.aimed,
     required this.advice,
     required this.stroke,
     required this.power,
     required this.spin,
+    required this.elevation,
+    required this.showUncompensated,
     required this.onStroke,
     required this.onPower,
     required this.onSpin,
+    required this.onElevation,
+    required this.onShowUncompensated,
     super.key,
   });
 
+  /// Khoá của công tắc *Xem nếu không bù ném*, cho test.
+  static const compensateToggleKey = Key('simulator-compensate-toggle');
+
   /// null khi không lỗ nào đánh được.
   final ShotResult? shot;
-  final CueBallPath? path;
-  final List<Advice> advice;
+  final AimedShot? aimed;
+
+  /// null khi gợi ý chống chết cái đang tính.
+  final List<Advice>? advice;
   final Stroke stroke;
   final double power;
   final SideSpin spin;
+  final CueElevation elevation;
+  final bool showUncompensated;
   final ValueChanged<Stroke> onStroke;
   final ValueChanged<double> onPower;
   final ValueChanged<SideSpin> onSpin;
+  final ValueChanged<CueElevation> onElevation;
 
-  List<String> _infoLines() {
-    final shot = this.shot;
-    final path = this.path;
-    return switch (shot) {
-      null => [Vi.simNoPocket],
-      // Không đánh được thì chỉ nói lý do (spec mục 5.4).
-      Unmakeable(:final reason) => [Vi.simUnmakeable(reason)],
-      Makeable(:final geometry) => [
-          Vi.simPocketLine(geometry.pocket),
-          Vi.simAngleLine(geometry.angle),
-          Vi.simBandLine(bandFor(geometry.angle)),
-          Vi.simStrokeLine(stroke),
-          Vi.simPowerLine(power),
-          Vi.simSpinLine(spin),
-          if (path?.scratch case final pocket?) Vi.simScratch(pocket),
-          if (path != null && path.bankUsed) Vi.simBankWarning,
-          if (!spin.isNone && !(path?.bankUsed ?? false)) Vi.simSpinNoRail,
-          if (spin.risksMiscue) Vi.simMiscue,
-          ...advice.map(Vi.simAdvice),
-        ],
-    };
-  }
+  /// null khi công tắc bị khoá (không có ném để xem).
+  final ValueChanged<bool>? onShowUncompensated;
 
   @override
   Widget build(BuildContext context) {
@@ -92,14 +84,30 @@ class SimulatorPanel extends StatelessWidget {
         chips(Vi.simStrokeLabel, Stroke.values, stroke, Vi.simStroke, onStroke),
         chips(Vi.simPowerLabel, powerPresets, power, Vi.simPowerPreset, onPower),
         chips(Vi.simSpinLabel, SideSpin.all, spin, Vi.simSpinChip, onSpin),
-        const SizedBox(height: 12),
+        chips(Vi.simElevationLabel, CueElevation.values, elevation,
+            Vi.simElevation, onElevation),
+        SwitchListTile(
+          key: compensateToggleKey,
+          contentPadding: EdgeInsets.zero,
+          title: Text(Vi.simCompensateToggle, style: text.bodyMedium),
+          value: showUncompensated,
+          onChanged: onShowUncompensated,
+        ),
         PcCard(
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final line in _infoLines())
+                for (final line in simulatorInfoLines(
+                  shot: shot,
+                  aimed: aimed,
+                  advice: advice,
+                  stroke: stroke,
+                  power: power,
+                  spin: spin,
+                  elevation: elevation,
+                ))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(line, style: text.bodyMedium),

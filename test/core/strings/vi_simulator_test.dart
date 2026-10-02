@@ -1,12 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/cushion.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 void main() {
   const none = SideSpin.none();
@@ -100,7 +102,7 @@ void main() {
     );
   });
 
-  test('nhãn tóm tắt của bàn', () {
+  group('nhãn tóm tắt của bàn', () {
     const g = ShotGeometry(
       cue: Vec2(80, 90),
       object: Vec2(170, 50),
@@ -111,60 +113,68 @@ void main() {
       aimDir: Vec2(1, 0),
       angle: 7.4,
     );
-    const path = CueBallPath(
-      segments: [Straight(Vec2(165, 53), Vec2(170, 60))],
-      end: Vec2(170, 60),
-    );
-    expect(Vi.simSummary(const Makeable(g), path),
-        'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ.');
-    expect(Vi.simSummary(null, null),
-        'Bàn mô phỏng. Không lỗ nào đánh được từ vị trí này.');
-    expect(Vi.simSummary(const Unmakeable(UnmakeableReason.tooThin), null),
-        'Bàn mô phỏng. Góc cắt quá lớn (>85°).');
-    expect(Vi.simBand(bandFor(7.4)), 'Dễ');
-  });
 
-  test('simSummary append dội băng khi path có railHit', () {
-    const g = ShotGeometry(
-      cue: Vec2(80, 90),
-      object: Vec2(170, 50),
-      pocket: Pocket.topRight,
-      ghost: Vec2(165, 53),
-      objectDir: Vec2(1, 0),
-      tangentDir: Vec2(0, 1),
-      aimDir: Vec2(1, 0),
-      angle: 7.4,
-    );
-    const bankPath = CueBallPath(
-      segments: [
-        Straight(Vec2(165, 53), Vec2(251.1425, 80)),
-        Straight(Vec2(251.1425, 80), Vec2(200, 100))
-      ],
-      end: Vec2(200, 100),
-      railHit: Vec2(251.1425, 80),
-    );
-    expect(Vi.simSummary(const Makeable(g), bankPath),
-        'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Dội băng.');
-  });
+    AimedShot aimed({
+      List<RailHit> rails = const [],
+      Pocket? cuePocket,
+      double aimOffsetDeg = 0,
+    }) =>
+        AimedShot(
+          trace: ShotTrace(
+            cueBefore: const [Vec2(80, 90), Vec2(165, 53)],
+            cueAfter: const [Vec2(165, 53), Vec2(200, 100)],
+            objectPath: const [Vec2(170, 50), Vec2(254, 0)],
+            contactCue: const Vec2(165, 53),
+            rails: rails,
+            cuePocket: cuePocket,
+            objectPocket: Pocket.topRight,
+            cueEnd: const Vec2(200, 100),
+          ),
+          uncompensated: null,
+          aimOffsetDeg: aimOffsetDeg,
+          verticalOffset: 0,
+          converged: true,
+        );
 
-  test('simSummary append chết cái khi path có scratch', () {
-    const g = ShotGeometry(
-      cue: Vec2(80, 90),
-      object: Vec2(170, 50),
-      pocket: Pocket.topRight,
-      ghost: Vec2(165, 53),
-      objectDir: Vec2(1, 0),
-      tangentDir: Vec2(0, 1),
-      aimDir: Vec2(1, 0),
-      angle: 7.4,
-    );
-    const scratchPath = CueBallPath(
-      segments: [Straight(Vec2(165, 53), Vec2(250, 4))],
-      end: Vec2(250, 4),
-      scratch: Pocket.topRight,
-    );
-    expect(Vi.simSummary(const Makeable(g), scratchPath),
-        'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Chết cái.');
+    test('đủ góc cắt, độ dốc cơ và độ bù ném', () {
+      expect(
+          Vi.simSummary(const Makeable(g), aimed(),
+              elevation: CueElevation.normal),
+          'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
+          'Thường. Không cần bù ném.');
+      expect(
+          Vi.simSummary(const Makeable(g), aimed(aimOffsetDeg: -1.2),
+              elevation: CueElevation.steep),
+          'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
+          'Dốc. Ngắm mỏng hơn 1°.');
+      expect(Vi.simBand(bandFor(7.4)), 'Dễ');
+    });
+
+    test('không đánh được thì chỉ nói lý do', () {
+      expect(Vi.simSummary(null, null, elevation: CueElevation.normal),
+          'Bàn mô phỏng. Không lỗ nào đánh được từ vị trí này.');
+      expect(
+          Vi.simSummary(const Unmakeable(UnmakeableReason.tooThin), null,
+              elevation: CueElevation.normal),
+          'Bàn mô phỏng. Góc cắt quá lớn (>85°).');
+    });
+
+    test('thêm số lần bi cái chạm băng sau va chạm, chết cái, đường đỏ', () {
+      const hit = RailHit(
+          ball: ShotBall.cue,
+          pos: Vec2(251.1425, 80),
+          rail: Rail.right,
+          afterContact: true);
+      expect(
+          Vi.simSummary(
+              const Makeable(g),
+              aimed(rails: const [hit, hit], cuePocket: Pocket.bottomLeft),
+              elevation: CueElevation.normal,
+              showingUncompensated: true),
+          'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
+          'Thường. Không cần bù ném. Bi cái chạm băng 2 lần. Chết cái. '
+          'Đang xem đường không bù ném.');
+    });
   });
 
   test('Vi.simAdvice với NoSpinAvoids', () {
