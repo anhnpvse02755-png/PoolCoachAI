@@ -153,7 +153,8 @@ void main() {
     for (var i = 0; i < shots.length; i += 7) {
       final g = shots[i];
       for (final stroke in [Stroke.stun, Stroke.follow]) {
-        for (final p in [70.0, 95.0]) {
+        // Bỏ mức nhẹ nhất cho đỡ chậm: lực nhẹ hiếm khi tới lỗ.
+        for (final p in powerPresets.skip(1)) {
           for (final chosen in SideSpin.all) {
             for (final a in scratchAdvice(g,
                 stroke: stroke, power: p, spin: chosen)) {

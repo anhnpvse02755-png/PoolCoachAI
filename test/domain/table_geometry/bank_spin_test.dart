@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
+import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
+import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -138,7 +140,7 @@ void main() {
     var drawBanks = 0;
     var followCurves = 0;
     for (final g in shots) {
-      for (final p in [40.0, 70.0, 95.0]) {
+      for (final p in powerPresets) {
         final draw = simulateCueBall(g, stroke: Stroke.draw, power: p);
         if (draw.bankUsed && draw.scratch == null && draw.segments.length == 2) {
           drawBanks++;
@@ -183,5 +185,75 @@ void main() {
       // Rơi lỗ trước băng thì không có điểm chạm để so.
       if (spun.railHit != null) expect(spun.railHit, path.railHit);
     }
+  });
+
+  // PRD §8: tối đa một lần dội — nếu đoạn sau sẽ ra khỏi bàn thì bi cái
+  // dừng đúng trên biên theo hướng bật, không dội lần hai.
+  group('chạm băng thứ hai thì dừng ở đó', () {
+    /// Điểm cuối chưa kẹp của đoạn sau: railHit + reboundDir * phần còn lại.
+    /// Phần còn lại = quãng bi cái đi tổng cộng trừ quãng tới băng đầu.
+    Vec2 unclampedEnd(ShotGeometry g, CueBallPath path, Stroke stroke,
+        double power) {
+      final travel = maxTravel * power / 100;
+      final theta = g.angle * math.pi / 180;
+      final rollSign = switch (stroke) {
+        Stroke.stun => 0.0,
+        Stroke.follow => 1.0,
+        Stroke.draw => -1.0,
+      };
+      final target = g.ghost +
+          g.tangentDir * (travel * math.sin(theta)) +
+          g.objectDir * (rollSign * rollCarry * travel * math.cos(theta));
+      final remaining =
+          g.ghost.distanceTo(target) - g.ghost.distanceTo(path.railHit!);
+      return path.railHit! + path.reboundDir! * remaining;
+    }
+
+    void expectStopsOnRail(
+        ShotGeometry g, CueBallPath path, Stroke stroke, String where) {
+      final last = path.segments.last;
+      expect(path.segments.length, 2, reason: where);
+      expect(onBounds(path.end), isTrue, reason: where);
+      expect(last, isA<Straight>(), reason: where);
+      expect(last.start, path.railHit, reason: where);
+      expect(last.end, path.end, reason: where);
+      if (stroke != Stroke.follow) {
+        final heading = (last.end - last.start).normalized;
+        expect(heading.dot(path.reboundDir!), closeTo(1, 1e-9),
+            reason: where);
+      }
+    }
+
+    test('lưới: đoạn sau ra khỏi bàn thì dừng đúng trên biên', () {
+      var cases = 0;
+      for (final g in shots) {
+        for (final stroke in Stroke.values) {
+          for (final power in powerPresets) {
+            for (final spin in SideSpin.all) {
+              final path = simulateCueBall(g,
+                  stroke: stroke, power: power, spin: spin);
+              if (!path.bankUsed || path.scratch != null) continue;
+              if (table.contains(unclampedEnd(g, path, stroke, power))) {
+                continue;
+              }
+              cases++;
+              expectStopsOnRail(g, path, stroke,
+                  '${g.cue}→${g.object} $stroke $power $spin');
+            }
+          }
+        }
+      }
+      expect(cases, greaterThan(10),
+          reason: 'lưới phải có cú chạm băng thứ hai thì test mới có nghĩa');
+    });
+
+    test('dựng tay: bi cái dội băng rồi chạy tiếp tới băng thứ hai', () {
+      final g = geometryFor(const Vec2(200, 40), Pocket.topRight, 35);
+      final path = simulateCueBall(g, stroke: Stroke.stun, power: 95);
+      expect(path.bankUsed, isTrue);
+      expect(table.contains(unclampedEnd(g, path, Stroke.stun, 95)), isFalse,
+          reason: 'bố cục dựng tay phải đủ lực để ra khỏi bàn');
+      expectStopsOnRail(g, path, Stroke.stun, 'dựng tay');
+    });
   });
 }
