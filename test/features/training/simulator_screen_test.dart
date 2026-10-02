@@ -207,6 +207,29 @@ void main() {
     });
   });
 
+  // Bi kia cách băng ~1 cm, thả bi này sát nó về phía băng: hướng đẩy ra
+  // ngoài bàn, kẹp lại thì chồng ~4.7 cm nếu không có cách xử lý riêng.
+  group('tách hai bi chồng nhau sát băng', () {
+    final other = Vec2(100, table.minY + 0.6);
+    final drop = Vec2(other.x, table.minY);
+    const previous = Vec2(40, 60);
+
+    test('đẩy dọc theo băng thì hai bi không còn chồng', () {
+      final moved = SimulatorScreen.separate(drop, other, previous);
+      expect(moved.distanceTo(other), greaterThanOrEqualTo(table.ballDiameter));
+      expect(table.contains(moved), isTrue);
+    });
+
+    test('giữa bàn thì vẫn đẩy theo hướng từ bi kia ra', () {
+      const centre = Vec2(120, 60);
+      final moved =
+          SimulatorScreen.separate(centre + const Vec2(1, 0), centre, previous);
+      expect(moved.distanceTo(centre), greaterThanOrEqualTo(table.ballDiameter));
+      expect(moved.y, centre.y);
+      expect(moved.x, greaterThan(centre.x));
+    });
+  });
+
   testWidgets('áp phê mà không chạm băng thì nói thẳng là không đổi đường đi',
       (tester) async {
     final path = simulateCueBall(initial, stroke: Stroke.stun, power: 70);

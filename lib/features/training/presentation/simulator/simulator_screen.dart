@@ -29,6 +29,38 @@ class SimulatorScreen extends StatefulWidget {
   static const initialCue = Vec2(80, 90);
   static const initialObject = Vec2(170, 50);
 
+  /// Thả đè lên bi kia thì đẩy về vừa chạm nhau.
+  ///
+  /// Đẩy xa hơn đúng một đường kính một chút: đặt đúng `D` thì sai số
+  /// làm tròn có thể cho ra 5.7149999 và lõi báo hai bi chồng nhau.
+  ///
+  /// Sát băng thì hướng đẩy có thể chỉ ra ngoài bàn, kẹp lại là chồng tiếp.
+  /// Khi đó thử trượt dọc theo băng (đẩy theo từng trục, về phía điểm thả);
+  /// không cách nào tách được thì giữ [previous] — bi không nhảy.
+  @visibleForTesting
+  static Vec2 separate(Vec2 p, Vec2 other, Vec2 previous,
+      {TableSpec table = TableSpec.nineFoot}) {
+    final d = table.ballDiameter;
+    if ((p - other).length >= d) return p;
+    bool clear(Vec2 v) => v.distanceTo(other) >= d;
+
+    final gap = p - other;
+    final dir = gap.isZero ? const Vec2(1, 0) : gap.normalized;
+    final direct = table.clamp(other + dir * (d + 1e-6));
+    if (clear(direct)) return direct;
+
+    final sx = gap.x < 0 ? -1.0 : 1.0;
+    final sy = gap.y < 0 ? -1.0 : 1.0;
+    final slides = [
+      Vec2(sx, 0), Vec2(-sx, 0), Vec2(0, sy), Vec2(0, -sy), //
+    ];
+    for (final s in slides) {
+      final slid = table.clamp(other + s * (d + 1e-6));
+      if (clear(slid)) return slid;
+    }
+    return previous;
+  }
+
   @override
   State<SimulatorScreen> createState() => _SimulatorScreenState();
 }
@@ -83,8 +115,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final dragging = _dragging;
     if (dragging == null) return;
     final other = dragging == _Ball.cue ? _object : _cue;
-    final moved =
-        _separate(_table.clamp(layout.toTable(details.localPosition)), other);
+    final moved = SimulatorScreen.separate(
+        _table.clamp(layout.toTable(details.localPosition)),
+        other,
+        dragging == _Ball.cue ? _cue : _object);
     setState(() {
       if (dragging == _Ball.cue) {
         _cue = moved;
@@ -94,17 +128,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       // Kéo bi là bố cục mới: quay về tự chọn lỗ.
       _pocketOverride = null;
     });
-  }
-
-  /// Thả đè lên bi kia thì đẩy về vừa chạm nhau.
-  ///
-  /// Đẩy xa hơn đúng một đường kính một chút: đặt đúng `D` thì sai số
-  /// làm tròn có thể cho ra 5.7149999 và lõi báo hai bi chồng nhau.
-  Vec2 _separate(Vec2 p, Vec2 other) {
-    final gap = p - other;
-    if (gap.length >= _table.ballDiameter) return p;
-    final dir = gap.isZero ? const Vec2(1, 0) : gap.normalized;
-    return _table.clamp(other + dir * (_table.ballDiameter + 1e-6));
   }
 
   void _onTapUp(TapUpDetails details, TableLayout layout) {
