@@ -7,6 +7,12 @@ import { randomBytes } from 'node:crypto';
 import { launch, sleep } from './cdp.mjs';
 import { registerThrowaway, deleteUserByEmail } from './throwaway_user.mjs';
 
+// Bài này luôn tạo user thật trên Directus, nên phải có quyền xoá nó: thiếu
+// biến thì dừng ngay, đừng để user thử rò rỉ trên bản thật (như accounts.mjs).
+const need = (n) => process.env[n] ?? (() => { throw new Error(`Thiếu ${n}`); })();
+need('DIRECTUS_URL');
+need('DIRECTUS_ADMIN_PASSWORD');
+
 const APP = (process.argv[2] ?? 'https://poolcoachai.kjdybl.easypanel.host').replace(/\/$/, '');
 const shots = path.join(process.env.TMP ?? os.tmpdir(), 'pcai-sim');
 const email = `e2e-sim-${Date.now()}@poolcoachai.example.com`;
