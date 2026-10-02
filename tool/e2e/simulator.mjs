@@ -28,7 +28,9 @@ const START = [170, 50];
 const STRAIGHT = [177.81, 110.8]; // thẳng hàng bi cái → lỗ góc dưới phải, góc cắt 0°
 const HALF_BALL = [170, 70]; // ~29° vào lỗ góc trên phải
 const TWO_RAILS = [150, 40]; // đứng bi 60 %: bi cái chạm 2 băng
-const FAR = [220, 40]; // đứng bi 30 %: đặt cơ dưới tâm ~1.25 đầu cơ
+// (220, 40) cũ chạm sàn stunMaxOffset mà vẫn còn xoáy trên, nên app không
+// còn hiện dòng đặt cơ ở đó; (190, 40) đứng bi được thật.
+const FAR = [190, 40]; // đứng bi 30 %: đặt cơ dưới tâm ~1.25 đầu cơ
 
 // Kéo bi không được rớt khung (spec mục 5): trung vị và p95 khoảng cách
 // giữa hai khung hình (ms) lúc kéo, trên Chrome giả lập điện thoại

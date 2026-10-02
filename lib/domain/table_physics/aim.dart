@@ -14,6 +14,7 @@ class AimedShot {
     required this.uncompensated,
     required this.aimOffsetDeg,
     required this.verticalOffset,
+    required this.stunReached,
     required this.converged,
   });
 
@@ -29,6 +30,9 @@ class AimedShot {
   /// `b` đã dùng, cm (Đánh đứng bi: `b` dò được).
   final double verticalOffset;
 
+  /// [AimSolution.stunReached] của cú đã dò.
+  final bool stunReached;
+
   /// Dò bù ném đạt `aimTolerance` trong `maxAimIterations` vòng.
   final bool converged;
 }
@@ -39,6 +43,7 @@ class AimSolution {
   const AimSolution({
     required this.aimed,
     required this.geometric,
+    required this.stunReached,
     required this.converged,
   });
 
@@ -47,6 +52,12 @@ class AimSolution {
 
   /// Cùng cú đánh, ngắm thẳng vào Bi ảo hình học.
   final ShotInput geometric;
+
+  /// Đánh đứng bi: `b` dò được thật sự làm hết xoáy dọc lúc chạm. False
+  /// khi đặt cơ thấp nhất (`stunMaxOffset`) vẫn còn xoáy trên — khi đó
+  /// `b` không đứng được bi, màn hình không được gọi nó là điểm đặt cơ.
+  /// Kiểu đánh khác luôn true.
+  final bool stunReached;
   final bool converged;
 
   /// Góc xoay từ hướng tới Bi ảo hình học sang hướng đã bù, độ, trong
@@ -99,9 +110,14 @@ AimSolution solveAim({
     table: table,
   );
 
+  var stunReached = true;
   if (!compensate) {
-    if (stroke == Stroke.stun) input = _solveStun(input);
-    return AimSolution(aimed: input, geometric: input, converged: true);
+    if (stroke == Stroke.stun) (input, stunReached) = _solveStun(input);
+    return AimSolution(
+        aimed: input,
+        geometric: input,
+        stunReached: stunReached,
+        converged: true);
   }
 
   // Bắt đầu từ hướng đã bù sẵn góc lệch do áp phê: vận tốc ban đầu khi
@@ -115,7 +131,7 @@ AimSolution solveAim({
   // hướng bù đổi quãng đường nên đổi `b`. Dò xen kẽ hai vòng, kết thúc
   // bằng dò bù ném để hướng cơ khớp đúng `b` cuối cùng.
   for (var round = 0; round < (stroke == Stroke.stun ? 2 : 1); round++) {
-    if (stroke == Stroke.stun) input = _solveStun(input);
+    if (stroke == Stroke.stun) (input, stunReached) = _solveStun(input);
     final (aim, ok) = _solveThrow(input, pocketPos);
     input = input.copyWith(aimAngle: aim);
     converged = ok;
@@ -123,6 +139,7 @@ AimSolution solveAim({
   return AimSolution(
     aimed: input,
     geometric: input.copyWith(aimAngle: aim0),
+    stunReached: stunReached,
     converged: converged,
   );
 }
@@ -162,6 +179,7 @@ AimedShot aimShot({
         : null,
     aimOffsetDeg: compensate ? s.aimOffsetDeg : 0,
     verticalOffset: s.aimed.verticalOffset,
+    stunReached: s.stunReached,
     converged: s.converged,
   );
 }
@@ -182,17 +200,22 @@ double? topspinAtContact(ShotInput input) {
 /// Xoáy lúc chạm gần như tuyến tính theo `b` (thời gian tới bi mục tiêu
 /// không phụ thuộc xoáy khi còn trượt), nên dò kiểu chia đôi có nội suy
 /// (Illinois): giữ khoảng kẹp như chia đôi nhưng 2–4 vòng là đủ.
-ShotInput _solveStun(ShotInput input) {
+///
+/// Trả thêm false khi chạm sàn `b` mà bi cái vẫn tới nơi còn xoáy trên.
+(ShotInput, bool) _solveStun(ShotInput input) {
   final lo = -stunMaxOffset * input.table.radius;
   double? f(double b) => topspinAtContact(input.copyWith(verticalOffset: b));
 
   final fHi = f(0);
   if (fHi == null || fHi <= stopSpin / 4) {
-    return input.copyWith(verticalOffset: 0);
+    return (input.copyWith(verticalOffset: 0), true);
   }
   final fLo = f(lo);
-  // Xa quá, đặt cơ thấp nhất vẫn không kịp hết xoáy dưới: dùng mức đó.
-  if (fLo == null || fLo >= 0) return input.copyWith(verticalOffset: lo);
+  // Xa quá, đặt cơ thấp nhất vẫn không kịp hết xoáy dưới: dùng mức đó,
+  // nhưng báo là không đứng được bi (vẫn còn xoáy trên lúc chạm).
+  if (fLo == null || fLo >= 0) {
+    return (input.copyWith(verticalOffset: lo), false);
+  }
 
   var a = lo, fa = fLo, b = 0.0, fb = fHi;
   var side = 0;
@@ -214,7 +237,7 @@ ShotInput _solveStun(ShotInput input) {
       side = 1;
     }
   }
-  return input.copyWith(verticalOffset: x);
+  return (input.copyWith(verticalOffset: x), true);
 }
 
 /// Bù ném: dò hướng cơ bằng cát tuyến, bắt đầu từ `input.aimAngle`, sao

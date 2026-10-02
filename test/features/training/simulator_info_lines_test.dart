@@ -54,6 +54,7 @@ void main() {
     Pocket? objectPocket = Pocket.topRight,
     double aimOffsetDeg = 0,
     double verticalOffset = 0,
+    bool stunReached = true,
   }) =>
       AimedShot(
         trace: ShotTrace(
@@ -76,6 +77,7 @@ void main() {
         uncompensated: null,
         aimOffsetDeg: aimOffsetDeg,
         verticalOffset: verticalOffset,
+        stunReached: stunReached,
         converged: true,
       );
 
@@ -136,6 +138,14 @@ void main() {
         isEmpty);
     expect(
         lines(a: fake(verticalOffset: deep), stroke: Stroke.draw)
+            .where((l) => l.startsWith('Đánh đứng bi:')),
+        isEmpty);
+  });
+
+  test('đặt cơ thấp nhất vẫn không đứng được bi: không nói điểm đặt cơ', () {
+    const floor = -stunOffsetShownTips * tipWidth * 4;
+    expect(
+        lines(a: fake(verticalOffset: floor, stunReached: false))
             .where((l) => l.startsWith('Đánh đứng bi:')),
         isEmpty);
   });

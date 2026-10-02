@@ -133,6 +133,7 @@ void main() {
           uncompensated: null,
           aimOffsetDeg: aimOffsetDeg,
           verticalOffset: 0,
+          stunReached: true,
           converged: true,
         );
 

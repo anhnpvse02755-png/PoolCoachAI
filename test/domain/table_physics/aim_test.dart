@@ -275,6 +275,30 @@ void main() {
           -stunMaxOffset * radius);
     });
 
+    test('chạm sàn đặt cơ mà vẫn còn xoáy trên: báo là không đứng được bi',
+        () {
+      final far = aim(straight(150), Stroke.stun, power: 30);
+      expect(far.verticalOffset, -stunMaxOffset * radius);
+      final s = solveAim(
+          cue: straight(150).cue,
+          object: straight(150).object,
+          pocket: straight(150).pocket,
+          stroke: Stroke.stun,
+          spin: const SideSpin.none(),
+          power: 30,
+          elevation: CueElevation.normal,
+          table: table,
+          compensate: true);
+      expect(topspinAtContact(s.aimed)!, greaterThan(stopSpin),
+          reason: 'bố cục phải là cú không đứng bi được');
+      expect(s.stunReached, isFalse);
+      expect(far.stunReached, isFalse);
+
+      expect(aim(straight(60), Stroke.stun, power: 30).stunReached, isTrue);
+      // Không đánh đứng bi thì không có gì để đạt.
+      expect(aim(straight(150), Stroke.draw, power: 30).stunReached, isTrue);
+    });
+
     test('bắn thẳng lực nhẹ và vừa: bi cái dừng trong 1 R quanh điểm chạm', () {
       // Từ 60 % trở lên bi cái còn trôi tới (1 − ballRestitution)/2 vận
       // tốc — xem "Deviations from spec" của plan.

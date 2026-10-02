@@ -52,6 +52,7 @@ List<String> simulatorInfoLines({
           Vi.simAimOffset(aimed.aimOffsetDeg),
         if (aimed != null &&
             stroke == Stroke.stun &&
+            aimed.stunReached &&
             aimed.verticalOffset.abs() >= stunOffsetShownTips * tipWidth)
           Vi.simStunOffset(aimed.verticalOffset),
         if (!spin.isNone)
