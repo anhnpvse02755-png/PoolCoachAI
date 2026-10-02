@@ -3,6 +3,11 @@ enum Stroke { stun, draw, follow }
 
 enum SpinSide { left, right }
 
+/// Hai mức độ dốc cơ: Thường và Dốc. Góc của từng mức là hằng số vật lý
+/// (`cueElevationNormal`, `cueElevationSteep` trong table_physics), để
+/// chủ sản phẩm chỉnh cùng chỗ với các hằng số khác.
+enum CueElevation { normal, steep }
+
 /// Bề rộng đầu cơ chuẩn, cm (giữa khoảng 12.2–12.8 mm).
 const tipWidth = 1.25;
 
