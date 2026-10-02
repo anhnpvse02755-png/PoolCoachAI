@@ -108,8 +108,9 @@ Plan: `docs/superpowers/plans/2026-10-02-poolcoachai-table-physics.md`.
 ### Owner's tuning at the eye check
 
 Constants changed: none. The owner said "tiếp tục" after seeing the
-screenshots. Plan deviations 1, 2, 3 and 9 accepted. The red uncompensated
-path stays drawn under the object path.
+screenshots, and that was read as acceptance of plan deviations 1, 2, 3 and
+9; it was not an explicit OK of each. The red uncompensated path stays drawn
+under the object path.
 
 ### Still open
 
