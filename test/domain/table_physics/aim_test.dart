@@ -106,6 +106,51 @@ void main() {
       }
     });
 
+    group('aimOffsetDeg là góc xoay thật, dương là về phía tâm bi mục tiêu',
+        () {
+      // Cắt 5°, cách 40 cm: hướng hình học lệch tâm bi mục tiêu chưa tới
+      // 1°, nên bù ném một độ là đủ vượt qua đường tâm sang phía bên kia.
+      final g = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 5);
+      AimSolution solve(SideSpin spin) => solveAim(
+          cue: g.cue,
+          object: g.object,
+          pocket: g.pocket,
+          stroke: Stroke.stun,
+          spin: spin,
+          power: 45,
+          elevation: CueElevation.normal,
+          table: table,
+          compensate: true);
+      Vec2 dir(double a) => Vec2(math.cos(a), math.sin(a));
+      double turnDeg(AimSolution s) =>
+          dir(s.geometric.aimAngle).signedAngleTo(dir(s.aimed.aimAngle)).abs() *
+          180 /
+          math.pi;
+      // Bên nào của đường tâm cái → bi mục tiêu.
+      double sideOf(double aim) => dir(aim).cross(g.object - g.cue).sign;
+
+      test('bù vượt qua đường tâm: đủ độ lớn, chiều dày hơn', () {
+        final s = solve(left1);
+        expect(sideOf(s.aimed.aimAngle), -sideOf(s.geometric.aimAngle),
+            reason: 'bố cục phải có cú bù vượt qua đường tâm');
+        expect(s.aimOffsetDeg, greaterThan(0));
+        expect(s.aimOffsetDeg, closeTo(turnDeg(s), 1e-9));
+      });
+
+      test('áp phê trái và phải cho hai chiều ngược nhau', () {
+        final left = solve(left1);
+        final right = solve(right1);
+        expect(right.aimOffsetDeg, lessThan(0));
+        expect(right.aimOffsetDeg.abs(), closeTo(turnDeg(right), 1e-9));
+        expect(left.aimOffsetDeg.sign, -right.aimOffsetDeg.sign);
+      });
+
+      test('AimedShot dùng đúng aimOffsetDeg của AimSolution', () {
+        final s = solve(left1);
+        expect(aim(g, Stroke.stun, spin: left1).aimOffsetDeg, s.aimOffsetDeg);
+      });
+    });
+
     test('tắt bù, có áp phê: bi mục tiêu lệch đúng chiều, đối xứng hai bên',
         () {
       // Bắn thẳng, 40 cm: áp phê phải làm bi cái lệch sang trái, chạm vào

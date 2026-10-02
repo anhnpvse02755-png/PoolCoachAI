@@ -108,6 +108,23 @@ void main() {
         contains(Vi.simAimOffset(a.aimOffsetDeg)));
   });
 
+  test('góc cắt hiện 0° có áp phê: không nói dày/mỏng', () {
+    final straight = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 0);
+    expect(straight.angle.round(), 0);
+    final a = aimShot(
+        cue: straight.cue,
+        object: straight.object,
+        pocket: straight.pocket,
+        stroke: Stroke.stun,
+        spin: right1,
+        power: 45);
+    expect(a.aimOffsetDeg.abs(), greaterThanOrEqualTo(aimOffsetShownDeg),
+        reason: 'cú thẳng có áp phê vẫn phải bù, đủ ngưỡng để dòng này hiện');
+    final out = lines(a: a, spin: right1, shot: Makeable(straight));
+    expect(out, contains(Vi.simAngleLine(straight.angle)));
+    expect(out.where((l) => l.startsWith('Ngắm')), isEmpty);
+  });
+
   test('dòng Đánh đứng bi chỉ hiện khi đặt cơ đủ xa tâm, và chỉ khi đứng bi',
       () {
     const deep = -stunOffsetShownTips * tipWidth * 2;

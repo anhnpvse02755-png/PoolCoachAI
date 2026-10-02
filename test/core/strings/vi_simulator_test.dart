@@ -150,6 +150,28 @@ void main() {
       expect(Vi.simBand(bandFor(7.4)), 'Dễ');
     });
 
+    test('góc cắt hiện 0°: không nói dày/mỏng, cũng không nói không cần bù',
+        () {
+      const straight = ShotGeometry(
+        cue: Vec2(80, 90),
+        object: Vec2(170, 50),
+        pocket: Pocket.topRight,
+        ghost: Vec2(165, 53),
+        objectDir: Vec2(1, 0),
+        tangentDir: Vec2(0, 1),
+        aimDir: Vec2(1, 0),
+        angle: 0.4,
+      );
+      for (final deg in [-1.2, 0.0, 1.2]) {
+        expect(
+            Vi.simSummary(const Makeable(straight), aimed(aimOffsetDeg: deg),
+                elevation: CueElevation.normal),
+            'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 0°, Dễ. Độ dốc cơ: '
+            'Thường.',
+            reason: '$deg°');
+      }
+    });
+
     test('không đánh được thì chỉ nói lý do', () {
       expect(Vi.simSummary(null, null, elevation: CueElevation.normal),
           'Bàn mô phỏng. Không lỗ nào đánh được từ vị trí này.');

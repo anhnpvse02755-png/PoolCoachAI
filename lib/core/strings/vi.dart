@@ -394,6 +394,11 @@ abstract final class Vi {
     return r == r.roundToDouble() ? '${r.round()}' : '$r';
   }
 
+  /// Góc cắt hiện trên màn là 0° thì cú gần như thẳng: không có phía dày
+  /// hay mỏng để nói, nên mọi câu ngắm dày/mỏng đều bỏ đi. Câu trái/phải
+  /// cho cú thẳng chờ chủ sản phẩm chọn từ.
+  static bool simSaysThickness(double cutAngle) => cutAngle.round() != 0;
+
   /// [deg] dương là dày hơn (spec mục 4.6), làm tròn 0.5°.
   static String simAimOffset(double deg) =>
       '${deg > 0 ? 'Ngắm dày hơn' : 'Ngắm mỏng hơn'} '
@@ -468,7 +473,7 @@ abstract final class Vi {
           '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
           '${simElevationLine(elevation)}.',
-          if (aimed != null)
+          if (aimed != null && simSaysThickness(geometry.angle))
             '${_aimSummary(aimed.aimOffsetDeg)}.',
           if (aimed != null && aimed.trace.cueRailCount > 0)
             simRailCount(aimed.trace.cueRailCount),

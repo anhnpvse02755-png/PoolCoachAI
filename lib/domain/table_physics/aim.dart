@@ -23,7 +23,7 @@ class AimedShot {
   /// Khi bù: cú ngắm thẳng vào Bi ảo hình học, để vẽ đường đỏ.
   final ShotTrace? uncompensated;
 
-  /// Hướng cơ đã bù trừ hướng tới Bi ảo hình học, độ; dương là dày hơn.
+  /// [AimSolution.aimOffsetDeg] của cú đã dò; 0 khi không bù.
   final double aimOffsetDeg;
 
   /// `b` đã dùng, cm (Đánh đứng bi: `b` dò được).
@@ -49,14 +49,18 @@ class AimSolution {
   final ShotInput geometric;
   final bool converged;
 
-  /// Dương là dày hơn: hướng cơ quay về phía tâm bi mục tiêu.
+  /// Góc xoay từ hướng tới Bi ảo hình học sang hướng đã bù, độ, trong
+  /// (−180°, 180°]. Dương là xoay về phía tâm bi mục tiêu (dày hơn).
+  ///
+  /// Lấy góc xoay thật chứ không lấy hiệu hai độ lệch tâm: cắt gần thẳng
+  /// mà bù vượt qua đường tâm thì hiệu đó sai cả độ lớn lẫn chiều. Góc cắt
+  /// đúng 0° thì không có phía dày/mỏng — màn hình không nói dòng này.
   double get aimOffsetDeg {
-    final toCenter = geometric.object - geometric.cue;
-    double offCenter(double aim) =>
-        Vec2(math.cos(aim), math.sin(aim)).signedAngleTo(toCenter).abs();
-    return (offCenter(geometric.aimAngle) - offCenter(aimed.aimAngle)) *
-        180 /
-        math.pi;
+    Vec2 dir(double a) => Vec2(math.cos(a), math.sin(a));
+    final from = dir(geometric.aimAngle);
+    final thicker =
+        from.cross(geometric.object - geometric.cue) >= 0 ? 1.0 : -1.0;
+    return thicker * from.signedAngleTo(dir(aimed.aimAngle)) * 180 / math.pi;
   }
 }
 

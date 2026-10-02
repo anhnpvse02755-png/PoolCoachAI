@@ -46,7 +46,9 @@ List<String> simulatorInfoLines({
         Vi.simPowerLine(power),
         Vi.simSpinLine(spin),
         Vi.simElevationLine(elevation),
-        if (aimed != null && aimed.aimOffsetDeg.abs() >= aimOffsetShownDeg)
+        if (aimed != null &&
+            Vi.simSaysThickness(geometry.angle) &&
+            aimed.aimOffsetDeg.abs() >= aimOffsetShownDeg)
           Vi.simAimOffset(aimed.aimOffsetDeg),
         if (aimed != null &&
             stroke == Stroke.stun &&
