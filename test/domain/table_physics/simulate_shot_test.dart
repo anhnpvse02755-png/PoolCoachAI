@@ -340,4 +340,23 @@ void main() {
     }
     expect(count, greaterThan(500));
   });
+
+  group('probeContact', () {
+    test('bi mục tiêu nằm sẵn trên băng, bị đánh vào băng: vẫn dò được chạm',
+        () {
+      final object = Vec2(table.maxX, 63.5);
+      final input = shot(const Vec2(180, 63.5), object);
+      final probe = probeContact(input);
+      final contact = simulateShot(input).contactCue;
+      expect(contact, isNotNull);
+      expect(probe, isNotNull);
+      expect(probe!.cueAtContact.pos, contact);
+    });
+
+    test('bi cái chạm băng trước khi tới bi mục tiêu: không phải cú chạm', () {
+      final input = shot(const Vec2(60, 63.5), const Vec2(200, 20),
+          toward: const Vec2(0, 63.5));
+      expect(probeContact(input), isNull);
+    });
+  });
 }

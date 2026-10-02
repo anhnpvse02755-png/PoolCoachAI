@@ -168,7 +168,9 @@ ShotTrace simulateShot(
 ContactProbe? probeContact(ShotInput input) {
   final run = _Run(input, record: false);
   run.go(untilContact: true);
-  return run.rails.isEmpty ? run.probe : null;
+  // Băng chạm sau va chạm (cùng bước 1 ms, vd bi mục tiêu nằm sát băng)
+  // không làm hỏng cú dò; chỉ băng chạm trước va chạm mới loại nó.
+  return run.rails.any((h) => !h.afterContact) ? null : run.probe;
 }
 
 /// Chỉ cần biết bi cái có rơi lỗ không: mô phỏng đủ nhưng không ghi
