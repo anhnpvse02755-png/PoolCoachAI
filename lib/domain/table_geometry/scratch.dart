@@ -1,7 +1,11 @@
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
+import 'dart:math' as math;
+
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/constants.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 /// Mức lực đầu tiên làm bi cái chết cái, và rơi lỗ nào.
 class ScratchRisk {
@@ -10,26 +14,73 @@ class ScratchRisk {
   final Pocket pocket;
 }
 
-/// Tăng lực từ [power] lên từng 1% tới 100%, trả mức đầu tiên chết cái.
+/// Lỗ bi cái rơi vào khi đánh [g] ở lực [power] với áp phê [spin] —
+/// đúng cú mà `aimShot` vẽ (cùng hướng bù ném, cùng `b`), nên
+/// `cuePocketAt(...) == aimShot(...).trace.cuePocket`.
+Pocket? cuePocketAt(
+  ShotGeometry g, {
+  required Stroke stroke,
+  required double power,
+  required SideSpin spin,
+  CueElevation elevation = CueElevation.normal,
+  TableSpec table = TableSpec.nineFoot,
+}) =>
+    simulateCuePocket(solveAim(
+      cue: g.cue,
+      object: g.object,
+      pocket: g.pocket,
+      stroke: stroke,
+      spin: spin,
+      power: power,
+      elevation: elevation,
+      table: table,
+      compensate: true,
+    ).aimed);
+
+/// Tra một lần mô phỏng: lỗ bi cái rơi vào ở áp phê và lực đã cho.
+typedef CuePocketLookup = Pocket? Function(SideSpin spin, double power);
+
+/// Mức lực đầu tiên từ [power] trở lên làm bi cái chết cái.
 ///
-/// Ngay [power] đã chết cái thì trả chính [power] (biên bằng 0). Không
-/// mức nào chết cái thì null. Chỉ xét **dư** lực: thiếu lực làm đường
-/// đi ngắn lại, hiếm khi chạm tới lỗ (spec mục 1, ngoài phạm vi).
+/// Dò thưa từng `overhitScanStep` % tới 100 %, gặp mức chết cái thì dò
+/// mịn từng 1 % trong khoảng vừa vượt qua: biên chết cái không đơn điệu
+/// theo lực (lực khác thì bi cái chạm băng ở chỗ khác), nên không chia
+/// đôi được. Ngay [power] đã chết cái thì trả chính [power]. Chỉ xét
+/// **dư** lực, như trước.
+ScratchRisk? marginWith(CuePocketLookup at, SideSpin spin, double power) {
+  final now = at(spin, power);
+  if (now != null) return ScratchRisk(power: power, pocket: now);
+  var below = power;
+  while (below < 100) {
+    final p = math.min(below + overhitScanStep, 100.0);
+    final pocket = at(spin, p);
+    if (pocket != null) {
+      for (var q = below + 1; q < p; q++) {
+        final fine = at(spin, q);
+        if (fine != null) return ScratchRisk(power: q, pocket: fine);
+      }
+      return ScratchRisk(power: p, pocket: pocket);
+    }
+    below = p;
+  }
+  return null;
+}
+
+/// [marginWith] trên mô phỏng thật (spec 2026-10-02 mục 4.7).
 ScratchRisk? scratchMargin(
   ShotGeometry g, {
   required Stroke stroke,
   required double power,
   SideSpin spin = const SideSpin.none(),
+  CueElevation elevation = CueElevation.normal,
   TableSpec table = TableSpec.nineFoot,
-}) {
-  for (var p = power; p <= 100; p += 1) {
-    final pocket =
-        simulateCueBall(g, stroke: stroke, power: p, spin: spin, table: table)
-            .scratch;
-    if (pocket != null) return ScratchRisk(power: p, pocket: pocket);
-  }
-  return null;
-}
+}) =>
+    marginWith(
+      (s, p) => cuePocketAt(g,
+          stroke: stroke, power: p, spin: s, elevation: elevation, table: table),
+      spin,
+      power,
+    );
 
 /// Biên lực dư cho cảnh báo chết cái — trùng `POWER_JITTER` của PRD.
 const overhitBand = 15.0;
@@ -161,24 +212,95 @@ SideSpin? _fewestTips(
   return best;
 }
 
+/// Kết quả của cả bảy mức áp phê, tra qua [at].
+Map<SideSpin, SpinOutcome> outcomesWith(CuePocketLookup at, double power) => {
+      for (final s in SideSpin.all)
+        s: () {
+          final risk = marginWith(at, s, power);
+          return SpinOutcome(
+            scratchAtPower:
+                risk != null && risk.power == power ? risk.pocket : null,
+            risk: risk,
+          );
+        }(),
+    };
+
 /// Mô phỏng đủ bảy mức áp phê rồi chọn lời khuyên.
 List<Advice> scratchAdvice(
   ShotGeometry g, {
   required Stroke stroke,
   required double power,
   required SideSpin spin,
+  CueElevation elevation = CueElevation.normal,
   TableSpec table = TableSpec.nineFoot,
 }) {
-  final outcomes = {
-    for (final s in SideSpin.all)
-      s: () {
-        final risk = scratchMargin(g,
-            stroke: stroke, power: power, spin: s, table: table);
-        return SpinOutcome(
-          scratchAtPower: risk != null && risk.power == power ? risk.pocket : null,
-          risk: risk,
-        );
-      }(),
-  };
-  return chooseAdvice(power: power, chosen: spin, outcomes: outcomes);
+  final job = ScratchAdviceJob(g,
+      stroke: stroke,
+      power: power,
+      spin: spin,
+      elevation: elevation,
+      table: table);
+  while (true) {
+    if (job.step() case final advice?) return advice;
+  }
+}
+
+/// [scratchAdvice] chia nhỏ: mỗi [step] chạy đúng một lần mô phỏng mới.
+///
+/// Gần trăm lần mô phỏng đầy đủ không xong trong một khung hình trên
+/// Chrome, nên màn hình gọi [step] từng chút giữa các khung hình và hiện
+/// "Đang tính…" trong lúc chờ (spec mục 5). Luật chọn lời khuyên vẫn
+/// chạy đúng một chỗ: mỗi [step] chạy lại từ đầu trên bộ nhớ đệm, gặp
+/// lần mô phỏng chưa có thì làm đúng lần đó rồi dừng.
+class ScratchAdviceJob {
+  ScratchAdviceJob(
+    this.g, {
+    required this.stroke,
+    required this.power,
+    required this.spin,
+    this.elevation = CueElevation.normal,
+    this.table = TableSpec.nineFoot,
+  });
+
+  final ShotGeometry g;
+  final Stroke stroke;
+  final double power;
+  final SideSpin spin;
+  final CueElevation elevation;
+  final TableSpec table;
+
+  final _cache = <(SideSpin, double), Pocket?>{};
+
+  /// Số lần mô phỏng đã chạy.
+  int get simulations => _cache.length;
+
+  /// Lời khuyên khi đã đủ dữ liệu; null khi vừa chạy thêm một lần.
+  List<Advice>? step() {
+    try {
+      return chooseAdvice(
+        power: power,
+        chosen: spin,
+        outcomes: outcomesWith(_lookup, power),
+      );
+    } on _Missing catch (m) {
+      _cache[m.key] = cuePocketAt(g,
+          stroke: stroke,
+          power: m.key.$2,
+          spin: m.key.$1,
+          elevation: elevation,
+          table: table);
+      return null;
+    }
+  }
+
+  Pocket? _lookup(SideSpin s, double p) {
+    final key = (s, p);
+    if (_cache.containsKey(key)) return _cache[key];
+    throw _Missing(key);
+  }
+}
+
+class _Missing implements Exception {
+  const _Missing(this.key);
+  final (SideSpin, double) key;
 }

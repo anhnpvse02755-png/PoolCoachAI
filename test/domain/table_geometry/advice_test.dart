@@ -1,8 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
+import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 
 import '../../support/table_layouts.dart';
 
@@ -138,63 +139,61 @@ void main() {
     });
   });
 
-  test('scratchAdvice nối đúng với mô phỏng thật', () {
-    // Đếm theo kiểu con để khẳng định cả bốn loại lời khuyên đều từng
-    // xuất hiện trên lưới thật — review finding 1: trước đây chỉ quét
-    // spin: none nên SpinCeiling không thể sinh ra (nó cần chosen.side
-    // khác null) và AddSpinToAvoid/NoSpinAvoids không có phép kiểm riêng.
-    final counts = <Type, int>{};
-    void bump(Advice a) =>
-        counts[a.runtimeType] = (counts[a.runtimeType] ?? 0) + 1;
+  /// Mô phỏng thật, mỗi (áp phê, lực) đúng một lần cho một cú đánh.
+  CuePocketLookup lookupFor(ShotGeometry g, Stroke stroke) {
+    final memo = <(SideSpin, double), Pocket?>{};
+    return (s, p) => memo.putIfAbsent(
+        (s, p), () => cuePocketAt(g, stroke: stroke, power: p, spin: s));
+  }
 
+  String describe(Advice a) => switch (a) {
+        AddSpinToAvoid(:final from, :final to, :final pocket) =>
+          'add $from→$to $pocket',
+        NoSpinAvoids(:final pocket) => 'none $pocket',
+        OverhitRisk(:final margin, :final fromPower, :final pocket, :final saferSpin) =>
+          'over $margin $fromPower $pocket $saferSpin',
+        SpinCeiling(:final side, :final maxSafeTips, :final pocket) =>
+          'ceiling $side $maxSafeTips $pocket',
+      };
+
+  test('lời khuyên trên lưới khớp mô phỏng thật, đủ cả bốn loại', () {
+    // Đếm theo kiểu con để khẳng định cả bốn loại lời khuyên đều từng
+    // xuất hiện trên lưới thật, nên nối dây của từng loại đều được kiểm.
+    final counts = <Type, int>{};
     final shots = gridShots().toList();
-    // Sải bước đủ thưa để quét thêm 7 mức áp phê vẫn chạy dưới ~60s;
-    // đo lại bằng `time` khi đổi tham số (xem task-7-report.md).
-    for (var i = 0; i < shots.length; i += 7) {
+    for (var i = 0; i < shots.length; i += 9) {
       final g = shots[i];
       for (final stroke in [Stroke.stun, Stroke.follow]) {
-        // Bỏ mức nhẹ nhất cho đỡ chậm: lực nhẹ hiếm khi tới lỗ.
-        for (final p in powerPresets.skip(1)) {
+        // Bỏ hai mức nhẹ nhất cho đỡ chậm: lực nhẹ hiếm khi tới lỗ.
+        for (final p in powerPresets.skip(2)) {
+          final at = lookupFor(g, stroke);
+          ScratchRisk? margin(SideSpin s) => marginWith(at, s, p);
+          final outcomes = outcomesWith(at, p);
           for (final chosen in SideSpin.all) {
-            for (final a in scratchAdvice(g,
-                stroke: stroke, power: p, spin: chosen)) {
-              bump(a);
+            for (final a
+                in chooseAdvice(power: p, chosen: chosen, outcomes: outcomes)) {
+              counts[a.runtimeType] = (counts[a.runtimeType] ?? 0) + 1;
+              final where = '${g.cue}→${g.object} $stroke $p $chosen';
               switch (a) {
                 case AddSpinToAvoid(:final from, :final to, :final pocket):
-                  expect(from, chosen);
-                  expect(
-                      simulateCueBall(g,
-                              stroke: stroke, power: p, spin: chosen)
-                          .scratch,
-                      pocket);
-                  expect(
-                      simulateCueBall(g, stroke: stroke, power: p, spin: to)
-                          .scratch,
-                      isNull);
-                  final toRisk =
-                      scratchMargin(g, stroke: stroke, power: p, spin: to);
+                  expect(from, chosen, reason: where);
+                  expect(at(chosen, p), pocket, reason: where);
+                  expect(at(to, p), isNull, reason: where);
+                  final toRisk = margin(to);
                   expect(toRisk == null || toRisk.power - p > overhitBand,
-                      isTrue);
+                      isTrue,
+                      reason: where);
 
                 case NoSpinAvoids(:final pocket):
-                  expect(
-                      simulateCueBall(g,
-                              stroke: stroke, power: p, spin: chosen)
-                          .scratch,
-                      pocket);
+                  expect(at(chosen, p), pocket, reason: where);
                   for (final s in SideSpin.all) {
                     if (s == chosen) continue;
-                    final scratchesNow = simulateCueBall(g,
-                            stroke: stroke, power: p, spin: s)
-                        .scratch !=
-                        null;
-                    final risk =
-                        scratchMargin(g, stroke: stroke, power: p, spin: s);
-                    final unsafe = scratchesNow ||
+                    final risk = margin(s);
+                    final unsafe = at(s, p) != null ||
                         (risk != null && risk.power - p <= overhitBand);
                     expect(unsafe, isTrue,
-                        reason:
-                            'NoSpinAvoids nghĩa là mọi mức khác đều không an toàn');
+                        reason: '$where: NoSpinAvoids nghĩa là mọi mức khác '
+                            'đều không an toàn');
                   }
 
                 case OverhitRisk(
@@ -203,23 +202,12 @@ void main() {
                     :final pocket,
                     :final saferSpin
                   ):
-                  expect(
-                      simulateCueBall(g,
-                              stroke: stroke, power: p, spin: chosen)
-                          .scratch,
-                      isNull);
-                  final risk =
-                      scratchMargin(g, stroke: stroke, power: p, spin: chosen);
-                  expect(risk, isNotNull);
-                  expect(risk!.power, fromPower);
-                  expect(risk.pocket, pocket);
-                  expect(margin, fromPower - p);
-                  expect(margin, lessThanOrEqualTo(overhitBand));
+                  expect(at(chosen, p), isNull, reason: where);
+                  expect(at(chosen, fromPower), pocket, reason: where);
+                  expect(margin, fromPower - p, reason: where);
+                  expect(margin, lessThanOrEqualTo(overhitBand), reason: where);
                   if (saferSpin != null) {
-                    expect(
-                        scratchMargin(g,
-                            stroke: stroke, power: p, spin: saferSpin),
-                        isNull);
+                    expect(marginWith(at, saferSpin, p), isNull, reason: where);
                   }
 
                 case SpinCeiling(
@@ -227,26 +215,18 @@ void main() {
                     :final maxSafeTips,
                     :final pocket
                   ):
-                  expect(side, chosen.side);
+                  expect(side, chosen.side, reason: where);
                   final sideLevels = SideSpin.all
                       .where((s) => s.side == side)
                       .toList()
                     ..sort((x, y) => x.tips.compareTo(y.tips));
                   final above =
                       sideLevels.where((s) => s.tips > maxSafeTips).toList();
-                  expect(above, isNotEmpty);
-                  expect(
-                      simulateCueBall(g,
-                              stroke: stroke, power: p, spin: above.first)
-                          .scratch,
-                      pocket);
+                  expect(above, isNotEmpty, reason: where);
+                  expect(at(above.first, p), pocket, reason: where);
                   for (final s in sideLevels) {
                     if (s.tips > chosen.tips && s.tips <= maxSafeTips) {
-                      expect(
-                          simulateCueBall(g,
-                                  stroke: stroke, power: p, spin: s)
-                              .scratch,
-                          isNull);
+                      expect(at(s, p), isNull, reason: where);
                     }
                   }
               }
@@ -261,5 +241,39 @@ void main() {
           reason:
               '$type phải xuất hiện ít nhất một lần trên lưới để nối dây được kiểm');
     }
+  });
+
+  test('scratchAdvice là luật chọn chạy trên mô phỏng thật', () {
+    final g = geometryFor(const Vec2(240, 14), Pocket.topRight, 0);
+    for (final chosen in [none, right1, left1]) {
+      final at = lookupFor(g, Stroke.follow);
+      expect(
+        scratchAdvice(g, stroke: Stroke.follow, power: 75, spin: chosen)
+            .map(describe),
+        chooseAdvice(
+                power: 75, chosen: chosen, outcomes: outcomesWith(at, 75))
+            .map(describe),
+      );
+    }
+  });
+
+  test('ScratchAdviceJob: mỗi bước đúng một lần mô phỏng, rồi ra lời khuyên',
+      () {
+    final g = geometryFor(const Vec2(240, 14), Pocket.topRight, 0);
+    final job = ScratchAdviceJob(g,
+        stroke: Stroke.follow, power: 60, spin: none);
+    List<Advice>? result;
+    var steps = 0;
+    while (result == null) {
+      result = job.step();
+      steps++;
+      if (result == null) expect(job.simulations, steps);
+    }
+    expect(job.simulations, steps - 1);
+    expect(
+      result.map(describe),
+      scratchAdvice(g, stroke: Stroke.follow, power: 60, spin: none)
+          .map(describe),
+    );
   });
 }

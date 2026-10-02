@@ -15,9 +15,9 @@ const tipWidth = 1.25;
 /// quá giới hạn thường gặp 0.5–0.6R.
 const miscueTips = 2.0;
 
-/// Ba mức lực trên màn — khớp `POWER_CANDIDATES` của Planner, để điều
+/// Năm mức lực trên màn — khớp `POWER_CANDIDATES` của Planner, để điều
 /// người chơi thấy ở đây đúng là điều Planner sẽ gợi ý.
-const powerPresets = <double>[40, 70, 95];
+const powerPresets = <double>[30, 45, 60, 75, 90];
 
 /// Áp phê, đo bằng số đầu cơ lệch từ tâm bi cái tới tâm đầu cơ.
 ///
