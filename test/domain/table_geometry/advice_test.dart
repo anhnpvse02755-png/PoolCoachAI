@@ -283,8 +283,10 @@ void main() {
     final g = geometryFor(const Vec2(240, 14), Pocket.topRight, 0);
     // Lực trên 80 % thì lõi quá giờ; áp phê phải 2 rơi lỗ ở mọi lực khác.
     Pocket? fake(SideSpin s, double p) {
-      if (p > 80) throw SimulationTimeout(ShotInput(
-          cue: g.cue, object: g.object, aimAngle: 0, power: p));
+      if (p > 80) {
+        throw SimulationTimeout(ShotInput(
+            cue: g.cue, object: g.object, aimAngle: 0, power: p));
+      }
       return s == right2 ? pocket : null;
     }
 

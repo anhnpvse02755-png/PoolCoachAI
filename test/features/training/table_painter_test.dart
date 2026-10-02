@@ -100,7 +100,7 @@ void main() {
       pocket: g.pocket,
       geometry: g,
     )).paint(spy, size);
-    final layout = TableLayout(size: size);
+    const layout = TableLayout(size: size);
     expect(spy.lines,
         contains((layout.toCanvas(g.cue), layout.toCanvas(g.ghost))));
     expect(spy.arcs.map((r) => r.center), contains(layout.toCanvas(g.ghost)));
@@ -109,7 +109,7 @@ void main() {
   test('chấm chạm băng chỉ cho bi cái sau va chạm, khớp dòng số lần chạm',
       () {
     final g = geometryFor(const Vec2(170, 70), Pocket.topRight, 30);
-    final table = TableSpec.nineFoot;
+    const table = TableSpec.nineFoot;
     RailHit hit(ShotBall ball, double y, {required bool after}) => RailHit(
         ball: ball,
         pos: Vec2(table.minX, y),
@@ -145,7 +145,7 @@ void main() {
       geometry: g,
       aimed: aimed,
     )).paint(spy, size);
-    final layout = TableLayout(size: size);
+    const layout = TableLayout(size: size);
     final dots = [
       for (final (c, color) in spy.circles)
         if (color.toARGB32() == AppColors.railHit.toARGB32()) c,

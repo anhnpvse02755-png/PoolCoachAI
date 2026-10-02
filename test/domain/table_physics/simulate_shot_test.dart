@@ -67,7 +67,7 @@ void main() {
     // lỗ, nên chỉ ma sát lăn hãm nó — lâu hơn maxSimTime nhiều. Không đổi
     // hằng số nào và không cần cửa riêng cho test.
     const long = TableSpec(length: 50000);
-    final rollSpeed = maxCueSpeed * 5 / 7;
+    const rollSpeed = maxCueSpeed * 5 / 7;
     expect(rollSpeed / (muRoll * gravity), greaterThan(2 * maxSimTime),
         reason: 'bi phải còn lăn khi hết maxSimTime');
     expect(rollSpeed * rollSpeed / (2 * muRoll * gravity),
