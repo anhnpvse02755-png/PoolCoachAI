@@ -1,0 +1,7 @@
+tags:
+  # Đo thời gian thật. Chạy cùng các file test khác thì CPU bị chia và
+  # trung vị đo được gấp ba (đo được 13.8 ms thay vì 3–5 ms), nên mặc
+  # định bỏ qua; chạy riêng bằng:
+  #   flutter test --tags perf --run-skipped
+  perf:
+    skip: "Đo hiệu năng: chạy riêng bằng flutter test --tags perf --run-skipped"
