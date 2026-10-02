@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/table_geometry/cue_ball_path.dart';
-import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
