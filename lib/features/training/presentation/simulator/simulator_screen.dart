@@ -252,6 +252,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       Makeable(:final geometry) => geometry,
       _ => null,
     };
+    final canToggle = geometry != null &&
+        SimulatorScreen.canShowUncompensated(geometry, _spin);
+    final showRed = canToggle && _showUncompensated;
+    // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
+    // khi nó thật sự được vẽ.
     final aimed = geometry == null
         ? null
         : aimShot(
@@ -263,10 +268,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             power: _power,
             elevation: _elevation,
             table: _table,
+            withUncompensated: showRed,
           );
-    final canToggle = geometry != null &&
-        SimulatorScreen.canShowUncompensated(geometry, _spin);
-    final showRed = canToggle && _showUncompensated;
     final scene = SimulatorScene(
       cue: _cue,
       object: _object,

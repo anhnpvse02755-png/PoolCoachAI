@@ -74,8 +74,7 @@ AimSolution solveAim({
 }) {
   final radius = table.radius;
   final pocketPos = table.pocketPosition(pocket);
-  final ghost =
-      object - (pocketPos - object).normalized * table.ballDiameter;
+  final ghost = object - (pocketPos - object).normalized * table.ballDiameter;
   final toGhost = ghost - cue;
   final aim0 = toGhost.isZero
       ? math.atan2(pocketPos.y - object.y, pocketPos.x - object.x)
@@ -105,7 +104,8 @@ AimSolution solveAim({
   // đó chỉ đúng vào Bi ảo hình học. Không có bước này, áp phê nhiều ở
   // xa làm cú dò đầu tiên trượt hẳn bi mục tiêu.
   input = input.copyWith(
-      aimAngle: aim0 + squirtAngle(sideOffsetOf(spin), radius));
+    aimAngle: aim0 + squirtAngle(sideOffsetOf(spin), radius),
+  );
   var converged = false;
   // Đánh đứng bi: `b` đổi xoáy nên đổi cả swerve, tức đổi hướng cần bù;
   // hướng bù đổi quãng đường nên đổi `b`. Dò xen kẽ hai vòng, kết thúc
@@ -124,6 +124,10 @@ AimSolution solveAim({
 }
 
 /// Dò bù ném và Đánh đứng bi, rồi mô phỏng đủ (spec mục 4.6).
+///
+/// [withUncompensated] false thì bỏ mô phỏng cú ngắm hình học (đường đỏ):
+/// mỗi khung kéo thả tiết kiệm một lần mô phỏng đủ, và màn hình chỉ cần
+/// nó khi đang vẽ đường đỏ. Cú đã bù (`trace`) không đổi.
 AimedShot aimShot({
   required Vec2 cue,
   required Vec2 object,
@@ -134,6 +138,7 @@ AimedShot aimShot({
   CueElevation elevation = CueElevation.normal,
   TableSpec table = TableSpec.nineFoot,
   bool compensate = true,
+  bool withUncompensated = true,
 }) {
   final s = solveAim(
     cue: cue,
@@ -148,7 +153,9 @@ AimedShot aimShot({
   );
   return AimedShot(
     trace: simulateShot(s.aimed),
-    uncompensated: compensate ? simulateShot(s.geometric) : null,
+    uncompensated: compensate && withUncompensated
+        ? simulateShot(s.geometric)
+        : null,
     aimOffsetDeg: compensate ? s.aimOffsetDeg : 0,
     verticalOffset: s.aimed.verticalOffset,
     converged: s.converged,
@@ -227,8 +234,9 @@ ShotInput _solveStun(ShotInput input) {
 
   final start = input.aimAngle;
   final toObject = input.object - input.cue;
-  final thicker =
-      Vec2(math.cos(start), math.sin(start)).cross(toObject) >= 0 ? 1.0 : -1.0;
+  final thicker = Vec2(math.cos(start), math.sin(start)).cross(toObject) >= 0
+      ? 1.0
+      : -1.0;
   var x0 = start;
   var e0 = error(x0);
   // Vẫn trượt (swerve, cắt rất mỏng): xoay dần về phía tâm bi mục tiêu

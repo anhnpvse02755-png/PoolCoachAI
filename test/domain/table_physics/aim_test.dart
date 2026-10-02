@@ -135,6 +135,24 @@ void main() {
       expect(off.converged, isTrue);
     });
 
+    test('bỏ đường đỏ: cùng cú đánh đã bù, chỉ không mô phỏng thêm', () {
+      final g = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 20);
+      final full = aim(g, Stroke.follow, spin: right1);
+      final lean = aimShot(
+          cue: g.cue,
+          object: g.object,
+          pocket: g.pocket,
+          stroke: Stroke.follow,
+          spin: right1,
+          power: 45,
+          withUncompensated: false);
+      expect(lean.uncompensated, isNull);
+      expect(lean.trace.objectPath, full.trace.objectPath);
+      expect(lean.trace.cueBefore, full.trace.cueBefore);
+      expect(lean.trace.cueAfter, full.trace.cueAfter);
+      expect(lean.aimOffsetDeg, full.aimOffsetDeg);
+    });
+
     test('cắt rất mỏng gần 85°: không lỗi, bi mục tiêu đi đúng đường lỗ', () {
       for (final cut in [80.0, 84.0, maxCutAngle]) {
         final g = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, cut);
