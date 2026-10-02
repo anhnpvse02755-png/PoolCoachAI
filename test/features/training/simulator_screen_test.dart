@@ -26,9 +26,10 @@ void main() {
     object: SimulatorScreen.initialObject,
   )!;
 
-  Future<void> openSimulator(WidgetTester tester) async {
-    // Đủ cao để cả bàn lẫn bảng thông tin nằm trong màn.
-    tester.view.physicalSize = const Size(1200, 1800);
+  Future<void> openSimulator(WidgetTester tester,
+      {Size size = const Size(1200, 1800)}) async {
+    // Mặc định đủ cao để cả bàn lẫn bảng thông tin nằm trong màn.
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -162,6 +163,48 @@ void main() {
       reason: 'phải có một dòng Lỗ: ... nghĩa là bestPocket tính ra lỗ thật, '
           'chứng tỏ hai bi đã được tách nhau chứ không còn chồng lên nhau',
     );
+  });
+
+  // Điện thoại ~390 px: bàn co lại còn ~1.3 px/cm, nên bán kính tính theo cm
+  // chỉ còn vài px — ngón tay phải có sàn bán kính trên màn.
+  group('điện thoại 390x844', () {
+    const phone = Size(390, 844);
+
+    testWidgets('kéo bi bắt đầu lệch tâm ~15 px vẫn bắt được bi',
+        (tester) async {
+      await openSimulator(tester, size: phone);
+
+      final centre = onTable(tester, SimulatorScreen.initialObject);
+      final from = centre + const Offset(15, 0);
+      const target = Vec2(170, 110);
+      await tester.dragFrom(from, onTable(tester, target) - from);
+      await tester.pumpAndSettle();
+
+      final expected =
+          bestPocket(cue: SimulatorScreen.initialCue, object: target)!;
+      expect(find.text(Vi.simAngleLine(expected.angle)), findsOneWidget);
+    });
+
+    testWidgets('chạm lệch tâm lỗ ~15 px vẫn chọn lỗ đó', (tester) async {
+      await openSimulator(tester, size: phone);
+
+      final centre =
+          onTable(tester, table.pocketPosition(Pocket.topMiddle));
+      await tester.tapAt(centre + const Offset(0, 15));
+      await tester.pumpAndSettle();
+
+      final expected = evaluateShot(
+        cue: SimulatorScreen.initialCue,
+        object: SimulatorScreen.initialObject,
+        pocket: Pocket.topMiddle,
+      );
+      switch (expected) {
+        case Makeable(:final geometry):
+          expect(find.text(Vi.simPocketLine(geometry.pocket)), findsOneWidget);
+        case Unmakeable(:final reason):
+          expect(find.text(Vi.simUnmakeable(reason)), findsOneWidget);
+      }
+    });
   });
 
   testWidgets('áp phê mà không chạm băng thì nói thẳng là không đổi đường đi',

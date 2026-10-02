@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -41,6 +43,11 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   /// Chạm trong bán kính này quanh điểm lỗ là chọn lỗ đó, cm.
   static const _pocketTapRadius = 10.0;
 
+  /// Sàn bán kính chạm trên màn, tính bằng px logic. Trên điện thoại bàn co
+  /// còn ~1.3 px/cm, nên bán kính tính theo cm chỉ còn vài px — nhỏ hơn
+  /// đầu ngón tay. Lấy lớn hơn giữa bán kính cm và sàn này.
+  static const _minTouchPx = 24.0;
+
   /// Lề quanh bàn — kích thước bàn tính trên phần còn lại sau lề này.
   static const _tablePadding = EdgeInsets.fromLTRB(16, 16, 16, 8);
 
@@ -65,7 +72,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onPanStart(DragStartDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
-    final grab = _table.radius * _grabRadii;
+    final grab = math.max(_table.radius * _grabRadii, _minTouchPx / layout.scale);
     final toCue = p.distanceTo(_cue);
     final toObject = p.distanceTo(_object);
     if (toCue > grab && toObject > grab) return;
@@ -102,8 +109,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onTapUp(TapUpDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
+    final reach = math.max(_pocketTapRadius, _minTouchPx / layout.scale);
     for (final pocket in Pocket.values) {
-      if (p.distanceTo(_table.pocketPosition(pocket)) <= _pocketTapRadius) {
+      if (p.distanceTo(_table.pocketPosition(pocket)) <= reach) {
         setState(() => _pocketOverride = pocket);
         return;
       }
