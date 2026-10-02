@@ -310,12 +310,8 @@ abstract final class Vi {
         Stroke.follow => 'Đánh cu lê',
       };
 
-  static String simPowerPreset(double power) => switch (power.round()) {
-        40 => 'Nhẹ 40%',
-        70 => 'Vừa 70%',
-        95 => 'Mạnh 95%',
-        final n => '$n%',
-      };
+  /// Năm mức lực đứng cạnh nhau: chỉ số phần trăm là đủ rõ.
+  static String simPowerPreset(double power) => '${power.round()}%';
 
   /// 0.5 → "0.5", 1 → "1": người chơi nói "lệch 1 đầu cơ", không "1.0".
   static String simTips(double tips) =>
@@ -380,6 +376,42 @@ abstract final class Vi {
       };
   static String simScratch(Pocket pocket) =>
       'Bi cái rơi lỗ ${simPocket(pocket)} (chết cái).';
+
+  // Lõi vật lý — docs/superpowers/specs/2026-10-02-poolcoachai-table-physics-design.md.
+  static const simElevationLabel = 'Độ dốc cơ';
+  static const simCompensateToggle = 'Xem nếu không bù ném';
+  static const simComputing = 'Đang tính…';
+  static const simObjectMissed = 'Bi mục tiêu không vào lỗ.';
+
+  static String simElevation(CueElevation elevation) => switch (elevation) {
+        CueElevation.normal => 'Thường',
+        CueElevation.steep => 'Dốc',
+      };
+
+  static String simElevationLine(CueElevation elevation) =>
+      'Độ dốc cơ: ${simElevation(elevation)}';
+
+  /// Làm tròn tới bội số gần nhất của [step], bỏ số 0 thừa: 1.0 → "1".
+  static String _rounded(double value, double step) {
+    final r = (value / step).round() * step;
+    return r == r.roundToDouble() ? '${r.round()}' : '$r';
+  }
+
+  /// [deg] dương là dày hơn (spec mục 4.6), làm tròn 0.5°.
+  static String simAimOffset(double deg) =>
+      '${deg > 0 ? 'Ngắm dày hơn' : 'Ngắm mỏng hơn'} '
+      '${_rounded(deg.abs(), 0.5)}°';
+
+  /// [offset] là `b`, cm (âm là dưới tâm), đổi ra đầu cơ, làm tròn 0.25.
+  static String simStunOffset(double offset) =>
+      'Đánh đứng bi: đặt cơ dưới tâm khoảng '
+      '${_rounded(offset.abs() / tipWidth, 0.25)} đầu cơ';
+
+  /// Góc lệch do áp phê, độ, làm tròn 0.5°.
+  static String simSquirt(double deg) =>
+      'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
+
+  static String simRailCount(int count) => 'Bi cái chạm băng $count lần.';
 
   static String simAdvice(Advice advice) => switch (advice) {
         AddSpinToAvoid(:final from, :final to, :final pocket) =>

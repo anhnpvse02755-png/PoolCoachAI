@@ -173,4 +173,43 @@ void main() {
       'Bi cái chết cái ở lỗ góc trên phải, áp phê không cứu được — đổi lực hoặc kiểu đánh.',
     );
   });
+
+  group('lõi vật lý', () {
+    test('thuật ngữ mới đã chốt với chủ sản phẩm', () {
+      expect(Vi.simElevationLabel, 'Độ dốc cơ');
+      expect(Vi.simElevation(CueElevation.normal), 'Thường');
+      expect(Vi.simElevation(CueElevation.steep), 'Dốc');
+      expect(Vi.simElevationLine(CueElevation.steep), 'Độ dốc cơ: Dốc');
+      expect(Vi.simCompensateToggle, 'Xem nếu không bù ném');
+      expect(Vi.simComputing, 'Đang tính…');
+      expect(Vi.simObjectMissed, 'Bi mục tiêu không vào lỗ.');
+    });
+
+    test('năm mức lực chỉ ghi phần trăm', () {
+      expect([for (final p in powerPresets) Vi.simPowerPreset(p)],
+          ['30%', '45%', '60%', '75%', '90%']);
+    });
+
+    test('ngắm dày/mỏng theo dấu, làm tròn 0.5°', () {
+      expect(Vi.simAimOffset(1.24), 'Ngắm dày hơn 1°');
+      expect(Vi.simAimOffset(1.26), 'Ngắm dày hơn 1.5°');
+      expect(Vi.simAimOffset(-0.6), 'Ngắm mỏng hơn 0.5°');
+      expect(Vi.simAimOffset(-2), 'Ngắm mỏng hơn 2°');
+    });
+
+    test('đặt cơ dưới tâm tính bằng đầu cơ, làm tròn 0.25', () {
+      expect(Vi.simStunOffset(-0.66),
+          'Đánh đứng bi: đặt cơ dưới tâm khoảng 0.5 đầu cơ');
+      expect(Vi.simStunOffset(-1.714),
+          'Đánh đứng bi: đặt cơ dưới tâm khoảng 1.25 đầu cơ');
+      expect(Vi.simStunOffset(-1.25),
+          'Đánh đứng bi: đặt cơ dưới tâm khoảng 1 đầu cơ');
+    });
+
+    test('lệch do áp phê và số lần chạm băng', () {
+      expect(Vi.simSquirt(1.55), 'Bi cái bị lệch do áp phê khoảng 1.5°');
+      expect(Vi.simSquirt(0.83), 'Bi cái bị lệch do áp phê khoảng 1°');
+      expect(Vi.simRailCount(3), 'Bi cái chạm băng 3 lần.');
+    });
+  });
 }
