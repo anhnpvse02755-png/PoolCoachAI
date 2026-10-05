@@ -394,16 +394,6 @@ abstract final class Vi {
     return r == r.roundToDouble() ? '${r.round()}' : '$r';
   }
 
-  /// Góc cắt hiện trên màn là 0° thì cú gần như thẳng: không có phía dày
-  /// hay mỏng để nói, nên mọi câu ngắm dày/mỏng đều bỏ đi. Câu trái/phải
-  /// cho cú thẳng chờ chủ sản phẩm chọn từ.
-  static bool simSaysThickness(double cutAngle) => cutAngle.round() != 0;
-
-  /// [deg] dương là dày hơn (spec mục 4.6), làm tròn 0.5°.
-  static String simAimOffset(double deg) =>
-      '${deg > 0 ? 'Ngắm dày hơn' : 'Ngắm mỏng hơn'} '
-      '${_rounded(deg.abs(), 0.5)}°';
-
   /// [offset] là `b`, cm (âm là dưới tâm), đổi ra đầu cơ, làm tròn 0.25.
   static String simStunOffset(double offset) =>
       'Đánh đứng bi: đặt cơ dưới tâm khoảng '
@@ -450,17 +440,12 @@ abstract final class Vi {
         'sang ${_spinAdvised(to)}.';
   }
 
-  static const simNoAimOffset = 'Không cần bù ném';
   static const simShowingUncompensated = 'Đang xem đường không bù ném.';
   static const simCannotSimulate =
       'Không mô phỏng được cú này — chỉ vẽ đường ngắm.';
 
-  /// Độ bù ném cho nhãn tóm tắt: làm tròn ra 0° thì nói là không cần.
-  static String _aimSummary(double deg) =>
-      _rounded(deg.abs(), 0.5) == '0' ? simNoAimOffset : simAimOffset(deg);
-
   /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây — nên
-  /// có đủ số lần chạm băng, độ bù ném và độ dốc cơ để phân biệt từng cảnh.
+  /// có đủ số lần chạm băng và độ dốc cơ để phân biệt từng cảnh.
   static String simSummary(
     ShotResult? shot,
     AimedShot? aimed, {
@@ -477,8 +462,6 @@ abstract final class Vi {
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
           '${simElevationLine(elevation)}.',
           if (cannotSimulate) simCannotSimulate,
-          if (aimed != null && simSaysThickness(geometry.angle))
-            '${_aimSummary(aimed.aimOffsetDeg)}.',
           if (aimed != null && aimed.trace.cueRailCount > 0)
             simRailCount(aimed.trace.cueRailCount),
           if (aimed?.trace.cuePocket != null) 'Chết cái.',

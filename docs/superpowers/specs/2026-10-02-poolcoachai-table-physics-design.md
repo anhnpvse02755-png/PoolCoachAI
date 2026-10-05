@@ -241,7 +241,7 @@ Giữ bố cục, cách kéo bi, chọn lỗ, vùng chạm tối thiểu 24 px v
 ### 6.3 Bảng thông tin
 
 - Góc cắt và mức độ khó: không đổi (vẫn tính theo hình học).
-- *"Ngắm dày hơn X°"* / *"Ngắm mỏng hơn X°"* khi `|aimOffsetDeg| ≥ 0.5`, làm tròn 0.5°.
+- ~~*"Ngắm dày hơn X°"* / *"Ngắm mỏng hơn X°"* khi `|aimOffsetDeg| ≥ 0.5`, làm tròn 0.5°.~~ (bỏ 2026-10-05: chủ sản phẩm — không đưa lời khuyên ngắm lệch theo độ; lời khuyên áp phê sẽ theo SAWS ở spec sau)
 - *"Đánh đứng bi: đặt cơ dưới tâm khoảng N đầu cơ"* khi kiểu đánh là Đánh đứng bi và `|b| ≥ 0.25 tipWidth`, làm tròn 0.25 đầu cơ.
 - *"Bi cái bị lệch do áp phê khoảng X°"* khi có áp phê, `X = α`, làm tròn 0.5°.
 - *"Bi cái chạm băng N lần."* — thông tin, không còn là cảnh báo.
@@ -312,7 +312,7 @@ Không đụng: luật 9/10-bi và 8-bi, bất biến `landingPos == cbFrom`, mi
 ### 8.3 Màn hình
 
 - Có nút Độ dốc cơ và 5 nút lực. Công tắc bù ném hiện/ẩn đường đỏ, và bị khoá khi không có ném.
-- Dòng *Ngắm dày/mỏng* đúng chiều với `aimOffsetDeg`. Dòng Đánh đứng bi chỉ hiện khi đủ ngưỡng.
+- ~~Dòng *Ngắm dày/mỏng* đúng chiều với `aimOffsetDeg`.~~ (bỏ 2026-10-05: chủ sản phẩm — không đưa lời khuyên ngắm lệch theo độ; lời khuyên áp phê sẽ theo SAWS ở spec sau) Dòng Đánh đứng bi chỉ hiện khi đủ ngưỡng.
 - Gợi ý chống chết cái hiện *Đang tính…* khi kéo và cập nhật khi thả tay.
 - Khổ 390 × 844: chạm và kéo lệch 15 px vẫn đúng (giữ test hiện có).
 - Không có chữ tiếng Việt trong `lib/features` (test kiến trúc hiện có).

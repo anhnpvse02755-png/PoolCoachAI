@@ -9,9 +9,6 @@ import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
 import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
 
-/// Bù ném nhỏ hơn mức này (độ) thì tay người không chỉnh được: không nói.
-const aimOffsetShownDeg = 0.5;
-
 /// Đặt cơ lệch tâm ít hơn mức này (đầu cơ) thì coi như đánh tâm: không nói.
 const stunOffsetShownTips = 0.25;
 
@@ -49,10 +46,6 @@ List<String> simulatorInfoLines({
         Vi.simSpinLine(spin),
         Vi.simElevationLine(elevation),
         if (cannotSimulate) Vi.simCannotSimulate,
-        if (aimed != null &&
-            Vi.simSaysThickness(geometry.angle) &&
-            aimed.aimOffsetDeg.abs() >= aimOffsetShownDeg)
-          Vi.simAimOffset(aimed.aimOffsetDeg),
         if (aimed != null &&
             stroke == Stroke.stun &&
             aimed.stunReached &&

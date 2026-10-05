@@ -137,40 +137,18 @@ void main() {
           converged: true,
         );
 
-    test('đủ góc cắt, độ dốc cơ và độ bù ném', () {
+    test('đủ góc cắt và độ dốc cơ, không có độ bù ném', () {
       expect(
           Vi.simSummary(const Makeable(g), aimed(),
               elevation: CueElevation.normal),
           'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
-          'Thường. Không cần bù ném.');
+          'Thường.');
       expect(
           Vi.simSummary(const Makeable(g), aimed(aimOffsetDeg: -1.2),
               elevation: CueElevation.steep),
           'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
-          'Dốc. Ngắm mỏng hơn 1°.');
+          'Dốc.');
       expect(Vi.simBand(bandFor(7.4)), 'Dễ');
-    });
-
-    test('góc cắt hiện 0°: không nói dày/mỏng, cũng không nói không cần bù',
-        () {
-      const straight = ShotGeometry(
-        cue: Vec2(80, 90),
-        object: Vec2(170, 50),
-        pocket: Pocket.topRight,
-        ghost: Vec2(165, 53),
-        objectDir: Vec2(1, 0),
-        tangentDir: Vec2(0, 1),
-        aimDir: Vec2(1, 0),
-        angle: 0.4,
-      );
-      for (final deg in [-1.2, 0.0, 1.2]) {
-        expect(
-            Vi.simSummary(const Makeable(straight), aimed(aimOffsetDeg: deg),
-                elevation: CueElevation.normal),
-            'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 0°, Dễ. Độ dốc cơ: '
-            'Thường.',
-            reason: '$deg°');
-      }
     });
 
     test('lõi không mô phỏng được: nói thẳng, không có số nào của lõi', () {
@@ -203,7 +181,7 @@ void main() {
               elevation: CueElevation.normal,
               showingUncompensated: true),
           'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
-          'Thường. Không cần bù ném. Bi cái chạm băng 2 lần. Chết cái. '
+          'Thường. Bi cái chạm băng 2 lần. Chết cái. '
           'Đang xem đường không bù ném.');
     });
   });
@@ -229,13 +207,6 @@ void main() {
     test('năm mức lực chỉ ghi phần trăm', () {
       expect([for (final p in powerPresets) Vi.simPowerPreset(p)],
           ['30%', '45%', '60%', '75%', '90%']);
-    });
-
-    test('ngắm dày/mỏng theo dấu, làm tròn 0.5°', () {
-      expect(Vi.simAimOffset(1.24), 'Ngắm dày hơn 1°');
-      expect(Vi.simAimOffset(1.26), 'Ngắm dày hơn 1.5°');
-      expect(Vi.simAimOffset(-0.6), 'Ngắm mỏng hơn 0.5°');
-      expect(Vi.simAimOffset(-2), 'Ngắm mỏng hơn 2°');
     });
 
     test('đặt cơ dưới tâm tính bằng đầu cơ, làm tròn 0.25', () {

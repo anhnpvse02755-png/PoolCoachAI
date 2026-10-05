@@ -94,37 +94,20 @@ void main() {
     ]);
   });
 
-  test('ngắm dày/mỏng đúng chiều, chỉ khi từ aimOffsetShownDeg trở lên', () {
-    expect(lines(a: fake(aimOffsetDeg: 1.2)), contains(Vi.simAimOffset(1.2)));
-    expect(Vi.simAimOffset(1.2), startsWith('Ngắm dày hơn'));
-    expect(lines(a: fake(aimOffsetDeg: -0.7)), contains(Vi.simAimOffset(-0.7)));
-    expect(Vi.simAimOffset(-0.7), startsWith('Ngắm mỏng hơn'));
-    final small = lines(a: fake(aimOffsetDeg: aimOffsetShownDeg * 0.9));
-    expect(small.where((l) => l.startsWith('Ngắm')), isEmpty);
-  });
-
-  test('cú thật có áp phê: dòng bù ném lấy đúng aimOffsetDeg của lõi', () {
+  test('không dòng nào, cũng không nhãn tóm tắt nào, khuyên ngắm lệch theo độ',
+      () {
     final a = aimed(Stroke.stun, spin: right1);
-    expect(a.aimOffsetDeg.abs(), greaterThanOrEqualTo(aimOffsetShownDeg));
-    expect(lines(a: a, spin: right1),
-        contains(Vi.simAimOffset(a.aimOffsetDeg)));
-  });
-
-  test('góc cắt hiện 0° có áp phê: không nói dày/mỏng', () {
-    final straight = geometryFor(const Vec2(150, 63.5), Pocket.bottomRight, 0);
-    expect(straight.angle.round(), 0);
-    final a = aimShot(
-        cue: straight.cue,
-        object: straight.object,
-        pocket: straight.pocket,
-        stroke: Stroke.stun,
-        spin: right1,
-        power: 45);
-    expect(a.aimOffsetDeg.abs(), greaterThanOrEqualTo(aimOffsetShownDeg),
-        reason: 'cú thẳng có áp phê vẫn phải bù, đủ ngưỡng để dòng này hiện');
-    final out = lines(a: a, spin: right1, shot: Makeable(straight));
-    expect(out, contains(Vi.simAngleLine(straight.angle)));
-    expect(out.where((l) => l.startsWith('Ngắm')), isEmpty);
+    expect(a.aimOffsetDeg.abs(), greaterThan(0.5),
+        reason: 'lõi vẫn tính bù ném; chỉ là không nói ra thành lời');
+    final out = lines(a: a, spin: right1);
+    final summary = Vi.simSummary(Makeable(g), a,
+        elevation: CueElevation.normal, showingUncompensated: true);
+    for (final text in [...out, summary]) {
+      expect(text, isNot(contains('Ngắm dày')));
+      expect(text, isNot(contains('Ngắm mỏng')));
+      expect(text, isNot(contains('Không cần bù ném')));
+    }
+    expect(summary, contains(Vi.simShowingUncompensated));
   });
 
   test('dòng Đánh đứng bi chỉ hiện khi đặt cơ đủ xa tâm, và chỉ khi đứng bi',

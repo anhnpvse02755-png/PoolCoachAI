@@ -351,19 +351,6 @@ void main() {
     expect(sceneOf(tester).showUncompensated, isFalse);
   });
 
-  testWidgets('dòng ngắm dày/mỏng đúng chiều với aimOffsetDeg của lõi',
-      (tester) async {
-    const spin = SideSpin(SpinSide.right, 1);
-    final expected = aimedFor(initial, spin: spin).aimOffsetDeg;
-    expect(expected.abs(), greaterThanOrEqualTo(aimOffsetShownDeg),
-        reason: 'bố cục mở màn có áp phê phải đủ bù để dòng này hiện');
-    await openSimulator(tester);
-
-    await tapText(tester, Vi.simSpinChip(spin));
-
-    expect(find.text(Vi.simAimOffset(expected)), findsOneWidget);
-  });
-
   testWidgets('dòng Đánh đứng bi chỉ hiện khi đánh đứng bi và đủ ngưỡng',
       (tester) async {
     final b = aimedFor(initial).verticalOffset;
