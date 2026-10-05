@@ -399,9 +399,16 @@ abstract final class Vi {
       'Đánh đứng bi: đặt cơ dưới tâm khoảng '
       '${_rounded(offset.abs() / tipWidth, 0.25)} đầu cơ';
 
-  /// Góc lệch do áp phê, độ, làm tròn 0.5°.
-  static String simSquirt(double deg) =>
-      'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
+  /// Góc lệch do áp phê, độ, làm tròn 0.5°. Có [shiftTips] và
+  /// [ballDenominator] (đã làm tròn ở `aimShiftUnits`) thì nói thêm điểm
+  /// ngắm phải dịch bao xa, bằng đầu cơ và phần con bi; thiếu thì thôi.
+  static String simSquirt(double deg,
+      [double? shiftTips, double? ballDenominator]) {
+    final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
+    if (shiftTips == null || ballDenominator == null) return base;
+    return '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} đầu cơ '
+        '≈ 1/${simTips(ballDenominator)} con bi).';
+  }
 
   static String simRailCount(int count) => 'Bi cái chạm băng $count lần.';
 

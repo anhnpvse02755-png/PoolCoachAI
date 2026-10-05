@@ -140,6 +140,50 @@ void main() {
         isEmpty);
   });
 
+  group('độ lệch điểm ngắm đổi ra đầu cơ và con bi', () {
+    test('đúng một đầu cơ thì phần con bi là đường kính chia đầu cơ', () {
+      final u = aimShiftUnits(tipWidth, table.ballDiameter)!;
+      expect(u.tips, 1);
+      expect(u.ballDenominator,
+          (table.ballDiameter / tipWidth * 2).round() / 2);
+    });
+
+    test('lệch bằng không, hay dưới nửa nấc 0.25 đầu cơ, thì không có số', () {
+      expect(aimShiftUnits(0, table.ballDiameter), isNull);
+      expect(aimShiftUnits(0.12 * tipWidth, table.ballDiameter), isNull);
+    });
+
+    test('làm tròn đầu cơ tới 0.25 và mẫu số con bi tới 0.5', () {
+      final u = aimShiftUnits(1.4 * tipWidth, table.ballDiameter)!;
+      expect(u.tips, 1.5);
+      final k = table.ballDiameter / (1.4 * tipWidth);
+      expect(u.ballDenominator, (k * 2).round() / 2);
+    });
+  });
+
+  test('áp phê thật: dòng kèm độ lệch điểm ngắm tính từ hướng cơ đã bù', () {
+    final a = aimed(Stroke.stun, spin: right1);
+    // Bi ảo thật gần như trùng bi ảo hình học (cú đã bù để vào lỗ), nên
+    // lượng phải dịch là độ xoay hướng cơ nhân quãng tới bi ảo.
+    final shift = g.cue.distanceTo(g.ghost) *
+        math.tan(a.aimOffsetDeg.abs() * math.pi / 180);
+    final u = aimShiftUnits(shift, table.ballDiameter)!;
+    final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
+    final line = lines(a: a, spin: right1)
+        .singleWhere((l) => l.startsWith('Bi cái bị lệch'));
+    expect(line, Vi.simSquirt(deg, u.tips, u.ballDenominator));
+    expect(line, contains('đầu cơ'));
+    expect(line, contains('con bi'));
+    // ignore: avoid_print
+    print('VÍ DỤ: $line');
+  });
+
+  test('lệch dưới nấc nhỏ nhất hoặc không có vết: dòng không có ngoặc', () {
+    final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
+    expect(lines(a: fake(), spin: right1), contains(Vi.simSquirt(deg)));
+    expect(lines(a: null, spin: right1), contains(Vi.simSquirt(deg)));
+  });
+
   test('số lần chạm băng, chết cái, bi mục tiêu không vào lỗ', () {
     final out = lines(
         a: fake(

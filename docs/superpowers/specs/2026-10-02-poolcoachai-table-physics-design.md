@@ -244,6 +244,7 @@ Giữ bố cục, cách kéo bi, chọn lỗ, vùng chạm tối thiểu 24 px v
 - ~~*"Ngắm dày hơn X°"* / *"Ngắm mỏng hơn X°"* khi `|aimOffsetDeg| ≥ 0.5`, làm tròn 0.5°.~~ (bỏ 2026-10-05: chủ sản phẩm — không đưa lời khuyên ngắm lệch theo độ; lời khuyên áp phê sẽ theo SAWS ở spec sau)
 - *"Đánh đứng bi: đặt cơ dưới tâm khoảng N đầu cơ"* khi kiểu đánh là Đánh đứng bi và `|b| ≥ 0.25 tipWidth`, làm tròn 0.25 đầu cơ.
 - *"Bi cái bị lệch do áp phê khoảng X°"* khi có áp phê, `X = α`, làm tròn 0.5°.
+  (thêm 2026-10-05, chủ sản phẩm: kèm độ lệch điểm ngắm bằng đầu cơ và phần con bi, tính từ độ xoay hướng cơ đã bù nhân quãng tới bi ảo hình học)
 - *"Bi cái chạm băng N lần."* — thông tin, không còn là cảnh báo.
 - *"Chết cái"* khi `cuePocket != null`.
 - *"Bi mục tiêu không vào lỗ"* khi `objectPocket` khác lỗ đã chọn (chỉ xảy ra khi dò không hội tụ).
