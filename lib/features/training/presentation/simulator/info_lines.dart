@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
+import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -66,7 +67,7 @@ List<String> simulatorInfoLines({
             aimed.stunReached &&
             aimed.verticalOffset.abs() >= stunOffsetShownTips * tipWidth)
           Vi.simStunOffset(aimed.verticalOffset),
-        if (!spin.isNone) _squirtLine(spin, aimed, geometry, table),
+        if (!spin.isNone) _squirtLine(spin, aimed, geometry, table, stroke, power),
         if (trace != null && trace.cueRailCount > 0)
           Vi.simRailCount(trace.cueRailCount),
         if (trace?.cuePocket case final pocket?) Vi.simScratch(pocket),
@@ -85,13 +86,23 @@ List<String> simulatorInfoLines({
 /// có vết (không mô phỏng được) thì chỉ nói góc; số độ của lệch ngắm không
 /// bao giờ nói ra, chỉ đổi thành đầu cơ.
 String _squirtLine(
-    SideSpin spin, AimedShot? aimed, ShotGeometry geometry, TableSpec table) {
+    SideSpin spin,
+    AimedShot? aimed,
+    ShotGeometry geometry,
+    TableSpec table,
+    Stroke stroke,
+    double power) {
   final deg = squirtAngle(sideOffsetOf(spin), table.radius) * 180 / math.pi;
+  final distance = geometry.cue.distanceTo(geometry.ghost);
   final units = aimed == null
       ? null
       : aimShiftUnits(
-          geometry.cue.distanceTo(geometry.ghost) *
-              math.tan(aimed.aimOffsetDeg.abs() * math.pi / 180),
+          distance * math.tan(aimed.aimOffsetDeg.abs() * math.pi / 180),
           table.ballDiameter);
-  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator);
+  // SAWS chỉ đi kèm khi có lượng dịch điểm ngắm để bù: cùng điều kiện với
+  // phần ngoặc, nên không có vết hay lệch bằng 0 thì không gợi ý.
+  final bhe = units == null
+      ? null
+      : sawsBhePercent(distance: distance, power: power, stroke: stroke);
+  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator, bhe);
 }

@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
+import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -171,7 +172,11 @@ void main() {
     final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
     final line = lines(a: a, spin: right1)
         .singleWhere((l) => l.startsWith('Bi cái bị lệch'));
-    expect(line, Vi.simSquirt(deg, u.tips, u.ballDenominator));
+    final bhe = sawsBhePercent(
+        distance: g.cue.distanceTo(g.ghost), power: 45, stroke: Stroke.stun);
+    expect(line, Vi.simSquirt(deg, u.tips, u.ballDenominator, bhe));
+    expect(line, contains('SAWS ($bhe% BHE / ${100 - bhe}% FHE)'));
+    expect(line, endsWith('để bù trừ áp phê'));
     expect(line, contains('đầu cơ'));
     expect(line, contains('con bi'));
     // ignore: avoid_print

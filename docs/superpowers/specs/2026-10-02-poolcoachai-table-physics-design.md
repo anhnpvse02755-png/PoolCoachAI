@@ -245,6 +245,7 @@ Giữ bố cục, cách kéo bi, chọn lỗ, vùng chạm tối thiểu 24 px v
 - *"Đánh đứng bi: đặt cơ dưới tâm khoảng N đầu cơ"* khi kiểu đánh là Đánh đứng bi và `|b| ≥ 0.25 tipWidth`, làm tròn 0.25 đầu cơ.
 - *"Bi cái bị lệch do áp phê khoảng X°"* khi có áp phê, `X = α`, làm tròn 0.5°.
   (thêm 2026-10-05, chủ sản phẩm: kèm độ lệch điểm ngắm bằng đầu cơ và phần con bi, tính từ độ xoay hướng cơ đã bù nhân quãng tới bi ảo hình học)
+  (thêm 2026-10-05, chủ sản phẩm: vế SAWS theo bảng BHE/FHE mặc định của chủ sản phẩm — lực 30 = chậm, 45–60 = vừa, 75–90 = nhanh; nội suy khoảng cách 30/90/180 cm, làm tròn 5%; trô +10% BHE, cu lê +10% FHE)
 - *"Bi cái chạm băng N lần."* — thông tin, không còn là cảnh báo.
 - *"Chết cái"* khi `cuePocket != null`.
 - *"Bi mục tiêu không vào lỗ"* khi `objectPocket` khác lỗ đã chọn (chỉ xảy ra khi dò không hội tụ).

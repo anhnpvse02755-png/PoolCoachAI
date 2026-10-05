@@ -402,12 +402,18 @@ abstract final class Vi {
   /// Góc lệch do áp phê, độ, làm tròn 0.5°. Có [shiftTips] và
   /// [ballDenominator] (đã làm tròn ở `aimShiftUnits`) thì nói thêm điểm
   /// ngắm phải dịch bao xa, bằng đầu cơ và phần con bi; thiếu thì thôi.
+  ///
+  /// Có thêm [bhePercent] thì câu kết bằng lựa chọn SAWS (FHE = phần còn
+  /// lại của 100) thay cho dấu chấm.
   static String simSquirt(double deg,
-      [double? shiftTips, double? ballDenominator]) {
+      [double? shiftTips, double? ballDenominator, int? bhePercent]) {
     final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
     if (shiftTips == null || ballDenominator == null) return base;
-    return '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} đầu cơ '
-        '≈ 1/${simTips(ballDenominator)} con bi).';
+    final shift = '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} '
+        'đầu cơ ≈ 1/${simTips(ballDenominator)} con bi)';
+    if (bhePercent == null) return '$shift.';
+    return '$shift → bạn có thể dùng SAWS ($bhePercent% BHE / '
+        '${100 - bhePercent}% FHE) hoặc ngắm lệch đi để bù trừ áp phê';
   }
 
   static String simRailCount(int count) => 'Bi cái chạm băng $count lần.';

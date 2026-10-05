@@ -123,3 +123,4 @@ under the object path.
 - áp phê aiming advice in SAWS form (BHE/FHE split by distance × speed) — next spec.
   The degree-based "Ngắm dày/mỏng hơn X°" line and the "Không cần bù ném"
   summary clause were removed on 2026-10-05 by owner ruling.
+- SAWS table per cue (calibration in cue management).

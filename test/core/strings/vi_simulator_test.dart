@@ -225,6 +225,8 @@ void main() {
           'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1 đầu cơ ≈ 1/4.5 con bi).');
       expect(Vi.simSquirt(1.55, 1.25, 9),
           'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1.25 đầu cơ ≈ 1/9 con bi).');
+      expect(Vi.simSquirt(1.55, 1.5, 3, 70),
+          'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1.5 đầu cơ ≈ 1/3 con bi) → bạn có thể dùng SAWS (70% BHE / 30% FHE) hoặc ngắm lệch đi để bù trừ áp phê');
       expect(Vi.simRailCount(3), 'Bi cái chạm băng 3 lần.');
     });
   });
