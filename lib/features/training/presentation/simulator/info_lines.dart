@@ -13,18 +13,35 @@ import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
 /// Đặt cơ lệch tâm ít hơn mức này (đầu cơ) thì coi như đánh tâm: không nói.
 const stunOffsetShownTips = 0.25;
 
-/// Độ lệch điểm ngắm, đổi ra đơn vị người chơi nhìn được.
-typedef AimShiftUnits = ({double tips, double ballDenominator});
+/// Độ lệch điểm ngắm, đổi ra đơn vị người chơi nhìn được. Đúng một trong
+/// [ballDenominator] ("1/k con bi") hoặc [ballCount] ("N con bi") có giá trị.
+typedef AimShiftUnits = ({
+  double tips,
+  double? ballDenominator,
+  double? ballCount,
+});
 
-/// Đổi độ lệch điểm ngắm [shiftCm] (cm) ra đầu cơ (làm tròn 0.25) và mẫu số
-/// phần con bi, "1/k con bi" (k làm tròn 0.5). Lệch dưới 0.125 đầu cơ thì
-/// làm tròn về 0: trả null, vì nói "lệch 0 đầu cơ" là vô nghĩa.
+/// Đổi độ lệch điểm ngắm [shiftCm] (cm) ra đầu cơ (làm tròn 0.25) và phần
+/// con bi. Mẫu số k tính từ số đầu cơ ĐÃ làm tròn (k làm tròn 0.5), để câu
+/// "1 đầu cơ ≈ 1/4.5 con bi" luôn khớp với số đầu cơ hiện ra. Lệch từ một
+/// con bi trở lên (k ≤ 1) thì nói "N con bi" (làm tròn 0.5) vì "1/1 con bi"
+/// vô nghĩa. Lệch dưới 0.125 đầu cơ làm tròn về 0: trả null.
 AimShiftUnits? aimShiftUnits(double shiftCm, double ballDiameter) {
   final tips = (shiftCm / tipWidth * 4).round() / 4;
   if (tips == 0) return null;
+  final k = (ballDiameter / (tips * tipWidth) * 2).round() / 2;
+  // So với k ĐÃ làm tròn: k thô 1.02 sẽ hiện "1/1 con bi", vô nghĩa.
+  if (k <= 1) {
+    return (
+      tips: tips,
+      ballDenominator: null,
+      ballCount: (tips * tipWidth / ballDiameter * 2).round() / 2,
+    );
+  }
   return (
     tips: tips,
-    ballDenominator: (ballDiameter / shiftCm * 2).round() / 2,
+    ballDenominator: k,
+    ballCount: null,
   );
 }
 
@@ -104,5 +121,6 @@ String _squirtLine(
   final bhe = units == null
       ? null
       : sawsBhePercent(distance: distance, power: power, stroke: stroke);
-  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator, bhe);
+  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator, bhe,
+      units?.ballCount);
 }

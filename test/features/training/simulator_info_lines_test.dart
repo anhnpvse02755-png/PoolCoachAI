@@ -145,8 +145,8 @@ void main() {
     test('đúng một đầu cơ thì phần con bi là đường kính chia đầu cơ', () {
       final u = aimShiftUnits(tipWidth, table.ballDiameter)!;
       expect(u.tips, 1);
-      expect(u.ballDenominator,
-          (table.ballDiameter / tipWidth * 2).round() / 2);
+      expect(u.ballDenominator, 4.5);
+      expect(u.ballCount, isNull);
     });
 
     test('lệch bằng không, hay dưới nửa nấc 0.25 đầu cơ, thì không có số', () {
@@ -157,8 +157,34 @@ void main() {
     test('làm tròn đầu cơ tới 0.25 và mẫu số con bi tới 0.5', () {
       final u = aimShiftUnits(1.4 * tipWidth, table.ballDiameter)!;
       expect(u.tips, 1.5);
-      final k = table.ballDiameter / (1.4 * tipWidth);
+      // Mẫu số tính từ 1.5 đầu cơ đã làm tròn, không từ 1.4 thô.
+      final k = table.ballDiameter / (1.5 * tipWidth);
       expect(u.ballDenominator, (k * 2).round() / 2);
+    });
+
+    test('mỗi nấc đầu cơ: mẫu số khớp số đầu cơ hiện ra', () {
+      for (final tips in [0.25, 0.5, 1.0, 2.0, 3.0]) {
+        // Cộng lệch nhỏ để chắc chắn số thô chưa phải nấc tròn.
+        final u = aimShiftUnits((tips + 0.05) * tipWidth, table.ballDiameter)!;
+        expect(u.tips, tips);
+        final k = table.ballDiameter / (tips * tipWidth);
+        if (k <= 1) {
+          expect(u.ballDenominator, isNull);
+        } else {
+          expect(u.ballDenominator, (k * 2).round() / 2);
+        }
+      }
+    });
+
+    test('lệch từ một con bi trở lên thì nói "N con bi", không phải 1/k', () {
+      final u = aimShiftUnits(table.ballDiameter, table.ballDiameter)!;
+      expect(u.ballDenominator, isNull);
+      expect(u.ballCount, 1);
+      final u2 = aimShiftUnits(1.5 * table.ballDiameter, table.ballDiameter)!;
+      expect(u2.ballDenominator, isNull);
+      expect(u2.ballCount, 1.5);
+      expect(Vi.simSquirt(1.5, u2.tips, null, null, u2.ballCount),
+          contains('≈ 1.5 con bi)'));
     });
   });
 
@@ -174,13 +200,12 @@ void main() {
         .singleWhere((l) => l.startsWith('Bi cái bị lệch'));
     final bhe = sawsBhePercent(
         distance: g.cue.distanceTo(g.ghost), power: 45, stroke: Stroke.stun);
-    expect(line, Vi.simSquirt(deg, u.tips, u.ballDenominator, bhe));
+    expect(line, Vi.simSquirt(
+        deg, u.tips, u.ballDenominator, bhe, u.ballCount));
     expect(line, contains('SAWS ($bhe% BHE / ${100 - bhe}% FHE)'));
-    expect(line, endsWith('để bù trừ áp phê'));
+    expect(line, endsWith('để bù trừ áp phê.'));
     expect(line, contains('đầu cơ'));
     expect(line, contains('con bi'));
-    // ignore: avoid_print
-    print('VÍ DỤ: $line');
   });
 
   test('lệch dưới nấc nhỏ nhất hoặc không có vết: dòng không có ngoặc', () {

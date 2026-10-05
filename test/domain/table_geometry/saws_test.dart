@@ -68,9 +68,25 @@ void main() {
     expect(at(1, 1, Stroke.draw), sawsBheTable[1][1] + sawsStrokeShift);
     expect(at(1, 1, Stroke.follow), sawsBheTable[1][1] - sawsStrokeShift);
     expect(at(0, 2, Stroke.draw), 100);
+    // (90 cm, Chậm) = 40, trừ 10 = 30.
     expect(
-        sawsBhePercent(
-            distance: 100, power: 30, stroke: Stroke.follow, ),
-        greaterThanOrEqualTo(0));
+        sawsBhePercent(distance: 90, power: 30, stroke: Stroke.follow), 30);
+  });
+
+  // Số liệu gốc của chủ sản phẩm, viết thẳng ra (không đọc từ bảng) để bảng
+  // sai hay bị chuyển chỗ ô là test đỏ.
+  test('giá trị bảng của chủ sản phẩm, viết cứng', () {
+    int at(double d, double p, [Stroke s = Stroke.stun]) =>
+        sawsBhePercent(distance: d, power: p, stroke: s);
+    expect(at(30, 30), 60);
+    expect(at(30, 90), 90);
+    expect(at(90, 45), 70);
+    expect(at(180, 90), 80);
+    expect(at(180, 30), 30);
+    expect(at(60, 45), 75);
+    expect(at(135, 30), 35);
+    expect(at(180, 30, Stroke.draw), 40);
+    expect(at(30, 30, Stroke.follow), 50);
+    expect(at(30, 90, Stroke.draw), 100);
   });
 }
