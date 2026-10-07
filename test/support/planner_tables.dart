@@ -1,3 +1,9 @@
+import 'package:poolcoachai/domain/planner/candidates.dart';
+import 'package:poolcoachai/domain/planner/scoring.dart';
+import 'package:poolcoachai/domain/planner/shot_options.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -152,3 +158,123 @@ TableSetup eightWithOpponentsTable() => const TableSetup(
         PlacedBall(number: 8, pos: Vec2(220, 100), role: BallRole.eight),
       ],
     );
+
+/// Ngữ cảnh chấm điểm cho bước đầu của [s], mô phỏng thật (không chia lát).
+ScoringContext contextFor(TableSetup s, {ShotLookup? lookup}) {
+  final finder = CandidateFinder(game: s.game, table: s.table);
+  final c = finder.easiest(s.cue, s.balls)!;
+  return ScoringContext(
+    geometry: c.geometry,
+    after: [for (final b in s.balls) if (b.number != c.ball.number) b],
+    lookup: lookup ?? directLookup(table: s.table),
+    next: finder,
+  );
+}
+
+/// aimShot thật, nhưng cú nào khớp [when] thì bi cái rơi vào đúng lỗ của
+/// cú đó — để ép Planner xuống từng tầng dự phòng mà vẫn chạy trên lõi thật.
+AimShotFn scratchingAim(
+        bool Function(Vec2 object, Stroke stroke, SideSpin spin, double power) when) =>
+    ({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) {
+      final real = aimShot(
+          cue: cue,
+          object: object,
+          pocket: pocket,
+          stroke: stroke,
+          spin: spin,
+          power: power,
+          elevation: elevation,
+          table: table,
+          compensate: compensate,
+          withUncompensated: withUncompensated);
+      if (!when(object, stroke, spin, power)) return real;
+      final t = real.trace;
+      return AimedShot(
+        trace: ShotTrace(
+          cueBefore: t.cueBefore,
+          cueAfter: t.cueAfter,
+          objectPath: t.objectPath,
+          contactCue: t.contactCue,
+          rails: t.rails,
+          cuePocket: pocket,
+          objectPocket: t.objectPocket,
+          cueEnd: t.cueEnd,
+        ),
+        uncompensated: real.uncompensated,
+        aimOffsetDeg: real.aimOffsetDeg,
+        verticalOffset: real.verticalOffset,
+        stunReached: real.stunReached,
+        converged: real.converged,
+      );
+    };
+
+/// aimShot thật, nhưng cú nào khớp [when] thì lõi "quá giờ".
+AimShotFn timeoutAim(
+        bool Function(Vec2 object, Stroke stroke, SideSpin spin, double power) when) =>
+    ({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) {
+      if (when(object, stroke, spin, power)) {
+        throw SimulationTimeout(
+            ShotInput(cue: cue, object: object, aimAngle: 0, power: power));
+      }
+      return aimShot(
+          cue: cue,
+          object: object,
+          pocket: pocket,
+          stroke: stroke,
+          spin: spin,
+          power: power,
+          elevation: elevation,
+          table: table,
+          compensate: compensate,
+          withUncompensated: withUncompensated);
+    };
+
+/// aimShot thật, ghi lại kiểu đánh, áp phê và lực của mọi lần gọi.
+AimShotFn recordingAim(void Function(Stroke stroke, SideSpin spin, double power) record) =>
+    ({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) {
+      record(stroke, spin, power);
+      return aimShot(
+          cue: cue,
+          object: object,
+          pocket: pocket,
+          stroke: stroke,
+          spin: spin,
+          power: power,
+          elevation: elevation,
+          table: table,
+          compensate: compensate,
+          withUncompensated: withUncompensated);
+    };
