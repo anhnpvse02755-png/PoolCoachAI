@@ -210,7 +210,7 @@ void main() {
     final offenders = [
       for (final file in files)
         if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
-          file.path.replaceAll(r'', '/'),
+          file.path.replaceAll(r'\', '/'),
     ];
 
     expect(files, isNotEmpty);
