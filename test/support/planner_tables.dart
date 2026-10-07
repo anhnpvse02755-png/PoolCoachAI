@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/shot_options.dart';
@@ -278,3 +279,26 @@ AimShotFn recordingAim(void Function(Stroke stroke, SideSpin spin, double power)
           compensate: compensate,
           withUncompensated: withUncompensated);
     };
+
+/// Mọi thứ của một kế hoạch mà người chơi thấy hoặc bước sau dựa vào, đủ
+/// chính xác để hai lần chạy chỉ trùng khi trùng thật.
+String fingerprint(List<PlanStep> steps) => [
+      for (final s in steps)
+        [
+          s.kind,
+          s.ballNum,
+          s.pocket,
+          s.stroke,
+          s.power,
+          s.spin,
+          s.cbFrom,
+          s.trace?.cueEnd,
+          s.trace?.cueRailCount,
+          s.score?.total,
+          s.jitterEnds,
+          s.tolerance,
+          s.missAdvice?.safer,
+          s.sawsBhePercent,
+          s.nextBallNum,
+        ].join('|'),
+    ].join('\n');
