@@ -6,7 +6,7 @@
 
 ## 1. Bối cảnh & mục tiêu
 
-Cut Angle Simulator (mục 4.3) hiện chỉ xử lý 1 cú đánh đơn lẻ. Tính năng này mở rộng thành **Run-out Planner**: nhập toàn bộ bố cục bàn, hệ thống tự lên kế hoạch đánh hết bi theo đúng luật của loại bàn đang chơi, kèm gợi ý cụ thể cho từng bước (lực, đầu cơ, vị trí bi cái nên dừng).
+Cut Angle Simulator (mục 4.3) hiện chỉ xử lý 1 cú đánh đơn lẻ. Tính năng này mở rộng thành **Kế hoạch dọn bàn** (Run-out Planner) *(sửa 2026-10-07: Kế hoạch dọn bàn)*: nhập toàn bộ bố cục bàn, hệ thống tự lên kế hoạch đánh hết bi theo đúng luật của loại bàn đang chơi, kèm gợi ý cụ thể cho từng bước (lực, đầu cơ, vị trí bi cái nên dừng).
 
 Mục tiêu là công cụ **huấn luyện tư duy vị trí (position play)**. Đường đi bi được mô phỏng theo vật lý (trượt rồi lăn, xoáy, nảy băng, ném), nhưng hằng số là ước lượng chỉnh bằng mắt, không đo trên bàn thật. Mọi gợi ý phải nêu rõ người chơi vẫn cần tự canh lực thực tế *(sửa 2026-10-02: mô phỏng vật lý)*.
 
@@ -15,7 +15,7 @@ Mục tiêu là công cụ **huấn luyện tư duy vị trí (position play)**.
 | Loại bàn | Ràng buộc thứ tự |
 |---|---|
 | 9-bi / 10-bi | **Bắt buộc** đánh đúng thứ tự số bi tăng dần (1→2→3→...). Không được chọn bi khác dễ hơn để đánh trước. |
-| 8-bi | Không ràng buộc thứ tự — ở mỗi bước, chọn trong tất cả bi còn lại cú đánh có góc cắt khả thi dễ nhất. |
+| 8-bi | Theo luật thật: người chơi chọn nhóm **Trơn** (1–7) hoặc **Sọc** (9–15). Ở mỗi bước, chọn trong các bi của mình cú đánh có góc cắt khả thi dễ nhất; bi đối thủ là bi chắn; **bi 8 luôn đánh cuối**, chỉ khi hết bi của mình. Khi còn đúng một bi của mình, bi kế tiếp là bi 8, nên bi áp chót được chấm theo độ dễ của cú bi 8 *(sửa 2026-10-07: Kế hoạch dọn bàn)* |
 
 Người chơi chọn loại bàn trước khi nhập bi; thuật toán tương ứng khác nhau (xem mục 5).
 
@@ -84,11 +84,18 @@ interface PlanStep {
   elevation: 'normal';              // độ dốc cơ — Planner luôn dùng Thường (5°) (sửa 2026-10-02)
   ghost: {x:number,y:number};
   aimOffsetDeg: number;             // ngắm dày(+)/mỏng(−) hơn bi ảo hình học để bù ném (sửa 2026-10-02)
+                                    // chỉ dùng bên trong, không bao giờ hiện lên màn (sửa 2026-10-07: Kế hoạch dọn bàn)
   trace: ShotTrace;                 // (sửa 2026-10-02: thay landingCurve)
   landingPos: {x:number,y:number} | null; // = trace.cueEnd; null chỉ khi hoàn toàn không tìm được phương án nào (edge case)
   nextBallHint: number | null;
   safety?: true;
   message?: string;                 // chỉ có khi safety = true
+  // (sửa 2026-10-07: Kế hoạch dọn bàn)
+  kind: 'normal' | 'fallback' | 'safety'; // fallback = Đánh đứng bi 30%, không có vị trí tốt; safety = phòng thủ, kế hoạch dừng
+  spin: { side: 'left' | 'right' | null; tips: 0 | 0.5 | 1 }; // áp phê, chỉ khác 0 khi phải dùng đường lui áp phê
+  sawsBhePercent: number | null;    // chỉ có khi dùng áp phê (bảng SAWS)
+  jitterEnds: { minus: {x:number,y:number} | null; plus: {x:number,y:number} | null }; // điểm dừng ở lực −15% / +15% (kẹp ≤ 100%)
+  tolerance: { good: number; fair: number; bad: number } | null; // 7 mức lực trong ±15%; null khi là bi cuối
 }
 ```
 
@@ -100,7 +107,7 @@ interface PlanStep {
 ### 5.1 Chọn bi + lỗ cho bước hiện tại (Priority 1 — Má bi)
 
 - **9-bi/10-bi**: bi hiện tại = bi có số nhỏ nhất còn lại trên bàn (cố định, không được đổi).
-- **8-bi**: bi hiện tại = bi có góc cắt khả thi dễ nhất trong TẤT CẢ bi còn lại (tìm kiếm toàn bộ tổ hợp bi × lỗ).
+- **8-bi**: bi hiện tại = bi có góc cắt khả thi dễ nhất trong các bi **của mình** còn lại (tìm kiếm toàn bộ tổ hợp bi × lỗ); bi đối thủ và bi 8 (khi chưa tới lượt) là bi chắn; hết bi của mình thì tới bi 8 *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
 
 Trong cả 2 trường hợp: với bi đã chọn, thử cả 6 lỗ, loại lỗ nào góc cắt > 85° hoặc đường bi cái→bi ảo hoặc bi→lỗ bị bi khác (còn trên bàn, kể cả bi chưa tới lượt trong chế độ 9/10-bi) chắn ngang. Chọn lỗ có góc cắt nhỏ nhất trong các lỗ hợp lệ. Nếu không lỗ nào hợp lệ → bước này là **safety** (dừng lập kế hoạch tại đây, không đoán tiếp vì kết quả cú safety không xác định trước được).
 
@@ -168,7 +175,14 @@ giữ lại tổ hợp có score thấp nhất
 
 **Vì sao đi thẳng-rồi-dội-băng không bị coi là khó:** `bankPenalty` (tối đa 7) nhỏ hơn nhiều so với `techPenalty` của trô (10), và nhỏ hơn cả cu lê (3) cộng dội 1 lần (2) = 5. Điều này đúng với thực tế: đánh tâm bi/cu lê cho bi tự chạy lên băng rồi bật ra vùng điều dễ canh lực hơn nhiều so với dùng trô để chủ động "bẻ" bi cái sang hướng khác — vì đi thẳng chỉ có 1 biến số (lực), còn dùng xoáy mạnh để đổi hướng có cả biến số lực lẫn biến số độ xoáy, sai số cộng dồn của 2 biến số luôn lớn hơn 1 biến số.
 
-Nếu KHÔNG tổ hợp nào hợp lệ (hiếm, toàn bộ bị chắn/nguy cơ chết cái) → dùng phương án dự phòng: `center`, lực 30% (ít chạy nhất, ít rủi ro nhất).
+Nếu KHÔNG tổ hợp nào hợp lệ, đi theo thứ tự dự phòng, tầng sau chỉ chạy khi tầng trước không còn phương án nào *(sửa 2026-10-07: Kế hoạch dọn bàn)*:
+
+1. Đứng / cu lê / trô × 5 mức lực (như trên).
+2. **Áp phê, chỉ như đường lui:** thử kiểu đánh × {trái, phải} × {½, 1 đầu cơ} × 5 mức lực (60 phương án), cùng điều kiện loại và cùng cách chấm. Phạt kỹ thuật cộng dồn: `techPenalty` của kiểu đánh + `sidePenalty` (½ đầu cơ = 15, 1 đầu cơ = 20), ví dụ trô + 1 đầu cơ = 10 + 20. Bước dùng áp phê kèm lời khuyên SAWS (tỉ lệ BHE/FHE), không bao giờ nói độ lệch ngắm theo độ.
+3. **Đánh đứng bi 30%** nếu cú đó vẫn đưa bi vào đúng lỗ, không chết cái, không đi qua bi chắn. Bỏ qua phần vị trí; màn báo *"Không có vị trí tốt cho bi sau."*; kế hoạch đi tiếp từ điểm dừng của cú đó.
+4. Cả cú đó cũng không được thì là bước **phòng thủ** và kế hoạch dừng.
+
+Bằng điểm thì giữ phương án thử trước (kiểu đánh theo thứ tự đứng, cu lê, trô; rồi lực tăng dần), để kết quả tất định.
 
 ### 5.4 Vòng lặp chính
 
@@ -179,7 +193,7 @@ lặp qua từng bi (theo 5.1):
   nếu không tìm được -> đẩy bước safety, DỪNG (không đoán tiếp)
   cand = chấm điểm theo 5.3, dùng nextBall/nextNextBall:
     - 9/10-bi: nextBall/nextNextBall = bi kế tiếp/kế-kế-tiếp theo đúng thứ tự số
-    - 8-bi: nextBall/nextNextBall = ước lượng bằng góc dễ nhất trong các bi còn lại (không phải tối ưu toàn cục)
+    - 8-bi: nextBall/nextNextBall = bi của mình có góc cắt dễ nhất từ điểm dừng (không phải tối ưu toàn cục); còn đúng một bi của mình thì bi kế tiếp là bi 8 (sửa 2026-10-07: Kế hoạch dọn bàn)
   đẩy PlanStep với cbFrom = cb (giá trị TRƯỚC khi cập nhật)
   cb = cand.trace.cueEnd   // bắt buộc: bước sau dùng ĐÚNG điểm này, không tính lại (sửa 2026-10-02)
 ```
@@ -209,6 +223,8 @@ Hiển thị cho người chơi: **"Nếu trượt, nên đánh dư [dày/mỏng
 
 ## 6. Yêu cầu UI
 
+Tên tính năng trên màn là **Kế hoạch dọn bàn**: tên thẻ trong Luyện tập (ngay dưới thẻ Mô phỏng góc cắt) và tiêu đề màn, đường dẫn `/training/planner` *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
+
 ### 6.1 Chọn loại bàn
 Toggle "9-bi / 10-bi" vs "8-bi" trước khi nhập bi. Đổi loại bàn thì xóa kế hoạch đã tính (nếu có), không đổi vị trí bi đã đặt.
 
@@ -226,7 +242,8 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 - Bi cái vẽ tại `plan[viewIndex].cbFrom`.
 
 ### 6.4 Điều hướng từng bước
-- Nút **"Đã đánh xong → Bi tiếp theo"**: `viewIndex++` (giới hạn không vượt quá số bước). Mô phỏng đúng trải nghiệm thực tế: người chơi đánh xong 1 bi ngoài đời rồi mới xem gợi ý cho bi kế tiếp.
+- Nút **"Đã đánh xong → Bi tiếp theo"**: hỏi *"Bi cái dừng đúng chỗ dự kiến?"*. **Đúng** thì `viewIndex++` (giới hạn không vượt quá số bước). **Đặt lại bi cái** thì bàn vào chế độ kéo bi cái; bấm *Tính lại từ đây* thì lập kế hoạch mới từ chỗ bi cái dừng thật, với các bi còn lại. Ở bước cuối nút đổi thành *Xong bàn*. Mô phỏng đúng trải nghiệm thực tế: người chơi đánh xong 1 bi ngoài đời rồi mới xem gợi ý cho bi kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
+- Tính từng bước: bước 1 hiện sau khoảng 1 giây, các bước sau tính tiếp trong nền với dòng *"Đang tính bước X/N…"*; nút *Đã đánh xong* ở bước cuối đã tính thì chờ bước kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
 - Nút **"← Quay lại"**: `viewIndex--` (giới hạn ≥ 0), phòng khi bấm nhầm.
 - Hiển thị "Bước X / N".
 - Panel thông tin bước hiện tại: tên bi, lỗ, góc cắt, lực, đầu cơ. Panel "XEM TRƯỚC" (viền đứt nét) cho bước kế tiếp với cùng thông tin nhưng nhạt hơn.
@@ -235,7 +252,7 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 - Đường bi cái tới bi mục tiêu (`trace.cueBefore`): nét đứt trắng *(sửa 2026-10-02: Planner không dùng áp phê nên đường này gần như thẳng tới bi ảo đã bù ném)*.
 - Đường bi cái sau va chạm: nét đứt màu ngọc (teal), vẽ đúng chuỗi điểm **`trace.cueAfter`** của mô phỏng — cong chỗ cong (đoạn trượt có xoáy), thẳng chỗ thẳng (đoạn lăn), qua các điểm chạm băng tới điểm dừng. Mỗi điểm trong `trace.rails` đánh dấu 1 chấm vàng nhỏ *(sửa 2026-10-02: mô phỏng vật lý)*.
 - **Không vẽ đường cong tự chế** — mọi chỗ cong trên màn phải là cong của mô phỏng vật lý, không vẽ thêm bằng công thức.
-- Khi `bankUsed = true`, hiển thị trong panel: *"Bi cái chạm băng N lần rồi tới vùng điều — mỗi lần chạm hao khoảng 15% lực, lực X% đã tính phần hao này."* (thông tin, không phải cảnh báo — dội băng không phải điều đáng ngại).
+- Khi `bankUsed = true`, hiển thị trong panel: *"Bi cái chạm băng N lần rồi tới vùng điều."* (bỏ vế "mỗi lần chạm hao khoảng 15% lực": lõi vật lý tính hao lực thật) *(sửa 2026-10-07: Kế hoạch dọn bàn)* (thông tin, không phải cảnh báo — dội băng không phải điều đáng ngại).
 - Khi `power ≥ 85%` hoặc `stroke = draw` (trô), hiển thị cảnh báo riêng: *"Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái hoặc sai số lớn hơn bình thường."*
 - Khi có bi kế tiếp, hiển thị gợi ý từ `missSafetyAdvice` (mục 5.5): *"Nếu trượt: nên đánh dư [dày/mỏng] một chút — bi sẽ khó cho đối thủ hơn."* Vẽ 2 điểm "nếu trượt" (dư dày/dư mỏng) lên bàn, tô đậm điểm ứng với hướng được khuyến nghị.
 
@@ -296,4 +313,4 @@ Luôn hiển thị: *"Lực và đầu cơ là gợi ý định hướng dựa t
 - *(sửa 2026-10-02: mô phỏng vật lý)* Bi thứ ba trở lên không tham gia va chạm trong mô phỏng — chỉ dùng để kiểm chắn đường trên `cueBefore`, `cueAfter`, `objectPath`. Không mô phỏng massé, bi nảy khỏi mặt bàn, hay bi va mép miệng lỗ.
 - Không tối ưu toàn cục (global optimization) cho toàn bộ trình tự bi trong chế độ 8-bi — chỉ dùng lookahead 2 bước (N+1, N+2), không giải toàn bộ bài toán tối ưu thứ tự.
 - `missSafetyAdvice` (mục 5.5) là gợi ý định tính, không mô phỏng quỹ đạo trượt thật (không tính bi mục tiêu nảy băng, không tính bi cái sau cú trượt) — nếu cần chính xác hơn, đây là hạng mục riêng cần bàn thêm.
-- Chưa đưa đầu cơ có áp phê (side-spin: 3h/9h, trô áp phê, cu lê áp phê — đã có ở Cut Angle Simulator 1 cú đánh) vào candidate set của Run-out Planner nhiều bi; nếu thêm, cần tăng `techPenalty` cho các biến thể này cao hơn cả trô, vì càng nhiều thông số xoáy càng nhiều sai số cộng dồn.
+- ~~Chưa đưa đầu cơ có áp phê vào candidate set~~ — áp phê nay **có** trong Planner, nhưng **chỉ như đường lui** khi không phương án đứng / cu lê / trô nào dùng được, với phạt cộng dồn cao hơn trô (xem §5.3) *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
