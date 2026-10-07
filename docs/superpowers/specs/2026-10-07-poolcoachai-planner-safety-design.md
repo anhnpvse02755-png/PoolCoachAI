@@ -1,7 +1,7 @@
 # PoolCoachAI — Thiết kế cú phòng thủ cho Kế hoạch dọn bàn, và nút Chờ khi mô phỏng quá giờ
 
 **Ngày:** 07/10/2026
-**Trạng thái:** đã duyệt hướng từng phần (5 phần), chờ duyệt bản viết
+**Trạng thái:** đã duyệt bản viết (07/10/2026), gồm cả 5 chỗ người viết tự điền: đui ở 8 bi khi mọi bi nhóm mình bị chắn; 1–3 băng chấm chung; chỉ bỏ đường chạm băng vào miệng lỗ; sát băng và khoảng cách tính với bi đối thủ dễ nhất; thứ tự giữ phương án thử trước
 **Tiền đề:** spec gốc `2026-10-07-poolcoachai-run-out-planner-design.md` đã xây xong trên nhánh `feat/run-out-planner` (bước 0–13, bước 14 đang ở vòng chủ sản phẩm xem bằng mắt). Spec gốc để "lập kế hoạch cho cú phòng thủ" **ngoài phạm vi**. Khi xem ảnh, chủ sản phẩm quyết định đưa phần này vào **ngay trên nhánh này, trước khi merge**.
 
 Spec này **bổ sung** spec gốc. Chỗ nào không nói lại thì giữ nguyên spec gốc.
