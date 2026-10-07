@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -15,6 +13,7 @@ import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/table_panel_layout.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
 
 enum _Ball { cue, object }
@@ -67,20 +66,8 @@ class SimulatorScreen extends StatefulWidget {
 class _SimulatorScreenState extends State<SimulatorScreen> {
   static const _table = TableSpec.nineFoot;
 
-  /// Chạm trong 1.5 bán kính quanh tâm bi là bắt được bi — ngón tay
-  /// không phải trúng từng milimét.
-  static const _grabRadii = 1.5;
-
   /// Chạm trong bán kính này quanh điểm lỗ là chọn lỗ đó, cm.
   static const _pocketTapRadius = 10.0;
-
-  /// Sàn bán kính chạm trên màn, tính bằng px logic. Trên điện thoại bàn co
-  /// còn ~1.3 px/cm, nên bán kính tính theo cm chỉ còn vài px — nhỏ hơn
-  /// đầu ngón tay. Lấy lớn hơn giữa bán kính cm và sàn này.
-  static const _minTouchPx = 24.0;
-
-  /// Lề quanh bàn — kích thước bàn tính trên phần còn lại sau lề này.
-  static const _tablePadding = EdgeInsets.fromLTRB(16, 16, 16, 8);
 
   Vec2 _cue = SimulatorScreen.initialCue;
   Vec2 _object = SimulatorScreen.initialObject;
@@ -194,7 +181,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onPanStart(DragStartDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
-    final grab = math.max(_table.radius * _grabRadii, _minTouchPx / layout.scale);
+    final grab = layout.ballGrab;
     final toCue = p.distanceTo(_cue);
     final toObject = p.distanceTo(_object);
     if (toCue > grab && toObject > grab) return;
@@ -232,7 +219,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onTapUp(TapUpDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
-    final reach = math.max(_pocketTapRadius, _minTouchPx / layout.scale);
+    final reach = layout.touchReach(_pocketTapRadius);
     for (final pocket in Pocket.values) {
       if (p.distanceTo(_table.pocketPosition(pocket)) <= reach) {
         _change(() => _pocketOverride = pocket);
@@ -298,91 +285,44 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
     return PcRootScaffold(
       title: Vi.simTitle,
-      // Bàn nằm ngoài vùng cuộn: kéo dọc trên bàn là kéo bi, không cuộn trang.
-      body: LayoutBuilder(
-        builder: (context, bodyConstraints) {
-          // Trên Chrome desktop, cửa sổ ngang hơn dọc: bàn cao theo chiều
-          // rộng mà không trần thì tràn RenderFlex và bảng điều khiển biến
-          // mất. Ghim chiều cao bàn theo cái nhỏ hơn giữa "vừa bề ngang" và
-          // "tối đa 55% chiều cao thân màn" — còn lại luôn dành cho bảng.
-          //
-          // Trần tính trên phần còn lại sau Padding của bàn: tính theo cả bề
-          // ngang thì SizedBox bị ép hẹp mà giữ chiều cao, bàn méo tỉ lệ.
-          final aspectRatio = TableLayout.aspectRatio(_table);
-          final availableWidth = (bodyConstraints.maxWidth -
-                  _tablePadding.horizontal)
-              .clamp(0.0, double.infinity);
-          final maxTableHeight = (bodyConstraints.maxHeight * 0.55 -
-                  _tablePadding.vertical)
-              .clamp(0.0, double.infinity);
-          final widthLimitedHeight = availableWidth / aspectRatio;
-          final tableHeight = widthLimitedHeight < maxTableHeight
-              ? widthLimitedHeight
-              : maxTableHeight;
-          final tableWidth = tableHeight * aspectRatio;
-
-          return Column(
-            children: [
-              Padding(
-                padding: _tablePadding,
-                child: Center(
-                  child: SizedBox(
-                    width: tableWidth,
-                    height: tableHeight,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final layout = TableLayout(
-                            size: constraints.biggest, table: _table);
-                        return Semantics(
-                          label: Vi.simSummary(shot, aimed,
-                              elevation: _elevation,
-                              showingUncompensated: showRed,
-                              cannotSimulate: cannotSimulate),
-                          child: GestureDetector(
-                            key: SimulatorScreen.tableKey,
-                            dragStartBehavior: DragStartBehavior.down,
-                            onPanStart: (d) => _onPanStart(d, layout),
-                            onPanUpdate: (d) => _onPanUpdate(d, layout),
-                            onPanEnd: (_) => _onPanEnd(),
-                            onPanCancel: _onPanEnd,
-                            onTapUp: (d) => _onTapUp(d, layout),
-                            child: CustomPaint(
-                              size: constraints.biggest,
-                              painter: TablePainter(scene),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: SimulatorPanel(
-                    shot: shot,
-                    aimed: aimed,
-                    cannotSimulate: cannotSimulate,
-                    advice: _advice,
-                    stroke: _stroke,
-                    power: _power,
-                    spin: _spin,
-                    elevation: _elevation,
-                    showUncompensated: _showUncompensated,
-                    onStroke: (v) => _change(() => _stroke = v),
-                    onPower: (v) => _change(() => _power = v),
-                    onSpin: (v) => _change(() => _spin = v),
-                    onElevation: (v) => _change(() => _elevation = v),
-                    onShowUncompensated: canToggle
-                        ? (v) => setState(() => _showUncompensated = v)
-                        : null,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      body: TablePanelLayout(
+        table: _table,
+        tableBuilder: (layout) => Semantics(
+          label: Vi.simSummary(shot, aimed,
+              elevation: _elevation,
+              showingUncompensated: showRed,
+              cannotSimulate: cannotSimulate),
+          child: GestureDetector(
+            key: SimulatorScreen.tableKey,
+            dragStartBehavior: DragStartBehavior.down,
+            onPanStart: (d) => _onPanStart(d, layout),
+            onPanUpdate: (d) => _onPanUpdate(d, layout),
+            onPanEnd: (_) => _onPanEnd(),
+            onPanCancel: _onPanEnd,
+            onTapUp: (d) => _onTapUp(d, layout),
+            child: CustomPaint(
+              size: layout.size,
+              painter: TablePainter(scene),
+            ),
+          ),
+        ),
+        panel: SimulatorPanel(
+          shot: shot,
+          aimed: aimed,
+          cannotSimulate: cannotSimulate,
+          advice: _advice,
+          stroke: _stroke,
+          power: _power,
+          spin: _spin,
+          elevation: _elevation,
+          showUncompensated: _showUncompensated,
+          onStroke: (v) => _change(() => _stroke = v),
+          onPower: (v) => _change(() => _power = v),
+          onSpin: (v) => _change(() => _spin = v),
+          onElevation: (v) => _change(() => _elevation = v),
+          onShowUncompensated:
+              canToggle ? (v) => setState(() => _showUncompensated = v) : null,
+        ),
       ),
     );
   }

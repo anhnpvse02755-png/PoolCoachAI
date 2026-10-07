@@ -26,6 +26,21 @@ class TableLayout {
   Offset toCanvas(Vec2 p) => Offset((p.x + frame) * scale, (p.y + frame) * scale);
 
   Vec2 toTable(Offset o) => Vec2(o.dx / scale - frame, o.dy / scale - frame);
+
+  /// Chạm trong 1.5 bán kính quanh tâm bi là bắt được bi — ngón tay
+  /// không phải trúng từng milimét.
+  static const grabRadii = 1.5;
+
+  /// Sàn bán kính chạm trên màn, tính bằng px logic. Trên điện thoại bàn co
+  /// còn ~1.3 px/cm, nên bán kính tính theo cm chỉ còn vài px — nhỏ hơn
+  /// đầu ngón tay. Lấy lớn hơn giữa bán kính cm và sàn này.
+  static const minTouchPx = 24.0;
+
+  /// Bán kính chạm theo cm: lớn hơn giữa [cm] và [minTouchPx] quy ra cm.
+  double touchReach(double cm) => math.max(cm, minTouchPx / scale);
+
+  /// Chạm cách tâm bi trong ngần này cm là bắt được bi.
+  double get ballGrab => touchReach(table.radius * grabRadii);
 }
 
 const pocketDrawRadius = 5.5; // cm
