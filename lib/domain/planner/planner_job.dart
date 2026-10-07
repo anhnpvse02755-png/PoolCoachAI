@@ -25,14 +25,7 @@ PlanStep planStep({
 }) {
   final candidate = finder.easiest(cue, remaining);
   if (candidate == null) {
-    // 9 / 10 bi: bi bắt buộc bị chắn ở mọi lỗ. 8 bi: không bi nào của mình
-    // đánh được — không có bi cụ thể bị ép (PRD §4).
-    return PlanStep.safety(
-      cbFrom: cue,
-      ballNum: game == GameType.eightBall
-          ? null
-          : legalTargetsAmong(game, remaining).firstOrNull?.number,
-    );
+    return _safetyStep(game, cue, remaining);
   }
   final g = candidate.geometry;
   final ctx = ScoringContext(
@@ -64,8 +57,18 @@ PlanStep planStep({
           ctx.hasNext ? finder.easiest(fallback.trace.cueEnd, ctx.after)?.ball.number : null,
     );
   }
-  return PlanStep.safety(cbFrom: cue, ballNum: candidate.ball.number);
+  return _safetyStep(game, cue, remaining);
 }
+
+/// Bước phòng thủ duy nhất của Planner. 9 / 10 bi: bi bắt buộc là bi bị
+/// ép đánh. 8 bi: không có bi cụ thể bị ép, nên không gắn số bi (PRD §4).
+PlanStep _safetyStep(GameType game, Vec2 cue, List<PlacedBall> remaining) =>
+    PlanStep.safety(
+      cbFrom: cue,
+      ballNum: game == GameType.eightBall
+          ? null
+          : legalTargetsAmong(game, remaining).firstOrNull?.number,
+    );
 
 PlanStep _chosenStep(ScoringContext ctx, Vec2 cue, Candidate candidate, ScoredOption best) {
   final key = best.key;

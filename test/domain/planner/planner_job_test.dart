@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
@@ -178,6 +179,19 @@ void main() {
       expect(steps, hasLength(1));
       expect(steps.single.kind, PlanStepKind.safety);
       expect(steps.single.ballNum, 1);
+    });
+
+    test('8 bi: có bi đánh được nhưng mọi cú hỏng thì phòng thủ không gắn số bi', () {
+      final setup = opponentBlocksTable();
+      final ball1 = setup.balls.first.pos;
+      final steps =
+          planToEnd(setup, aim: scratchingAim((object, _, _, _) => object == ball1));
+      expect(steps, hasLength(1));
+      final s = steps.single;
+      expect(s.kind, PlanStepKind.safety);
+      expect(s.ballNum, isNull);
+      expect(Vi.planSummary(s, index: 0, total: 1), contains(Vi.planSafety(null)));
+      expect(Vi.planSafety(s.ballNum), startsWith('Không bi nào có đường đánh rõ ràng'));
     });
 
     test('9 bi: bi bắt buộc bị chắn ở mọi lỗ thì phòng thủ ngay', () {
