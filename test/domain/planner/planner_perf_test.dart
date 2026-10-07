@@ -29,7 +29,6 @@ void main() {
     planToEnd(railTable());
     final job = PlannerJob(typicalNineBallTable());
     final micros = <int>[];
-    final total = Stopwatch()..start();
     while (!job.isDone) {
       final w = Stopwatch()..start();
       job.step();
