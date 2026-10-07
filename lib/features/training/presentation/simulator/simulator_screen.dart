@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
+import 'package:poolcoachai/domain/table_geometry/separate.dart';
 import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -56,27 +57,8 @@ class SimulatorScreen extends StatefulWidget {
   /// không cách nào tách được thì giữ [previous] — bi không nhảy.
   @visibleForTesting
   static Vec2 separate(Vec2 p, Vec2 other, Vec2 previous,
-      {TableSpec table = TableSpec.nineFoot}) {
-    final d = table.ballDiameter;
-    if ((p - other).length >= d) return p;
-    bool clear(Vec2 v) => v.distanceTo(other) >= d;
-
-    final gap = p - other;
-    final dir = gap.isZero ? const Vec2(1, 0) : gap.normalized;
-    final direct = table.clamp(other + dir * (d + 1e-6));
-    if (clear(direct)) return direct;
-
-    final sx = gap.x < 0 ? -1.0 : 1.0;
-    final sy = gap.y < 0 ? -1.0 : 1.0;
-    final slides = [
-      Vec2(sx, 0), Vec2(-sx, 0), Vec2(0, sy), Vec2(0, -sy), //
-    ];
-    for (final s in slides) {
-      final slid = table.clamp(other + s * (d + 1e-6));
-      if (clear(slid)) return slid;
-    }
-    return previous;
-  }
+          {TableSpec table = TableSpec.nineFoot}) =>
+      separateBalls(p, other, previous, table: table);
 
   @override
   State<SimulatorScreen> createState() => _SimulatorScreenState();

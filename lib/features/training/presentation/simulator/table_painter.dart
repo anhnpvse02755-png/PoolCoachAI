@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
@@ -7,29 +5,10 @@ import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/table_drawing.dart';
 
-/// Quy đổi giữa cm trên mặt bàn và pixel trên canvas.
-///
-/// Màn và test dùng chung lớp này, nên test chạm đúng chỗ màn vẽ.
-class TableLayout {
-  const TableLayout({required this.size, this.table = TableSpec.nineFoot});
-
-  /// Khung băng vẽ quanh mặt chơi, cm.
-  static const frame = 8.0;
-
-  static double aspectRatio(TableSpec table) =>
-      (table.length + 2 * frame) / (table.width + 2 * frame);
-
-  final Size size;
-  final TableSpec table;
-
-  double get scale => size.width / (table.length + 2 * frame);
-
-  Offset toCanvas(Vec2 p) =>
-      Offset((p.x + frame) * scale, (p.y + frame) * scale);
-
-  Vec2 toTable(Offset o) => Vec2(o.dx / scale - frame, o.dy / scale - frame);
-}
+export 'package:poolcoachai/features/training/presentation/simulator/table_drawing.dart'
+    show TableLayout;
 
 /// Mọi thứ cần vẽ của một khung hình — đã tính xong từ lõi.
 class SimulatorScene {
@@ -67,9 +46,6 @@ class TablePainter extends CustomPainter {
 
   final SimulatorScene scene;
 
-  static const _pocketDrawRadius = 5.5; // cm
-  static const _dash = 2.0; // cm
-  static const _gap = 1.5; // cm
   static const _railDot = 1.2; // cm
   static const _ghostDot = 0.8; // cm
 
@@ -85,48 +61,8 @@ class TablePainter extends CustomPainter {
     final aimed = scene.aimed;
     final trace = aimed?.trace;
 
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.tableRail);
-    canvas.drawRect(
-      Rect.fromPoints(
-        layout.toCanvas(Vec2.zero),
-        layout.toCanvas(Vec2(table.length, table.width)),
-      ),
-      Paint()..color = AppColors.tableFelt,
-    );
-
-    for (final pocket in Pocket.values) {
-      final c = layout.toCanvas(table.pocketPosition(pocket));
-      final r = _pocketDrawRadius * s;
-      canvas.drawCircle(
-        c,
-        r,
-        Paint()
-          ..color = trace?.cuePocket == pocket
-              ? AppColors.danger
-              : AppColors.bgDeep,
-      );
-      if (pocket == scene.pocket) {
-        canvas.drawCircle(
-          c,
-          r,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2
-            ..color = AppColors.accent,
-        );
-      }
-      if (pocket == scene.riskPocket) {
-        _dashedCircle(
-          canvas,
-          c,
-          r + 2 * s,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5
-            ..color = AppColors.warning,
-        );
-      }
-    }
+    drawTableBed(canvas, layout,
+        selected: scene.pocket, danger: trace?.cuePocket, risk: scene.riskPocket);
 
     final g = scene.geometry;
     // 1. Đường ngắm hình học (bi cái → Bi ảo hình học): vạch mờ. Vẽ cả
@@ -140,7 +76,7 @@ class TablePainter extends CustomPainter {
           ..strokeWidth = 1,
       );
       if (trace == null) {
-        _dashedCircle(
+        drawDashedCircle(
           canvas,
           layout.toCanvas(g.ghost),
           table.radius * s,
@@ -157,7 +93,7 @@ class TablePainter extends CustomPainter {
 
       // 2. Bi cái tới bi mục tiêu: nét đứt trắng — thấy bi cái bị lệch
       // do áp phê và swerve.
-      _dashedPolyline(
+      drawDashedPolyline(
         canvas,
         px(trace.cueBefore),
         Paint()
@@ -170,7 +106,7 @@ class TablePainter extends CustomPainter {
       // mờ chỗ hình học.
       final contact = trace.contactCue;
       if (contact != null) {
-        _dashedCircle(
+        drawDashedCircle(
           canvas,
           layout.toCanvas(contact),
           table.radius * s,
@@ -189,7 +125,7 @@ class TablePainter extends CustomPainter {
       // trước đường thật để không che nó.
       final red = aimed.uncompensated;
       if (scene.showUncompensated && red != null) {
-        _polyline(
+        drawPolyline(
           canvas,
           px(red.objectPath),
           Paint()
@@ -199,7 +135,7 @@ class TablePainter extends CustomPainter {
       }
 
       // 4. Bi mục tiêu: nét liền.
-      _polyline(
+      drawPolyline(
         canvas,
         px(trace.objectPath),
         Paint()
@@ -209,7 +145,7 @@ class TablePainter extends CustomPainter {
 
       // 5. Bi cái sau va chạm: nét đứt màu ngọc, đúng chuỗi điểm của
       // mô phỏng — chỗ cong là cong thật.
-      _dashedPolyline(
+      drawDashedPolyline(
         canvas,
         px(trace.cueAfter),
         Paint()
@@ -244,52 +180,6 @@ class TablePainter extends CustomPainter {
         Paint()..color = AppColors.ballObject);
     canvas.drawCircle(layout.toCanvas(scene.cue), table.radius * s,
         Paint()..color = AppColors.ballCue);
-  }
-
-  void _polyline(Canvas canvas, List<Offset> points, Paint paint) {
-    if (points.length < 2) return;
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final p in points.skip(1)) {
-      path.lineTo(p.dx, p.dy);
-    }
-    canvas.drawPath(path, paint..style = PaintingStyle.stroke);
-  }
-
-  void _dashedPolyline(
-      Canvas canvas, List<Offset> points, Paint paint, double scale) {
-    final dash = _dash * scale;
-    final gap = _gap * scale;
-    var drawing = true;
-    var left = dash;
-    for (var i = 0; i + 1 < points.length; i++) {
-      final start = points[i];
-      final delta = points[i + 1] - start;
-      final len = delta.distance;
-      if (len == 0) continue;
-      final dir = delta / len;
-      var at = 0.0;
-      while (at < len) {
-        final step = math.min(left, len - at);
-        if (drawing) {
-          canvas.drawLine(start + dir * at, start + dir * (at + step), paint);
-        }
-        at += step;
-        left -= step;
-        if (left <= 0) {
-          drawing = !drawing;
-          left = drawing ? dash : gap;
-        }
-      }
-    }
-  }
-
-  void _dashedCircle(Canvas canvas, Offset center, double radius, Paint paint) {
-    const parts = 16;
-    const sweep = 2 * math.pi / parts;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    for (var i = 0; i < parts; i += 2) {
-      canvas.drawArc(rect, i * sweep, sweep, false, paint);
-    }
   }
 
   @override
