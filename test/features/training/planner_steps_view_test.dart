@@ -17,12 +17,30 @@ import 'package:poolcoachai/features/training/presentation/simulator/table_drawi
 
 import '../../support/planner_tables.dart';
 
-/// Canvas ghi lại các nét thẳng kèm Paint; mọi lệnh vẽ khác bỏ qua.
+/// Canvas ghi lại các nét thẳng kèm Paint, và độ mờ của lớp đang vẽ mỗi
+/// hình tròn; mọi lệnh vẽ khác bỏ qua.
 class _SpyCanvas implements Canvas {
   final lines = <Paint>[];
+  final _layers = <double>[];
+
+  /// Tâm mỗi hình tròn kèm độ mờ của lớp bọc nó (1 khi không có lớp).
+  final circles = <(Offset, double)>[];
 
   @override
   void drawLine(Offset p1, Offset p2, Paint paint) => lines.add(paint);
+
+  @override
+  void saveLayer(Rect? bounds, Paint paint) => _layers.add(paint.color.a);
+
+  @override
+  void save() => _layers.add(1);
+
+  @override
+  void restore() => _layers.removeLast();
+
+  @override
+  void drawCircle(Offset c, double radius, Paint paint) =>
+      circles.add((c, _layers.fold(1.0, (a, b) => a * b)));
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -129,6 +147,61 @@ void main() {
     expect(sceneOf(tester).zone.length, lessThan(whole.length));
     await tester.pumpAndSettle();
     expect(flat(sceneOf(tester).zone), flat(whole));
+  });
+
+  testWidgets('các bi khác còn trên bàn vẽ mờ: không phải 3 bi đang xem, không phải bi đã vào',
+      (tester) async {
+    final setup = typicalNineBallTable();
+    final steps = planToEnd(setup);
+    List<int> ghostsAt(int view) {
+      final gone = {for (final s in steps.take(view)) s.ballNum};
+      final shown = {for (final s in steps.skip(view).take(3)) s.ballNum};
+      return [
+        for (final b in setup.balls)
+          if (!gone.contains(b.number) && !shown.contains(b.number)) b.number,
+      ];
+    }
+
+    await open(tester, setup);
+    await tester.pumpAndSettle();
+    var scene = sceneOf(tester);
+    expect(scene.balls.map((b) => b.number), steps.take(3).map((s) => s.ballNum));
+    expect(ghostsAt(0), isNotEmpty);
+    expect(scene.ghosts.map((b) => b.number), ghostsAt(0));
+
+    await tester.tap(find.byKey(PlannerStepsView.shotDoneKey));
+    await tester.pumpAndSettle();
+    await tapText(tester, Vi.planYes);
+    scene = sceneOf(tester);
+    expect(scene.ghosts.map((b) => b.number), ghostsAt(1));
+    expect(scene.ghosts.map((b) => b.number), isNot(contains(steps.first.ballNum)));
+  });
+
+  testWidgets('bàn phòng thủ: các bi chắn vẫn thấy, vẽ mờ', (tester) async {
+    final setup = blockedEverywhereTable();
+    await open(tester, setup);
+    await tester.pumpAndSettle();
+    final scene = sceneOf(tester);
+    expect(scene.balls.map((b) => b.number), [1]);
+    expect(scene.ghosts.map((b) => b.number), setup.balls.skip(1).map((b) => b.number));
+  });
+
+  test('painter vẽ bi mờ trong một lớp nhạt, bi đang xem thì rõ', () {
+    final setup = typicalNineBallTable();
+    const size = Size(540, 286);
+    const layout = TableLayout(size: size);
+    final canvas = _SpyCanvas();
+    PlannerPainter(PlannerScene(
+      cue: setup.cue,
+      balls: setup.balls.take(1).toList(),
+      ghosts: setup.balls.skip(1).toList(),
+    )).paint(canvas, size);
+    double alphaAt(Vec2 p) =>
+        canvas.circles.lastWhere((c) => (c.$1 - layout.toCanvas(p)).distance < 1e-6).$2;
+    expect(alphaAt(setup.balls.first.pos), 1);
+    for (final b in setup.balls.skip(1)) {
+      expect(alphaAt(b.pos), lessThanOrEqualTo(0.3));
+    }
   });
 
   testWidgets('Quay lại không xuống dưới bước 1; Đã đánh xong → Đúng thì sang bước sau',

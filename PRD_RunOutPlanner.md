@@ -240,6 +240,7 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 - Chỉ vẽ các bi xuất hiện trong `plan[viewIndex..viewIndex+2]` (tối đa 3 bi liên quan tới bước hiện tại + 2 bước kế tiếp).
 - Vẽ đường đánh của `plan[viewIndex]` rõ nét (alpha = 1) và `plan[viewIndex+1]` mờ hơn để xem trước (alpha ~0.45).
 - Bi cái vẽ tại `plan[viewIndex].cbFrom`.
+- Các bi khác còn trên bàn (chưa vào lỗ tính tới bước đang xem — gồm bi chắn và bi đối thủ) vẫn vẽ, nhưng rất mờ như bóng bi, dưới mọi đường đánh: người chơi thấy được bi nào chắn đường mà bàn không rối *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
 
 ### 6.4 Điều hướng từng bước
 - Nút **"Đã đánh xong → Bi tiếp theo"**: hỏi *"Bi cái dừng đúng chỗ dự kiến?"*. **Đúng** thì `viewIndex++` (giới hạn không vượt quá số bước). **Đặt lại bi cái** thì bàn vào chế độ kéo bi cái; bấm *Tính lại từ đây* thì lập kế hoạch mới từ chỗ bi cái dừng thật, với các bi còn lại. Ở bước cuối nút đổi thành *Xong bàn*, bấm vào thì quay về Luyện tập (sửa 2026-10-07: Kế hoạch dọn bàn). Mô phỏng đúng trải nghiệm thực tế: người chơi đánh xong 1 bi ngoài đời rồi mới xem gợi ý cho bi kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.

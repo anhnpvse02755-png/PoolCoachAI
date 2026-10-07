@@ -15,6 +15,7 @@ class PlannerScene {
   const PlannerScene({
     this.cue,
     this.balls = const [],
+    this.ghosts = const [],
     this.step,
     this.preview,
     this.zone = const [],
@@ -23,6 +24,10 @@ class PlannerScene {
   /// null khi chưa đặt bi cái (màn nhập bàn).
   final Vec2? cue;
   final List<PlacedBall> balls;
+
+  /// Các bi khác còn trên bàn: vẽ rất mờ, để thấy bi chắn và bi đối thủ
+  /// mà bàn không rối (PRD §6.3).
+  final List<PlacedBall> ghosts;
 
   /// Bước đang xem: vẽ đủ lớp.
   final PlanStep? step;
@@ -40,6 +45,7 @@ class PlannerPainter extends CustomPainter {
   final PlannerScene scene;
 
   static const _previewAlpha = 0.45;
+  static const _ghostAlpha = 0.25;
   static const _zoneAlpha = 0.22;
   static const _railDot = 1.2; // cm
   static const _missDot = 1.4; // cm
@@ -63,11 +69,22 @@ class PlannerPainter extends CustomPainter {
       );
     }
 
+    final r = layout.table.radius * s;
+
+    // Bi mờ dưới mọi đường: một lớp nhạt cho cả nhóm, không che đường đánh.
+    if (scene.ghosts.isNotEmpty) {
+      canvas.saveLayer(
+          null, Paint()..color = const Color(0xFF000000).withValues(alpha: _ghostAlpha));
+      for (final b in scene.ghosts) {
+        drawPoolBall(canvas, layout.toCanvas(b.pos), r, b.number);
+      }
+      canvas.restore();
+    }
+
     final preview = scene.preview;
     if (preview != null) _shot(canvas, layout, preview, alpha: _previewAlpha, full: false);
     if (step != null) _shot(canvas, layout, step, alpha: 1, full: true);
 
-    final r = layout.table.radius * s;
     for (final b in scene.balls) {
       drawPoolBall(canvas, layout.toCanvas(b.pos), r, b.number);
     }

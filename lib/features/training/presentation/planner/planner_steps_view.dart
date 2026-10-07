@@ -181,12 +181,15 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
     if (reset != null) return PlannerScene(cue: reset, balls: _ballsBefore(_view + 1));
     if (_steps.isEmpty) return PlannerScene(cue: _planned.cue, balls: _planned.balls);
     final step = _steps[_view];
+    // Bi của bước đang xem và 2 bước kế tiếp vẽ rõ; các bi khác còn trên bàn
+    // vẽ mờ (PRD §6.3).
+    final shown = {for (final s in _steps.skip(_view).take(3)) ?s.ballNum};
     return PlannerScene(
       cue: step.cbFrom,
-      // Chỉ bi của bước đang xem và 2 bước kế tiếp (PRD §6.3).
-      balls: [
-        for (final s in _steps.skip(_view).take(3))
-          if (s.ballNum case final n?) _ball(n),
+      balls: [for (final n in shown) _ball(n)],
+      ghosts: [
+        for (final b in _ballsBefore(_view))
+          if (!shown.contains(b.number)) b,
       ],
       step: step,
       preview: _view + 1 < _steps.length ? _steps[_view + 1] : null,
