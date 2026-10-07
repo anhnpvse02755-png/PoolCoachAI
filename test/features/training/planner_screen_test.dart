@@ -71,6 +71,45 @@ void main() {
     expect(find.text(Vi.simDisclaimer), findsOneWidget);
   });
 
+  testWidgets('cuộn hết bảng: nút Huấn luyện viên nổi không che nội dung, cả hai màn',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    final container = testContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: PoolCoachApp(router: router),
+    ));
+    await tester.pumpAndSettle();
+    router.go(Routes.planner);
+    await tester.pumpAndSettle();
+
+    /// Cuộn bảng tới cuối rồi so đáy nội dung cuối với đỉnh nút nổi.
+    Future<void> expectClearOfFab() async {
+      final scrollable = tester.state<ScrollableState>(find.descendant(
+          of: find.byType(PlannerScreen), matching: find.byType(Scrollable)));
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final fabTop = tester.getTopLeft(find.byType(FloatingActionButton)).dy;
+      expect(tester.getBottomLeft(find.text(Vi.simDisclaimer)).dy, lessThanOrEqualTo(fabTop));
+    }
+
+    await expectClearOfFab();
+
+    for (final p in const [Vec2(190, 40), Vec2(60, 40), Vec2(200, 100)]) {
+      await tester.tapAt(onTable(tester, p));
+      await tester.pumpAndSettle();
+    }
+    await tapText(tester, Vi.planStart);
+    expect(find.byType(PlannerStepsView), findsOneWidget);
+    expect(find.text(Vi.planPreviewLabel), findsOneWidget);
+    await expectClearOfFab();
+  });
+
   testWidgets('chạm đặt bi cái rồi bi theo thứ tự số; đủ bi thì Lập kế hoạch bật',
       (tester) async {
     final handle = tester.ensureSemantics();

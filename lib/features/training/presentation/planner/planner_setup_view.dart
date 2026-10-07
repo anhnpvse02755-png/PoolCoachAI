@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_painter.dart';
 import 'package:poolcoachai/features/training/presentation/planner/setup_editing.dart';
@@ -147,6 +148,8 @@ class _PlannerSetupViewState extends State<PlannerSetupView> {
           ),
           const SizedBox(height: 12),
           Text(Vi.simDisclaimer, style: text.bodySmall),
+          // Cuộn hết thì nút Coach nổi không che nút bấm.
+          const SizedBox(height: PcShellScaffold.fabClearance),
         ],
       ),
     );

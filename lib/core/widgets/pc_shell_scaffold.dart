@@ -20,6 +20,10 @@ class PcShellScaffold extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
+  /// Khoảng nút Coach nổi chiếm ở đáy thân màn (nút 56 + lề). Màn có bảng
+  /// cuộn chèn khoảng trống này ở cuối, để cuộn hết thì nút không che chữ.
+  static const fabClearance = 56 + kFloatingActionButtonMargin;
+
   static const _icons = <IconData>[
     Icons.home_outlined,
     Icons.track_changes_outlined,
