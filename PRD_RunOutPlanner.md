@@ -94,8 +94,8 @@ interface PlanStep {
   kind: 'normal' | 'fallback' | 'safety'; // fallback = Đánh đứng bi 30%, không có vị trí tốt; safety = phòng thủ, kế hoạch dừng
   spin: { side: 'left' | 'right' | null; tips: 0 | 0.5 | 1 }; // áp phê, chỉ khác 0 khi phải dùng đường lui áp phê
   sawsBhePercent: number | null;    // chỉ có khi dùng áp phê (bảng SAWS)
-  jitterEnds: { minus: {x:number,y:number} | null; plus: {x:number,y:number} | null }; // điểm dừng ở lực −15% / +15% (kẹp ≤ 100%)
-  tolerance: { good: number; fair: number; bad: number } | null; // 7 mức lực trong ±15%; null khi là bi cuối
+  jitterEnds: { minus: {x:number,y:number} | null; plus: {x:number,y:number} | null }; // điểm dừng ở lực −15% / +15% (kẹp ≤ 100%); null khi kind = fallback (sửa 2026-10-07: Kế hoạch dọn bàn)
+  tolerance: { good: number; fair: number; bad: number } | null; // 7 mức lực trong ±15%; null khi là bi cuối hoặc kind = fallback (sửa 2026-10-07: Kế hoạch dọn bàn)
 }
 ```
 
@@ -242,7 +242,7 @@ Sau khi tính kế hoạch, canvas **không vẽ tất cả bi cùng lúc**. Dù
 - Bi cái vẽ tại `plan[viewIndex].cbFrom`.
 
 ### 6.4 Điều hướng từng bước
-- Nút **"Đã đánh xong → Bi tiếp theo"**: hỏi *"Bi cái dừng đúng chỗ dự kiến?"*. **Đúng** thì `viewIndex++` (giới hạn không vượt quá số bước). **Đặt lại bi cái** thì bàn vào chế độ kéo bi cái; bấm *Tính lại từ đây* thì lập kế hoạch mới từ chỗ bi cái dừng thật, với các bi còn lại. Ở bước cuối nút đổi thành *Xong bàn*. Mô phỏng đúng trải nghiệm thực tế: người chơi đánh xong 1 bi ngoài đời rồi mới xem gợi ý cho bi kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
+- Nút **"Đã đánh xong → Bi tiếp theo"**: hỏi *"Bi cái dừng đúng chỗ dự kiến?"*. **Đúng** thì `viewIndex++` (giới hạn không vượt quá số bước). **Đặt lại bi cái** thì bàn vào chế độ kéo bi cái; bấm *Tính lại từ đây* thì lập kế hoạch mới từ chỗ bi cái dừng thật, với các bi còn lại. Ở bước cuối nút đổi thành *Xong bàn*, bấm vào thì quay về Luyện tập (sửa 2026-10-07: Kế hoạch dọn bàn). Mô phỏng đúng trải nghiệm thực tế: người chơi đánh xong 1 bi ngoài đời rồi mới xem gợi ý cho bi kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
 - Tính từng bước: bước 1 hiện sau khoảng 1 giây, các bước sau tính tiếp trong nền với dòng *"Đang tính bước X/N…"*; nút *Đã đánh xong* ở bước cuối đã tính thì chờ bước kế tiếp *(sửa 2026-10-07: Kế hoạch dọn bàn)*.
 - Nút **"← Quay lại"**: `viewIndex--` (giới hạn ≥ 0), phòng khi bấm nhầm.
 - Hiển thị "Bước X / N".
@@ -266,6 +266,8 @@ Ngoài các đường ở 6.5, với **bước đang xem** (không áp dụng ch
 4. Chú giải (legend) dưới canvas giải thích từng lớp màu/ký hiệu.
 
 Panel thông tin bước hiện tại thêm 1 dòng **"Độ chịu sai số lực"**: thử 7 mức lực đều nhau trong khoảng ±15%, với mỗi mức phân loại điểm dừng thành *vùng điều tốt / tạm được / xấu-hoặc-bị-chắn* và hiển thị số lượng (ví dụ "7/7 mức lực vẫn trong vùng điều tốt"). Đây là số liệu **để hiển thị cho người dùng hiểu độ chịu sai số** — dùng cùng các hàm mô phỏng/chấm điểm ở mục 5, không được có logic tính riêng khác đi.
+
+Với bước `kind = fallback` (Đánh đứng bi 30%, không có vị trí tốt): `score`, `jitterEnds` và `tolerance` đều null; màn không vẽ thanh phạm vi sai số lực và không hiện dòng "Độ chịu sai số lực", nhưng vẫn hiện dòng "Nếu trượt" khi có bi kế tiếp, kèm *"Không có vị trí tốt cho bi sau."* (sửa 2026-10-07: Kế hoạch dọn bàn).
 
 **Lưu ý phân biệt:** chấm điểm ở mục 5.3 hiện dựa trên góc cắt xấu nhất trong 3 mức lực (−15%, chuẩn, +15%), chưa dùng tỉ lệ "phần đường đi của bi cái nằm trong vùng điều tốt". Nếu sau này muốn ưu tiên phương án có đường đi cắt qua vùng tốt nhiều hơn thì đó là thay đổi thuật toán riêng, cần cập nhật mục 3 và 5.3, không phải chỉ là thay đổi hiển thị.
 
