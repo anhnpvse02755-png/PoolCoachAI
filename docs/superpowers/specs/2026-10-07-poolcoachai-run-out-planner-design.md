@@ -1,7 +1,7 @@
 # PoolCoachAI — Thiết kế Kế hoạch dọn bàn (Run-out Planner)
 
 **Ngày:** 07/10/2026 (thiết kế duyệt từng phần ngày 05/10/2026)
-**Trạng thái:** đã duyệt hướng từng phần (5 phần), chờ duyệt bản viết
+**Trạng thái:** đã duyệt bản viết (07/10/2026), gồm cả 6 chỗ người viết tự điền: phạt áp phê cộng dồn, 60 phương án áp phê, bằng điểm giữ phương án thử trước, cú dự phòng đi tiếp, nút Xong bàn, tự sửa PRD
 **Tiền đề:** lõi vật lý `lib/domain/table_physics/` và màn Mô phỏng góc cắt đã vào `main`, đã push và deploy (`0e17995`, 546 test + 1 test đo thời gian). PRD gốc là `PRD_RunOutPlanner.md`, bản đã sửa ngày 02/10 cho khớp lõi vật lý.
 
 ---
