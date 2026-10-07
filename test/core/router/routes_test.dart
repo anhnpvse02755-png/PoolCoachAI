@@ -21,12 +21,17 @@ void main() {
         Routes.drillPattern,
         Routes.drillSessionPattern,
         Routes.simulator,
+        Routes.planner,
         Routes.articlePattern,
         Routes.login,
         Routes.register,
         Routes.forgotPassword,
         Routes.resetPassword,
       ]);
+    });
+
+    test('Kế hoạch dọn bàn nằm trong nhánh Luyện tập', () {
+      expect(Routes.planner, '${Routes.training}/planner');
     });
 
     test('mọi đường dẫn đều bắt đầu bằng dấu gạch chéo', () {

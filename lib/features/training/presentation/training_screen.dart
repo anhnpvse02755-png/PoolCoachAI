@@ -88,6 +88,18 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: PcCard(
+              child: ListTile(
+                leading: const Icon(Icons.route),
+                title: const Text(Vi.planTitle),
+                subtitle: const Text(Vi.planCardBody),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go(Routes.planner),
+              ),
+            ),
+          ),
           Expanded(
             child: drillsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

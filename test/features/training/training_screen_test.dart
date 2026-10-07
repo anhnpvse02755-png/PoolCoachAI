@@ -9,6 +9,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 
 import '../../support/test_data.dart';
@@ -98,6 +99,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SimulatorScreen), findsOneWidget);
+  });
+
+  testWidgets('thẻ Kế hoạch dọn bàn nằm ngay dưới thẻ mô phỏng và mở đúng màn', (tester) async {
+    await openTraining(tester, const []);
+
+    expect(tester.getTopLeft(find.text(Vi.planTitle)).dy,
+        greaterThan(tester.getTopLeft(find.text(Vi.simTitle)).dy));
+    await tester.tap(find.text(Vi.planTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PlannerScreen), findsOneWidget);
   });
 
   // Mô phỏng không cần dữ liệu bài tập, nên thẻ không được biến mất khi

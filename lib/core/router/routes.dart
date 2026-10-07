@@ -23,6 +23,9 @@ abstract final class Routes {
 
   /// Mô phỏng góc cắt — trong nhánh Luyện tập như các màn bài tập.
   static const simulator = '$training/simulator';
+
+  /// Kế hoạch dọn bàn — trong nhánh Luyện tập như màn mô phỏng.
+  static const planner = '$training/planner';
   static const articlePattern = '/knowledge/:id';
 
   /// Đường dẫn chi tiết một bài tập.
@@ -64,6 +67,7 @@ abstract final class Routes {
     drillPattern,
     drillSessionPattern,
     simulator,
+    planner,
     articlePattern,
     login,
     register,

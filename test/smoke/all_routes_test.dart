@@ -18,6 +18,7 @@ import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
+import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -56,6 +57,7 @@ const _routeCases = <String, _RouteCase>{
     screen: DrillSessionScreen,
   ),
   Routes.simulator: (path: Routes.simulator, screen: SimulatorScreen),
+  Routes.planner: (path: Routes.planner, screen: PlannerScreen),
   Routes.articlePattern: (path: '/knowledge/k1', screen: KnowledgeScreen),
 };
 
