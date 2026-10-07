@@ -203,21 +203,65 @@ class ZoneCell {
 /// ô không có đường, ô đè lên bi. Cùng [CandidateFinder.easiest] với lúc chấm.
 List<ZoneCell> zoneGrid({required List<PlacedBall> after, required CandidateFinder next}) {
   if (legalTargetsAmong(next.game, after).isEmpty) return const [];
-  final table = next.table;
   final cells = <ZoneCell>[];
-  for (var x = zoneCell / 2; x < table.length; x += zoneCell) {
-    for (var y = zoneCell / 2; y < table.width; y += zoneCell) {
-      final p = Vec2(x, y);
-      if (!table.contains(p)) continue;
-      if (after.any((b) => b.pos.distanceTo(p) < table.ballDiameter)) continue;
-      final angle = next.easiest(p, after)?.angle;
-      if (angle == null) continue;
-      if (angle <= zoneGood) {
-        cells.add(ZoneCell(p, ZoneLevel.good));
-      } else if (angle <= zoneFair) {
-        cells.add(ZoneCell(p, ZoneLevel.fair));
-      }
-    }
+  for (var x = zoneCell / 2; x < next.table.length; x += zoneCell) {
+    _zoneRow(x, after, next, cells);
   }
   return cells;
+}
+
+/// Một hàng ô của [zoneGrid] (cùng x), thêm vào [cells].
+void _zoneRow(double x, List<PlacedBall> after, CandidateFinder next, List<ZoneCell> cells) {
+  final table = next.table;
+  for (var y = zoneCell / 2; y < table.width; y += zoneCell) {
+    final p = Vec2(x, y);
+    if (!table.contains(p)) continue;
+    if (after.any((b) => b.pos.distanceTo(p) < table.ballDiameter)) continue;
+    final angle = next.easiest(p, after)?.angle;
+    if (angle == null) continue;
+    if (angle <= zoneGood) {
+      cells.add(ZoneCell(p, ZoneLevel.good));
+    } else if (angle <= zoneFair) {
+      cells.add(ZoneCell(p, ZoneLevel.fair));
+    }
+  }
+}
+
+/// [zoneGrid] tính vài hàng mỗi khung hình: tính một mạch thì khung hình
+/// bước 1 hiện ra bị rớt. Cùng thứ tự hàng, cùng hàm một hàng, nên xong
+/// thì [cells] đúng y [zoneGrid]; ngân sách chỉ quyết định *khi nào* dừng.
+class ZoneGridJob {
+  ZoneGridJob({required this.after, required this.next})
+      : _done = legalTargetsAmong(next.game, after).isEmpty;
+
+  final List<PlacedBall> after;
+  final CandidateFinder next;
+  final _cells = <ZoneCell>[];
+  double _x = zoneCell / 2;
+  bool _done;
+
+  bool get isDone => _done;
+
+  /// Các ô đã tính tới giờ.
+  List<ZoneCell> get cells => List.unmodifiable(_cells);
+
+  /// Làm từng hàng tới khi hết [budget] (hoặc đủ [maxRows] hàng, cho
+  /// test), luôn ít nhất một hàng. Không bắt đầu hàng mới nếu hàng dài
+  /// nhất của lát này không còn vừa ngân sách.
+  void step({required Duration budget, int? maxRows}) {
+    final clock = Stopwatch()..start();
+    var rows = 0;
+    var longest = Duration.zero;
+    while (!_done) {
+      final started = clock.elapsed;
+      _zoneRow(_x, after, next, _cells);
+      _x += zoneCell;
+      rows++;
+      if (_x >= next.table.length) _done = true;
+      final row = clock.elapsed - started;
+      if (row > longest) longest = row;
+      if (maxRows != null && rows >= maxRows) break;
+      if (clock.elapsed + longest > budget) break;
+    }
+  }
 }

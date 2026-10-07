@@ -180,4 +180,48 @@ void main() {
     }
     expect(zoneGrid(after: const [], next: finder), isEmpty);
   });
+
+  group('lưới vùng điều tính từng lát (ZoneGridJob)', () {
+    List<(Vec2, ZoneLevel)> flat(List<ZoneCell> cells) =>
+        [for (final c in cells) (c.center, c.level)];
+
+    test('chạy từng vài hàng cho đúng y lưới tính một mạch', () {
+      for (final s in [railTable(), typicalNineBallTable(), orderTable(GameType.nineBall)]) {
+        final after = s.without([s.balls.first.number]).balls;
+        final whole = zoneGrid(after: after, next: CandidateFinder(game: s.game));
+        expect(whole, isNotEmpty);
+        for (final rows in [1, 3, 7]) {
+          final job = ZoneGridJob(after: after, next: CandidateFinder(game: s.game));
+          var slices = 0;
+          while (!job.isDone) {
+            job.step(budget: const Duration(days: 1), maxRows: rows);
+            slices++;
+          }
+          expect(slices, greaterThan(1));
+          expect(flat(job.cells), flat(whole));
+        }
+      }
+    });
+
+    test('mỗi lát làm ít nhất một hàng; xong rồi thì step không làm gì', () {
+      final s = railTable();
+      final after = s.without([1]).balls;
+      final whole = zoneGrid(after: after, next: CandidateFinder(game: s.game));
+      final job = ZoneGridJob(after: after, next: CandidateFinder(game: s.game));
+      job.step(budget: Duration.zero);
+      expect(job.isDone, isFalse);
+      expect(job.cells.length, lessThan(whole.length));
+      while (!job.isDone) {
+        job.step(budget: Duration.zero);
+      }
+      job.step(budget: const Duration(days: 1));
+      expect(flat(job.cells), flat(whole));
+    });
+
+    test('không còn bi được đánh: xong ngay, lưới rỗng', () {
+      final job = ZoneGridJob(after: const [], next: CandidateFinder(game: GameType.nineBall));
+      expect(job.isDone, isTrue);
+      expect(job.cells, isEmpty);
+    });
+  });
 }

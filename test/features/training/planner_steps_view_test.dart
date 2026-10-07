@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/core/theme/app_theme.dart';
+import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
+import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -32,7 +34,8 @@ void main() {
   const table = TableSpec.nineFoot;
   late int edits;
 
-  Future<void> open(WidgetTester tester, TableSetup setup, {int? maxSimulationsPerFrame}) async {
+  Future<void> open(WidgetTester tester, TableSetup setup,
+      {int? maxSimulationsPerFrame, int? maxZoneRowsPerFrame}) async {
     edits = 0;
     tester.view.physicalSize = const Size(1200, 2600);
     tester.view.devicePixelRatio = 1;
@@ -44,6 +47,7 @@ void main() {
           setup: setup,
           onEditTable: () => edits++,
           maxSimulationsPerFrame: maxSimulationsPerFrame,
+          maxZoneRowsPerFrame: maxZoneRowsPerFrame,
         ),
       ),
     ));
@@ -106,6 +110,25 @@ void main() {
     expect(scene.preview!.ballNum, steps[1].ballNum);
     expect(scene.zone, isNotEmpty);
     expect(find.text(Vi.planPreviewLabel), findsOneWidget);
+  });
+
+  testWidgets('vùng điều hiện dần vài hàng mỗi khung hình, xong thì đúng y lưới một mạch',
+      (tester) async {
+    final setup = orderTable(GameType.nineBall);
+    final steps = planToEnd(setup);
+    final whole = zoneGrid(
+        after: setup.without([steps.first.ballNum!]).balls,
+        next: CandidateFinder(game: setup.game, table: setup.table));
+    List<(Vec2, ZoneLevel)> flat(List<ZoneCell> cells) =>
+        [for (final c in cells) (c.center, c.level)];
+
+    await open(tester, setup, maxZoneRowsPerFrame: 1);
+    for (var i = 0; i < 5000 && find.text(Vi.planStepHeader(1, 4)).evaluate().isEmpty; i++) {
+      await tester.pump();
+    }
+    expect(sceneOf(tester).zone.length, lessThan(whole.length));
+    await tester.pumpAndSettle();
+    expect(flat(sceneOf(tester).zone), flat(whole));
   });
 
   testWidgets('Quay lại không xuống dưới bước 1; Đã đánh xong → Đúng thì sang bước sau',

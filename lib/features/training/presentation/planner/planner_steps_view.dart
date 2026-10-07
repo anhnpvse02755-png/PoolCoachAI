@@ -26,6 +26,7 @@ class PlannerStepsView extends StatefulWidget {
     required this.onEditTable,
     this.aim = aimShot,
     this.maxSimulationsPerFrame,
+    this.maxZoneRowsPerFrame,
     super.key,
   });
 
@@ -47,11 +48,20 @@ class PlannerStepsView extends StatefulWidget {
   @visibleForTesting
   final int? maxSimulationsPerFrame;
 
+  /// Giới hạn số hàng lưới vùng điều mỗi khung hình, để test thấy được lúc
+  /// vùng điều mới hiện một phần. null là theo ngân sách thời gian.
+  @visibleForTesting
+  final int? maxZoneRowsPerFrame;
+
   @override
   State<PlannerStepsView> createState() => _PlannerStepsViewState();
 }
 
 class _PlannerStepsViewState extends State<PlannerStepsView> {
+  /// Ngân sách lưới vùng điều mỗi khung hình. Nhỏ hơn `sliceBudget`: cùng
+  /// khung hình còn lát tính kế hoạch và vẽ, cộng lại phải dưới 16 ms.
+  static const _zoneBudget = Duration(milliseconds: 4);
+
   late TableSetup _planned;
   late CandidateFinder _finder;
   PlannerJob? _job;
@@ -64,7 +74,12 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
 
   /// Ngón tay đã bắt được bi cái lúc bắt đầu kéo.
   bool _draggingCue = false;
-  final _zones = <int, List<ZoneCell>>{};
+
+  /// Lưới vùng điều theo bước, tính dần; giữ cả lưới dở khi đổi bước.
+  final _zones = <int, ZoneGridJob>{};
+
+  /// Lưới đang được tính tiếp mỗi khung hình: luôn là lưới của bước đang xem.
+  ZoneGridJob? _zonePumping;
 
   @override
   void initState() {
@@ -92,6 +107,7 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
     _resetCue = null;
     _draggingCue = false;
     _zones.clear();
+    _zonePumping = null;
     _schedule(job);
   }
 
@@ -129,11 +145,35 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
 
   PlacedBall _ball(int number) => _planned.balls.firstWhere((b) => b.number == number);
 
-  /// Vùng điều của bước [index], tính một lần rồi nhớ.
+  /// Vùng điều của bước [index]: các ô đã tính tới giờ. Lưới tính vài hàng
+  /// mỗi khung hình (tính một mạch thì khung hình bước 1 hiện ra bị rớt),
+  /// hiện dần trong khoảng 0,1–0,2 giây; tính xong thì nhớ.
   List<ZoneCell> _zoneFor(int index) {
     if (_steps[index].nextBallNum == null) return const [];
-    return _zones.putIfAbsent(
-        index, () => zoneGrid(after: _ballsBefore(index + 1), next: _finder));
+    final job = _zones.putIfAbsent(
+        index, () => ZoneGridJob(after: _ballsBefore(index + 1), next: _finder));
+    if (!job.isDone && !identical(job, _zonePumping)) {
+      _zonePumping = job;
+      _scheduleZone(job);
+    }
+    return job.cells;
+  }
+
+  void _scheduleZone(ZoneGridJob job) {
+    SchedulerBinding.instance.scheduleFrameCallback((_) => _pumpZone(job));
+    SchedulerBinding.instance.scheduleFrame();
+  }
+
+  void _pumpZone(ZoneGridJob job) {
+    // Đã sang bước khác hay tính lại: lưới này dừng, quay lại thì tính tiếp.
+    if (!mounted || !identical(job, _zonePumping)) return;
+    job.step(budget: _zoneBudget, maxRows: widget.maxZoneRowsPerFrame);
+    if (job.isDone) {
+      _zonePumping = null;
+    } else {
+      _scheduleZone(job);
+    }
+    setState(() {});
   }
 
   PlannerScene _scene() {
