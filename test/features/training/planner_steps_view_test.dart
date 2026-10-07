@@ -221,12 +221,12 @@ void main() {
     expect(find.text(Vi.planStepHeader(1, 4)), findsOneWidget);
   });
 
-  testWidgets('bước cuối: nút đổi thành Xong bàn; bước phòng thủ nói nên phòng thủ',
+  testWidgets('bước cuối: nút đổi thành Xong bàn; bước phòng thủ nói bi nào và nên chơi an toàn',
       (tester) async {
     await open(tester, blockedEverywhereTable());
     await tester.pumpAndSettle();
     expect(find.text(Vi.planStepHeader(1, 1)), findsOneWidget);
-    expect(find.text(Vi.planSafety), findsOneWidget);
+    expect(find.text(Vi.planSafety(1)), findsOneWidget);
     expect(find.text(Vi.planFinish), findsOneWidget);
     expect(find.byKey(PlannerStepsView.shotDoneKey), findsNothing);
   });

@@ -19,7 +19,7 @@ List<String> planStepLines(PlanStep step,
     return [
       header,
       if (step.ballNum case final n?) Vi.planBallLine(n),
-      Vi.planSafety,
+      Vi.planSafety(step.ballNum),
     ];
   }
   final g = step.geometry!;

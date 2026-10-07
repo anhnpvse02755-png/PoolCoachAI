@@ -552,7 +552,13 @@ abstract final class Vi {
       'bi sẽ khó cho đối thủ hơn.';
 
   static const planNoPosition = 'Không có vị trí tốt cho bi sau.';
-  static const planSafety = 'Không có cú nào đưa bi vào lỗ an toàn — nên phòng thủ.';
+
+  /// Bước phòng thủ. [ballNum] là bi bắt buộc (9 / 10 bi); null khi 8 bi
+  /// không bi nào của mình có đường (không bi cụ thể nào bị ép).
+  static String planSafety(int? ballNum) =>
+      '${ballNum == null ? 'Không bi nào có' : 'Bi $ballNum không có'} đường đánh rõ ràng '
+      'vào lỗ nào (bị chắn hoặc góc quá khó) — nên chơi an toàn (safety) thay vì cố đánh.';
+
   static const planPreviewLabel = 'XEM TRƯỚC';
   static const planBack = '← Quay lại';
   static const planShotDone = 'Đã đánh xong → Bi tiếp theo';
@@ -588,7 +594,7 @@ abstract final class Vi {
     const head = 'Bàn kế hoạch.';
     if (step == null) return '$head ${planComputing(index + 1, total)}';
     final at = planStepHeader(index + 1, total);
-    if (step.kind == PlanStepKind.safety) return '$head $at: $planSafety';
+    if (step.kind == PlanStepKind.safety) return '$head $at: ${planSafety(step.ballNum)}';
     return '$head $at: bi ${step.ballNum}, lỗ ${simPocket(step.pocket!)}, '
         '${simStroke(step.stroke)}, lực ${step.power.round()}%.';
   }

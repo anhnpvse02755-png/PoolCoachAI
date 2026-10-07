@@ -359,7 +359,7 @@ try {
       const eightAt = labels.findIndex((l) => l.includes('bi 8,'));
       if (eightAt >= 0 && eightAt !== labels.length - 1) throw new Error('8 bi: bi 8 không đánh cuối');
     }
-    if (t.name.startsWith('4-') && !labels[0]?.includes('nên phòng thủ')) {
+    if (t.name.startsWith('4-') && !labels[0]?.includes('nên chơi an toàn (safety)')) {
       throw new Error(`bàn phòng thủ: ${labels[0]}`);
     }
   }

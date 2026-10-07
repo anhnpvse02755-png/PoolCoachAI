@@ -41,7 +41,13 @@ void main() {
     expect(Vi.planMissAdvice(MissSide.thin),
         'Nếu trượt: nên đánh dư mỏng một chút — bi sẽ khó cho đối thủ hơn.');
     expect(Vi.planNoPosition, 'Không có vị trí tốt cho bi sau.');
-    expect(Vi.planSafety, 'Không có cú nào đưa bi vào lỗ an toàn — nên phòng thủ.');
+    // 9 / 10 bi: bi bắt buộc có số. 8 bi: không bi cụ thể nào bị ép.
+    expect(Vi.planSafety(3),
+        'Bi 3 không có đường đánh rõ ràng vào lỗ nào (bị chắn hoặc góc quá khó) — '
+        'nên chơi an toàn (safety) thay vì cố đánh.');
+    expect(Vi.planSafety(null),
+        'Không bi nào có đường đánh rõ ràng vào lỗ nào (bị chắn hoặc góc quá khó) — '
+        'nên chơi an toàn (safety) thay vì cố đánh.');
     expect(Vi.planCueStoppedQuestion, 'Bi cái dừng đúng chỗ dự kiến?');
     expect(Vi.planOrderHint, 'Chạm theo đúng thứ tự số: bi 1 trước, bi 2 sau…');
   });
@@ -65,7 +71,10 @@ void main() {
     expect(Vi.planSummary(step, index: 1, total: 5),
         'Bàn kế hoạch. Bước 2 / 5: bi 3, lỗ góc trên phải, Đánh trô bi, lực 60%.');
     expect(Vi.planSummary(const PlanStep.safety(cbFrom: Vec2(1, 1), ballNum: 2), index: 0, total: 1),
-        'Bàn kế hoạch. Bước 1 / 1: Không có cú nào đưa bi vào lỗ an toàn — nên phòng thủ.');
+        'Bàn kế hoạch. Bước 1 / 1: Bi 2 không có đường đánh rõ ràng vào lỗ nào '
+        '(bị chắn hoặc góc quá khó) — nên chơi an toàn (safety) thay vì cố đánh.');
+    expect(Vi.planSummary(const PlanStep.safety(cbFrom: Vec2(1, 1)), index: 0, total: 1),
+        'Bàn kế hoạch. Bước 1 / 1: ${Vi.planSafety(null)}');
     expect(Vi.planSummary(null, index: 0, total: 9), 'Bàn kế hoạch. Đang tính bước 1/9…');
     expect(Vi.planSetupSummary(hasCue: false, balls: 0), 'Bàn bày bi. Chưa đặt bi cái.');
     expect(Vi.planSetupSummary(hasCue: true, balls: 3), 'Bàn bày bi. Đã đặt bi cái, 3 bi mục tiêu.');

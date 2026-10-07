@@ -7,6 +7,7 @@ import 'package:poolcoachai/domain/planner/planner_job.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/features/training/presentation/planner/step_lines.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 
@@ -114,7 +115,11 @@ void main() {
     // Lời khuyên trượt không phụ thuộc vị trí bi cái nên lõi vẫn tính cho bước dự phòng.
     expect(linesOf(fallback, 0),
         contains(Vi.planMissAdvice(fallback.first.missAdvice!.safer)));
-    expect(linesOf(fallback, 1), [Vi.planStepHeader(2, 2), Vi.planBallLine(2), Vi.planSafety]);
+    expect(linesOf(fallback, 1),
+        [Vi.planStepHeader(2, 2), Vi.planBallLine(2), Vi.planSafety(2)]);
+    // 8 bi không có bi cụ thể bị ép: không dòng bi, câu "Không bi nào".
+    expect(planStepLines(const PlanStep.safety(cbFrom: Vec2(1, 1)), index: 0, total: 1),
+        [Vi.planStepHeader(1, 1), Vi.planSafety(null)]);
   });
 
   test('không câu nào là lời khuyên ngắm theo độ (memory: lời khuyên làm được)', () {
