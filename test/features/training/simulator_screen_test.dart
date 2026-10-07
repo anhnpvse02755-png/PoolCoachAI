@@ -475,6 +475,61 @@ void main() {
     expect(calls, 2);
   });
 
+  testWidgets('lõi ném lỗi thì không giữ cú cũ dưới khoá mới', (tester) async {
+    var calls = 0;
+    var failNext = false;
+    AimedShot flaky({
+      required Vec2 cue,
+      required Vec2 object,
+      required Pocket pocket,
+      required Stroke stroke,
+      SideSpin spin = const SideSpin.none(),
+      required double power,
+      CueElevation elevation = CueElevation.normal,
+      TableSpec table = TableSpec.nineFoot,
+      bool compensate = true,
+      bool withUncompensated = true,
+    }) {
+      calls++;
+      if (failNext) {
+        failNext = false;
+        throw StateError('lõi hỏng đúng một lần');
+      }
+      return aimShot(
+          cue: cue,
+          object: object,
+          pocket: pocket,
+          stroke: stroke,
+          spin: spin,
+          power: power,
+          elevation: elevation,
+          table: table,
+          compensate: compensate,
+          withUncompensated: withUncompensated);
+    }
+
+    await openWithAim(tester, flaky);
+    expect(calls, 1);
+    final stun = sceneOf(tester).aimed;
+
+    // Đổi sang trô: lần dò đầu ném lỗi. Gợi ý chống chết cái tính xong thì
+    // setState, dựng lại bàn với cùng đầu vào: phải dò lại, không được trả
+    // cú Đánh đứng bi cũ dưới khoá của cú trô.
+    failNext = true;
+    await tapText(tester, Vi.simStroke(Stroke.draw));
+    expect(tester.takeException(), isA<StateError>());
+    expect(calls, 3);
+
+    // Dựng lại lần nữa mà không đổi gì: giờ mới được dùng lại kết quả.
+    tester.view.physicalSize = const Size(1100, 1800);
+    await tester.pumpAndSettle();
+    expect(calls, 3);
+    final draw = sceneOf(tester).aimed;
+    expect(draw, isNotNull);
+    expect(identical(draw, stun), isFalse);
+    expect(find.text(Vi.simStrokeLine(Stroke.draw)), findsOneWidget);
+  });
+
   testWidgets('lệch 2 đầu cơ thì cảnh báo trượt cơ', (tester) async {
     await openSimulator(tester);
 

@@ -18,20 +18,6 @@ import 'package:poolcoachai/features/training/presentation/simulator/table_paint
 
 enum _Ball { cue, object }
 
-/// Cùng chữ ký với `aimShot`, để test thay lõi (vd lõi quá giờ).
-typedef AimShotFn = AimedShot Function({
-  required Vec2 cue,
-  required Vec2 object,
-  required Pocket pocket,
-  required Stroke stroke,
-  SideSpin spin,
-  required double power,
-  CueElevation elevation,
-  TableSpec table,
-  bool compensate,
-  bool withUncompensated,
-});
-
 /// Mô phỏng góc cắt — spec 2026-10-01 mục 5, chạy trên lõi vật lý của
 /// spec 2026-10-02 mục 6.
 ///
@@ -278,9 +264,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final key =
         (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
     if (key == _aimKey) return _aimed;
-    _aimKey = key;
+    AimedShot? aimed;
     try {
-      return _aimed = widget.aim(
+      aimed = widget.aim(
         cue: g.cue,
         object: g.object,
         pocket: g.pocket,
@@ -293,9 +279,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       );
     } on SimulationTimeout {
       // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
-      // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi.
-      return _aimed = null;
+      // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi. Quá
+      // giờ là kết quả tất định của cú này nên nhớ được như mọi kết quả.
+      aimed = null;
     }
+    // Chỉ gán khoá khi đã có kết quả (spec 2026-10-07 mục 8): lỗi khác ném
+    // ra giữa chừng mà khoá đã đổi thì lần dựng sau trả nhầm cú cũ dưới
+    // khoá mới.
+    _aimKey = key;
+    return _aimed = aimed;
   }
 
   @override

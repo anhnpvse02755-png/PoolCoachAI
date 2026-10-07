@@ -144,6 +144,21 @@ AimSolution solveAim({
   );
 }
 
+/// Cùng chữ ký với [aimShot], để màn mô phỏng, Planner và test thay lõi
+/// (vd lõi quá giờ, hay đếm số lần gọi).
+typedef AimShotFn = AimedShot Function({
+  required Vec2 cue,
+  required Vec2 object,
+  required Pocket pocket,
+  required Stroke stroke,
+  SideSpin spin,
+  required double power,
+  CueElevation elevation,
+  TableSpec table,
+  bool compensate,
+  bool withUncompensated,
+});
+
 /// Dò bù ném và Đánh đứng bi, rồi mô phỏng đủ (spec mục 4.6).
 ///
 /// [withUncompensated] false thì bỏ mô phỏng cú ngắm hình học (đường đỏ):
