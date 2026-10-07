@@ -22,6 +22,7 @@ void main() {
   setUpAll(() {
     plans = {
       'order9': planToEnd(orderTable(GameType.nineBall)),
+      'order10': planToEnd(orderTable(GameType.tenBall)),
       'order8': planToEnd(orderTable(GameType.eightBall)),
       'rail': planToEnd(railTable()),
       'corner': planToEnd(cornerFollowTable()),
@@ -45,15 +46,17 @@ void main() {
     }
   });
 
-  test('2. 9 bi đánh đúng 1 → 2 → 3 → 4 dù bi 3 dễ hơn bi 1', () {
-    final s = orderTable(GameType.nineBall);
-    double angleOf(int n) => bestAngleFrom(s.cue, s.balls[n - 1].pos,
-        [for (final b in s.balls) if (b.number != n) b.pos])!;
-    expect(angleOf(3), lessThan(angleOf(1)));
-    final steps = plans['order9']!;
-    expect(steps.map((x) => x.ballNum), [1, 2, 3, 4]);
-    expect(steps.every((x) => x.kind != PlanStepKind.safety), isTrue);
-  });
+  for (final (game, plan) in const [(GameType.nineBall, 'order9'), (GameType.tenBall, 'order10')]) {
+    test('2. ${game.name}: đánh đúng 1 → 2 → 3 → 4 dù bi 3 dễ hơn bi 1', () {
+      final s = orderTable(game);
+      double angleOf(int n) => bestAngleFrom(s.cue, s.balls[n - 1].pos,
+          [for (final b in s.balls) if (b.number != n) b.pos])!;
+      expect(angleOf(3), lessThan(angleOf(1)));
+      final steps = plans[plan]!;
+      expect(steps.map((x) => x.ballNum), [1, 2, 3, 4]);
+      expect(steps.every((x) => x.kind != PlanStepKind.safety), isTrue);
+    });
+  }
 
   group('3. 8 bi', () {
     test('mọi bi là của tôi: được đánh bi dễ trước', () {
@@ -182,6 +185,9 @@ void main() {
     double nominalTotal(ScoredOption o) => nominalAngle(o) + penalties(o) + o.score.distance;
     for (final o in options) {
       expect(o.score.diff2, isNull);
+      // Phương trình mà phép so dưới đây dựa vào: thêm khoản điểm mới thì vỡ ở đây.
+      expect(o.score.total,
+          closeTo(o.score.robustDiff1! + penalties(o) + o.score.distance, 1e-9));
     }
 
     // Phương án A: dừng gần bi kế tiếp hơn, và chỉ xét góc danh nghĩa thì A
