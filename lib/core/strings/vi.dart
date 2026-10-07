@@ -540,6 +540,9 @@ abstract final class Vi {
   /// lõi vật lý tính hao lực thật (spec quyết định 7).
   static String planRailInfo(int count) => 'Bi cái chạm băng $count lần rồi tới vùng điều.';
 
+  /// Bước cuối: không có bi kế tiếp, nên không có vùng điều để tới.
+  static String planRailInfoLast(int count) => 'Bi cái chạm băng $count lần.';
+
   /// PRD §6.5, nguyên văn.
   static const planRiskWarning = 'Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái '
       'hoặc sai số lớn hơn bình thường.';

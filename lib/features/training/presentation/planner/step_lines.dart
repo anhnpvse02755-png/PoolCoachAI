@@ -36,7 +36,9 @@ List<String> planStepLines(PlanStep step,
       squirtLine(step.spin, step.aimed, g, table, step.stroke, step.power),
     ],
     if (step.tolerance case final t?) Vi.planTolerance(t.good, toleranceSamples),
-    if (railCount > 0) Vi.planRailInfo(railCount),
+    // Bước cuối không có bi kế tiếp: chỉ nói số băng, không nói vùng điều.
+    if (railCount > 0)
+      step.nextBallNum == null ? Vi.planRailInfoLast(railCount) : Vi.planRailInfo(railCount),
     if (step.power >= riskPower || step.stroke == Stroke.draw) Vi.planRiskWarning,
     if (step.missAdvice case final m?) Vi.planMissAdvice(m.safer),
     if (step.kind == PlanStepKind.fallback) Vi.planNoPosition,

@@ -52,6 +52,32 @@ void main() {
     }
   });
 
+  test('dội băng ở bước cuối: không nói tới vùng điều', () {
+    final s = rail.first;
+    final rails = s.trace!.cueRailCount;
+    expect(rails, greaterThan(0));
+    expect(s.nextBallNum, isNotNull);
+    expect(linesOf(rail, 0), isNot(contains(Vi.planRailInfoLast(rails))));
+
+    // Cùng cú, nhưng là bi cuối: không có bi kế tiếp.
+    final last = PlanStep(
+        kind: s.kind,
+        cbFrom: s.cbFrom,
+        ballNum: s.ballNum,
+        geometry: s.geometry,
+        stroke: s.stroke,
+        power: s.power,
+        aimed: s.aimed);
+    final lines = planStepLines(last, index: 1, total: 2);
+    expect(lines, contains(Vi.planRailInfoLast(rails)));
+    expect(lines, isNot(contains(Vi.planRailInfo(rails))));
+
+    for (final plan in [rail, corner, fallback]) {
+      final n = plan.last.trace?.cueRailCount ?? 0;
+      expect(linesOf(plan, plan.length - 1), isNot(contains(Vi.planRailInfo(n))));
+    }
+  });
+
   test('cảnh báo khi lực từ riskPower hoặc dùng trô, không thì không', () {
     expect(corner.first.power, greaterThanOrEqualTo(riskPower));
     expect(linesOf(corner, 0), contains(Vi.planRiskWarning));

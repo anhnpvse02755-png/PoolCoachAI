@@ -29,6 +29,8 @@ void main() {
   test('dội băng là thông tin, không còn vế 15%', () {
     expect(Vi.planRailInfo(2), 'Bi cái chạm băng 2 lần rồi tới vùng điều.');
     expect(Vi.planRailInfo(2), isNot(contains('15%')));
+    // Bước cuối không có bi kế tiếp, nên không có vùng điều để tới.
+    expect(Vi.planRailInfoLast(2), 'Bi cái chạm băng 2 lần.');
   });
 
   test('câu PRD giữ nguyên văn', () {
