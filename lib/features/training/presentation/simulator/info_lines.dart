@@ -84,7 +84,7 @@ List<String> simulatorInfoLines({
             aimed.stunReached &&
             aimed.verticalOffset.abs() >= stunOffsetShownTips * tipWidth)
           Vi.simStunOffset(aimed.verticalOffset),
-        if (!spin.isNone) _squirtLine(spin, aimed, geometry, table, stroke, power),
+        if (!spin.isNone) squirtLine(spin, aimed, geometry, table, stroke, power),
         if (trace != null && trace.cueRailCount > 0)
           Vi.simRailCount(trace.cueRailCount),
         if (trace?.cuePocket case final pocket?) Vi.simScratch(pocket),
@@ -96,13 +96,14 @@ List<String> simulatorInfoLines({
   }
 }
 
-/// Dòng áp phê. Độ lệch điểm ngắm là bề ngang hướng cơ đã bù xê dịch so với
+/// Dòng áp phê — màn Mô phỏng góc cắt và màn Kế hoạch dọn bàn dùng chung,
+/// không viết lại (spec 2026-10-07 mục 7.2). Độ lệch điểm ngắm là bề ngang hướng cơ đã bù xê dịch so với
 /// hướng hình học, tại quãng cơ tới bi ảo: gộp cả squirt, swerve lẫn ném,
 /// đúng lượng người chơi phải dịch. Không lấy hiệu điểm chạm thật với bi ảo
 /// hình học vì cú đã bù để vào lỗ nên hai điểm đó gần như trùng nhau. Không
 /// có vết (không mô phỏng được) thì chỉ nói góc; số độ của lệch ngắm không
 /// bao giờ nói ra, chỉ đổi thành đầu cơ.
-String _squirtLine(
+String squirtLine(
     SideSpin spin,
     AimedShot? aimed,
     ShotGeometry geometry,

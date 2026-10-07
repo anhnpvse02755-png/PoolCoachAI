@@ -1,4 +1,8 @@
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/planner/miss_advice.dart';
+import 'package:poolcoachai/domain/planner/plan_step.dart';
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
@@ -489,5 +493,100 @@ abstract final class Vi {
           if (showingUncompensated) simShowingUncompensated,
         ].join(' '),
     };
+  }
+
+  // Kế hoạch dọn bàn — docs/superpowers/specs/2026-10-07-poolcoachai-run-out-planner-design.md.
+  // Câu nào có số thì số do lõi planner tính ra; ở đây chỉ ghép chữ.
+  static const planTitle = 'Kế hoạch dọn bàn';
+  static const planCardBody = 'Bày bàn, xem cách dọn hết bi từng bước.';
+  static const planGameLabel = 'Loại bàn';
+  static const planGroupLabel = 'Nhóm của tôi';
+  static const planPlacingLabel = 'Đang đặt';
+
+  static String planGame(GameType game) => switch (game) {
+        GameType.nineBall => '9 bi',
+        GameType.tenBall => '10 bi',
+        GameType.eightBall => '8 bi',
+      };
+
+  static String planGroup(BallGroup group) => switch (group) {
+        BallGroup.solids => 'Trơn',
+        BallGroup.stripes => 'Sọc',
+      };
+
+  static String planPlacing(BallRole role) => switch (role) {
+        BallRole.mine => 'Bi của tôi',
+        BallRole.opponent => 'Bi đối thủ',
+        BallRole.eight => 'Bi 8',
+      };
+
+  static const planCueHint = 'Chạm lên bàn để đặt bi cái trước.';
+
+  /// PRD §6.2: số bi gán theo thứ tự chạm.
+  static const planOrderHint = 'Chạm theo đúng thứ tự số: bi 1 trước, bi 2 sau…';
+  static const planUndo = 'Xoá bi cuối';
+  static const planClear = 'Xoá hết';
+  static const planStart = 'Lập kế hoạch';
+
+  static String planComputing(int step, int total) => 'Đang tính bước $step/$total…';
+  static String planStepHeader(int step, int total) => 'Bước $step / $total';
+  static String planBallLine(int number) => 'Bi $number';
+
+  /// Số mức lực (trong [samples] mức) mà điểm dừng vẫn trong vùng điều tốt.
+  static String planTolerance(int good, int samples) =>
+      '$good/$samples mức lực vẫn trong vùng điều tốt';
+
+  /// Thông tin, không phải cảnh báo. Không còn vế "hao khoảng 15% lực":
+  /// lõi vật lý tính hao lực thật (spec quyết định 7).
+  static String planRailInfo(int count) => 'Bi cái chạm băng $count lần rồi tới vùng điều.';
+
+  /// PRD §6.5, nguyên văn.
+  static const planRiskWarning = 'Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái '
+      'hoặc sai số lớn hơn bình thường.';
+
+  static String planMissAdvice(MissSide side) =>
+      'Nếu trượt: nên đánh dư ${side == MissSide.thick ? 'dày' : 'mỏng'} một chút — '
+      'bi sẽ khó cho đối thủ hơn.';
+
+  static const planNoPosition = 'Không có vị trí tốt cho bi sau.';
+  static const planSafety = 'Không có cú nào đưa bi vào lỗ an toàn — nên phòng thủ.';
+  static const planPreviewLabel = 'XEM TRƯỚC';
+  static const planBack = '← Quay lại';
+  static const planShotDone = 'Đã đánh xong → Bi tiếp theo';
+  static const planFinish = 'Xong bàn';
+  static const planEditTable = 'Sửa bàn';
+  static const planCueStoppedQuestion = 'Bi cái dừng đúng chỗ dự kiến?';
+  static const planYes = 'Đúng';
+  static const planResetCue = 'Đặt lại bi cái';
+  static const planResetHint = 'Kéo bi cái tới đúng chỗ nó dừng ngoài bàn.';
+  static const planRecompute = 'Tính lại từ đây';
+
+  /// Chú giải các lớp trên bàn (spec mục 7.1). Ngưỡng lấy từ hằng số planner.
+  static List<String> get planLegend => [
+        'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',
+        'Ô vàng: tạm được — góc cắt bi sau ≤ ${zoneFair.round()}°.',
+        'Nét đứt trắng: bi cái tới bi mục tiêu. Nét đứt ngọc: bi cái sau va chạm.',
+        'Chấm vàng: bi cái chạm băng. Vòng trắng nét đứt: chỗ bi cái dừng.',
+        'Thanh vàng: chỗ bi cái dừng nếu lực lệch ±${powerJitter.round()}%.',
+        'Hai chấm cam: bi mục tiêu trôi tới đâu nếu trượt (dư dày / dư mỏng); '
+            'chấm đặc là hướng nên chọn.',
+      ];
+
+  /// Nhãn semantics của bàn khi bày bi — E2E đọc từ đây.
+  static String planSetupSummary({required bool hasCue, required int balls}) => hasCue
+      ? 'Bàn bày bi. Đã đặt bi cái, $balls bi mục tiêu.'
+      : 'Bàn bày bi. Chưa đặt bi cái.';
+
+  static const planResetSummary = 'Bàn kế hoạch. Đang đặt lại bi cái.';
+
+  /// Nhãn semantics của bàn ở màn từng bước (spec mục 7.4): bi, lỗ, kiểu
+  /// đánh, lực của bước đang xem. [step] null khi bước đầu còn đang tính.
+  static String planSummary(PlanStep? step, {required int index, required int total}) {
+    const head = 'Bàn kế hoạch.';
+    if (step == null) return '$head ${planComputing(index + 1, total)}';
+    final at = planStepHeader(index + 1, total);
+    if (step.kind == PlanStepKind.safety) return '$head $at: $planSafety';
+    return '$head $at: bi ${step.ballNum}, lỗ ${simPocket(step.pocket!)}, '
+        '${simStroke(step.stroke)}, lực ${step.power.round()}%.';
   }
 }
