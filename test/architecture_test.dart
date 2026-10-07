@@ -204,4 +204,21 @@ void main() {
           'import hình học, không có chiều ngược lại (spec 2026-10-07 mục 8)',
     );
   });
+
+  test('lõi Planner không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/planner');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'Planner phải chạy và đo được trên Dart VM thuần, và sau này '
+          'chuyển sang Web Worker hay điện thoại mà không đổi lõi (spec mục 2)',
+    );
+  });
 }
