@@ -90,3 +90,26 @@ class SafetyOption {
   String toString() => 'SafetyOption(${kind.name} bi $ballNum ${rails.map((r) => r.name).join('-')} '
       '$thickness ${side.name} ${stroke.name} $spin ${power.round()}%)';
 }
+
+/// Phương án thủ trực tiếp vào [target] với độ dày [thickness] lệch [side];
+/// null khi không dựng được bi ảo. Không kiểm đường chắn — [openContacts]
+/// đã lọc trước.
+SafetyOption? directOption(SafetyContext c, PlacedBall target, double thickness,
+    ThicknessSide side, Stroke stroke, SideSpin spin, double power) {
+  final lateral = contactLateral(thickness, side, table: c.table);
+  final g = directContact(c.cue, target.pos, lateral, table: c.table);
+  if (g == null) return null;
+  return SafetyOption(
+    kind: SafetyKind.direct,
+    ballNum: target.number,
+    ball: target.pos,
+    thickness: thickness,
+    side: side,
+    lateral: lateral,
+    stroke: stroke,
+    spin: spin,
+    power: power,
+    initialAim: g.aim,
+    contact: g.contact,
+  );
+}

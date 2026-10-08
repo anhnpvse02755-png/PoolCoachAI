@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
@@ -398,3 +399,12 @@ TableSetup eightSafetyTable() {
     ],
   );
 }
+
+/// Lõi thủ không bao giờ chạm bi và mô phỏng nào cũng quá giờ: mọi phương án
+/// thủ bị bỏ nhanh, bước phòng thủ ra với safety = null. Cho test chỉ cần biết
+/// kế hoạch dừng (spec cú phòng thủ 9.1.10).
+final noSafetyPhysics = SafetyPhysics(
+  probe: (input, {required maxRails}) =>
+      const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null),
+  simulate: (input) => throw SimulationTimeout(input),
+);
