@@ -151,12 +151,22 @@ void main() {
       expect(Vi.simBand(bandFor(7.4)), 'Dễ');
     });
 
-    test('lõi không mô phỏng được: nói thẳng, không có số nào của lõi', () {
+    test('lõi quá giờ: câu hỏi chờ nằm cuối nhãn, không có số nào của lõi', () {
       expect(
           Vi.simSummary(const Makeable(g), null,
-              elevation: CueElevation.normal, cannotSimulate: true),
+              elevation: CueElevation.normal, notice: Vi.simTimeoutQuestion),
           'Bàn mô phỏng. Lỗ góc trên phải, góc cắt 7°, Dễ. Độ dốc cơ: '
-          'Thường. ${Vi.simCannotSimulate}');
+          'Thường. ${Vi.simTimeoutQuestion}');
+    });
+
+    test('câu quá giờ đúng chữ đã chốt (spec cú phòng thủ mục 7)', () {
+      expect(Vi.simTimeoutQuestion,
+          'Cú này tính quá lâu, bạn muốn chờ hay bỏ qua chỉ vẽ đường ngắm?');
+      expect(Vi.simWait, 'Chờ');
+      expect(Vi.simAimOnly, 'Chỉ vẽ đường ngắm');
+      expect(Vi.simAimOnlyLine, 'Chỉ vẽ đường ngắm.');
+      expect(Vi.simTooLong, 'Cú này quá dài để mô phỏng.');
+      expect(Vi.simComputing, 'Đang tính…');
     });
 
     test('không đánh được thì chỉ nói lý do', () {

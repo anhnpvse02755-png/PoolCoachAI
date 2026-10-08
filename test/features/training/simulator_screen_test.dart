@@ -402,34 +402,133 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('lõi quá maxSimTime: chỉ vẽ hình học, báo một dòng, không vỡ',
-      (tester) async {
-    AimedShot timesOut({
-      required Vec2 cue,
-      required Vec2 object,
-      required Pocket pocket,
-      required Stroke stroke,
-      SideSpin spin = const SideSpin.none(),
-      required double power,
-      CueElevation elevation = CueElevation.normal,
-      TableSpec table = TableSpec.nineFoot,
-      bool compensate = true,
-      bool withUncompensated = true,
-      double maxTime = maxSimTime,
-    }) =>
-        throw SimulationTimeout(
-            ShotInput(cue: cue, object: object, aimAngle: 0, power: power));
+  group('lõi quá giờ: Chờ hay Chỉ vẽ đường ngắm (spec cú phòng thủ mục 7)', () {
+    /// aimShot thật, nhưng ở giới hạn mặc định thì cú khớp [slow] quá giờ;
+    /// [alwaysSlow] thì quá giờ cả khi chờ. Ghi lại giới hạn của mọi lần gọi.
+    AimShotFn slowAim(List<double> limits,
+            {bool Function(Stroke stroke)? slow, bool alwaysSlow = false}) =>
+        ({
+          required Vec2 cue,
+          required Vec2 object,
+          required Pocket pocket,
+          required Stroke stroke,
+          SideSpin spin = const SideSpin.none(),
+          required double power,
+          CueElevation elevation = CueElevation.normal,
+          TableSpec table = TableSpec.nineFoot,
+          bool compensate = true,
+          bool withUncompensated = true,
+          double maxTime = maxSimTime,
+        }) {
+          limits.add(maxTime);
+          final isSlow = (slow ?? (_) => true)(stroke);
+          if (isSlow && (alwaysSlow || maxTime < extendedSimTime)) {
+            throw SimulationTimeout(
+                ShotInput(cue: cue, object: object, aimAngle: 0, power: power));
+          }
+          return aimShot(
+              cue: cue,
+              object: object,
+              pocket: pocket,
+              stroke: stroke,
+              spin: spin,
+              power: power,
+              elevation: elevation,
+              table: table,
+              compensate: compensate,
+              withUncompensated: withUncompensated,
+              maxTime: maxTime);
+        };
 
-    await openWithAim(tester, timesOut);
+    Future<void> tapKey(WidgetTester tester, Key key) async {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.tap(find.byKey(key));
+    }
 
-    expect(tester.takeException(), isNull);
-    final scene = sceneOf(tester);
-    expect(scene.geometry, isNotNull);
-    expect(scene.aimed, isNull);
-    expect(find.text(Vi.simCannotSimulate), findsOneWidget);
-    expect(find.text(Vi.simPocketLine(initial.pocket)), findsOneWidget);
-    // Gợi ý vẫn chạy xong trên lõi thật.
-    expect(find.text(Vi.simComputing), findsNothing);
+    testWidgets('hỏi Chờ hay Chỉ vẽ đường ngắm, bàn tạm vẽ đường ngắm, không vỡ',
+        (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits));
+      expect(tester.takeException(), isNull);
+      expect(sceneOf(tester).geometry, isNotNull);
+      expect(sceneOf(tester).aimed, isNull);
+      expect(find.text(Vi.simTimeoutQuestion), findsOneWidget);
+      expect(find.byKey(SimulatorPanel.waitKey), findsOneWidget);
+      expect(find.byKey(SimulatorPanel.aimOnlyKey), findsOneWidget);
+      expect(find.text(Vi.simPocketLine(initial.pocket)), findsOneWidget);
+      expect(limits, everyElement(maxSimTime));
+    });
+
+    testWidgets('Chờ: vẽ Đang tính… trước, rồi tính lại gấp ba và vẽ đủ', (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits));
+      await tapKey(tester, SimulatorPanel.waitKey);
+
+      // Khung hình đầu chỉ vẽ chữ báo; chưa gọi lõi với giới hạn dài.
+      await tester.pump();
+      expect(find.text(Vi.simComputing), findsOneWidget);
+      expect(find.text(Vi.simTimeoutQuestion), findsNothing);
+      expect(limits, isNot(contains(extendedSimTime)));
+
+      // Lần tính chạy trong Timer sau khung hình: pump có thời lượng mới chạy Timer.
+      await tester.pump(Duration.zero);
+      expect(limits.last, extendedSimTime);
+      expect(sceneOf(tester).aimed, isNotNull);
+      expect(find.text(Vi.simComputing), findsNothing);
+      expect(find.byKey(SimulatorPanel.waitKey), findsNothing);
+    });
+
+    testWidgets('Chờ mà vẫn quá giờ: báo quá dài, giữ đường ngắm', (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits, alwaysSlow: true));
+      await tapKey(tester, SimulatorPanel.waitKey);
+      await tester.pump();
+      await tester.pump(Duration.zero);
+      expect(limits.last, extendedSimTime);
+      expect(find.text(Vi.simTooLong), findsOneWidget);
+      expect(sceneOf(tester).aimed, isNull);
+      expect(find.byKey(SimulatorPanel.waitKey), findsNothing);
+    });
+
+    testWidgets('Chỉ vẽ đường ngắm: giữ đường ngắm, câu đổi thành Chỉ vẽ đường ngắm.',
+        (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits));
+      await tapKey(tester, SimulatorPanel.aimOnlyKey);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.simAimOnlyLine), findsOneWidget);
+      expect(find.text(Vi.simTimeoutQuestion), findsNothing);
+      expect(sceneOf(tester).aimed, isNull);
+      expect(limits, everyElement(maxSimTime));
+    });
+
+    testWidgets('không nhớ lựa chọn: đổi kiểu đánh thì câu hỏi biến mất, cú quá giờ mới hỏi lại',
+        (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits, slow: (s) => s == Stroke.stun));
+      await tapKey(tester, SimulatorPanel.aimOnlyKey);
+      await tester.pumpAndSettle();
+
+      await tapText(tester, Vi.simStroke(Stroke.draw));
+      expect(find.text(Vi.simAimOnlyLine), findsNothing);
+      expect(find.text(Vi.simTimeoutQuestion), findsNothing);
+      expect(sceneOf(tester).aimed, isNotNull);
+
+      await tapText(tester, Vi.simStroke(Stroke.stun));
+      expect(find.text(Vi.simTimeoutQuestion), findsOneWidget);
+    });
+
+    testWidgets('đổi kiểu đánh trong lúc chờ: kết quả cũ không đè lên cú mới', (tester) async {
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits, slow: (s) => s == Stroke.stun));
+      await tapKey(tester, SimulatorPanel.waitKey);
+      await tester.pump();
+      // Chưa tính xong thì đổi sang trô: lần chờ cũ phải bỏ.
+      await tapText(tester, Vi.simStroke(Stroke.draw));
+      expect(limits, isNot(contains(extendedSimTime)));
+      expect(find.text(Vi.simStrokeLine(Stroke.draw)), findsOneWidget);
+      expect(find.text(Vi.simComputing), findsNothing);
+    });
   });
 
   testWidgets('dựng lại mà đầu vào không đổi thì không dò lại cú đánh',

@@ -12,7 +12,9 @@ class SimulatorPanel extends StatelessWidget {
   const SimulatorPanel({
     required this.shot,
     required this.aimed,
-    this.cannotSimulate = false,
+    this.timeout = SimTimeoutState.none,
+    this.onWait,
+    this.onAimOnly,
     required this.advice,
     required this.stroke,
     required this.power,
@@ -34,8 +36,14 @@ class SimulatorPanel extends StatelessWidget {
   final ShotResult? shot;
   final AimedShot? aimed;
 
-  /// Lõi không mô phỏng được cú này: [aimed] null mà vẫn có cú đánh.
-  final bool cannotSimulate;
+  /// Khoá hai nút khi lõi quá giờ, cho test.
+  static const waitKey = Key('simulator-wait');
+  static const aimOnlyKey = Key('simulator-aim-only');
+
+  /// Lõi quá giờ cho cú này (spec cú phòng thủ mục 7).
+  final SimTimeoutState timeout;
+  final VoidCallback? onWait;
+  final VoidCallback? onAimOnly;
 
   /// null khi gợi ý chống chết cái đang tính.
   final List<Advice>? advice;
@@ -106,7 +114,7 @@ class SimulatorPanel extends StatelessWidget {
                 for (final line in simulatorInfoLines(
                   shot: shot,
                   aimed: aimed,
-                  cannotSimulate: cannotSimulate,
+                  timeout: timeout,
                   advice: advice,
                   stroke: stroke,
                   power: power,
@@ -116,6 +124,26 @@ class SimulatorPanel extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(line, style: text.bodyMedium),
+                  ),
+                if (timeout == SimTimeoutState.asking)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton(
+                          key: waitKey,
+                          onPressed: onWait,
+                          child: const Text(Vi.simWait),
+                        ),
+                        OutlinedButton(
+                          key: aimOnlyKey,
+                          onPressed: onAimOnly,
+                          child: const Text(Vi.simAimOnly),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),

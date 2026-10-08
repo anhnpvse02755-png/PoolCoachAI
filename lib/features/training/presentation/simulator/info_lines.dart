@@ -45,16 +45,29 @@ AimShiftUnits? aimShiftUnits(double shiftCm, double ballDiameter) {
   );
 }
 
+/// Lõi quá giờ cho cú đang xem (spec cú phòng thủ mục 7): đang hỏi, đang
+/// chờ tính lại, chờ rồi vẫn quá giờ, hay người chơi chọn chỉ vẽ đường ngắm.
+enum SimTimeoutState { none, asking, waiting, tooLong, aimOnly }
+
+/// Câu của bảng thông tin cho [s]; null khi không quá giờ.
+String? simTimeoutLine(SimTimeoutState s) => switch (s) {
+      SimTimeoutState.none => null,
+      SimTimeoutState.asking => Vi.simTimeoutQuestion,
+      SimTimeoutState.waiting => Vi.simComputing,
+      SimTimeoutState.tooLong => Vi.simTooLong,
+      SimTimeoutState.aimOnly => Vi.simAimOnlyLine,
+    };
+
 /// Các dòng của bảng thông tin (spec 2026-10-02 mục 6.3).
 ///
 /// Hàm thuần, tách khỏi widget để test thẳng từng ngưỡng. Mọi số đều lấy
 /// từ [aimed] và lõi; ở đây chỉ chọn dòng nào hiện. [advice] null nghĩa
-/// là gợi ý chống chết cái đang tính. [cannotSimulate] là lõi chạy quá
-/// `maxSimTime` cho cú này ([aimed] khi đó null).
+/// là gợi ý chống chết cái đang tính. [timeout] là trạng thái lõi quá
+/// giờ ([aimed] khi đó null).
 List<String> simulatorInfoLines({
   required ShotResult? shot,
   required AimedShot? aimed,
-  bool cannotSimulate = false,
+  SimTimeoutState timeout = SimTimeoutState.none,
   required List<Advice>? advice,
   required Stroke stroke,
   required double power,
@@ -78,7 +91,7 @@ List<String> simulatorInfoLines({
         Vi.simPowerLine(power),
         Vi.simSpinLine(spin),
         Vi.simElevationLine(elevation),
-        if (cannotSimulate) Vi.simCannotSimulate,
+        ?simTimeoutLine(timeout),
         if (aimed != null &&
             stroke == Stroke.stun &&
             aimed.stunReached &&

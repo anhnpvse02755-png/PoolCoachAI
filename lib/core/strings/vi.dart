@@ -466,8 +466,14 @@ abstract final class Vi {
   }
 
   static const simShowingUncompensated = 'Đang xem đường không bù ném.';
-  static const simCannotSimulate =
-      'Không mô phỏng được cú này — chỉ vẽ đường ngắm.';
+
+  // Lõi quá maxSimTime — docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md mục 7.
+  static const simTimeoutQuestion =
+      'Cú này tính quá lâu, bạn muốn chờ hay bỏ qua chỉ vẽ đường ngắm?';
+  static const simWait = 'Chờ';
+  static const simAimOnly = 'Chỉ vẽ đường ngắm';
+  static const simAimOnlyLine = 'Chỉ vẽ đường ngắm.';
+  static const simTooLong = 'Cú này quá dài để mô phỏng.';
 
   /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây — nên
   /// có đủ số lần chạm băng và độ dốc cơ để phân biệt từng cảnh.
@@ -476,7 +482,7 @@ abstract final class Vi {
     AimedShot? aimed, {
     required CueElevation elevation,
     bool showingUncompensated = false,
-    bool cannotSimulate = false,
+    String? notice,
   }) {
     const head = 'Bàn mô phỏng.';
     return switch (shot) {
@@ -486,7 +492,7 @@ abstract final class Vi {
           '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
           '${simElevationLine(elevation)}.',
-          if (cannotSimulate) simCannotSimulate,
+          ?notice,
           if (aimed != null && aimed.trace.cueRailCount > 0)
             simRailCount(aimed.trace.cueRailCount),
           if (aimed?.trace.cuePocket != null) 'Chết cái.',

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -11,7 +13,9 @@ import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_panel_layout.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
@@ -90,6 +94,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   /// null khi lõi quá maxSimTime cho cú này.
   AimedShot? _aimed;
+
+  /// Lõi quá giờ cho cú đang xem. Mỗi cú mới bắt đầu lại từ đầu: không nhớ
+  /// lựa chọn Chờ hay Chỉ vẽ đường ngắm (spec cú phòng thủ quyết định 10).
+  SimTimeoutState _timeout = SimTimeoutState.none;
 
   @override
   void initState() {
@@ -234,30 +242,80 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
     if (key == _aimKey) return _aimed;
     AimedShot? aimed;
+    var timeout = SimTimeoutState.none;
     try {
-      aimed = widget.aim(
-        cue: g.cue,
-        object: g.object,
-        pocket: g.pocket,
-        stroke: _stroke,
-        spin: _spin,
-        power: _power,
-        elevation: _elevation,
-        table: _table,
-        withUncompensated: showRed,
-      );
+      aimed = _aim(key, maxSimTime);
     } on SimulationTimeout {
-      // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
-      // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi. Quá
-      // giờ là kết quả tất định của cú này nên nhớ được như mọi kết quả.
-      aimed = null;
+      // Quá giờ (spec mục 4.5): không ném tiếp trong build, vẽ hình học
+      // và hỏi người chơi có muốn chờ không (spec cú phòng thủ mục 7).
+      timeout = SimTimeoutState.asking;
     }
     // Chỉ gán khoá khi đã có kết quả (spec 2026-10-07 mục 8): lỗi khác ném
     // ra giữa chừng mà khoá đã đổi thì lần dựng sau trả nhầm cú cũ dưới
     // khoá mới.
     _aimKey = key;
+    _timeout = timeout;
     return _aimed = aimed;
   }
+
+  AimedShot _aim(
+          (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool) key,
+          double maxTime) =>
+      widget.aim(
+        cue: key.$1,
+        object: key.$2,
+        pocket: key.$3,
+        stroke: key.$4,
+        spin: key.$5,
+        power: key.$6,
+        elevation: key.$7,
+        table: _table,
+        withUncompensated: key.$8,
+        maxTime: maxTime,
+      );
+
+  /// *Chờ*: vẽ xong khung hình có chữ "Đang tính…" rồi mới tính — tính
+  /// ngay trong lúc bấm thì màn đứng 1–3 giây mà không có chữ nào báo.
+  /// Lần tính này không chia lát được.
+  void _wait() {
+    final key = _aimKey;
+    if (key == null) return;
+    setState(() => _timeout = SimTimeoutState.waiting);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      // Sau khung hình, nhường trình duyệt vẽ ra màn rồi mới tính.
+      Timer.run(() => _computeLonger(key));
+    });
+  }
+
+  /// Khoá của cú đang chỉnh trên màn, tính từ trạng thái hiện tại — không từ
+  /// [_aimKey], vì đổi nút chỉnh chỉ cập nhật [_aimKey] ở lần dựng sau, mà
+  /// lần tính chờ có thể chạy trước lần dựng đó.
+  (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool)? _currentKey() {
+    final shot = _shot();
+    if (shot is! Makeable) return null;
+    final g = shot.geometry;
+    final showRed = SimulatorScreen.canShowUncompensated(g, _spin) && _showUncompensated;
+    return (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
+  }
+
+  void _computeLonger(
+      (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool) key) {
+    // Đã đổi cú hay rời màn trong lúc chờ: bỏ, không đè lên cú mới.
+    if (!mounted || key != _currentKey() || _timeout != SimTimeoutState.waiting) return;
+    AimedShot? aimed;
+    var timeout = SimTimeoutState.none;
+    try {
+      aimed = _aim(key, extendedSimTime);
+    } on SimulationTimeout {
+      timeout = SimTimeoutState.tooLong;
+    }
+    setState(() {
+      _aimed = aimed;
+      _timeout = timeout;
+    });
+  }
+
+  void _aimOnly() => setState(() => _timeout = SimTimeoutState.aimOnly);
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +330,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
     // khi nó thật sự được vẽ.
     final aimed = geometry == null ? null : _aimFor(geometry, showRed);
-    final cannotSimulate = geometry != null && aimed == null;
+    final timeout = geometry == null ? SimTimeoutState.none : _timeout;
     final scene = SimulatorScene(
       cue: _cue,
       object: _object,
@@ -291,7 +349,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
           label: Vi.simSummary(shot, aimed,
               elevation: _elevation,
               showingUncompensated: showRed,
-              cannotSimulate: cannotSimulate),
+              notice: simTimeoutLine(timeout)),
           child: GestureDetector(
             key: SimulatorScreen.tableKey,
             dragStartBehavior: DragStartBehavior.down,
@@ -309,7 +367,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         panel: SimulatorPanel(
           shot: shot,
           aimed: aimed,
-          cannotSimulate: cannotSimulate,
+          timeout: timeout,
+          onWait: _wait,
+          onAimOnly: _aimOnly,
           advice: _advice,
           stroke: _stroke,
           power: _power,
