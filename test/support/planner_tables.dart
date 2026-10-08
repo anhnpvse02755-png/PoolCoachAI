@@ -4,6 +4,7 @@ import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/shot_options.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
@@ -187,6 +188,7 @@ AimShotFn scratchingAim(
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) {
       final real = aimShot(
           cue: cue,
@@ -198,7 +200,8 @@ AimShotFn scratchingAim(
           elevation: elevation,
           table: table,
           compensate: compensate,
-          withUncompensated: withUncompensated);
+          withUncompensated: withUncompensated,
+          maxTime: maxTime);
       if (!when(object, stroke, spin, power)) return real;
       final t = real.trace;
       return AimedShot(
@@ -234,6 +237,7 @@ AimShotFn timeoutAim(
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) {
       if (when(object, stroke, spin, power)) {
         throw SimulationTimeout(
@@ -249,7 +253,8 @@ AimShotFn timeoutAim(
           elevation: elevation,
           table: table,
           compensate: compensate,
-          withUncompensated: withUncompensated);
+          withUncompensated: withUncompensated,
+          maxTime: maxTime);
     };
 
 /// aimShot thật, ghi lại kiểu đánh, áp phê và lực của mọi lần gọi.
@@ -265,6 +270,7 @@ AimShotFn recordingAim(void Function(Stroke stroke, SideSpin spin, double power)
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) {
       record(stroke, spin, power);
       return aimShot(
@@ -277,7 +283,8 @@ AimShotFn recordingAim(void Function(Stroke stroke, SideSpin spin, double power)
           elevation: elevation,
           table: table,
           compensate: compensate,
-          withUncompensated: withUncompensated);
+          withUncompensated: withUncompensated,
+          maxTime: maxTime);
     };
 
 /// Mọi thứ của một kế hoạch mà người chơi thấy hoặc bước sau dựa vào, đủ

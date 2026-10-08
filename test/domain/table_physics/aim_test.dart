@@ -8,6 +8,7 @@ import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
 import 'package:poolcoachai/domain/table_physics/constants.dart';
+import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 import '../../support/table_layouts.dart';
@@ -353,5 +354,41 @@ void main() {
     final a = aim(geometryFor(const Vec2(180, 40), Pocket.topRight, 25),
         Stroke.follow, spin: right1);
     expect(identical(a.trace.cueEnd, a.trace.cueAfter.last), isTrue);
+  });
+
+  group('dùng chung cho Planner thủ bi (spec cú phòng thủ)', () {
+    test('aimShot nhận giới hạn thời gian; mặc định maxSimTime', () {
+      AimedShot run([double maxTime = maxSimTime]) => aimShot(
+          cue: const Vec2(60, 63.5),
+          object: const Vec2(127, 63.5),
+          pocket: Pocket.topRight,
+          stroke: Stroke.stun,
+          power: 90,
+          maxTime: maxTime);
+      expect(() => run(), returnsNormally);
+      expect(() => run(0.05), throwsA(isA<SimulationTimeout>()));
+    });
+
+    test('kiểu đánh ra b: cu lê trên tâm, trô dưới tâm, đứng bi bắt đầu từ tâm', () {
+      const r = 2.8575;
+      expect(strokeVerticalOffset(Stroke.follow, r), strokeOffset * r);
+      expect(strokeVerticalOffset(Stroke.draw, r), -strokeOffset * r);
+      expect(strokeVerticalOffset(Stroke.stun, r), 0);
+    });
+
+    test('solveStun với hàm đo xoáy mặc định cho đúng kết quả cũ', () {
+      final input = ShotInput(
+        cue: const Vec2(40, 63.5),
+        object: const Vec2(160, 63.5),
+        aimAngle: 0,
+        power: 45,
+        elevation: CueElevation.normal.radians,
+      );
+      final (a, reachedA) = solveStun(input);
+      final (b, reachedB) = solveStun(input, topspin: topspinAtContact);
+      expect(a.verticalOffset, b.verticalOffset);
+      expect(reachedA, reachedB);
+      expect(topspinOf(probeContact(a)!.cueAtContact).abs(), lessThan(stopSpin));
+    });
   });
 }

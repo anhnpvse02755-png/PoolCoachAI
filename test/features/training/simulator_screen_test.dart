@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
@@ -414,6 +415,7 @@ void main() {
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) =>
         throw SimulationTimeout(
             ShotInput(cue: cue, object: object, aimAngle: 0, power: power));
@@ -444,6 +446,7 @@ void main() {
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) {
       calls++;
       return aimShot(
@@ -456,7 +459,8 @@ void main() {
           elevation: elevation,
           table: table,
           compensate: compensate,
-          withUncompensated: withUncompensated);
+          withUncompensated: withUncompensated,
+          maxTime: maxTime);
     }
 
     await openWithAim(tester, counting);
@@ -489,6 +493,7 @@ void main() {
       TableSpec table = TableSpec.nineFoot,
       bool compensate = true,
       bool withUncompensated = true,
+      double maxTime = maxSimTime,
     }) {
       calls++;
       if (failNext) {
@@ -505,7 +510,8 @@ void main() {
           elevation: elevation,
           table: table,
           compensate: compensate,
-          withUncompensated: withUncompensated);
+          withUncompensated: withUncompensated,
+          maxTime: maxTime);
     }
 
     await openWithAim(tester, flaky);

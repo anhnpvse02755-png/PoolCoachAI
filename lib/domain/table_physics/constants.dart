@@ -62,6 +62,10 @@ const stopSpin = 0.5;
 /// Trần an toàn, s. Vượt là lỗi chứ không phải kết quả.
 const maxSimTime = 20.0;
 
+/// Màn mô phỏng: người chơi bấm *Chờ* thì tính lại với giới hạn này
+/// (spec cú phòng thủ mục 7). Planner không bao giờ chờ.
+const extendedSimTime = 3 * maxSimTime;
+
 /// Dừng dò bù ném khi hướng bi mục tiêu sai dưới mức này, độ.
 const aimTolerance = 0.05;
 
