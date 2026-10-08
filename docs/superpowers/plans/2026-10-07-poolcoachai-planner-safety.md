@@ -4,14 +4,14 @@
 
 **Goal:** On the branch that already holds *Kế hoạch dọn bàn*, before it merges:
 - set the planner's slice to 4 ms (owner decision);
-- replace the bare *phòng thủ* step with a real safety-shot search: direct safeties when the cue ball sees a legal ball, *A băng* kicks of 1–3 rails (4 rails as the last resort) when it is *bị đui*;
+- replace the bare *phòng thủ* step with a real safety-shot search: direct safeties on every legal ball the cue ball sees (no-spin options first, *áp phê* only when none of them is legal), then *A băng* kicks of 1–3 rails whether or not the cue ball is *bị đui*, all in one search; 4 rails only as the last resort (owner decisions 2026-10-08);
 - ask *Chờ / Chỉ vẽ đường ngắm* when the Cut Angle Simulator times out.
 
 **Architecture:** The safety search is plain Dart in `lib/domain/planner/`, built on the physics core.
 - Geometry (`safety_geometry.dart`) classifies *bị đui*, lists the visible thicknesses, unfolds rail sequences by mirror images, and converts rail hits to *chấm*.
 - `safety_aim.dart` refines each option's cue direction with real simulation. A secant on the aim angle drives the measured lateral contact offset to its target, after exactly the option's rail sequence, then one full `simulateShot` runs.
 - `safety_rules.dart` rejects fouls; `safety_scoring.dart` scores the opponent's position (worst of ±15 %) plus the owner's penalties.
-- `SafetyJob` slices the search like `PlannerJob`: every unit re-runs the pure evaluation over a memo and does exactly one new simulation, so slicing never changes the result. A cursor keeps evaluated options, so replay cost stays flat.
+- `SafetyJob` slices the search like `PlannerJob`: every unit re-runs the pure evaluation over a memo and does exactly one new simulation, so slicing never changes the result. A cursor keeps evaluated options, so replay cost stays flat. Options are added stage by stage in a fixed order (per ball: direct without spin, then direct with *áp phê* only if needed; then kicks of 1–3 rails; then 4 rails only if nothing is legal), and whether a stage opens depends only on memoised results, never on pruning.
 - `PlannerJob` hands its safety step to a `SafetyJob` and reports the step when the search ends.
 - The simulator gains an optional time limit on `simulateShot` / `aimShot` and a wait flow that paints *Đang tính…* before it computes.
 
@@ -25,7 +25,7 @@
 
 The spec was checked against the code at `a35667b`. The numbers below were measured on the Dart VM with a throwaway prototype in a temporary worktree of `feat/run-out-planner` (detached at `a35667b`, removed afterwards). The prototype ran the real `simulateShot`, `probeContact`, a kick probe equal to Task 17's `probeKick`, the mirror start and secant of Task 20, and a simplified version of the rules and scoring of Task 21. The owner should see this list before execution.
 
-1. **The "vài giây" target (spec §6) is not reachable with 675 direct options per ball on the main thread. Task 25 is a hard stop for the owner.**
+1. **The "vài giây" target (spec §6) was not reachable with 675 direct options per ball on the main thread, and is still not reachable after the owner decisions of 2026-10-08 (last bullet). Task 25 is a hard stop for the owner.**
    - One full `simulateShot` of a 90 cm safety took 2.4 ms at 30 %, 2.6 ms at 60 % and 4.6 ms at 90 % on the VM. A `probeContact` took 0.08–0.17 ms.
    - The direct search of one legal ball with all 675 options and both ±15 % levels needed 1509 full simulations and 1374 probes: 7.0 s.
    - With the exact pruning of item 4 it needed 602–784 full simulations and 1270–1500 probes: 1.9–11.0 s on nine tables (the machine was noisy; the fast end had only 8 legal options).
@@ -33,34 +33,55 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
    - The plan's own code (see "How this plan was checked") took 1.6–10.2 s per safety step on the VM over the five fixtures, 4.2–5.0 s for the two tables of the perf test.
    - Chrome runs about 2× the VM. With a 4 ms slice per 16.7 ms frame, the wall time is about 4× the CPU time. So one safety step would take roughly 15–90 s in Chrome, and 3–22 s even in a Web Worker.
    - The plan builds what the spec says, measures it in Task 25, and stops there with these numbers. Candidate changes for the owner are listed in Task 25. A Web Worker is a separate project after merge and out of scope here.
+   - **After the owner decisions of 2026-10-08** (áp phê as a fallback, kicks always tried), the numbers above are historical and Task 25 re-measures them. A plan-time re-run of the amended code on the VM (see "How this plan was checked") gave: `noPotTable` 394 units, about 1.1 s (was 1146 units, 3.8–4.2 s); `eightSafetyTable` 904 units, 4.9 s (was 1412, 10.2 s); the three kick tables unchanged (689 / 399 / 137 units). So "vài giây" is still out of reach on the kick tables.
 2. **Units of work.** One unit is either an *aim* unit or a *sim* unit. An aim unit is a contact refinement (cheap probes, plus a stun solve) for one option, like one `aimShot` is one unit in `PlannerJob`. A sim unit is one full `simulateShot`. Either way, a unit performs exactly one new memo entry.
 3. **`SafetyJob` keeps a cursor instead of replaying from step 1.**
    - `PlannerJob` re-runs `planStep` from scratch after each simulation. That costs nothing there (about 60 memo lookups). With about 2000 simulations per search, each full replay would also redo every opponent evaluation, and the cost would grow quadratically.
    - So `SafetyJob` stores each finished option's evaluation and re-runs only the current option's pure evaluation over the memo. The order is fixed and the evaluation is pure, so sliced and one-shot runs stay identical (tested in Task 22).
-4. **Exact pruning.** Spec §3.3 "675 phương án": every option is still considered, in the fixed order, but two bounds skip simulations of options that cannot win.
+4. **Exact pruning.** Spec §3.3 "675 phương án": every option of every opened stage is still considered, in the fixed order (since 2026-10-08 the *áp phê* options of a ball are a stage that opens only when needed, see the owner decisions), but two bounds skip simulations of options that cannot win.
    - Before any simulation: an option's total is at least its penalties plus the lowest possible score (two near-rail bonuses and the table diagonal times `distanceWeight`). If that is not below the best total so far, the option is skipped.
    - After the chosen-power level: the worst of three levels is at least that level. If it plus the penalties is not below the best, the ±15 % levels are not simulated.
    - Ties keep the earlier option, so `>=` is the right test, and the chosen shot is the same as without pruning (tested in Task 22 against `prune: false`).
-5. **The cue ball after contact passing through another ball is a foul.** Spec §3.5 does not list it. The two-ball simulation cannot say where the cue ball stops after hitting a third ball, so the scoring would rest on a fiction. The pot planner rejects the same case (spec gốc §4.3). Owner question in Task 29.
+   - Since 2026-10-08 the options come in stages (owner decisions below). Pruning must not change *which* stages open, or the pruned and unpruned searches would consider different option sets. So the *áp phê* stage of a ball asks `isLegalOption` (aim converged and the chosen power legal, no bound) of that ball's no-spin options in order until one is legal: evaluated options answer from the memo, and an option pruned before its aim is aimed and simulated at its chosen power. The 4-rail stage opens on `best == null`, which only happens before anything is legal, i.e. before any pruning. Tested in Task 22 (`cắt tỉa không đổi cú được chọn và các chặng được mở`).
+   - Direct options come before every kick, so a good direct shot gives a bound that skips most kicks before their aim: every kick carries at least `kickRailPenalty[1]` = 10 more than a direct shot of the same stroke and power.
+5. **The cue ball after contact passing through another ball is a foul.** Spec §3.5 does not list it. The two-ball simulation cannot say where the cue ball stops after hitting a third ball, so the scoring would rest on a fiction. The pot planner rejects the same case (spec gốc §4.3). **Owner-confirmed 2026-10-08.**
 6. **An option counts only if its chosen power is legal.** Spec §4.1 gives 95 to an illegal level, but an illegal chosen power would make the option itself a foul (spec §3.5 "loại phương án"). Only the ±15 % levels can be illegal and score 95.
 7. **Which ball "near rail" and "distance" use when the opponent is *bị đui* or has no pocket.** The spec's choice is "bi đối thủ phải đánh dễ nhất", which does not exist in those cases. The plan uses the lowest-numbered opponent target. With no target at all (8-ball, no opponent ball and no 8), the opponent part is 0 and both terms are skipped.
 8. **"Cách băng ≤ 5,7 cm"** is the gap between the ball and the cushion, i.e. the ball centre's distance to its bound line (`TableSpec.minX` …) is at most `nearRailDiameters × ballDiameter`. `nearRailDistance = ballDiameter` is not a compile-time constant (`TableSpec.nineFoot.ballDiameter` is an instance field), so the constant is `nearRailDiameters = 1.0`.
-9. **Counting *chấm* on the short rails.** Spec decision 5 says "đếm từ góc trái của băng theo hướng nhìn trên màn". A vertical rail on the screen has a top and a bottom, not a left. The plan counts long rails from x = 0 (the left corner) and short rails from y = 0 (the top corner). The *chấm* is the projection of the cue-ball centre's contact with the cushion, taken from the simulated trace, not from the mirror start. Owner question in Task 29.
+9. **Counting *chấm* on the short rails.** Spec decision 5 says "đếm từ góc trái của băng theo hướng nhìn trên màn". A vertical rail on the screen has a top and a bottom, not a left. The plan counts long rails from x = 0 (the left corner) and short rails from y = 0 (the top corner). The *chấm* is the projection of the cue-ball centre's contact with the cushion, taken from the simulated trace, not from the mirror start. **Owner-confirmed 2026-10-08.**
 10. **Stun in a safety.** "Đánh đứng bi" uses the stun offset solved by the core's own `solveStun`, made public with a pluggable spin probe so it also works after rails. For a stun option, the aim is refined at `b = 0`, then the stun is solved at that aim, then the aim is refined again: two rounds, like `aimShot`.
 11. **The pocket mouth for kicks** (spec §3.4 "điểm chạm băng rơi vào miệng lỗ"): a geometric rail hit closer than `captureRadius(pocket) + ballDiameter` to a pocket point (11.7 cm at a corner, 10.7 cm at a side pocket). No new constant.
 12. **Order inside the fixed tie-break order** (spec §4.2 leaves these open):
     - rail sequences of the same length in generation order (left, right, top, bottom at each position);
     - kick contacts: full, then ½ left, then ½ right;
     - direct thicknesses: full, ¾ left, ¾ right, ½ left, ½ right, ¼ left, ¼ right, ⅛ left, ⅛ right;
-    - spins: none, left ½, left 1, right ½, right 1.
-13. **Direct and kick never compete in one search.** Spec §3.2 searches kicks only when *bị đui* and direct safeties only when not. Spec test 9.1.7 ("cú đơn giản thắng khi gần ngang") therefore cannot happen inside one search, and Task 21 tests it on the scoring itself. Owner question in Task 29: should a not-snookered table also try kicks?
-14. **8-ball *bị đui*:** kicks are tried on every legal ball, which multiplies the cost by the number of legal balls.
+    - spins, inside a ball's *áp phê* stage: left ½, left 1, right ½, right 1 (no spin is the ball's own earlier stage);
+    - stages (owner decisions 2026-10-08): for each visible legal ball, number ascending, its no-spin direct options, then its *áp phê* options if needed; then kicks of 1–3 rails over every legal ball (rail count, ball, sequence, contact, stroke, power); then the 4-rail stage.
+13. **Direct and kick compete in one search** *(changed by the owner, 2026-10-08; was "never compete")*. Spec §3.2 searched kicks only when *bị đui*. Now a table that is not *bị đui* also tries kicks of 1–3 rails after its direct options, and both are scored by the same total; `kickRailPenalty` keeps a direct shot ahead when the two are close. When the cue ball is *bị đui* there are no direct options, so the search is kicks only, as before. Spec test 9.1.7 ("cú đơn giản thắng khi gần ngang") is now tested inside one real search in Task 23 (`noPotTable`, `eightSafetyTable`: kicks considered, a direct shot chosen), and Task 21 keeps the scoring-level check of the margin.
+14. **Kicks are tried on every legal ball** (8-ball: every ball of the player's group, or the 8), on every table now, not only when *bị đui*. This multiplies the kick cost by the number of legal balls. Exact pruning (deviation 4) skips most of it once a good direct shot exists: at plan time `noPotTable` aimed kicks of 1 rail only, `eightSafetyTable` of 1–3 rails.
 15. **Thickness side.** "Lệch bên trái" means the cue-ball centre passes to the left of the object-ball centre, seen from behind the cue ball along the shot (the cue ball takes the object's left half). In code a positive lateral offset is left, measured as `(cueAtContact.pos − ball) · leftOf(velocity)` with `leftOf(d) = (d.y, −d.x)` on the y-down screen.
 16. **The 8-ball safety step keeps `PlanStep.ballNum == null`** (as before). The touched ball is `safety.ballNum`, and the steps view shows it.
 17. **`AimShotFn` gains `double maxTime`.** Every fake in the tests must accept it (three in `test/support/planner_tables.dart`, three in `test/features/training/simulator_screen_test.dart`).
 18. **The simulator's *Đang tính…* line reuses `Vi.simComputing`.** The spec's wording is the same text.
 19. **PRD:** spec §8 says to amend "§5.4 / §5.5". In `PRD_RunOutPlanner.md` the fallback order lives in §5.3 and the loop in §5.4; §5.5 is the miss advice. The plan amends §4, §5.1, §5.3, §5.4, adds §5.6 and §6.7, and changes §8. §8 has no line that names *cú phòng thủ* as out of scope, so the plan adds one rather than removing one.
 20. **"Vài giây"** is read as at most 5 s of wall time in Chrome mobile emulation, from *Lập kế hoạch* to the safety step. Task 25 derives a VM gate of 600 ms from it.
+
+## Owner decisions (2026-10-08)
+
+The owner answered four of the plan's open questions before execution. The tasks below already carry these answers.
+
+1. **Áp phê is a fallback inside the safety search** *(changes spec decision 4 and spec §3.3)*.
+   - For each visible legal ball, the search first considers only its no-spin direct options: open thicknesses × đứng / cu lê / trô × 5 powers, at most 135.
+   - Only if **none** of those is legal (aim converged and the chosen power has no foul) does it add that ball's *áp phê* options (left ½, left 1, right ½, right 1: at most 540), right after them and before the next ball.
+   - Kicks have no spin dimension (`kickStrokes` = đứng, cu lê; `SafetyOption.spin` stays `SideSpin.none()`), so nothing changes for them.
+   - Constant: `safetySpins` (5 entries) becomes `safetySideSpins` (the 4 spins). `directOptions(c)` becomes `directOptions(c, target, spins)`.
+   - Determinism, "sliced == one-shot" and "prune == no-prune" hold: see deviation 4. Tests: Task 21 (`isLegalOption`), Task 22 (no spin option listed when a no-spin option is legal; the spin stage opens, right after its ball, when none is; sliced and pruned runs open the same stages), Task 23 (on every fixture, no spin option is ever listed).
+2. **A băng is always tried, also when the cue ball is not *bị đui*** *(changes spec §3.2 and deviation 13)*.
+   - Direct and kick options compete in one search by the same total. The tier structure for kicks stays: 1–3 rails, then 4 rails only as the last resort when nothing else, direct or kick, is legal.
+   - Fixed order: all direct stages first, then kicks, so the best direct shot prunes kicks before their aim (deviation 4).
+   - `SafetyJob` gains `enum SafetyTier { direct, directSpin, kick, kickFallback }`, `typedef SafetyStage = ({SafetyTier tier, int? ballNum})`, `stages` and `openedStages`. `maxOptions` now caps each stage, not the whole list.
+3. **Deviation 5** (the cue path after contact through another ball is a foul): confirmed as written.
+4. **Deviation 9** (short-rail *chấm* counted from the top corner; the *chấm* is the projection of the traced cue-ball contact): confirmed as written.
 
 ## How this plan was checked
 
@@ -86,6 +107,20 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
 
   - Task 25's perf test with `sliceBudget` at 4 ms: one-shot searches took 5045 ms (kick table) and 4174 ms (no-pot table) against the 600 ms gate, so it fails as expected. The slice median while searching was 4.9 ms on a quiet run and 7.6 ms on a contended one (gate 6 ms).
   - Tasks 18, 26–29 (screens, strings, PRD, Chrome) were not run at plan time.
+- **Re-checked after the owner decisions of 2026-10-08.** The same temporary worktree was reset to `a35667b`, the previously validated code restored, and the amended code of Tasks 19, 21 and 22 and the amended tests of Tasks 21–23 applied exactly as written here:
+  - `flutter analyze` (whole project): `No issues found!`;
+  - `flutter test test/domain` (350 tests, perf and probe skipped) and `flutter test test/features/training test/architecture_test.dart` (137): all pass. That includes Task 22's job tests (14), Task 23's spec tests (9) and Task 24's `planner_job_test.dart`;
+  - Task 22's probe, one-shot:
+
+    | Fixture | Chosen | Units | Stages opened | VM time |
+    |---|---|---|---|---|
+    | `snookerOneRailTable` | unchanged (A băng 1 băng, chấm 3,5 băng dài dưới, cu lê 90 %) | 689 | kick | 4.2 s |
+    | `snookerTwoRailTable` | unchanged (A băng 2 băng, chấm 2 băng ngắn trái, cu lê 45 %) | 399 | kick | 2.8 s |
+    | `snookerThreeRailTable` | unchanged (A băng 3 băng, chấm 0,5 băng ngắn phải) | 137 | kick | 1.3 s |
+    | `noPotTable` | unchanged (¼ bi lệch phải, đứng bi 45 %); kicks of 1 rail aimed, the rest pruned | 394 | direct 1 → kick | 1.1 s |
+    | `eightSafetyTable` | unchanged (¾ bi lệch phải, đứng bi 45 %, đối thủ bi 10); kicks of 1–3 rails aimed | 904 | direct 1 → kick | 4.9 s |
+
+  - Task 25's perf test: 6242 ms (kick table, a noisy run; the probe read 4.2 s for the same search) and 1074 ms (no-pot table) against the 600 ms gate, so it still fails. Slice median 3.8 ms, p95 8.0 ms (gate on the median: 6 ms).
 
 ## Global Constraints
 
@@ -98,7 +133,7 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
   - `nearRailBonus = 5`, `nearRailDiameters = 1.0` (`nearRailDistance = ballDiameter`);
   - `safetyThicknesses = [1, ¾, ½, ¼, ⅛]`, `kickThicknesses = [1, ½]`;
   - `maxKickRails = 4`, `kickFallbackRails = 4`, `opponentHardAngle = zoneFair`;
-  - `safetySpins` = none, left ½, left 1, right ½, right 1; `kickStrokes` = đứng, cu lê;
+  - `safetySideSpins` = left ½, left 1, right ½, right 1 (the *áp phê* fallback; no spin is tried first, owner decision 2026-10-08); `kickStrokes` = đứng, cu lê (kicks carry no spin);
   - added by this plan: `contactTolerance = 0.02` (ball diameters), `maxContactProbes = 16`, `contactMaxStepDeg = 2.0`, `contactStartStepDeg = 0.5`, `longRailDiamonds = 8`, `shortRailDiamonds = 4`.
 - **Physics constants:** `extendedSimTime = 3 * maxSimTime` (60 s simulated) in `lib/domain/table_physics/constants.dart`.
 - **Safety score** (lower is better): worst of three power levels (chosen, −15 %, +15 %, clamped at 100 %) of `opponent part − 5 per near-rail ball − distance × distanceWeight`, plus `techPenaltyFor(stroke, spin) + kickRailPenalty[rails] + power × powerPenaltyPerPercent`. Opponent part = 0 if *bị đui*, else `blockedAngle − easiest cut angle` (0 with no pocket). An illegal ±15 % level scores `blockedAngle` (95).
@@ -148,8 +183,8 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
 | `lib/domain/planner/kick_search.dart` | `kickOption`, `kickOptions` |
 | `lib/domain/planner/safety_aim.dart` | `SafetyPhysics`, `SimKey`, `AimResult`, `refineContact`, `aimSafety`, `simulateSafety`, `aimOffsetDegOf` |
 | `lib/domain/planner/safety_rules.dart` | `SafetyFoul`, `safetyFoulOf` |
-| `lib/domain/planner/safety_scoring.dart` | `opponentTargets`, `opponentView`, `SafetyLevel`, `levelOf`, penalties, `scoreFloor`, `SafetyLookup`, `DirectSafetyLookup`, `SafetyEval`, `evaluateOption`, `beats`, `safetyToleranceOf`, `buildSafetyShot` |
-| `lib/domain/planner/safety_job.dart` | `SafetyJob`, `searchToEnd` |
+| `lib/domain/planner/safety_scoring.dart` | `opponentTargets`, `opponentView`, `SafetyLevel`, `levelOf`, penalties, `scoreFloor`, `SafetyLookup`, `DirectSafetyLookup`, `SafetyEval`, `evaluateOption`, `isLegalOption`, `beats`, `safetyToleranceOf`, `buildSafetyShot` |
+| `lib/domain/planner/safety_job.dart` | `SafetyTier`, `SafetyStage`, `SafetyJob`, `searchToEnd` |
 | `lib/domain/planner/plan_step.dart` | `PlanStep.safety` field |
 | `lib/domain/planner/planner_job.dart` | hands the safety step to a `SafetyJob`; `searchingSafety`; `safety` physics |
 | `lib/core/strings/vi.dart` | simulator wait strings (`simCannotSimulate` removed), safety strings, `planSummary` |
@@ -943,7 +978,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `isPathClear` (`path_clear.dart`), `TableSpec`, `Vec2`, `Rail`, `BallState`, `legalTargetsAmong`, `obstaclesFor`, `CandidateFinder`, `blockedAngle`, `zoneFair`.
 - Produces:
-  - constants: `safetyThicknesses`, `kickThicknesses`, `safetySpins`, `kickStrokes`, `kickRailPenalty` (`Map<int, double>`), `maxKickRails`, `kickFallbackRails`, `nearRailBonus`, `nearRailDiameters`, `opponentHardAngle`, `contactTolerance`, `maxContactProbes`, `contactMaxStepDeg`, `contactStartStepDeg`, `longRailDiamonds`, `shortRailDiamonds`.
+  - constants: `safetyThicknesses`, `kickThicknesses`, `safetySideSpins`, `kickStrokes`, `kickRailPenalty` (`Map<int, double>`), `maxKickRails`, `kickFallbackRails`, `nearRailBonus`, `nearRailDiameters`, `opponentHardAngle`, `contactTolerance`, `maxContactProbes`, `contactMaxStepDeg`, `contactStartStepDeg`, `longRailDiamonds`, `shortRailDiamonds`.
   - `safety_shot.dart`: `enum SafetyReason { snookered, noPot }`, `enum SafetyKind { direct, kick }`, `enum ThicknessSide { full, left, right }`, `class RailAim({required Rail rail, required double diamond, required Vec2 at})`, `class OpponentView({required bool snookered, PlacedBall? ball, ShotGeometry? easiest})` with `double get part` and `bool get hard`, `class SafetyShot` (fields below).
   - `safety_geometry.dart`: `Vec2 leftOf(Vec2 dir)`, `double contactLateral(double thickness, ThicknessSide side, {TableSpec table})`, `typedef DirectContact = ({double aim, Vec2 contact})`, `DirectContact? directContact(Vec2 cue, Vec2 ball, double lateral, {TableSpec table})`, `bool canSee(Vec2 cue, Vec2 ball, Iterable<Vec2> obstacles, {TableSpec table})`, `final List<(double, ThicknessSide)> directContactOrder`, `final List<(double, ThicknessSide)> kickContactOrder`, `List<(double, ThicknessSide)> openContacts(Vec2 cue, Vec2 ball, Iterable<Vec2> obstacles, {TableSpec table})`, `List<List<Rail>> railSequences(int count)`, `Vec2 mirrorAcross(Vec2 p, Rail rail, {TableSpec table})`, `bool inPocketMouth(Vec2 p, {TableSpec table})`, `class KickPath({required double aim, required List<Vec2> hits, required Vec2 contact})`, `KickPath? kickPath({required Vec2 cue, required Vec2 ball, required List<Rail> rails, required double lateral, required List<Vec2> obstacles, TableSpec table})`, `double diamondOf(Vec2 hit, Rail rail, {TableSpec table})`, `bool nearRail(Vec2 p, {TableSpec table})`, `double lateralAt(BallState cueAtContact, Vec2 ball)`.
   - `safety_options.dart`: `class SafetyContext({required GameType game, required Vec2 cue, required List<PlacedBall> balls, TableSpec table})` with `balls` (sorted), `legal`, `visible`, `snookered`, `reason`, `obstaclesOf(int ballNum)`, `after(int ballNum, Vec2 to)`; `class SafetyOption` (fields below).
@@ -1163,10 +1198,11 @@ const safetyThicknesses = <double>[1, 0.75, 0.5, 0.25, 0.125];
 /// A băng: chạm trọn bi hoặc ½ bi hai bên.
 const kickThicknesses = <double>[1, 0.5];
 
-/// Cú thủ trực tiếp luôn thử cả áp phê (spec quyết định 4): không, trái ½,
-/// trái 1, phải ½, phải 1 đầu cơ — đúng thứ tự thử.
-const safetySpins = <SideSpin>[
-  SideSpin.none(),
+/// Áp phê của cú thủ trực tiếp, đúng thứ tự thử: trái ½, trái 1, phải ½,
+/// phải 1 đầu cơ. Chỉ là đường lui (chủ sản phẩm chốt 08/10/2026, sửa spec
+/// quyết định 4): mỗi bi hợp lệ thử trước các cú không áp phê, chỉ khi không
+/// cú nào hợp lệ mới thử các cú này. A băng không áp phê.
+const safetySideSpins = <SideSpin>[
   SideSpin(SpinSide.left, 0.5),
   SideSpin(SpinSide.left, 1),
   SideSpin(SpinSide.right, 0.5),
@@ -1179,8 +1215,8 @@ const kickStrokes = <Stroke>[Stroke.stun, Stroke.follow];
 /// Phạt A băng theo số băng (spec quyết định 7, số của chủ sản phẩm).
 const kickRailPenalty = <int, double>{1: 10, 2: 20, 3: 45, 4: 55};
 
-/// Thử tới 4 băng; chuỗi 4 băng chỉ là đường lui khi 1–3 băng không còn
-/// phương án hợp lệ nào (spec quyết định 3).
+/// Thử tới 4 băng; chuỗi 4 băng chỉ là đường lui khi cả cú trực tiếp lẫn
+/// A băng 1–3 băng không còn phương án hợp lệ nào (spec quyết định 3).
 const maxKickRails = 4;
 const kickFallbackRails = 4;
 
@@ -2252,6 +2288,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `class DirectSafetyLookup implements SafetyLookup` (`DirectSafetyLookup(SafetyContext context, List<SafetyOption> options, {SafetyPhysics physics})`)
   - `class SafetyEval({required SafetyOption option, required int index, required AimResult aim, required ShotTrace base, required List<SafetyLevel> levels, required double penalty})` with `worst`, `total`
   - `SafetyEval? evaluateOption(SafetyContext c, int index, SafetyOption o, SafetyLookup lookup, {double? bound})`
+  - `bool isLegalOption(SafetyContext c, int index, SafetyOption o, SafetyLookup lookup)` — aim converged and the chosen power has no foul, never pruned; `SafetyJob` uses it to decide the *áp phê* fallback (owner decision 2026-10-08)
   - `bool beats(SafetyEval e, SafetyEval? best)`
   - `int safetyToleranceOf(SafetyContext c, SafetyOption o, SimKey key, ShotTrace? Function(SimKey key) trace)`
   - `SafetyShot buildSafetyShot(SafetyContext c, SafetyEval e, ShotTrace? Function(SimKey key) trace)`
@@ -2522,11 +2559,24 @@ void main() {
       expect(beats(a, null), isTrue);
     });
 
+    test('hợp lệ không tuỳ cắt tỉa: hỏi được cả phương án cắt tỉa đã bỏ, chỉ lực chọn', () {
+      const aim = (key: (cue: cue, object: ball, aim: 0.0, power: 45.0, b: 0.0, spin: SideSpin.none()), stunReached: true);
+      final skipped = _FakeLookup(aim, (_) => traceOf());
+      expect(evaluateOption(ctx, 0, option, skipped, bound: safetyPenaltyOf(option) + scoreFloor(table)),
+          isNull);
+      expect(isLegalOption(ctx, 0, option, skipped), isTrue);
+      expect(skipped.powers, [45]);
+      expect(isLegalOption(ctx, 0, option, _FakeLookup(aim, (_) => traceOf(cuePocket: Pocket.topRight))),
+          isFalse);
+      expect(isLegalOption(ctx, 0, option, _FakeLookup(null, (_) => traceOf())), isFalse);
+      expect(isLegalOption(ctx, 0, option, _FakeLookup(aim, (_) => null)), isFalse);
+    });
+
     test('cú đơn giản thắng khi gần ngang (test 9.1.7): trực tiếp đứng bi hơn A băng 2 băng', () {
-      // Spec 3.2 không bao giờ để trực tiếp và A băng thi trong cùng một lần
-      // tìm (độ lệch 13 của kế hoạch), nên kiểm thẳng trên cách cộng điểm:
-      // cùng kiểu đánh và lực, A băng 2 băng chấm vị trí tốt hơn gần bằng
-      // phạt của nó vẫn thua.
+      // Trực tiếp và A băng nay thi trong cùng một lần tìm (chủ sản phẩm chốt
+      // 08/10/2026); safety_spec_test kiểm điều đó trên bàn thật. Ở đây kiểm
+      // đúng cách cộng điểm: cùng kiểu đánh và lực, A băng 2 băng chấm vị trí
+      // tốt hơn gần bằng phạt của nó vẫn thua.
       final direct = safetyPenaltyOf(option);
       final kick = techPenaltyStun + kickPenaltyFor(2) + option.power * powerPenaltyPerPercent;
       const worst = 30.0;
@@ -2782,6 +2832,20 @@ SafetyEval? evaluateOption(SafetyContext c, int index, SafetyOption o, SafetyLoo
   return SafetyEval(option: o, index: index, aim: aim, base: base, levels: levels, penalty: penalty);
 }
 
+/// Phương án thứ [index] hợp lệ ở lực đã chọn: dò hội tụ và vết đúng luật —
+/// đúng điều kiện [evaluateOption] đòi trước khi chấm, nhưng không cắt tỉa.
+/// Áp phê là đường lui (chủ sản phẩm chốt 08/10/2026): biết một bi còn cú
+/// không áp phê nào hợp lệ không phải độc lập với cắt tỉa, nếu không thì có
+/// cắt tỉa và không cắt tỉa sẽ thử hai tập phương án khác nhau.
+bool isLegalOption(SafetyContext c, int index, SafetyOption o, SafetyLookup lookup) {
+  final aim = lookup.aim(index);
+  if (aim == null) return false;
+  final t = lookup.trace(aim.key);
+  return t != null &&
+      safetyFoulOf(t, rails: o.rails.length, obstacles: c.obstaclesOf(o.ballNum), table: c.table) ==
+          null;
+}
+
 /// [e] thay được [best]: điểm thấp hơn hẳn. Bằng điểm thì giữ phương án thử
 /// trước (spec 4.2), để kết quả tất định.
 bool beats(SafetyEval e, SafetyEval? best) => best == null || e.total < best.total;
@@ -2874,18 +2938,22 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: Tasks 19–21.
 - Produces:
-  - `List<SafetyOption> directOptions(SafetyContext c)` — for each visible legal ball (number ascending), each open thickness in `directContactOrder`, `strokeCandidates × safetySpins × powerCandidates`.
-  - `List<SafetyOption> kickOptions(SafetyContext c, {required int fromRails, required int toRails})` — rail count ascending, then ball number, then `railSequences` order, then `kickContactOrder`, then `kickStrokes`, then `powerCandidates`.
-  - `class SafetyJob(SafetyContext context, {SafetyPhysics physics = const SafetyPhysics(), bool prune = true, int? maxOptions})` with `bool work()`, `void step({Duration budget = sliceBudget, int? maxSimulations})`, `void cancel()`, `bool get isDone`, `bool get isCancelled`, `SafetyShot? get result`, `int get simulations`, `Set<int> get triedRailCounts`, `List<SafetyOption> get options`.
+  - `List<SafetyOption> directOptions(SafetyContext c, PlacedBall target, List<SideSpin> spins)` — for one ball: each open thickness in `directContactOrder`, then `strokeCandidates × spins × powerCandidates`. The job calls it with `[SideSpin.none()]` and, only if needed, with `safetySideSpins`.
+  - `List<SafetyOption> kickOptions(SafetyContext c, {required int fromRails, required int toRails})` — rail count ascending, then ball number, then `railSequences` order, then `kickContactOrder`, then `kickStrokes`, then `powerCandidates`. No spin dimension.
+  - `enum SafetyTier { direct, directSpin, kick, kickFallback }`, `typedef SafetyStage = ({SafetyTier tier, int? ballNum})` (in `safety_job.dart`).
+  - `class SafetyJob(SafetyContext context, {SafetyPhysics physics = const SafetyPhysics(), bool prune = true, int? maxOptions})` with `bool work()`, `void step({Duration budget = sliceBudget, int? maxSimulations})`, `void cancel()`, `bool get isDone`, `bool get isCancelled`, `SafetyShot? get result`, `int get simulations`, `Set<int> get triedRailCounts` (0 = direct), `List<SafetyStage> stages`, `List<SafetyStage> get openedStages`, `List<SafetyOption> get options` (the options of the opened stages). `maxOptions` caps each stage.
   - `SafetyShot? searchToEnd(SafetyContext c, {SafetyPhysics physics = const SafetyPhysics()})`
   - `String safetyFingerprint(SafetyShot? s)` in `planner_tables.dart`.
 
-**How the job works.**
-- At construction it lists the options: `directOptions` when the cue ball sees a legal ball, `kickOptions(1 … kickFallbackRails − 1)` when *bị đui*.
+**How the job works** (owner decisions 2026-10-08).
+- At construction it fixes the stage order, `stages`: for each visible legal ball, number ascending, `(direct, n)` then `(directSpin, n)`; then `(kick, null)`; then `(kickFallback, null)`. A *bị đui* table has no visible ball, so its stages are the two kick stages, as before. No option is listed yet.
 - `work()` evaluates `options[cursor]` with `evaluateOption` over a lookup that throws `_MissingAim(index)` or `_MissingSim(key)` when a result is not in the memo. On a miss it runs exactly that one unit (`aimSafety` or `simulateSafety`), stores it and returns `true`. Otherwise it keeps the better evaluation (`beats`), advances the cursor and continues.
-- When the cursor reaches the end:
-  - *bị đui*, no valid option yet, and 4 rails not tried: append `kickOptions(kickFallbackRails … maxKickRails)` and continue;
-  - otherwise build the result with `buildSafetyShot` (its four tolerance simulations go through the same memo) and finish.
+- When the cursor reaches the end of the list, it decides the next stage:
+  - `direct` and `kick` always open: append `directOptions(c, ball, [SideSpin.none()])` or `kickOptions(1 … kickFallbackRails − 1)`;
+  - `directSpin` opens only if the ball's no-spin stage, just finished, has no legal option. It asks `isLegalOption` of those options in order, from a second cursor `_scan`, and stops at the first legal one. Evaluated options answer from the memo; an option pruned before its aim throws a miss, so its aim and chosen-power simulation run as ordinary units. With `prune: false` every answer comes from the memo, so both runs open the same stages;
+  - `kickFallback` opens only if `_best == null`: nothing direct or 1–3 rails was legal;
+  - after the last stage, build the result with `buildSafetyShot` (its four tolerance simulations go through the same memo) and finish.
+- Why this order: a direct shot is simpler and its penalty is at least 10 lower than any kick of the same stroke and power, so once a good direct shot is the best, the bound of deviation 4 skips most kicks before their aim. At plan time, `noPotTable` aimed only 1-rail kicks.
 - `step()` copies `PlannerJob.step`'s budget rule: always at least one unit, never start a unit if the longest unit of this slice no longer fits.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2902,6 +2970,7 @@ import 'package:poolcoachai/domain/planner/safety_job.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
@@ -2909,54 +2978,105 @@ import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import '../../support/planner_tables.dart';
 
 /// Việc tìm cú thủ chia lát (spec cú phòng thủ 3.6, test 9.1.9). Phần lớn
-/// test giới hạn số phương án (maxOptions) để chạy nhanh: chia lát và cắt
-/// tỉa không phụ thuộc số phương án.
+/// test giới hạn số phương án mỗi chặng (maxOptions) để chạy nhanh: chia lát,
+/// cắt tỉa và thứ tự chặng không phụ thuộc số phương án.
 void main() {
   SafetyContext contextOf(TableSetup s) =>
       SafetyContext(game: s.game, cue: s.cue, balls: s.balls, table: s.table);
 
-  SafetyShot? run(SafetyContext c,
+  SafetyJob runJob(SafetyContext c,
       {int? maxSimulations, Duration budget = const Duration(days: 1), int? maxOptions,
       bool prune = true, SafetyPhysics physics = const SafetyPhysics()}) {
     final job = SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics);
     while (!job.isDone) {
       job.step(budget: budget, maxSimulations: maxSimulations);
     }
-    return job.result;
+    return job;
   }
 
+  SafetyShot? run(SafetyContext c,
+          {int? maxSimulations, Duration budget = const Duration(days: 1), int? maxOptions,
+          bool prune = true, SafetyPhysics physics = const SafetyPhysics()}) =>
+      runJob(c,
+              maxSimulations: maxSimulations,
+              budget: budget,
+              maxOptions: maxOptions,
+              prune: prune,
+              physics: physics)
+          .result;
+
+  const direct1 = (tier: SafetyTier.direct, ballNum: 1);
+  const directSpin1 = (tier: SafetyTier.directSpin, ballNum: 1);
+  const kicks = (tier: SafetyTier.kick, ballNum: null);
+  const kickFallback = (tier: SafetyTier.kickFallback, ballNum: null);
+
+  // Lõi thật, trừ cú trực tiếp không áp phê: không bao giờ chạm bi. Ép mọi
+  // phương án không áp phê hỏng để thấy đường lui áp phê.
+  final noPlain = SafetyPhysics(
+    probe: (input, {required maxRails}) => maxRails == 0 && input.spin.isNone
+        ? const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null)
+        : probeKick(input, maxRails: maxRails),
+  );
+
   group('danh sách phương án', () {
-    test('trực tiếp: mỗi bi thấy được × độ dày mở × kiểu đánh × áp phê × lực, đúng thứ tự', () {
+    test('trực tiếp: độ dày mở × kiểu đánh × áp phê × lực của một bi, đúng thứ tự', () {
       final c = contextOf(noPotTable());
-      final open = openContacts(c.cue, c.legal.single.pos, c.obstaclesOf(1));
-      final options = directOptions(c);
-      expect(options, hasLength(open.length *
-          strokeCandidates.length * safetySpins.length * powerCandidates.length));
-      expect(options.every((o) => o.kind == SafetyKind.direct && o.rails.isEmpty), isTrue);
-      final first = options.first;
-      expect((first.thickness, first.side), open.first);
-      expect((first.stroke, first.spin, first.power),
-          (strokeCandidates.first, safetySpins.first, powerCandidates.first));
-      expect(options[1].power, powerCandidates[1]);
+      final target = c.legal.single;
+      final open = openContacts(c.cue, target.pos, c.obstaclesOf(1));
+      final plain = directOptions(c, target, const [SideSpin.none()]);
+      expect(plain, hasLength(open.length * strokeCandidates.length * powerCandidates.length));
+      expect(
+          plain.every((o) => o.kind == SafetyKind.direct && o.rails.isEmpty && o.spin.isNone),
+          isTrue);
+      expect((plain.first.thickness, plain.first.side), open.first);
+      expect((plain.first.stroke, plain.first.power),
+          (strokeCandidates.first, powerCandidates.first));
+      expect(plain[1].power, powerCandidates[1]);
+      final spun = directOptions(c, target, safetySideSpins);
+      expect(spun, hasLength(plain.length * safetySideSpins.length));
+      expect(spun.any((o) => o.spin.isNone), isFalse);
+      expect((spun.first.spin, spun[powerCandidates.length].spin),
+          (safetySideSpins.first, safetySideSpins[1]));
     });
 
-    test('A băng: ít băng trước, rồi bi, chuỗi, điểm chạm, kiểu đánh, lực', () {
+    test('A băng: ít băng trước, rồi bi, chuỗi, điểm chạm, kiểu đánh, lực; không áp phê', () {
       final c = contextOf(snookerOneRailTable());
       final options = kickOptions(c, fromRails: 1, toRails: 3);
       expect(options, isNotEmpty);
       final counts = options.map((o) => o.rails.length).toList();
       expect(counts, [...counts]..sort());
-      expect(options.every((o) => o.kind == SafetyKind.kick && kickStrokes.contains(o.stroke)),
+      expect(
+          options.every(
+              (o) => o.kind == SafetyKind.kick && kickStrokes.contains(o.stroke) && o.spin.isNone),
           isTrue);
       expect(kickOptions(c, fromRails: 4, toRails: 4).every((o) => o.rails.length == 4), isTrue);
     });
 
-    test('không đui: chỉ thử trực tiếp; đui: chỉ thử A băng 1–3 băng', () {
-      expect(SafetyJob(contextOf(noPotTable())).options.every((o) => o.kind == SafetyKind.direct),
+    test('thứ tự chặng: trực tiếp, áp phê, A băng 1–3, 4 băng; đui thì chỉ A băng', () {
+      expect(SafetyJob(contextOf(noPotTable())).stages,
+          [direct1, directSpin1, kicks, kickFallback]);
+      expect(SafetyJob(contextOf(snookerOneRailTable())).stages, [kicks, kickFallback]);
+      // Chưa làm đơn vị việc nào thì chưa mở chặng nào.
+      expect(SafetyJob(contextOf(noPotTable())).options, isEmpty);
+    });
+  });
+
+  group('áp phê là đường lui (chủ sản phẩm chốt 08/10/2026)', () {
+    test('có cú không áp phê hợp lệ: không mở chặng áp phê, không dò cú áp phê nào', () {
+      final job = runJob(contextOf(noPotTable()), maxOptions: 30);
+      expect(job.result, isNotNull);
+      expect(job.openedStages, [direct1, kicks]);
+      expect(job.options.every((o) => o.spin.isNone), isTrue);
+    });
+
+    test('không cú không áp phê nào hợp lệ: mới thử áp phê, ngay sau bi đó và trước A băng', () {
+      final job = runJob(contextOf(noPotTable()), maxOptions: 30, physics: noPlain);
+      expect(job.openedStages.take(3), [direct1, directSpin1, kicks]);
+      final firstSpun = job.options.indexWhere((o) => !o.spin.isNone);
+      expect(firstSpun, 30);
+      expect(job.options.skip(firstSpun).take(30).every((o) => o.kind == SafetyKind.direct),
           isTrue);
-      final kicks = SafetyJob(contextOf(snookerOneRailTable())).options;
-      expect(kicks.every((o) => o.kind == SafetyKind.kick && o.rails.length < kickFallbackRails),
-          isTrue);
+      expect(job.result, isNotNull);
     });
   });
 
@@ -2971,6 +3091,14 @@ void main() {
         }
         expect(safetyFingerprint(run(c, maxOptions: 40, budget: Duration.zero)), whole);
       }
+    });
+
+    test('đường lui áp phê: chạy từng lát vẫn mở đúng các chặng như chạy một mạch', () {
+      final c = contextOf(noPotTable());
+      final whole = runJob(c, maxOptions: 20, physics: noPlain);
+      final sliced = runJob(c, maxOptions: 20, physics: noPlain, maxSimulations: 1);
+      expect(sliced.openedStages, whole.openedStages);
+      expect(safetyFingerprint(sliced.result), safetyFingerprint(whole.result));
     });
 
     test('mỗi đơn vị việc chạy đúng một lần mô phỏng mới, hoặc không lần nào', () {
@@ -3000,34 +3128,35 @@ void main() {
       expect(job.isCancelled, isTrue);
     });
 
-    test('cắt tỉa không đổi cú được chọn, chỉ bớt mô phỏng', () {
+    test('cắt tỉa không đổi cú được chọn và các chặng được mở, chỉ bớt mô phỏng', () {
       final c = contextOf(noPotTable());
-      final pruned = SafetyJob(c, maxOptions: 75);
-      final full = SafetyJob(c, maxOptions: 75, prune: false);
-      for (final j in [pruned, full]) {
-        while (!j.isDone) {
-          j.step(budget: const Duration(days: 1));
-        }
+      for (final physics in [const SafetyPhysics(), noPlain]) {
+        final pruned = runJob(c, maxOptions: 75, physics: physics);
+        final full = runJob(c, maxOptions: 75, physics: physics, prune: false);
+        expect(safetyFingerprint(pruned.result), safetyFingerprint(full.result));
+        expect(pruned.openedStages, full.openedStages);
+        expect(pruned.simulations, lessThanOrEqualTo(full.simulations));
       }
-      expect(safetyFingerprint(pruned.result), safetyFingerprint(full.result));
-      expect(pruned.simulations, lessThanOrEqualTo(full.simulations));
     });
   });
 
-  test('4 băng chỉ là đường lui: 1–3 băng hỏng hết thì mới thử 4 băng', () {
-    final c = contextOf(snookerOneRailTable());
-    expect(kickOptions(c, fromRails: 4, toRails: 4), isNotEmpty);
-    // Lõi thật, nhưng chỉ cho bi cái chạm bi khi được phép 4 băng.
-    final onlyFour = SafetyPhysics(
-      probe: (input, {required maxRails}) => maxRails < 4
-          ? const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null)
-          : probeKick(input, maxRails: maxRails),
-    );
-    final job = SafetyJob(c, physics: onlyFour);
-    while (!job.isDone && !job.triedRailCounts.contains(4)) {
-      job.step(budget: const Duration(days: 1), maxSimulations: 1);
+  test('4 băng chỉ là đường lui: trực tiếp và 1–3 băng hỏng hết thì mới thử 4 băng', () {
+    for (final s in [snookerOneRailTable(), noPotTable()]) {
+      final c = contextOf(s);
+      expect(kickOptions(c, fromRails: 4, toRails: 4), isNotEmpty);
+      // Lõi thật, nhưng chỉ cho bi cái chạm bi khi được phép 4 băng.
+      final onlyFour = SafetyPhysics(
+        probe: (input, {required maxRails}) => maxRails < 4
+            ? const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null)
+            : probeKick(input, maxRails: maxRails),
+      );
+      final job = SafetyJob(c, physics: onlyFour);
+      while (!job.isDone && !job.triedRailCounts.contains(4)) {
+        job.step(budget: const Duration(days: 1), maxSimulations: 1);
+      }
+      expect(job.triedRailCounts, containsAll([1, 2, 3, 4]));
+      expect(job.openedStages.last, kickFallback);
     }
-    expect(job.triedRailCounts, containsAll([1, 2, 3, 4]));
   });
 
   test('không có cú thủ hợp lệ nào thì kết quả là null', () {
@@ -3085,17 +3214,18 @@ Expected: compile errors (`directOptions`, `kickOptions`, `SafetyJob` missing).
 Append to `safety_options.dart` (add `import 'package:poolcoachai/domain/planner/planner_constants.dart';`):
 
 ```dart
-/// Mọi phương án thủ trực tiếp (spec 3.3), đúng thứ tự thử: bi số nhỏ
-/// trước, độ dày theo [directContactOrder] (bỏ độ dày bị chắn), kiểu đánh,
-/// áp phê, lực tăng dần.
-List<SafetyOption> directOptions(SafetyContext c) => [
-      for (final target in c.visible)
-        for (final (f, side) in openContacts(c.cue, target.pos, c.obstaclesOf(target.number),
-            table: c.table))
-          for (final stroke in strokeCandidates)
-            for (final spin in safetySpins)
-              for (final power in powerCandidates)
-                directOption(c, target, f, side, stroke, spin, power)!,
+/// Các phương án thủ trực tiếp vào [target] với các áp phê [spins] (spec
+/// 3.3), đúng thứ tự thử: độ dày theo [directContactOrder] (bỏ độ dày bị
+/// chắn), kiểu đánh, áp phê, lực tăng dần. `SafetyJob` gọi hai lần mỗi bi:
+/// trước với `[SideSpin.none()]`, rồi — chỉ khi không cú nào hợp lệ — với
+/// [safetySideSpins] (chủ sản phẩm chốt 08/10/2026).
+List<SafetyOption> directOptions(SafetyContext c, PlacedBall target, List<SideSpin> spins) => [
+      for (final (f, side) in openContacts(c.cue, target.pos, c.obstaclesOf(target.number),
+          table: c.table))
+        for (final stroke in strokeCandidates)
+          for (final spin in spins)
+            for (final power in powerCandidates)
+              directOption(c, target, f, side, stroke, spin, power)!,
     ];
 ```
 
@@ -3140,7 +3270,30 @@ import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/safety_scoring.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
+import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
+
+/// Các tầng của việc tìm cú thủ, theo thứ tự cố định (chủ sản phẩm chốt
+/// 08/10/2026). Trực tiếp trước A băng: có cú trực tiếp tốt rồi thì cắt tỉa
+/// bỏ được phần lớn A băng mà không mô phỏng (phạt A băng từ 10 trở lên).
+enum SafetyTier {
+  /// Trực tiếp vào một bi hợp lệ thấy được, không áp phê.
+  direct,
+
+  /// Trực tiếp vào bi đó có áp phê — chỉ khi tầng [direct] của bi không có
+  /// phương án nào hợp lệ.
+  directSpin,
+
+  /// A băng 1–3 băng vào mọi bi hợp lệ — luôn thử, kể cả khi không đui.
+  kick,
+
+  /// A băng 4 băng — chỉ khi mọi chặng trước không có phương án hợp lệ nào.
+  kickFallback,
+}
+
+/// Một chặng: tầng và bi (null với A băng, vì A băng thử mọi bi hợp lệ).
+typedef SafetyStage = ({SafetyTier tier, int? ballNum});
 
 /// Tìm cú thủ chia lát (spec cú phòng thủ 3.6), cùng mẫu với `PlannerJob`.
 ///
@@ -3150,13 +3303,20 @@ import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 /// trỏ): tìm cú thủ cần vài nghìn lần mô phỏng, chạy lại từ đầu mỗi lần thì
 /// tốn theo bình phương. Thứ tự cố định và phép chấm thuần, nên chạy từng
 /// lát vẫn cho đúng y kết quả chạy một mạch.
+///
+/// Phương án được thêm theo từng chặng ([stages]). Mở chặng nào chỉ tuỳ kết
+/// quả dò và mô phỏng, không tuỳ cắt tỉa, nên có cắt tỉa hay không vẫn xét
+/// cùng một tập phương án.
 class SafetyJob {
   SafetyJob(this.context, {this.physics = const SafetyPhysics(), this.prune = true, this.maxOptions})
-      : _options = context.snookered
-            ? kickOptions(context, fromRails: 1, toRails: kickFallbackRails - 1)
-            : directOptions(context) {
-    _truncate();
-  }
+      : stages = List.unmodifiable(<SafetyStage>[
+          for (final t in context.visible) ...[
+            (tier: SafetyTier.direct, ballNum: t.number),
+            (tier: SafetyTier.directSpin, ballNum: t.number),
+          ],
+          (tier: SafetyTier.kick, ballNum: null),
+          (tier: SafetyTier.kickFallback, ballNum: null),
+        ]);
 
   final SafetyContext context;
   final SafetyPhysics physics;
@@ -3165,16 +3325,27 @@ class SafetyJob {
   /// test kiểm cắt tỉa không đổi kết quả.
   final bool prune;
 
-  /// Chỉ xét ngần này phương án đầu — cho test chạy nhanh.
+  /// Mỗi chặng chỉ xét ngần này phương án đầu — cho test chạy nhanh mà vẫn
+  /// đi qua mọi chặng.
   final int? maxOptions;
 
-  final List<SafetyOption> _options;
+  /// Mọi chặng có thể mở, đúng thứ tự: mỗi bi thấy được (số nhỏ trước) một
+  /// chặng [SafetyTier.direct] rồi một chặng [SafetyTier.directSpin], sau đó
+  /// [SafetyTier.kick], cuối cùng [SafetyTier.kickFallback].
+  final List<SafetyStage> stages;
+
+  final _options = <SafetyOption>[];
+  final _opened = <SafetyStage>[];
   final _aims = <int, AimResult?>{};
   final _sims = <SimKey, ShotTrace?>{};
   final _tried = <int>{};
   var _cursor = 0;
+  var _nextStage = 0;
+
+  /// Chỗ đang hỏi xem chặng [SafetyTier.direct] vừa xong có phương án nào
+  /// hợp lệ không; giữ qua các đơn vị việc như [_cursor].
+  var _scan = 0;
   SafetyEval? _best;
-  var _fallbackAdded = false;
   var _done = false;
   var _cancelled = false;
   SafetyShot? _result;
@@ -3188,16 +3359,56 @@ class SafetyJob {
   /// Số lần dò và mô phỏng đã chạy.
   int get simulations => _aims.length + _sims.length;
 
-  /// Số băng của các phương án đã dò — test 9.1.4 kiểm 4 băng chỉ là đường lui.
+  /// Số băng của các phương án đã dò (0 là trực tiếp) — test 9.1.4 kiểm 4
+  /// băng chỉ là đường lui.
   Set<int> get triedRailCounts => Set.unmodifiable(_tried);
 
+  /// Các chặng đã mở, đúng thứ tự.
+  List<SafetyStage> get openedStages => List.unmodifiable(_opened);
+
+  /// Mọi phương án của các chặng đã mở, đúng thứ tự xét.
   List<SafetyOption> get options => List.unmodifiable(_options);
 
   void cancel() => _cancelled = true;
 
-  void _truncate() {
+  List<SafetyOption> _capped(List<SafetyOption> list) {
     final cap = maxOptions;
-    if (cap != null && _options.length > cap) _options.removeRange(cap, _options.length);
+    return cap == null || list.length <= cap ? list : list.sublist(0, cap);
+  }
+
+  List<SafetyOption> _optionsOf(SafetyStage s) {
+    PlacedBall target() => context.visible.firstWhere((b) => b.number == s.ballNum);
+    return switch (s.tier) {
+      SafetyTier.direct => directOptions(context, target(), const [SideSpin.none()]),
+      SafetyTier.directSpin => directOptions(context, target(), safetySideSpins),
+      SafetyTier.kick => kickOptions(context, fromRails: 1, toRails: kickFallbackRails - 1),
+      SafetyTier.kickFallback =>
+        kickOptions(context, fromRails: kickFallbackRails, toRails: maxKickRails),
+    };
+  }
+
+  /// Chặng [s] có mở không. Chỉ đọc qua [_lookup]: thiếu kết quả thì ném lỗi
+  /// thiếu, đơn vị việc làm đúng lần đó rồi lần sau hỏi tiếp từ [_scan].
+  bool _opens(SafetyStage s) => switch (s.tier) {
+        SafetyTier.direct || SafetyTier.kick => true,
+        // Áp phê là đường lui: chỉ khi bi này không có cú không áp phê nào
+        // hợp lệ (chủ sản phẩm chốt 08/10/2026).
+        SafetyTier.directSpin => !_plainLegal(),
+        // 4 băng chỉ khi chưa có phương án hợp lệ nào (spec quyết định 3).
+        // _best null đúng khi chưa có phương án hợp lệ, và khi đó chưa cắt
+        // tỉa gì, nên điều kiện này không tuỳ cắt tỉa.
+        SafetyTier.kickFallback => _best == null,
+      };
+
+  /// Chặng [SafetyTier.direct] vừa xong (từ [_scan] tới cuối danh sách) có
+  /// phương án nào hợp lệ không. Phương án đã chấm thì đọc bộ nhớ đệm;
+  /// phương án cắt tỉa đã bỏ trước khi dò thì phải dò và mô phỏng lực chọn,
+  /// để câu trả lời giống hệt khi không cắt tỉa.
+  bool _plainLegal() {
+    for (; _scan < _options.length; _scan++) {
+      if (isLegalOption(context, _scan, _options[_scan], _lookup)) return true;
+    }
+    return false;
   }
 
   /// Một đơn vị việc. true khi vừa chạy đúng một lần dò hay mô phỏng mới;
@@ -3210,13 +3421,14 @@ class SafetyJob {
               bound: prune ? _best?.total : null);
           if (e != null && beats(e, _best)) _best = e;
           _cursor++;
-        } else if (context.snookered && !_fallbackAdded && _best == null) {
-          // 1–3 băng không còn phương án hợp lệ nào: mới thử 4 băng
-          // (spec quyết định 3).
-          _fallbackAdded = true;
-          _options.addAll(
-              kickOptions(context, fromRails: kickFallbackRails, toRails: maxKickRails));
-          _truncate();
+        } else if (_nextStage < stages.length) {
+          final stage = stages[_nextStage];
+          if (_opens(stage)) {
+            _opened.add(stage);
+            if (stage.tier == SafetyTier.direct) _scan = _options.length;
+            _options.addAll(_capped(_optionsOf(stage)));
+          }
+          _nextStage++;
         } else {
           final best = _best;
           _result = best == null ? null : buildSafetyShot(context, best, _lookup.trace);
@@ -3306,10 +3518,12 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/kick_search.dart';
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_job.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 
@@ -3325,13 +3539,15 @@ void main() {
     final c = contextOf(s);
     final pot = CandidateFinder(game: s.game).easiest(s.cue, s.balls);
     print('== $name: ${c.reason.name}, lỗ ${pot?.geometry.pocket.name ?? 'không'}');
-    if (c.snookered) {
-      for (var n = 1; n <= 4; n++) {
-        final groups = kickOptions(c, fromRails: n, toRails: n).length ~/ 10;
-        print('  $n băng: $groups đường hình học mở');
-      }
-    } else {
-      print('  trực tiếp: ${directOptions(c).length} phương án');
+    for (final t in c.visible) {
+      print('  trực tiếp bi ${t.number}: '
+          '${directOptions(c, t, const [SideSpin.none()]).length} không áp phê, '
+          '${directOptions(c, t, safetySideSpins).length} áp phê');
+    }
+    // A băng luôn thử, kể cả khi không đui (chủ sản phẩm chốt 08/10/2026).
+    for (var n = 1; n <= 4; n++) {
+      final groups = kickOptions(c, fromRails: n, toRails: n).length ~/ 10;
+      print('  $n băng: $groups đường hình học mở');
     }
     final w = Stopwatch()..start();
     final job = SafetyJob(c);
@@ -3340,7 +3556,8 @@ void main() {
     }
     final r = job.result;
     print('  ${job.simulations} lần dò/mô phỏng, ${w.elapsedMilliseconds} ms, '
-        'thử ${job.triedRailCounts.toList()..sort()} băng');
+        '${job.options.length} phương án, thử ${job.triedRailCounts.toList()..sort()} băng; '
+        'chặng ${job.openedStages.map((s) => '${s.tier.name}${s.ballNum ?? ''}').join(' → ')}');
     if (r == null) {
       print('  không có cú thủ hợp lệ');
       return;
@@ -3436,7 +3653,8 @@ Run:
 ```
 Expected:
 - the job tests pass;
-- the probe prints five tables with a chosen shot (or `không có cú thủ hợp lệ`), the number of units and milliseconds. Save that output for Task 23 and Task 25;
+- the probe prints five tables with a chosen shot (or `không có cú thủ hợp lệ`), the number of units, milliseconds and the stages opened. Save that output for Task 23 and Task 25. At plan time (2026-10-08) it chose the shots listed in "How this plan was checked", with stages `kick` on the three kick tables and `direct1 → kick` on the two no-pot tables (no `directSpin`);
+- if a job test about the *áp phê* fallback fails, print `job.openedStages` and `job.options.length`: `firstSpun == 30` assumes the no-spin stage of `noPotTable` has at least 30 options (it has 135 at plan time);
 - `No issues found!`.
 
 - [ ] **Step 7: Commit**
@@ -3456,12 +3674,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `test/domain/planner/safety_spec_test.dart`
 
 **Interfaces:**
-- Consumes: `SafetyJob`, `SafetyContext`, `safetyFoulOf`, `polylineClear`, `diamondOf`, the fixtures (Tasks 19–22).
+- Consumes: `SafetyJob` (with `SafetyTier`, `openedStages`, `options`), `SafetyContext`, `safetyFoulOf`, `polylineClear`, `diamondOf`, the fixtures (Tasks 19–22).
 - Produces: nothing new.
 
 **How the fixtures were found, and what to do if one breaks.**
 - The geometric facts (*bị đui*, no pot, which rail counts are geometrically open) are fixed by Task 19's tests and do not depend on physics constants.
 - Which shot the search chooses depends on physics and on the penalties. The prototype could not check it: its rules and scoring were simplified. Task 22's probe prints it.
+- Owner decisions 2026-10-08 are checked here on the real core: test 7 runs direct and kick options in one search on the two no-pot tables and expects a direct shot to win (re-measured on the amended code: both still choose their direct shot); the *áp phê* test expects no spin option to be listed on any fixture, since each has a legal no-spin option or is *bị đui*. No fixture with a near-tie between a direct shot and a kick was searched for; Task 21 keeps the scoring-level check of that margin.
 
 If an assertion below fails (now, or after the owner's tuning in Task 29):
 1. Run the probe (`--plain-name "bảng cú thủ"`) and read that table's line.
@@ -3543,9 +3762,11 @@ void main() {
     }
   });
 
-  test('4. 1–3 băng có cú hợp lệ thì không mô phỏng chuỗi 4 băng nào', () {
-    for (final name in ['one', 'two', 'three']) {
-      expect(runs[name]!.$2.triedRailCounts, isNot(contains(maxKickRails)), reason: name);
+  test('4. có cú hợp lệ (trực tiếp hay 1–3 băng) thì không mô phỏng chuỗi 4 băng nào', () {
+    for (final MapEntry(:key, value: (_, job)) in runs.entries) {
+      expect(job.triedRailCounts, isNot(contains(maxKickRails)), reason: key);
+      expect(job.openedStages.map((st) => st.tier), isNot(contains(SafetyTier.kickFallback)),
+          reason: key);
     }
   });
 
@@ -3559,14 +3780,27 @@ void main() {
     }
   });
 
-  test('không đui, hết đường ăn: cú thủ trực tiếp, không có điểm ngắm băng', () {
+  test('7. không đui: trực tiếp và A băng thi trong cùng một lần tìm, cú trực tiếp thắng', () {
     for (final name in ['noPot', 'eight']) {
-      final s = runs[name]!.$2.result!;
+      final job = runs[name]!.$2;
+      final s = job.result!;
       expect(s.reason, SafetyReason.noPot, reason: name);
+      // A băng luôn được xét, kể cả khi không đui (chủ sản phẩm chốt
+      // 08/10/2026); phạt A băng giữ cú trực tiếp thắng khi gần ngang.
+      expect(job.openedStages.map((st) => st.tier), contains(SafetyTier.kick), reason: name);
+      expect(job.options.where((o) => o.kind == SafetyKind.kick), isNotEmpty, reason: name);
       expect(s.kind, SafetyKind.direct, reason: name);
       expect(s.rails, 0, reason: name);
       expect(s.railAim, isNull, reason: name);
       expect(cueRailsBefore(s.trace), 0, reason: name);
+    }
+  });
+
+  test('áp phê là đường lui: còn cú không áp phê hợp lệ thì không xét cú áp phê nào', () {
+    for (final MapEntry(:key, value: (_, job)) in runs.entries) {
+      expect(job.openedStages.map((st) => st.tier), isNot(contains(SafetyTier.directSpin)),
+          reason: key);
+      expect(job.options.every((o) => o.spin.isNone), isTrue, reason: key);
     }
   });
 
@@ -3587,7 +3821,7 @@ void main() {
 - [ ] **Step 2: Run them**
 
 Run: `"$FLUTTER" test test/domain/planner/safety_spec_test.dart`
-Expected: all PASS on the real core. The file runs five full searches; expect it to take tens of seconds on the VM (see deviation 1). A failure in 3, 4, 5 or the no-pot test means a fixture no longer meets its condition: apply the procedure above.
+Expected: all PASS on the real core. The file runs five full searches; expect it to take tens of seconds on the VM (see deviation 1). A failure in 3, 4, 5, 7 or the *áp phê* test means a fixture no longer meets its condition: apply the procedure above. If test 7 fails because a kick beat the direct shot on a no-pot table, that is not a bug by itself (kicks now compete): print both totals with the probe and report to the owner before moving the fixture.
 
 - [ ] **Step 3: Run the domain suite and the analyzer**
 
@@ -3598,7 +3832,7 @@ Expected: all pass (the probe and perf tags are skipped), `No issues found!`.
 
 ```bash
 git add test/domain/planner/safety_spec_test.dart test/support/planner_tables.dart tool/e2e/planner.mjs
-git commit -m "Run the safety spec tests on the real physics core: kick rail counts, the 4-rail fallback, diamonds and the opponent's ball
+git commit -m "Run the safety spec tests on the real physics core: kick rail counts, the 4-rail fallback, diamonds, direct against kick, the áp phê fallback and the opponent's ball
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -3855,7 +4089,7 @@ In `planner_steps_view.dart`:
 - [ ] **Step 6: Run the tests and the analyzer**
 
 Run: `"$FLUTTER" test test/domain/planner test/features/training && "$FLUTTER" analyze`
-Expected: all pass, `No issues found!`. `prd_section7_test.dart` keeps the real core for test 6 (`blockedEverywhereTable`) and for `fallbackTable`; those two plans now run a real safety search and take a few seconds more.
+Expected: all pass, `No issues found!`. `prd_section7_test.dart` keeps the real core for test 6 (`blockedEverywhereTable`) and for `fallbackTable`; those two plans now run a real safety search and take a few seconds more (the search also tries kicks there, owner decision 2026-10-08). With `noSafetyPhysics` a search walks every stage (direct, *áp phê*, kicks of 1–3 rails, 4 rails) and fails each option at its first probes, so those tests stay fast; at plan time `flutter test test/domain` took under 2 minutes in all.
 
 - [ ] **Step 7: Commit**
 
@@ -3880,7 +4114,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Why 600 ms on the VM.** Deviation 20 reads "vài giây" as at most 5 s in Chrome. Chrome runs about 2× the VM. Sliced at 4 ms per 16.7 ms frame, the search gets about a quarter of each frame, so the wall time is about 4× the CPU time. So 5 s of wall time is about 5000 / (2 × 4.2) ≈ 600 ms on the VM.
 
-**Expected outcome: FAIL.** The prototype measured 4.3–11.0 s for one ball's direct search (deviation 1). This task exists to put the real numbers in front of the owner before any screen work.
+**Expected outcome: FAIL, numbers to be re-measured.** The prototype measured 4.3–11.0 s for one ball's direct search with all 675 options (deviation 1). The owner decisions of 2026-10-08 change both sides of the cost: the *áp phê* fallback cuts the direct search to the 135 no-spin options per ball on a table that has a legal one, and always-on kicks add the 1–3-rail kick stage to every not-*bị đui* table (mostly pruned once a good direct shot is the best). A plan-time re-run of the amended code read about 6.2 s (kick table, noisy; 4.2 s in the probe) and 1.1 s (no-pot table), so the 600 ms gate still fails. The numbers that count are the ones this task prints. This task exists to put them in front of the owner before any screen work.
 
 - [ ] **Step 1: Write the test**
 
@@ -3953,7 +4187,7 @@ void main() {
 - [ ] **Step 2: Run it alone**
 
 Run: `"$FLUTTER" test --tags perf --run-skipped test/domain/planner/safety_perf_test.dart`
-Expected: the slice test PASSES on a quiet machine (a unit is one probe series or one simulation; at plan time the median was 4.9 ms against the 6 ms gate, and 7.6 ms under CPU contention — rerun alone before reporting). The first test is expected to FAIL (5045 ms and 4174 ms at plan time); copy both printed lines.
+Expected: the slice test PASSES on a quiet machine (a unit is one probe series or one simulation; at plan time the median was 4.9 ms against the 6 ms gate before the 2026-10-08 changes and 3.8 ms after them, and 7.6 ms under CPU contention — rerun alone before reporting). The first test is expected to FAIL; at plan time it read 5045 ms and 4174 ms before the 2026-10-08 changes and 6242 ms and 1074 ms after them. These are to be re-measured: copy both printed lines.
 
 - [ ] **Step 3: Confirm the default run skips it**
 
@@ -3969,7 +4203,8 @@ Append to the build log:
 
 - Dart VM, one-shot search: <paste the two lines of the first test>.
 - Slices while searching: <paste the `lát tìm cú thủ: …` line>.
-- Plan-time prototype (a35667b): one ball's direct search 4.3–11.0 s with exact pruning; Chrome estimate ≈ 2× CPU and ≈ 4× wall at 4 ms slices.
+- Plan-time prototype (a35667b): one ball's direct search 4.3–11.0 s with exact pruning and all 675 options; Chrome estimate ≈ 2× CPU and ≈ 4× wall at 4 ms slices.
+- Search shape (owner decisions 2026-10-08): no-spin direct options first, *áp phê* only as a fallback per ball, kicks of 1–3 rails always, 4 rails last. Plan-time re-run of the amended code: 6242 ms (kick table, noisy) and 1074 ms (no-pot table).
 ```
 
 ```bash
@@ -3982,11 +4217,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 5: STOP if the first test failed**
 
 Report to the owner, through the controller: the two printed lines, the prototype numbers of deviation 1, and these candidate changes. **Do not pick one yourself.**
-- **Áp phê as a fallback inside the safety search too:** try the 135 no-spin options per ball first, and the 540 spin options only if none is legal. This changes spec decision 4. It cuts the direct search to roughly a fifth — still several seconds in Chrome at a 4 ms slice.
-- **Fewer power levels for safeties** (for example 30 · 60 · 90): cuts direct options and kicks by 40 %.
+- **Already done (owner decision 2026-10-08): áp phê as a fallback.** The direct search tries the 135 no-spin options per ball first and the 540 spin options only if none is legal. On `noPotTable` it cut the units from 1146 to 394.
+- **Cost added by the same day's decision: kicks are always tried.** On a not-*bị đui* table the 1–3-rail kick stage runs after the direct stages. Exact pruning skips most of it when a good direct shot exists (`noPotTable`: only 1-rail kicks aimed), but not all (`eightSafetyTable`: kicks of 1–3 rails aimed, 904 units). If the owner wants that cost back, the option is to try kicks on a not-*bị đui* table only when no direct option is legal; that would undo part of the decision, so it is the owner's call.
+- **Fewer power levels for safeties** (for example 30 · 60 · 90): cuts direct options and kicks by 40 %. The kick tables (689 / 399 / 137 units) are now the slowest case, and this is the change that shrinks them most.
 - **A longer slice only while the safety search runs** (the user is waiting on *Đang tìm cú thủ…*, not dragging). This trades the frame gate during that wait.
 - **Accept a long wait** with the progress line, and revisit with the Web Worker after merge.
-- **A Web Worker now:** out of scope by the owner's decision; it would still leave about 3–22 s at today's option count.
+- **A Web Worker now:** out of scope by the owner's decision; the 4× wall-time factor of slicing would go, leaving roughly 2× the VM times above (to be re-measured).
 
 Continue with Task 26 only after the owner's answer. If the owner changes the search (option count, tiers, slice), do it as a new task inserted here with its own tests, and rerun Tasks 23 and 25.
 
@@ -4371,7 +4607,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   1. other balls faint (existing ghosts);
   2. the opponent's easiest shot in faint red (cue end → ghost, ball → pocket), or a dashed red line to the ball plus *"Đối thủ bị đui"* when snookered;
   3. the cue ball's simulated path: before contact dashed white, after contact dashed jade, a yellow dot at every cue rail hit, a white dashed ring where it stops;
-  4. for *A băng*: a thick gold ring at the first rail hit and the *chấm* numbers on the frame (long rails 0–8, short rails 0–4);
+  4. for *A băng*: a thick gold ring at the first rail hit and the *chấm* numbers on the frame (long rails 0–8, short rails 0–4). This keys on `safety.railAim` (i.e. `kind == kick`), never on `reason`: since 2026-10-08 a not-*bị đui* table can also end in a kick, with the headline *"Không còn đường ăn bi — nên thủ bi."* and the *A băng* aim line (Task 26's `safetyAimLine` already switches on `railAim`);
   5. the legal ball's path after contact and a dashed grey ring where it stops;
   6. the jitter bar between `jitterEnds` through the stop point.
   The steps view shows *Đang tìm cú thủ…* while searching, shows the touched ball, and adds `Vi.planSafetyLegend` under the legend for a safety step with a shot.
@@ -4398,6 +4634,9 @@ In `planner_steps_view_test.dart`:
 
     setUpAll(() {
       kick = planToEnd(snookerOneRailTable()).single;
+      // A băng nay cũng được xét ở bàn hết đường ăn (chủ sản phẩm chốt
+      // 08/10/2026), nhưng cú trực tiếp vẫn thắng — test 7 của
+      // safety_spec_test giữ điều đó, nên bước này không có điểm ngắm băng.
       direct = planToEnd(noPotTable()).single;
     });
 
@@ -4657,7 +4896,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: the decisions of Tasks 19–27 and the deviations above.
-- Produces: PRD text that matches the code; every change carries *(sửa 2026-10-07: cú phòng thủ)*.
+- Produces: PRD text that matches the code; every change carries *(sửa 2026-10-07: cú phòng thủ)*, and the owner's decisions of 2026-10-08 inside §5.6 also carry *(sửa 2026-10-08 …)*.
 
 - [ ] **Step 1: §4 — `PlanStep`**
 
@@ -4687,8 +4926,9 @@ and after the block:
 Chạy ở bước phòng thủ (tầng 4 của §5.3, hoặc khi không có cặp bi–lỗ nào). Kế hoạch vẫn dừng sau bước này vì tới lượt đối thủ.
 
 - **Phân loại.** Bị đui khi từ bi cái cả ba đường — tới bi ảo trọn bi, và hai đường mỏng sát hai mép bi hợp lệ — đều bị bi khác chắn. 8-bi: bi hợp lệ là mọi bi nhóm mình (hết thì bi 8), đui khi mọi bi hợp lệ đều bị chắn.
-- **Không đui → cú thủ trực tiếp:** độ dày trọn bi, ¾, ½, ¼, ⅛ (trừ trọn bi, mỗi mức lệch hai bên) × đứng / cu lê / trô × áp phê (không, trái ½, trái 1, phải ½, phải 1 đầu cơ) × 5 mức lực = 675 phương án mỗi bi hợp lệ; bỏ trước độ dày mà đường bi cái tới bi ảo bị chắn.
-- **Bị đui → A băng:** mọi chuỗi băng không lặp băng liền nhau (1 băng 4, 2 băng 12, 3 băng 36, 4 băng 108); hướng ban đầu soi gương bi hợp lệ qua chuỗi, bỏ chuỗi bị chắn hoặc chạm băng ở miệng lỗ; mỗi chuỗi: đứng / cu lê × 5 mức lực × chạm trọn bi hoặc ½ bi hai bên. Thử 1–3 băng; chỉ khi không còn phương án hợp lệ nào mới thử 4 băng.
+- **Cú thủ trực tiếp** (mỗi bi hợp lệ nhìn thấy được, bi số nhỏ trước): độ dày trọn bi, ¾, ½, ¼, ⅛ (trừ trọn bi, mỗi mức lệch hai bên) × đứng / cu lê / trô × 5 mức lực, **không áp phê** = tối đa 135 phương án mỗi bi; bỏ trước độ dày mà đường bi cái tới bi ảo bị chắn. Chỉ khi không phương án nào của bi đó hợp lệ mới thử thêm áp phê (trái ½, trái 1, phải ½, phải 1 đầu cơ) = tối đa 540 phương án *(sửa 2026-10-08: áp phê là đường lui)*.
+- **A băng — luôn thử, kể cả khi không đui** *(sửa 2026-10-08)*: mọi chuỗi băng không lặp băng liền nhau (1 băng 4, 2 băng 12, 3 băng 36, 4 băng 108) vào mọi bi hợp lệ; hướng ban đầu soi gương bi hợp lệ qua chuỗi, bỏ chuỗi bị chắn hoặc chạm băng ở miệng lỗ; mỗi chuỗi: đứng / cu lê × 5 mức lực × chạm trọn bi hoặc ½ bi hai bên, không áp phê. Thử 1–3 băng; chỉ khi không còn phương án hợp lệ nào (trực tiếp hay 1–3 băng) mới thử 4 băng. Bị đui thì không có cú trực tiếp, chỉ còn A băng.
+- **Thứ tự cố định:** cú trực tiếp trước (từng bi: không áp phê, rồi áp phê nếu cần), rồi A băng 1–3 băng, rồi 4 băng. Cú trực tiếp và A băng chấm cùng một thang điểm; phạt A băng giữ cú trực tiếp thắng khi gần ngang *(sửa 2026-10-08)*.
 - **Dò hướng cơ bằng mô phỏng thật** cho bi cái chạm bi hợp lệ đúng độ dày, sau đúng chuỗi băng; không hội tụ thì bỏ phương án.
 - **Luật WPA:** loại phương án nếu bi cái chạm bi khác trước, sai số băng trước va chạm (A băng), sau va chạm không bi nào chạm băng, chết cái, bi hợp lệ rơi lỗ, đường bi hợp lệ hoặc bi cái sau va chạm đi qua bi chắn, hoặc lõi quá giờ.
 - **Chấm điểm** (thấp là tốt), mỗi mức lực (chọn, −15%, +15%, kẹp ≤ 100%): phần đối thủ (đui → 0; không đui → 95 − góc cắt dễ nhất của đối thủ; không lỗ nào → 0) − 5 cho mỗi bi sát băng (cách băng ≤ một bi: bi cái, bi đối thủ phải đánh dễ nhất) − khoảng cách bi cái → bi đó (cm) × 0,01; mức phạm luật tính 95. Lấy mức xấu nhất, cộng phạt kỹ thuật (như §5.3, áp phê cộng dồn) + phạt A băng (1 băng 10, 2 băng 20, 3 băng 45, 4 băng 55) + lực × 0,04. Bằng điểm giữ phương án thử trước.
@@ -4717,8 +4957,8 @@ Append to §8:
 
 - [ ] **Step 6: Check every marker is in place**
 
-Run: `grep -c "sửa 2026-10-07: cú phòng thủ" PRD_RunOutPlanner.md`
-Expected: at least 8.
+Run: `grep -c "sửa 2026-10-07: cú phòng thủ" PRD_RunOutPlanner.md` and `grep -c "sửa 2026-10-08" PRD_RunOutPlanner.md`
+Expected: at least 8, and 3.
 
 - [ ] **Step 7: Commit**
 
@@ -4881,9 +5121,7 @@ Load the secrets from the main checkout's `.claude/settings.local.json` `env` bl
 The controller shows the owner the screenshots of tables 4–7, the printed labels, the safety times and the frame lines. Spec §9.3 says to stop here for the owner to judge whether each safety looks like how a good player would play it, before tuning any penalty. Ask specifically:
 - Tables 5–7: is the chosen safety what the owner would play? Is the *A băng* rail and *chấm* where a good player aims?
 - Are the kick penalties (10 / 20 / 45 / 55), `nearRailBonus` and the ±15 % worst case giving the right balance between "simple" and "hard for the opponent"?
-- Deviation 5: should a cue ball that runs into a third ball after contact reject the safety?
-- Deviation 9: counting *chấm* on the short rails from the top corner, and the *chấm* as the projection of the cue-ball contact.
-- Deviation 13: should a not-snookered table also try kicks (cost: about 2× the search)?
+- Tables 6–7: kicks now compete with direct shots (owner decision 2026-10-08) and the direct shot still won. Does the margin `kickRailPenalty` gives a direct shot feel right?
 - The opponent's degree number on screen (spec decision 9) and the legend wording.
 
 Do not change any constant or string without the owner's answer.
@@ -4912,9 +5150,8 @@ Append to the build log:
 ## Cú phòng thủ — tuning and open questions
 
 - Constants: <each changed constant: old → new, or "none">.
-- Deviation 5 (cue ball into a third ball): <answer>.
-- Deviation 9 (short-rail diamonds): <answer>.
-- Deviation 13 (kicks when not snookered): <answer>.
+- Already answered before execution (2026-10-08): deviation 5 and deviation 9 confirmed as written; *áp phê* is a fallback inside the safety search; kicks are always tried (deviation 13).
+- Direct against kick on tables 6–7: <answer>.
 ```
 
 Fill every `<…>` with what Step 2 printed and what the owner said, verbatim.
@@ -4957,9 +5194,9 @@ Expected:
 
 Use superpowers:requesting-code-review on `main...feat/run-out-planner`, with both specs, both plans and the build log as context. Ask the reviewer to check at least these:
 - the plan invariant (`identical(steps[i].trace!.cueEnd, steps[i + 1].cbFrom)`) and determinism;
-- that slicing cannot change results, in `PlannerJob` and in `SafetyJob` (one new memo entry per unit, the cursor, exact pruning);
+- that slicing cannot change results, in `PlannerJob` and in `SafetyJob` (one new memo entry per unit, the cursor, exact pruning), and that pruning cannot change which stages open (`isLegalOption`, `_scan`);
 - the safety rules and score against spec §3.5 and §4, with the owner's numbers;
-- the 4-rail fallback only after 1–3 rails found nothing;
+- the owner decisions of 2026-10-08: *áp phê* only after a ball's no-spin options found nothing legal; kicks always tried after the direct stages; the 4-rail fallback only after direct and 1–3 rails found nothing;
 - every Review Focus item of both plans;
 - no degree aim instruction on any screen (the opponent's cut angle is the only degree number added);
 - every visible string in `Vi`, and the owner's terms used exactly (*bị đui*, *A băng*, *chấm*, rail names, *"Ăn ½ bi, lệch bên trái"*);
@@ -4990,10 +5227,10 @@ The same sequence as the physics feature (memory: poolcoachai-deploy). Do not de
    | Spec section | Task |
    |---|---|
    | §1 goal: *bị đui* → A băng; no pot → direct safety; simulator wait | 19–24; 18 |
-   | §2 decisions 1 (WPA) · 2 (opponent first, ±15 %) · 3 (1–4 rails, 4 as fallback) · 4 (675 with áp phê) · 5 (*chấm*) · 6 (additive score) · 7 (10/20/45/55) · 8 (−5 near rail) · 9 (opponent degrees) · 10 (wait ×3, no memory) · 11 (sliced core) | 21 · 21 · 22, 23 · 22 · 19, 23, 26 · 21 · 19, 21 · 19, 21 · 26 · 17, 18 · 22, 24 |
+   | §2 decisions 1 (WPA) · 2 (opponent first, ±15 %) · 3 (1–4 rails, 4 as fallback) · 4 (675 with áp phê; since 2026-10-08 áp phê is a per-ball fallback) · 5 (*chấm*) · 6 (additive score) · 7 (10/20/45/55) · 8 (−5 near rail) · 9 (opponent degrees) · 10 (wait ×3, no memory) · 11 (sliced core) | 21 · 21 · 22, 23 · 22 · 19, 23, 26 · 21 · 19, 21 · 19, 21 · 26 · 17, 18 · 22, 24 |
    | §2 terms | 26 (string tests), Global Constraints |
    | §3.1 when it runs | 24 |
-   | §3.2 classification | 19 |
+   | §3.2 classification (since 2026-10-08 it no longer decides direct against kick: both run) | 19, 22 |
    | §3.3 direct options, pruning, refinement | 19, 20, 22 |
    | §3.4 kicks: sequences, mirror, refinement, tiers | 19, 20, 22, 23 |
    | §3.5 rules | 21, 23 |
@@ -5009,21 +5246,22 @@ The same sequence as the physics feature (memory: poolcoachai-deploy). Do not de
    | §6 speed, frame budget, perf test | 16, 25, 29 |
    | §7 simulator wait | 17, 18 |
    | §8 PRD | 28 |
-   | §9.1 tests 1–10 | 1: 19 · 2: 21 · 3: 23 · 4: 22, 23 · 5: 19, 23 · 6: 21 · 7: 21 · 8: 21, 23 · 9: 22, 24 · 10: 22, 24 |
+   | §9.1 tests 1–10 | 1: 19 · 2: 21 · 3: 23 · 4: 22, 23 · 5: 19, 23 · 6: 21 · 7: 21, 23 · 8: 21, 23 · 9: 22, 24 · 10: 22, 24 |
    | §9.2 screens | 18, 26, 27 |
    | §9.3 Chrome and owner | 29 |
    | Owner decision: 4 ms slice | 16 |
+   | Owner decisions 2026-10-08: áp phê fallback, kicks always, deviations 5 and 9 confirmed | 19, 21, 22, 23, 25, 28 |
    | Run-out Task 15 moved to the end | 30 |
 
-   Gaps the spec leaves open are the Deviations, each with its owner question in Task 25 or Task 29.
+   Gaps the spec leaves open are the Deviations. Deviations 5, 9 and 13 were answered by the owner on 2026-10-08; the rest carry their owner question in Task 25 or Task 29.
 2. **Placeholder scan.** The only `<…>` markers are in the build-log templates (Tasks 16, 25, 29), which must hold measured output and the owner's words. No "TBD", no "similar to Task N"; every code step carries its code. Fixture coordinates are either verified at plan time (geometry, prototype convergence) or found by a named probe with fixed acceptance assertions (Task 23), never guessed.
 3. **Type consistency.** These names were checked across tasks:
    - `KickProbe({cueAtContact, railsBefore, cuePocket})`, `probeKick(input, {maxRails, maxTime})`, `solveStun(input, {topspin})`, `topspinOf(BallState)`, `strokeVerticalOffset(Stroke, double)`, `extendedSimTime`.
    - `SafetyContext({game, cue, balls, table})` with `legal`, `visible`, `snookered`, `reason`, `obstaclesOf`, `after`.
    - `SafetyOption` fields `kind, ballNum, ball, rails, thickness, side, lateral, stroke, spin, power, initialAim, contact`; builders `directOption(c, target, thickness, side, stroke, spin, power)` and `kickOption(c, target, rails, thickness, side, stroke, power)`.
    - `SafetyPhysics({probe, simulate})`, `SimKey (cue, object, aim, power, b, spin)`, `AimResult (key, stunReached)`, `aimSafety(o, {cue, physics, table})`, `simulateSafety(key, {physics, table})`, `withSimPower`, `inputOf`, `keyOf`.
-   - `SafetyFoul` values; `safetyFoulOf(t, {rails, obstacles, table})`; `SafetyLevel`, `levelOf(c, o, t)`; `evaluateOption(c, index, o, lookup, {bound})`; `beats`; `safetyToleranceOf(c, o, key, trace)`; `buildSafetyShot(c, e, trace)`.
-   - `SafetyJob(context, {physics, prune, maxOptions})` with `work`, `step({budget, maxSimulations})`, `cancel`, `isDone`, `isCancelled`, `result`, `simulations`, `triedRailCounts`, `options`; `searchToEnd(c, {physics})`.
+   - `SafetyFoul` values; `safetyFoulOf(t, {rails, obstacles, table})`; `SafetyLevel`, `levelOf(c, o, t)`; `evaluateOption(c, index, o, lookup, {bound})`; `isLegalOption(c, index, o, lookup)`; `beats`; `safetyToleranceOf(c, o, key, trace)`; `buildSafetyShot(c, e, trace)`.
+   - `SafetyTier { direct, directSpin, kick, kickFallback }`, `SafetyStage = ({tier, ballNum})`; `SafetyJob(context, {physics, prune, maxOptions})` with `work`, `step({budget, maxSimulations})`, `cancel`, `isDone`, `isCancelled`, `result`, `simulations`, `triedRailCounts`, `stages`, `openedStages`, `options`; `searchToEnd(c, {physics})`; `directOptions(c, target, spins)`, `kickOptions(c, {fromRails, toRails})`; constant `safetySideSpins` (no `safetySpins`).
    - `PlanStep.safety({cbFrom, ballNum, safety})`; `PlannerJob(setup, {aim, safety})`, `searchingSafety`; `planToEnd(setup, {aim, safety})`; `PlannerStepsView(safety:)`.
    - `SimTimeoutState`, `simTimeoutLine`, `SimulatorPanel.waitKey/aimOnlyKey`, `Vi.simSummary(…, notice:)`; `squirtLineFor(spin, aimOffsetDeg, distance, table, stroke, power)`.
    - Fixtures `snookerOneRailTable`, `snookerTwoRailTable`, `snookerThreeRailTable`, `partlyVisibleTable`, `noPotTable`, `eightSafetyTable`, `jawBlocker`, `noSafetyPhysics`, `safetyFingerprint`.
