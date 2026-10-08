@@ -309,3 +309,92 @@ String fingerprint(List<PlanStep> steps) => [
           s.nextBallNum,
         ].join('|'),
     ].join('\n');
+
+/// Bi chắn đặt trên đường bi → lỗ, cách điểm lỗ [distance] cm: chắn lỗ đó
+/// mà không chắn chỗ bi hợp lệ lăn đi.
+Vec2 jawBlocker(Vec2 ball, Pocket pocket, {double distance = 14}) {
+  final at = TableSpec.nineFoot.pocketPosition(pocket);
+  return at + (ball - at).normalized * distance;
+}
+
+/// Thế đui cần A băng 1 băng (spec cú phòng thủ 9.1.3). Bi 2 nằm giữa đường
+/// bi cái → bi 1 nên cả trọn bi lẫn hai đường mỏng đều bị chắn, không lỗ
+/// nào đánh được. Kiểm bằng nguyên mẫu trên a35667b: đường mở 6 / 15 / 23
+/// cho 1 / 2 / 3 băng; đường 1 băng (băng dài trên, dưới) dò hội tụ ở 6–8
+/// trên 10 phương án. Đo trên a35667b với mã của kế hoạch: chọn A băng 1
+/// băng (băng dài dưới, chấm 3,5), cu lê 90 %.
+TableSetup snookerOneRailTable() => TableSetup(
+      game: GameType.nineBall,
+      cue: const Vec2(30, 80),
+      balls: _numbered(const [Vec2(180, 80), Vec2(105, 80)]),
+    );
+
+/// Như [snookerOneRailTable], thêm bi 3, 4 chắn hai đường 1 băng. Nguyên
+/// mẫu: đường mở 0 / 13 / 8. Đo trên a35667b: chọn A băng 2 băng (băng ngắn
+/// trái, chấm 2), cu lê 45 %.
+TableSetup snookerTwoRailTable() => TableSetup(
+      game: GameType.nineBall,
+      cue: const Vec2(30, 80),
+      balls: _numbered(const [Vec2(180, 80), Vec2(105, 80), Vec2(105, 9), Vec2(105, 118)]),
+    );
+
+/// Như [snookerTwoRailTable], thêm bi 5–7 chắn mọi đường 2 băng (tìm bằng
+/// lưới tham lam, safety_probe_test.dart làm lại được). Nguyên mẫu: đường mở
+/// 0 / 0 / 8. Đo trên a35667b: chọn A băng 3 băng (băng ngắn phải, chấm 0,5),
+/// đối thủ bị đui.
+TableSetup snookerThreeRailTable() => TableSetup(
+      game: GameType.nineBall,
+      cue: const Vec2(30, 80),
+      balls: _numbered(const [
+        Vec2(180, 80),
+        Vec2(105, 80),
+        Vec2(105, 9),
+        Vec2(105, 118),
+        Vec2(42, 68),
+        Vec2(120, 104),
+        Vec2(12, 50),
+      ]),
+    );
+
+/// Bi 2 lệch 4 cm khỏi đường bi cái → bi 1: chắn trọn bi và mép phải, hở mép
+/// trái — chỉ ¼ và ⅛ bên trái nhìn thấy được (tính tay từ hình học).
+TableSetup partlyVisibleTable() => TableSetup(
+      game: GameType.nineBall,
+      cue: const Vec2(30, 80),
+      balls: _numbered(const [Vec2(180, 80), Vec2(105, 84)]),
+    );
+
+/// Không đui nhưng hết đường ăn (spec cú phòng thủ 9.3). Từ bi cái chỉ góc
+/// trên phải và góc dưới phải đánh được; hai bi chắn ngay miệng hai lỗ đó,
+/// nên bi 1 vẫn lăn tự do trên bàn. Nguyên mẫu trên a35667b: 233–277 cú thủ
+/// trực tiếp hợp lệ. Đo với mã của kế hoạch: chọn ¼ bi lệch phải, đứng bi
+/// 45 %, đối thủ không còn đường ăn.
+TableSetup noPotTable() {
+  const ball = Vec2(150, 40);
+  return TableSetup(
+    game: GameType.nineBall,
+    cue: const Vec2(60, 100),
+    balls: _numbered([
+      ball,
+      jawBlocker(ball, Pocket.topRight),
+      jawBlocker(ball, Pocket.bottomRight),
+    ]),
+  );
+}
+
+/// 8 bi Trơn, cùng thế với [noPotTable]: hai bi chắn miệng lỗ là bi đối thủ 9,
+/// 10; bi 8 ở xa. Sau cú thủ đối thủ phải đánh bi 9 hoặc 10, không phải bi 1.
+/// Đo trên a35667b: chọn ¾ bi lệch phải, đứng bi 45 %; đối thủ đánh bi 10.
+TableSetup eightSafetyTable() {
+  const ball = Vec2(150, 40);
+  return TableSetup(
+    game: GameType.eightBall,
+    cue: const Vec2(60, 100),
+    balls: [
+      const PlacedBall(number: 1, pos: ball),
+      PlacedBall(number: 9, pos: jawBlocker(ball, Pocket.topRight), role: BallRole.opponent),
+      PlacedBall(number: 10, pos: jawBlocker(ball, Pocket.bottomRight), role: BallRole.opponent),
+      const PlacedBall(number: 8, pos: Vec2(40, 20), role: BallRole.eight),
+    ],
+  );
+}
