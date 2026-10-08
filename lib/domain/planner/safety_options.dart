@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/planner/legal_targets.dart';
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_geometry.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
@@ -113,3 +114,17 @@ SafetyOption? directOption(SafetyContext c, PlacedBall target, double thickness,
     contact: g.contact,
   );
 }
+
+/// Các phương án thủ trực tiếp vào [target] với các áp phê [spins] (spec
+/// 3.3), đúng thứ tự thử: độ dày theo [directContactOrder] (bỏ độ dày bị
+/// chắn), kiểu đánh, áp phê, lực tăng dần. `SafetyJob` gọi hai lần mỗi bi:
+/// trước với `[SideSpin.none()]`, rồi — chỉ khi không cú nào hợp lệ — với
+/// [safetySideSpins] (chủ sản phẩm chốt 08/10/2026).
+List<SafetyOption> directOptions(SafetyContext c, PlacedBall target, List<SideSpin> spins) => [
+      for (final (f, side) in openContacts(c.cue, target.pos, c.obstaclesOf(target.number),
+          table: c.table))
+        for (final stroke in strokeCandidates)
+          for (final spin in spins)
+            for (final power in powerCandidates)
+              directOption(c, target, f, side, stroke, spin, power)!,
+    ];

@@ -1,0 +1,209 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/domain/planner/kick_search.dart';
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/safety_aim.dart';
+import 'package:poolcoachai/domain/planner/safety_geometry.dart';
+import 'package:poolcoachai/domain/planner/safety_job.dart';
+import 'package:poolcoachai/domain/planner/safety_options.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
+import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/table_geometry/stroke.dart';
+import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
+
+import '../../support/planner_tables.dart';
+
+/// Việc tìm cú thủ chia lát (spec cú phòng thủ 3.6, test 9.1.9). Phần lớn
+/// test giới hạn số phương án mỗi chặng (maxOptions) để chạy nhanh: chia lát,
+/// cắt tỉa và thứ tự chặng không phụ thuộc số phương án.
+void main() {
+  SafetyContext contextOf(TableSetup s) =>
+      SafetyContext(game: s.game, cue: s.cue, balls: s.balls, table: s.table);
+
+  SafetyJob runJob(SafetyContext c,
+      {int? maxSimulations, Duration budget = const Duration(days: 1), int? maxOptions,
+      bool prune = true, SafetyPhysics physics = const SafetyPhysics()}) {
+    final job = SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics);
+    while (!job.isDone) {
+      job.step(budget: budget, maxSimulations: maxSimulations);
+    }
+    return job;
+  }
+
+  SafetyShot? run(SafetyContext c,
+          {int? maxSimulations, Duration budget = const Duration(days: 1), int? maxOptions,
+          bool prune = true, SafetyPhysics physics = const SafetyPhysics()}) =>
+      runJob(c,
+              maxSimulations: maxSimulations,
+              budget: budget,
+              maxOptions: maxOptions,
+              prune: prune,
+              physics: physics)
+          .result;
+
+  const direct1 = (tier: SafetyTier.direct, ballNum: 1);
+  const directSpin1 = (tier: SafetyTier.directSpin, ballNum: 1);
+  const kicks = (tier: SafetyTier.kick, ballNum: null);
+  const kickFallback = (tier: SafetyTier.kickFallback, ballNum: null);
+
+  // Lõi thật, trừ cú trực tiếp không áp phê: không bao giờ chạm bi. Ép mọi
+  // phương án không áp phê hỏng để thấy đường lui áp phê.
+  final noPlain = SafetyPhysics(
+    probe: (input, {required maxRails}) => maxRails == 0 && input.spin.isNone
+        ? const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null)
+        : probeKick(input, maxRails: maxRails),
+  );
+
+  group('danh sách phương án', () {
+    test('trực tiếp: độ dày mở × kiểu đánh × áp phê × lực của một bi, đúng thứ tự', () {
+      final c = contextOf(noPotTable());
+      final target = c.legal.single;
+      final open = openContacts(c.cue, target.pos, c.obstaclesOf(1));
+      final plain = directOptions(c, target, const [SideSpin.none()]);
+      expect(plain, hasLength(open.length * strokeCandidates.length * powerCandidates.length));
+      expect(
+          plain.every((o) => o.kind == SafetyKind.direct && o.rails.isEmpty && o.spin.isNone),
+          isTrue);
+      expect((plain.first.thickness, plain.first.side), open.first);
+      expect((plain.first.stroke, plain.first.power),
+          (strokeCandidates.first, powerCandidates.first));
+      expect(plain[1].power, powerCandidates[1]);
+      final spun = directOptions(c, target, safetySideSpins);
+      expect(spun, hasLength(plain.length * safetySideSpins.length));
+      expect(spun.any((o) => o.spin.isNone), isFalse);
+      expect((spun.first.spin, spun[powerCandidates.length].spin),
+          (safetySideSpins.first, safetySideSpins[1]));
+    });
+
+    test('A băng: ít băng trước, rồi bi, chuỗi, điểm chạm, kiểu đánh, lực; không áp phê', () {
+      final c = contextOf(snookerOneRailTable());
+      final options = kickOptions(c, fromRails: 1, toRails: 3);
+      expect(options, isNotEmpty);
+      final counts = options.map((o) => o.rails.length).toList();
+      expect(counts, [...counts]..sort());
+      expect(
+          options.every(
+              (o) => o.kind == SafetyKind.kick && kickStrokes.contains(o.stroke) && o.spin.isNone),
+          isTrue);
+      expect(kickOptions(c, fromRails: 4, toRails: 4).every((o) => o.rails.length == 4), isTrue);
+    });
+
+    test('thứ tự chặng: trực tiếp, áp phê, A băng 1–3, 4 băng; đui thì chỉ A băng', () {
+      expect(SafetyJob(contextOf(noPotTable())).stages,
+          [direct1, directSpin1, kicks, kickFallback]);
+      expect(SafetyJob(contextOf(snookerOneRailTable())).stages, [kicks, kickFallback]);
+      // Chưa làm đơn vị việc nào thì chưa mở chặng nào.
+      expect(SafetyJob(contextOf(noPotTable())).options, isEmpty);
+    });
+  });
+
+  group('áp phê là đường lui (chủ sản phẩm chốt 08/10/2026)', () {
+    test('có cú không áp phê hợp lệ: không mở chặng áp phê, không dò cú áp phê nào', () {
+      final job = runJob(contextOf(noPotTable()), maxOptions: 30);
+      expect(job.result, isNotNull);
+      expect(job.openedStages, [direct1, kicks]);
+      expect(job.options.every((o) => o.spin.isNone), isTrue);
+    });
+
+    test('không cú không áp phê nào hợp lệ: mới thử áp phê, ngay sau bi đó và trước A băng', () {
+      final job = runJob(contextOf(noPotTable()), maxOptions: 30, physics: noPlain);
+      expect(job.openedStages.take(3), [direct1, directSpin1, kicks]);
+      final firstSpun = job.options.indexWhere((o) => !o.spin.isNone);
+      expect(firstSpun, 30);
+      expect(job.options.skip(firstSpun).take(30).every((o) => o.kind == SafetyKind.direct),
+          isTrue);
+      expect(job.result, isNotNull);
+    });
+  });
+
+  group('chia lát', () {
+    test('chạy từng lát cho đúng y kết quả chạy một mạch, với mọi cỡ lát', () {
+      for (final s in [noPotTable(), snookerOneRailTable()]) {
+        final c = contextOf(s);
+        final whole = safetyFingerprint(run(c, maxOptions: 40));
+        for (final n in [1, 3]) {
+          expect(safetyFingerprint(run(c, maxOptions: 40, maxSimulations: n)), whole,
+              reason: 'lát $n');
+        }
+        expect(safetyFingerprint(run(c, maxOptions: 40, budget: Duration.zero)), whole);
+      }
+    });
+
+    test('đường lui áp phê: chạy từng lát vẫn mở đúng các chặng như chạy một mạch', () {
+      final c = contextOf(noPotTable());
+      final whole = runJob(c, maxOptions: 20, physics: noPlain);
+      final sliced = runJob(c, maxOptions: 20, physics: noPlain, maxSimulations: 1);
+      expect(sliced.openedStages, whole.openedStages);
+      expect(safetyFingerprint(sliced.result), safetyFingerprint(whole.result));
+    });
+
+    test('mỗi đơn vị việc chạy đúng một lần mô phỏng mới, hoặc không lần nào', () {
+      final job = SafetyJob(contextOf(noPotTable()), maxOptions: 30);
+      while (!job.isDone) {
+        final before = job.simulations;
+        final ran = job.work();
+        expect(job.simulations - before, ran ? 1 : 0);
+      }
+    });
+
+    test('tất định: cùng bàn chạy hai lần cho cùng cú thủ', () {
+      final c = contextOf(noPotTable());
+      expect(safetyFingerprint(run(c, maxOptions: 40)), safetyFingerprint(run(c, maxOptions: 40)));
+    });
+
+    test('hủy giữa chừng thì không chạy thêm gì', () {
+      final job = SafetyJob(contextOf(noPotTable()), maxOptions: 40);
+      job.step(maxSimulations: 5);
+      job.cancel();
+      final sims = job.simulations;
+      for (var i = 0; i < 20; i++) {
+        job.step();
+      }
+      expect(job.simulations, sims);
+      expect(job.isDone, isFalse);
+      expect(job.isCancelled, isTrue);
+    });
+
+    test('cắt tỉa không đổi cú được chọn và các chặng được mở, chỉ bớt mô phỏng', () {
+      final c = contextOf(noPotTable());
+      for (final physics in [const SafetyPhysics(), noPlain]) {
+        final pruned = runJob(c, maxOptions: 75, physics: physics);
+        final full = runJob(c, maxOptions: 75, physics: physics, prune: false);
+        expect(safetyFingerprint(pruned.result), safetyFingerprint(full.result));
+        expect(pruned.openedStages, full.openedStages);
+        expect(pruned.simulations, lessThanOrEqualTo(full.simulations));
+      }
+    });
+  });
+
+  test('4 băng chỉ là đường lui: trực tiếp và 1–3 băng hỏng hết thì mới thử 4 băng', () {
+    for (final s in [snookerOneRailTable(), noPotTable()]) {
+      final c = contextOf(s);
+      expect(kickOptions(c, fromRails: 4, toRails: 4), isNotEmpty);
+      // Lõi thật, nhưng chỉ cho bi cái chạm bi khi được phép 4 băng.
+      final onlyFour = SafetyPhysics(
+        probe: (input, {required maxRails}) => maxRails < 4
+            ? const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null)
+            : probeKick(input, maxRails: maxRails),
+      );
+      final job = SafetyJob(c, physics: onlyFour);
+      while (!job.isDone && !job.triedRailCounts.contains(4)) {
+        job.step(budget: const Duration(days: 1), maxSimulations: 1);
+      }
+      expect(job.triedRailCounts, containsAll([1, 2, 3, 4]));
+      expect(job.openedStages.last, kickFallback);
+    }
+  });
+
+  test('không có cú thủ hợp lệ nào thì kết quả là null', () {
+    expect(run(contextOf(noPotTable()), physics: noSafetyPhysics), isNull);
+  });
+
+  test('bi hợp lệ sát băng: tìm xong, không lỗi', () {
+    final s = TableSetup(game: GameType.nineBall, cue: const Vec2(60, 60), balls: [
+      PlacedBall(number: 1, pos: Vec2(200, TableSpec.nineFoot.minY)),
+    ]);
+    expect(() => run(contextOf(s), maxOptions: 30), returnsNormally);
+  });
+}

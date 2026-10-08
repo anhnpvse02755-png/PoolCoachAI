@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_geometry.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
@@ -32,4 +33,30 @@ SafetyOption? kickOption(SafetyContext c, PlacedBall target, List<Rail> rails,
     initialAim: path.aim,
     contact: path.contact,
   );
+}
+
+/// Mọi phương án A băng từ [fromRails] tới [toRails] băng (spec 3.4), đúng
+/// thứ tự thử: ít băng trước, bi số nhỏ trước, chuỗi theo [railSequences],
+/// điểm chạm theo [kickContactOrder], kiểu đánh, lực tăng dần. Đường soi
+/// gương hỏng thì bỏ cả nhóm.
+List<SafetyOption> kickOptions(SafetyContext c, {required int fromRails, required int toRails}) {
+  final out = <SafetyOption>[];
+  for (var n = fromRails; n <= toRails; n++) {
+    for (final target in c.legal) {
+      for (final rails in railSequences(n)) {
+        for (final (f, side) in kickContactOrder) {
+          if (kickOption(c, target, rails, f, side, kickStrokes.first, powerCandidates.first) ==
+              null) {
+            continue;
+          }
+          for (final stroke in kickStrokes) {
+            for (final power in powerCandidates) {
+              out.add(kickOption(c, target, rails, f, side, stroke, power)!);
+            }
+          }
+        }
+      }
+    }
+  }
+  return out;
 }

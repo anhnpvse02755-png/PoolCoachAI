@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/planner/safety_aim.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
@@ -408,3 +409,31 @@ final noSafetyPhysics = SafetyPhysics(
       const KickProbe(cueAtContact: null, railsBefore: [], cuePocket: null),
   simulate: (input) => throw SimulationTimeout(input),
 );
+
+/// Mọi thứ của cú thủ mà người chơi thấy, đủ chính xác để hai lần chạy chỉ
+/// trùng khi trùng thật.
+String safetyFingerprint(SafetyShot? s) => s == null
+    ? 'không có cú thủ'
+    : [
+        s.reason,
+        s.kind,
+        s.rails,
+        s.ballNum,
+        s.thickness,
+        s.side,
+        s.stroke,
+        s.spin,
+        s.power,
+        s.trace.cueEnd,
+        s.trace.objectPath.last,
+        s.railAim?.rail,
+        s.railAim?.diamond,
+        s.opponent.snookered,
+        s.opponent.ball?.number,
+        s.opponent.easiest?.pocket,
+        s.opponent.easiest?.angle,
+        s.jitterEnds,
+        s.tolerance,
+        s.sawsBhePercent,
+        s.total,
+      ].join('|');
