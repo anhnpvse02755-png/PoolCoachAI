@@ -1,4 +1,4 @@
-// Mở Kế hoạch dọn bàn trên Chrome thật: bày bốn bàn, đo thời gian ra bước 1
+// Mở Kế hoạch dọn bàn trên Chrome thật: bày bảy bàn (ba bàn cú thủ), đo thời gian ra bước 1
 // và thời gian khung hình lúc đang tính, chụp từng bước, kiểm luồng đặt lại
 // bi cái.
 //   node tool/e2e/planner.mjs [appUrl]
@@ -28,7 +28,23 @@ const FIRST_STEP_MAX_MS = 1000;
 const FRAME_MEDIAN_MAX = 17;
 const FRAME_P95_MAX = 20;
 
-// Bốn bàn — đúng toạ độ của test/support/planner_tables.dart.
+// Spec cú phòng thủ mục 6: bước thủ ra trong "vài giây" — đọc là ≤ 5 s
+// (độ lệch 20 của kế hoạch), tính tới lúc bước thủ hiện ra (điểm hỏi, cú tạm,
+// hay hết lượt tìm khi lượt thô không có cú).
+const SAFETY_MAX_MS = 5000;
+
+// Bi chắn ở miệng lỗ — đúng jawBlocker của test/support/planner_tables.dart.
+const jaw = (ball, [px, py], d = 14) => {
+  const dx = ball[0] - px, dy = ball[1] - py, l = Math.hypot(dx, dy);
+  return [px + (dx / l) * d, py + (dy / l) * d];
+};
+const NO_POT_BALL = [150, 40];
+
+// Điểm hỏi và cú tạm của cú thủ (chủ sản phẩm chốt 08/10/2026 sau Task 25).
+const CHECKPOINT = 'Bạn muốn tính tiếp hay không?';
+const PROVISIONAL = 'đang tìm cú tốt hơn';
+
+// Bảy bàn — đúng toạ độ của test/support/planner_tables.dart.
 const RING = [[116.27, 58.13], [127, 51.5], [137.73, 58.13], [116.27, 68.87], [127, 75.5], [137.73, 68.87]];
 const TABLES = [
   { name: '1-9bi-de', game: '9 bi', cue: [127, 63.5], balls: [[200, 8], [60, 40], [127, 100], [220, 100]] },
@@ -44,6 +60,20 @@ const TABLES = [
     ],
   },
   { name: '4-phong-thu', game: '9 bi', cue: [40, 100], balls: [[127, 63.5], ...RING] },
+  // Cú phòng thủ — đúng toạ độ của snookerOneRailTable, noPotTable, eightSafetyTable.
+  // ask: nút bấm ở điểm hỏi; không có thì bàn không được hỏi (đo trên VM, Task 25b).
+  { name: '5-9bi-dui-a-bang', game: '9 bi', cue: [30, 80], balls: [[180, 80], [105, 80]], safety: true, ask: 'Dùng cú này' },
+  {
+    name: '6-9bi-het-duong', game: '9 bi', cue: [60, 100], safety: true, gateSafety: true, ask: 'Tính tiếp',
+    balls: [NO_POT_BALL, jaw(NO_POT_BALL, [254, 0]), jaw(NO_POT_BALL, [254, 127])],
+  },
+  {
+    name: '7-8bi-thu', game: '8 bi', group: 'Trơn', cue: [60, 100], safety: true, provisional: true,
+    balls: [
+      ['Bi của tôi', NO_POT_BALL], ['Bi đối thủ', jaw(NO_POT_BALL, [254, 0])],
+      ['Bi đối thủ', jaw(NO_POT_BALL, [254, 127])], ['Bi 8', [40, 20]],
+    ],
+  },
 ];
 
 // Chỗ thả bi cái khi đặt lại (spec mục 4.5).
@@ -258,11 +288,16 @@ async function stepCardLines() {
 }
 
 async function waitPlanDone() {
-  for (let i = 0; i < 240 && (await tab.text()).includes('Đang tính bước'); i++) await sleep(250);
+  for (let i = 0; i < 1200; i++) {
+    const text = await tab.text();
+    if (!text.includes('Đang tính bước') && !text.includes('Đang tìm cú thủ') && !text.includes(PROVISIONAL)) return;
+    await sleep(250);
+  }
 }
 
 const results = [];
 let frameStats = null;
+let safetyFrames = null;
 
 try {
   await registerThrowaway(tab, APP, { email, password: randomBytes(6).toString('hex') });
@@ -287,20 +322,61 @@ try {
     await tab.shot(path.join(shots, `${t.name}-0-bay-ban.png`));
 
     let stopInput = null;
-    if (t.gate) await startFrames();
+    if (t.gate || t.gateSafety) await startFrames();
     const t0 = Date.now();
     await clickNow('Lập kế hoạch');
-    // Bơm input sau khi bấm: kéo trên màn nhập bàn thì dời bi mất.
-    if (t.gate) stopInput = agitate(r);
-    const first = await waitLabel('Bàn kế hoạch. Bước 1 /', 15000);
+    // Bơm input sau khi bấm: kéo trên màn nhập bàn thì dời bi mất. Máy bận
+    // thì màn nhập bàn còn trên màn sau cú bấm (lăn chuột cuộn nó, bi bị
+    // kéo dời), nên đợi màn kế hoạch hiện ra rồi mới bơm.
+    if (t.gate || t.gateSafety) {
+      await waitLabel('Bàn kế hoạch.', 15000);
+      stopInput = agitate(r);
+    }
+    const first = await waitLabel('Bàn kế hoạch. Bước 1 /', t.safety ? 300000 : 15000);
     const firstMs = Date.now() - t0;
     if (!first) throw new Error(`${t.name}: không thấy bước 1`);
     console.log(`${t.name}: bước 1 sau ${firstMs} ms — ${first}`);
+    const sawProvisional = (await tab.text()).includes(PROVISIONAL);
+    if (sawProvisional) await tab.shot(path.join(shots, `${t.name}-cu-tam.png`));
+    // Bàn 4 cũng đi qua lượt tìm cú thủ nhưng không đo trên VM: chỉ in, không kiểm.
+    if (t.safety && Boolean(t.provisional) !== sawProvisional) {
+      throw new Error(`${t.name}: ${sawProvisional ? 'có' : 'không có'} cú tạm — khác lúc đo trên VM`);
+    }
     await waitPlanDone();
+    const doneMs = Date.now() - t0;
     if (t.gate) {
       frameStats = stats(await stopFrames());
       const input = await stopInput();
       console.log(`  khung hình lúc đang tính sau Lập kế hoạch: ${JSON.stringify(frameStats)}; input ${JSON.stringify(input)}`);
+    }
+    if (t.gateSafety) {
+      safetyFrames = stats(await stopFrames());
+      const input = await stopInput();
+      console.log(`  khung hình lúc tìm cú thủ: ${JSON.stringify(safetyFrames)}; input ${JSON.stringify(input)}`);
+    }
+    // Lượt thô thủ tốt thì màn hỏi có tính tiếp không. firstMs là tới lúc
+    // bước hiện ra; "Tính tiếp" chỉ in thời gian.
+    let continueMs = null;
+    const asked = (await tab.text()).includes(CHECKPOINT);
+    if (t.safety || asked || sawProvisional) {
+      if (t.safety && Boolean(t.ask) !== asked) {
+        throw new Error(`${t.name}: ${asked ? 'có' : 'không có'} điểm hỏi — khác lúc đo trên VM`);
+      }
+      if (asked) {
+        // Bàn không đo trên VM mà bị hỏi thì tính tiếp — ra cú của lượt tìm đủ.
+        const ask = t.ask ?? 'Tính tiếp';
+        await tab.shot(path.join(shots, `${t.name}-diem-hoi.png`));
+        const t2 = Date.now();
+        await clickNow(ask);
+        await sleep(100);
+        await waitPlanDone();
+        continueMs = Date.now() - t2;
+        console.log(`  điểm hỏi → ${ask}: xong sau ${continueMs} ms`);
+      }
+      if (sawProvisional) {
+        const last = await labelStarting('Bàn kế hoạch. Bước 1 /');
+        console.log(`  cú tạm sau ${firstMs} ms, cú cuối sau ${doneMs} ms — ${last === first ? 'giữ cú tạm' : last}`);
+      }
     }
 
     const labels = [];
@@ -352,15 +428,29 @@ try {
       // kéo bi cái rồi tính lại.
       if (resetFrames.p95 > frameStats.p95) frameStats = resetFrames;
     }
-    results.push({ table: t.name, firstMs, steps: labels.length });
+    results.push({ table: t.name, firstMs, doneMs, steps: labels.length, continueMs });
 
     if (t.name.startsWith('3-')) {
       if (labels.some((l) => /bi (9|10),/.test(l))) throw new Error('8 bi: kế hoạch đánh bi đối thủ');
       const eightAt = labels.findIndex((l) => l.includes('bi 8,'));
       if (eightAt >= 0 && eightAt !== labels.length - 1) throw new Error('8 bi: bi 8 không đánh cuối');
     }
-    if (t.name.startsWith('4-') && !labels[0]?.includes('nên chơi an toàn (safety)')) {
+    if (t.name.startsWith('4-') && !/nên chơi an toàn \(safety\)|nên thủ bi|để thủ\./.test(labels[0] ?? '')) {
       throw new Error(`bàn phòng thủ: ${labels[0]}`);
+    }
+    if (t.name.startsWith('5-')) {
+      if (!labels[0]?.includes('Bi cái bị đui bi 1 — đánh A băng để thủ.') || !/A băng \d băng: ngắm chấm/.test(labels[0])) {
+        throw new Error(`bàn đui: ${labels[0]}`);
+      }
+    }
+    if (t.name.startsWith('6-')) {
+      if (!labels[0]?.includes('Không còn đường ăn bi — nên thủ bi.') || !/Ăn (trọn|¾|½|¼|⅛) bi/.test(labels[0])) {
+        throw new Error(`bàn hết đường ăn: ${labels[0]}`);
+      }
+    }
+    if (t.name.startsWith('7-')) {
+      if (!labels[0]?.includes('nên thủ bi')) throw new Error(`bàn 8 bi thủ: ${labels[0]}`);
+      if (/đối thủ: bi 1 /.test(labels[0])) throw new Error('8 bi: đối thủ được tính đánh bi của tôi');
     }
   }
 
@@ -380,12 +470,18 @@ try {
   console.log(`Bước 1 ở CPU chậm 4 lần (tham khảo): ${Date.now() - t1} ms`);
   await tab.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
+  const slowSafety = results.filter((x) => /^(5|6|7)-/.test(x.table) && x.firstMs > SAFETY_MAX_MS);
+  console.log(`Khung hình lúc tìm cú thủ (bàn 6): ${JSON.stringify(safetyFrames)}`);
+
   const errors = tab.errors.filter((e) => !/favicon/i.test(e));
   if (errors.length) throw new Error(`Lỗi trong console:\n${errors.join('\n')}`);
   const gated = results.find((x) => x.table.startsWith('2-'));
   if (gated.firstMs > FIRST_STEP_MAX_MS) throw new Error(`Bước 1 chậm: ${gated.firstMs} ms`);
   if (frameStats.median > FRAME_MEDIAN_MAX || frameStats.p95 > FRAME_P95_MAX) {
     throw new Error(`Rớt khung lúc đang tính: trung vị ${frameStats.median.toFixed(1)} ms, p95 ${frameStats.p95.toFixed(1)} ms`);
+  }
+  if (slowSafety.length) {
+    throw new Error(`Bước thủ chậm: ${slowSafety.map((x) => `${x.table} ${x.firstMs} ms`).join(', ')}`);
   }
   console.log(`\nXong. Ảnh ở ${shots}`);
 } finally {

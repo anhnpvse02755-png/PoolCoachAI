@@ -37,3 +37,23 @@ Plans: `docs/superpowers/plans/2026-10-07-poolcoachai-run-out-planner.md`, `docs
   - The failures coincide with other sessions loading the machine (full 8-ball search 131 s and 19.9 s against 8.7–10.9 s otherwise); the three-rail path was not in the perf test.
 - Chrome estimate (× 2.8) of the first shown step, from the passing runs: one-rail ≈ 1.0–2.7 s, no-pot ≈ 2.3–4.2 s, 8-ball ≈ 3.3–4.9 s (provisional). The 8-ball case sits right at the 1800 ms VM gate on a busy machine.
 - Over the gate: 8-ball (coarse pass 150 units) on a loaded machine only (2491 and 3408 ms); within it on quiet runs.
+
+## Cú phòng thủ — Chrome (Task 29)
+
+- Build: `flutter build web --release` of the worktree at 8fea213 plus the `planner.mjs` change, served by `tool/e2e/serve.mjs build/web 5555`, headless Chrome at 412 × 915 mobile. The machine was not quiet: 30–76 % total CPU from other sessions (chroma-mcp, another python process) throughout; it never went quiet.
+- Four runs of `planner.mjs`:
+  - run 1: stopped on table 4 — table 4 now also goes through the safety search and showed a provisional shot (the brief only expected that on table 7). Fixed in the script: the provisional and checkpoint asserts apply to tables 5–7 only; table 4 prints them, and if it is ever asked it presses *Tính tiếp*.
+  - run 2: all safety checks passed; failed the old frame gate on table 2 (p95 33.4 ms, gate 20).
+  - run 3 (rerun): failed on table 6 — it planned `Bước 1 / 3: bi 1, lỗ giữa trên` because on the loaded machine the input agitation started while the setup screen was still showing and moved the balls (the setup screenshot shows the correct layout). Fixed in the script: agitation waits for the *Bàn kế hoạch.* label. Table 2 here: step 1 1204 ms, frames p95 66.8 ms.
+  - run 4: every safety check passed; failed the old gates on table 2 (step 1 1091 ms against 1000; frames p95 66.8 ms against 20). The safety gate (≤ 5000 ms first shown step) would have passed: 792 / 1248 / 1915 ms.
+- Safety step times, run 4 (`Thời gian ra bước 1`): `{"table":"4-phong-thu","firstMs":528,"doneMs":1351}`, `{"table":"5-9bi-dui-a-bang","firstMs":792,"doneMs":1412,"continueMs":409}`, `{"table":"6-9bi-het-duong","firstMs":1248,"doneMs":1875,"continueMs":2343}`, `{"table":"7-8bi-thu","firstMs":1915,"doneMs":6852}`. Run 2: 4 → 350/1153, 5 → 1222/1868 (+428), 6 → 1637/2278 (+2176), 7 → 2525/11901. Run 3: 4 → 960/2433, 5 → 2260 (+703).
+- Checkpoint (run 4): `5-9bi-dui-a-bang: điểm hỏi → Dùng cú này: xong sau 409 ms` (kept *A băng 1 băng: ngắm chấm 3,5 băng dài dưới*, opponent 73°); `6-9bi-het-duong: điểm hỏi → Tính tiếp: xong sau 2343 ms` (coarse *A băng 1 băng: ngắm chấm 2,5 băng dài dưới*, opponent 56° → final *Ăn ¼ bi, lệch bên phải. Đối thủ không còn đường ăn.*). Table 7 was not asked. Matches the VM in Task 25b.
+- Provisional (run 4): `7-8bi-thu: cú tạm sau 1915 ms, cú cuối sau 6852 ms` — provisional *Ăn trọn bi*, opponent bi 9 at 1°; final *Ăn ⅛ bi, lệch bên phải*, opponent bi 9 at 24°. Run 2: 2525 ms / 11901 ms, same two shots.
+- Table 4 (run 4): provisional *A băng 1 băng: ngắm chấm 3 băng dài trên*, opponent bi 1 at 38°, kept as final after 1351 ms; not asked.
+- Frames while searching (table 6, printed, not gated): run 4 `{"n":103,"median":16.7,"p95":17,"max":66.8}`; run 2 `{"n":117,"median":16.7,"p95":33.4,"max":83.4}`; run 3 `{"n":96,"median":16.8,"p95":83.6,"max":200}` (that run's balls were moved).
+- Table 2 frames (gated, 17 / 20 ms): run 1 p95 49.9; run 2 p95 33.4; run 3 p95 66.8; run 4 p95 66.8, max 183. Step 1 on table 2: 662 / 619 / 1204 / 1091 ms. 4× CPU (reference): 6992 ms (run 2), 2714 ms (run 4).
+- `simulator.mjs` (unchanged by this work) failed its own drag frame gate twice on the same machine: p95 33.3 ms, then median 33.3 / p95 50.1 ms — evidence the frame failures are machine load, not the safety search.
+- *Đối thủ bị đui* was not seen in Chrome: since the 30 · 60 · 90 power change no fixture leaves the opponent snookered, and none was invented.
+- Console errors: not verified. The console check sits after the old frame and step-1 gates in the script, so no run reached it.
+- Screenshots for the eye check: `%TMP%/pcai-planner` (run 4); run 2 kept in `%TMP%/pcai-planner-run2`.
+- Status: STOPPED for the owner's eye check (Task 29 step 3); no constant or string changed.
