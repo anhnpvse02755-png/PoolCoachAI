@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
+import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/separate.dart';
@@ -26,6 +27,7 @@ class PlannerStepsView extends StatefulWidget {
     required this.setup,
     required this.onEditTable,
     this.aim = aimShot,
+    this.safety = const SafetyPhysics(),
     this.maxSimulationsPerFrame,
     this.maxZoneRowsPerFrame,
     super.key,
@@ -43,6 +45,10 @@ class PlannerStepsView extends StatefulWidget {
   /// Lõi dò và mô phỏng; test thay để ép lõi quá giờ.
   @visibleForTesting
   final AimShotFn aim;
+
+  /// Lõi của việc tìm cú thủ; test thay để bước phòng thủ ra nhanh.
+  @visibleForTesting
+  final SafetyPhysics safety;
 
   /// Giới hạn số lần mô phỏng mỗi khung hình, để test thấy được lúc kế
   /// hoạch mới tính xong một phần. null là theo `sliceBudget`.
@@ -98,7 +104,7 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
   /// Kế hoạch mới cho [setup]: bỏ việc tính cũ, bắt đầu lại từ bước 1.
   void _start(TableSetup setup) {
     _job?.cancel();
-    final job = PlannerJob(setup, aim: widget.aim);
+    final job = PlannerJob(setup, aim: widget.aim, safety: widget.safety);
     _planned = setup;
     _finder = CandidateFinder(game: setup.game, table: setup.table);
     _job = job;

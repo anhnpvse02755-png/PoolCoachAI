@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -8,8 +9,9 @@ import 'package:poolcoachai/domain/table_physics/aim.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 /// normal: phương án đã chấm (tầng 1 hoặc 2). fallback: Đánh đứng bi
-/// [fallbackPower], không có vị trí tốt (tầng 3). safety: phòng thủ, kế
-/// hoạch dừng (tầng 4, hoặc không cặp bi–lỗ nào).
+/// [fallbackPower], không có vị trí tốt (tầng 3). safety: phòng thủ — tìm
+/// cú thủ rồi kế hoạch dừng, vì tới lượt đối thủ (tầng 4, hoặc không cặp
+/// bi–lỗ nào).
 enum PlanStepKind { normal, fallback, safety }
 
 /// Điểm dừng khi lực −15 % và +15 %; null ở mức hỏng.
@@ -32,9 +34,10 @@ class PlanStep {
     this.missAdvice,
     this.sawsBhePercent,
     this.nextBallNum,
+    this.safety,
   });
 
-  const PlanStep.safety({required this.cbFrom, this.ballNum})
+  const PlanStep.safety({required this.cbFrom, this.ballNum, this.safety})
       : kind = PlanStepKind.safety,
         geometry = null,
         stroke = Stroke.stun,
@@ -75,6 +78,11 @@ class PlanStep {
   /// Chỉ có khi dùng áp phê.
   final int? sawsBhePercent;
   final int? nextBallNum;
+
+  /// Cú thủ đã tìm (spec cú phòng thủ 3.7); null ở bước thường, và ở bước
+  /// phòng thủ khi không còn cú thủ hợp lệ nào. 8 bi: [ballNum] vẫn null,
+  /// bi được chạm là `safety.ballNum`.
+  final SafetyShot? safety;
 
   ShotTrace? get trace => aimed?.trace;
   Pocket? get pocket => geometry?.pocket;

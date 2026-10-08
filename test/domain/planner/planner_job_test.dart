@@ -3,6 +3,9 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
+import 'package:poolcoachai/domain/planner/safety_job.dart';
+import 'package:poolcoachai/domain/planner/safety_options.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/saws.dart';
@@ -15,7 +18,7 @@ void main() {
   /// Chạy [setup] từng lát, kiểm thứ tự sự kiện, trả các bước đã báo.
   List<PlanStep> sliced(TableSetup setup,
       {int? maxSimulations, Duration budget = sliceBudget}) {
-    final job = PlannerJob(setup);
+    final job = PlannerJob(setup, safety: noSafetyPhysics);
     final seen = <PlanStep>[];
     var done = 0;
     while (!job.isDone) {
@@ -36,7 +39,7 @@ void main() {
 
   test('nối liền: bước sau bắt đầu đúng đối tượng điểm dừng của bước trước', () {
     for (final setup in [orderTable(GameType.nineBall), railTable(), fallbackTable()]) {
-      final steps = planToEnd(setup);
+      final steps = planToEnd(setup, safety: noSafetyPhysics);
       expect(identical(steps.first.cbFrom, setup.cue), isTrue);
       for (var i = 0; i + 1 < steps.length; i++) {
         expect(identical(steps[i].trace!.cueEnd, steps[i + 1].cbFrom), isTrue,
@@ -47,7 +50,7 @@ void main() {
 
   test('chạy từng lát cho đúng y kết quả chạy một mạch, với mọi cỡ lát', () {
     for (final setup in [orderTable(GameType.nineBall), railTable(), fallbackTable()]) {
-      final whole = fingerprint(planToEnd(setup));
+      final whole = fingerprint(planToEnd(setup, safety: noSafetyPhysics));
       for (final n in [1, 3, 7]) {
         expect(fingerprint(sliced(setup, maxSimulations: n)), whole, reason: 'lát $n');
       }
@@ -101,7 +104,8 @@ void main() {
   });
 
   test('đặt lại bi cái vào chỗ không đánh được: bước đầu là phòng thủ', () {
-    final steps = planToEnd(blockedEverywhereTable().withCue(const Vec2(200, 30)));
+    final steps = planToEnd(blockedEverywhereTable().withCue(const Vec2(200, 30)),
+        safety: noSafetyPhysics);
     expect(steps, hasLength(1));
     expect(steps.single.kind, PlanStepKind.safety);
   });
@@ -157,7 +161,7 @@ void main() {
     });
 
     test('tầng 3: không vị trí nào cho bi sau thì Đánh đứng bi 30 %, kế hoạch đi tiếp', () {
-      final steps = planToEnd(fallbackTable());
+      final steps = planToEnd(fallbackTable(), safety: noSafetyPhysics);
       expect(steps, hasLength(2));
       final s = steps.first;
       expect(s.kind, PlanStepKind.fallback);
@@ -174,8 +178,8 @@ void main() {
     test('tầng 4: cả cú dự phòng cũng hỏng thì phòng thủ, kế hoạch dừng', () {
       final setup = railTable();
       final ball1 = setup.balls.first.pos;
-      final steps =
-          planToEnd(setup, aim: scratchingAim((object, _, _, _) => object == ball1));
+      final steps = planToEnd(setup,
+          aim: scratchingAim((object, _, _, _) => object == ball1), safety: noSafetyPhysics);
       expect(steps, hasLength(1));
       expect(steps.single.kind, PlanStepKind.safety);
       expect(steps.single.ballNum, 1);
@@ -184,8 +188,8 @@ void main() {
     test('8 bi: có bi đánh được nhưng mọi cú hỏng thì phòng thủ không gắn số bi', () {
       final setup = opponentBlocksTable();
       final ball1 = setup.balls.first.pos;
-      final steps =
-          planToEnd(setup, aim: scratchingAim((object, _, _, _) => object == ball1));
+      final steps = planToEnd(setup,
+          aim: scratchingAim((object, _, _, _) => object == ball1), safety: noSafetyPhysics);
       expect(steps, hasLength(1));
       final s = steps.single;
       expect(s.kind, PlanStepKind.safety);
@@ -194,12 +198,14 @@ void main() {
       expect(Vi.planSafety(s.ballNum), startsWith('Không bi nào có đường đánh rõ ràng'));
     });
 
-    test('9 bi: bi bắt buộc bị chắn ở mọi lỗ thì phòng thủ ngay', () {
-      final job = PlannerJob(blockedEverywhereTable());
+    test('9 bi: bi bắt buộc bị chắn ở mọi lỗ thì phòng thủ ngay, không thử cú ăn bi nào', () {
+      var calls = 0;
+      final job = PlannerJob(blockedEverywhereTable(),
+          aim: recordingAim((_, _, _) => calls++), safety: noSafetyPhysics);
       final events = job.step(budget: const Duration(days: 1));
       expect(job.isDone, isTrue);
       expect(events.whereType<PlanDone>().single.steps.single.kind, PlanStepKind.safety);
-      expect(job.simulations, 0);
+      expect(calls, 0);
     });
   });
 
@@ -212,5 +218,67 @@ void main() {
     final s = steps.first;
     expect(s.kind, PlanStepKind.normal);
     expect(s.stroke == Stroke.stun && s.power == 45, isFalse);
+  });
+
+  group('bước phòng thủ tìm cú thủ (spec cú phòng thủ 3.1, 3.6)', () {
+    test('không có cú thủ hợp lệ: giữ câu cũ, safety null, kế hoạch dừng', () {
+      final steps = planToEnd(blockedEverywhereTable(), safety: noSafetyPhysics);
+      expect(steps.single.kind, PlanStepKind.safety);
+      expect(steps.single.safety, isNull);
+      expect(steps.single.ballNum, 1);
+    });
+
+    test('đang tìm cú thủ: chưa báo bước nào, searchingSafety bật; xong thì báo đúng một bước', () {
+      final job = PlannerJob(noPotTable(), safety: noSafetyPhysics);
+      final first = job.step(maxSimulations: 1);
+      expect(first, isEmpty);
+      expect(job.searchingSafety, isTrue);
+      final events = <PlannerEvent>[];
+      while (!job.isDone) {
+        events.addAll(job.step(budget: const Duration(days: 1)));
+      }
+      expect(events.whereType<StepReady>(), hasLength(1));
+      expect(events.last, isA<PlanDone>());
+      expect(job.searchingSafety, isFalse);
+    });
+
+    test('hủy giữa lúc tìm cú thủ thì không báo thêm gì', () {
+      final job = PlannerJob(noPotTable());
+      while (!job.searchingSafety) {
+        job.step(maxSimulations: 1);
+      }
+      job.step(maxSimulations: 3);
+      job.cancel();
+      final sims = job.simulations;
+      for (var i = 0; i < 20; i++) {
+        expect(job.step(), isEmpty);
+      }
+      expect(job.simulations, sims);
+      expect(job.steps, isEmpty);
+    });
+
+    group('trên lõi thật, bàn hết đường ăn', () {
+      // Một lần tìm đủ tốn vài giây (độ lệch 1 của kế hoạch): tính một lần.
+      late List<PlanStep> whole;
+      setUpAll(() => whole = planToEnd(noPotTable()));
+
+      test('bước phòng thủ mang đúng cú thủ của lần tìm riêng, cbFrom vẫn là bi cái', () {
+        final setup = noPotTable();
+        final s = whole.single;
+        expect(s.cbFrom, setup.cue);
+        final alone = searchToEnd(SafetyContext(
+            game: setup.game, cue: setup.cue, balls: setup.balls, table: setup.table));
+        expect(safetyFingerprint(s.safety), safetyFingerprint(alone));
+        expect(s.safety!.kind, SafetyKind.direct);
+      });
+
+      test('chạy từng lát cho đúng y một mạch, cả bước phòng thủ', () {
+        final job = PlannerJob(noPotTable());
+        while (!job.isDone) {
+          job.step(maxSimulations: 7);
+        }
+        expect(fingerprint(job.steps), fingerprint(whole));
+      });
+    });
   });
 }

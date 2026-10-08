@@ -17,7 +17,7 @@ void main() {
   const table = TableSpec.nineFoot;
   final rail = planToEnd(railTable());
   final corner = planToEnd(cornerFollowTable());
-  final fallback = planToEnd(fallbackTable());
+  final fallback = planToEnd(fallbackTable(), safety: noSafetyPhysics);
   final ball1 = railTable().balls.first.pos;
   final spin = planToEnd(railTable(),
       aim: scratchingAim((object, _, s, _) => object == ball1 && s.isNone));

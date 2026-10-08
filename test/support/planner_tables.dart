@@ -309,6 +309,7 @@ String fingerprint(List<PlanStep> steps) => [
           s.missAdvice?.safer,
           s.sawsBhePercent,
           s.nextBallNum,
+          s.safety == null ? null : safetyFingerprint(s.safety),
         ].join('|'),
     ].join('\n');
 

@@ -3,6 +3,9 @@ import 'package:poolcoachai/domain/planner/legal_targets.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/safety_aim.dart';
+import 'package:poolcoachai/domain/planner/safety_job.dart';
+import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/shot_options.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
@@ -128,13 +131,20 @@ final class PlanDone extends PlannerEvent {
 /// lát cho đúng y kết quả như chạy một mạch: Stopwatch chỉ quyết định *khi
 /// nào* trả quyền cho giao diện, không bao giờ quyết định *tính gì*.
 class PlannerJob {
-  PlannerJob(this.setup, {this.aim = aimShot})
+  PlannerJob(this.setup, {this.aim = aimShot, this.safety = const SafetyPhysics()})
       : _cue = setup.cue,
         _remaining = [...setup.balls]..sort((a, b) => a.number.compareTo(b.number)),
         _finder = CandidateFinder(game: setup.game, table: setup.table);
 
   final TableSetup setup;
   final AimShotFn aim;
+
+  /// Lõi của việc tìm cú thủ; test thay để bước phòng thủ ra nhanh.
+  final SafetyPhysics safety;
+
+  /// Việc tìm cú thủ của bước phòng thủ đang chờ báo ra (spec cú phòng thủ 3.6).
+  SafetyJob? _search;
+  PlanStep? _bareSafety;
   final CandidateFinder _finder;
   final _sims = <ShotKey, AimedShot?>{};
   final _steps = <PlanStep>[];
@@ -147,14 +157,20 @@ class PlannerJob {
   bool get isDone => _done;
   bool get isCancelled => _cancelled;
 
-  /// Số lần mô phỏng đã chạy.
-  int get simulations => _sims.length;
+  /// Đang tìm cú thủ: màn hình nói "Đang tìm cú thủ…" thay "Đang tính bước".
+  bool get searchingSafety => _search != null && !_done;
+
+  /// Số lần mô phỏng đã chạy, kể cả lần dò và mô phỏng của việc tìm cú thủ.
+  int get simulations => _sims.length + (_search?.simulations ?? 0);
 
   /// Mẫu số của "Đang tính bước X/N".
   int get totalSteps => plannedStepCount(setup);
 
   /// Rời màn hay sửa bàn: bỏ việc đang tính, không báo thêm gì.
-  void cancel() => _cancelled = true;
+  void cancel() {
+    _cancelled = true;
+    _search?.cancel();
+  }
 
   /// Làm việc tới khi hết [budget] (hoặc đủ [maxSimulations] lần mô phỏng
   /// mới, cho test), luôn ít nhất một đơn vị. Không bắt đầu đơn vị mới nếu
@@ -168,20 +184,31 @@ class PlannerJob {
     var longest = Duration.zero;
     while (!_done) {
       final started = clock.elapsed;
-      try {
-        _commit(
-          planStep(
-            game: setup.game,
-            cue: _cue,
-            remaining: _remaining,
-            lookup: _lookup,
-            finder: _finder,
-          ),
-          events,
-        );
-      } on _Missing catch (m) {
-        _sims[m.key] = simulateKey(m.key, aim: aim, table: setup.table);
-        simulated++;
+      final search = _search;
+      if (search != null) {
+        if (search.work()) simulated++;
+        if (search.isDone) {
+          final bare = _bareSafety!;
+          _commit(
+              PlanStep.safety(cbFrom: bare.cbFrom, ballNum: bare.ballNum, safety: search.result),
+              events);
+        }
+      } else {
+        try {
+          _commit(
+            planStep(
+              game: setup.game,
+              cue: _cue,
+              remaining: _remaining,
+              lookup: _lookup,
+              finder: _finder,
+            ),
+            events,
+          );
+        } on _Missing catch (m) {
+          _sims[m.key] = simulateKey(m.key, aim: aim, table: setup.table);
+          simulated++;
+        }
       }
       final unit = clock.elapsed - started;
       if (unit > longest) longest = unit;
@@ -197,6 +224,16 @@ class PlannerJob {
   }
 
   void _commit(PlanStep step, List<PlannerEvent> events) {
+    if (step.kind == PlanStepKind.safety && _search == null) {
+      // Bước phòng thủ: tìm cú thủ trước khi báo bước ra. Kế hoạch vẫn dừng
+      // sau bước này vì tới lượt đối thủ (spec cú phòng thủ 3.1).
+      _bareSafety = step;
+      _search = SafetyJob(
+        SafetyContext(game: setup.game, cue: step.cbFrom, balls: _remaining, table: setup.table),
+        physics: safety,
+      );
+      return;
+    }
     _steps.add(step);
     events.add(StepReady(_steps.length - 1, step));
     if (step.kind == PlanStepKind.safety) {
@@ -222,8 +259,9 @@ class _Missing implements Exception {
 }
 
 /// Chạy một mạch tới hết — cho test, công cụ dò bàn và đo tốc độ.
-List<PlanStep> planToEnd(TableSetup setup, {AimShotFn aim = aimShot}) {
-  final job = PlannerJob(setup, aim: aim);
+List<PlanStep> planToEnd(TableSetup setup,
+    {AimShotFn aim = aimShot, SafetyPhysics safety = const SafetyPhysics()}) {
+  final job = PlannerJob(setup, aim: aim, safety: safety);
   while (!job.isDone) {
     job.step(budget: const Duration(days: 1));
   }

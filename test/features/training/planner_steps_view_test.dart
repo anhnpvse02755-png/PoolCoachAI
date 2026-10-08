@@ -7,6 +7,7 @@ import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
+import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
@@ -53,7 +54,9 @@ void main() {
   late int edits;
 
   Future<void> open(WidgetTester tester, TableSetup setup,
-      {int? maxSimulationsPerFrame, int? maxZoneRowsPerFrame}) async {
+      {int? maxSimulationsPerFrame,
+      int? maxZoneRowsPerFrame,
+      SafetyPhysics safety = const SafetyPhysics()}) async {
     edits = 0;
     tester.view.physicalSize = const Size(1200, 2600);
     tester.view.devicePixelRatio = 1;
@@ -64,6 +67,7 @@ void main() {
         body: PlannerStepsView(
           setup: setup,
           onEditTable: () => edits++,
+          safety: safety,
           maxSimulationsPerFrame: maxSimulationsPerFrame,
           maxZoneRowsPerFrame: maxZoneRowsPerFrame,
         ),
@@ -179,7 +183,7 @@ void main() {
 
   testWidgets('bàn phòng thủ: các bi chắn vẫn thấy, vẽ mờ', (tester) async {
     final setup = blockedEverywhereTable();
-    await open(tester, setup);
+    await open(tester, setup, safety: noSafetyPhysics);
     await tester.pumpAndSettle();
     final scene = sceneOf(tester);
     expect(scene.balls.map((b) => b.number), [1]);
@@ -223,7 +227,7 @@ void main() {
 
   testWidgets('bước cuối: nút đổi thành Xong bàn; bước phòng thủ nói bi nào và nên chơi an toàn',
       (tester) async {
-    await open(tester, blockedEverywhereTable());
+    await open(tester, blockedEverywhereTable(), safety: noSafetyPhysics);
     await tester.pumpAndSettle();
     expect(find.text(Vi.planStepHeader(1, 1)), findsOneWidget);
     expect(find.text(Vi.planSafety(1)), findsOneWidget);
@@ -233,7 +237,7 @@ void main() {
 
   testWidgets('bước dự phòng: nói không có vị trí tốt, không có dòng chịu sai số, '
       'không có thanh sai số lực', (tester) async {
-    await open(tester, fallbackTable());
+    await open(tester, fallbackTable(), safety: noSafetyPhysics);
     await tester.pumpAndSettle();
     final step = sceneOf(tester).step!;
     expect(step.kind, PlanStepKind.fallback);
@@ -266,7 +270,7 @@ void main() {
       expect(normal.kind, PlanStepKind.normal);
       expect(jitterBars(normal), isNotEmpty);
 
-      final fallback = planToEnd(fallbackTable()).first;
+      final fallback = planToEnd(fallbackTable(), safety: noSafetyPhysics).first;
       expect(fallback.kind, PlanStepKind.fallback);
       expect(fallback.jitterEnds, isNull);
       expect(jitterBars(fallback), isEmpty);
