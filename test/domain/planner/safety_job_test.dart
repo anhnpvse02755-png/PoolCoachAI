@@ -113,18 +113,18 @@ void main() {
       final target = c.legal.single;
       final open = openContacts(c.cue, target.pos, c.obstaclesOf(1));
       final plain = directOptions(c, target, const [SideSpin.none()]);
-      expect(plain, hasLength(open.length * strokeCandidates.length * powerCandidates.length));
+      expect(plain, hasLength(open.length * strokeCandidates.length * safetyPowers.length));
       expect(
           plain.every((o) => o.kind == SafetyKind.direct && o.rails.isEmpty && o.spin.isNone),
           isTrue);
       expect((plain.first.thickness, plain.first.side), open.first);
       expect((plain.first.stroke, plain.first.power),
-          (strokeCandidates.first, powerCandidates.first));
-      expect(plain[1].power, powerCandidates[1]);
+          (strokeCandidates.first, safetyPowers.first));
+      expect(plain[1].power, safetyPowers[1]);
       final spun = directOptions(c, target, safetySideSpins);
       expect(spun, hasLength(plain.length * safetySideSpins.length));
       expect(spun.any((o) => o.spin.isNone), isFalse);
-      expect((spun.first.spin, spun[powerCandidates.length].spin),
+      expect((spun.first.spin, spun[safetyPowers.length].spin),
           (safetySideSpins.first, safetySideSpins[1]));
     });
 
@@ -138,6 +138,8 @@ void main() {
           options.every(
               (o) => o.kind == SafetyKind.kick && kickStrokes.contains(o.stroke) && o.spin.isNone),
           isTrue);
+      // Lực của cú thủ: 30 · 60 · 90 (chủ sản phẩm chốt 08/10/2026 sau Task 25).
+      expect(options.map((o) => o.power).toSet(), safetyPowers.toSet());
       expect(kickOptions(c, fromRails: 4, toRails: 4).every((o) => o.rails.length == 4), isTrue);
     });
 
@@ -238,11 +240,12 @@ void main() {
     });
 
     test('cú bị cắt tỉa trước khi dò vẫn được dò khi hỏi bi đó có mở chặng áp phê không', () {
-      // Bi 4 cho cú thủ tốt, nên cú cu lê nặng (phạt cao) của bi 5, 6 bị bỏ
-      // lúc chấm mà chưa dò; bi 5, 6 không có cú không áp phê nào hợp lệ,
-      // nên lúc hỏi chặng áp phê việc tìm phải quay lại dò chúng.
+      // Bi 1 cho cú thủ tốt, nên cú trô 90 % (phạt cao) của các bi kẹt trong
+      // vòng bị bỏ lúc chấm mà chưa dò; các bi đó không có cú không áp phê
+      // nào hợp lệ, nên lúc hỏi chặng áp phê việc tìm phải quay lại dò chúng.
+      // Từ 45 phương án mỗi chặng trở lên (lực 30 · 60 · 90).
       final c = contextOf(eightRingSafetyTable());
-      for (final cap in [30, 75]) {
+      for (final cap in [45, 81]) {
         final pruned = traceAims(c, maxOptions: cap);
         final full = traceAims(c, maxOptions: cap, prune: false);
         final back = aimedBack(pruned.aimed);

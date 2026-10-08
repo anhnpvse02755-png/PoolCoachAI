@@ -75,6 +75,12 @@ const riskPower = 85.0;
 /// bước 1 vẫn 0,36–0,46 s. Chủ sản phẩm chốt 07/10/2026.
 const sliceBudget = Duration(milliseconds: 4);
 
+/// Lát dài hơn chỉ trong lúc tìm cú thủ: người dùng đang chờ "Đang tìm cú
+/// thủ…", không kéo bi, nên đổi khung hình mượt lấy thời gian chờ ngắn hơn
+/// (chủ sản phẩm chốt 08/10/2026 sau Task 25). 12 ms trong khung 16,7 ms;
+/// mọi việc khác vẫn [sliceBudget].
+const safetySliceBudget = Duration(milliseconds: 12);
+
 // Cú phòng thủ — spec 2026-10-07 planner-safety mục 4.5. Test chỉ dùng tên.
 
 /// Độ dày cú thủ trực tiếp: trọn bi, ¾, ½, ¼, ⅛ (mỏng). Trừ trọn bi, mỗi
@@ -94,6 +100,11 @@ const safetySideSpins = <SideSpin>[
   SideSpin(SpinSide.right, 0.5),
   SideSpin(SpinSide.right, 1),
 ];
+
+/// Mức lực của cú thủ, cả trực tiếp lẫn A băng, cả lượt thô lẫn lượt đầy
+/// đủ: 30 · 60 · 90 thay năm mức của [powerCandidates] (chủ sản phẩm chốt
+/// 08/10/2026 sau Task 25 — bớt 40 % số phương án).
+const safetyPowers = <double>[30, 60, 90];
 
 /// A băng chỉ đánh đứng bi hoặc cu lê (spec 3.4).
 const kickStrokes = <Stroke>[Stroke.stun, Stroke.follow];

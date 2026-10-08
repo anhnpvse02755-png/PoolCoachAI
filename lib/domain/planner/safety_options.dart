@@ -125,6 +125,6 @@ List<SafetyOption> directOptions(SafetyContext c, PlacedBall target, List<SideSp
           table: c.table))
         for (final stroke in strokeCandidates)
           for (final spin in spins)
-            for (final power in powerCandidates)
+            for (final power in safetyPowers)
               directOption(c, target, f, side, stroke, spin, power)!,
     ];

@@ -42,7 +42,7 @@ void main() {
     expect(over, isEmpty, reason: 'quá $safetyVmBudgetMs ms: $over');
   });
 
-  test('lát lúc tìm cú thủ giữ quanh sliceBudget; in p95 và lát dài nhất', () {
+  test('lát lúc tìm cú thủ giữ quanh safetySliceBudget; in p95 và lát dài nhất', () {
     planToEnd(railTable());
     final job = SafetyJob(contextOf(noPotTable()));
     final micros = <int>[];
@@ -56,6 +56,6 @@ void main() {
     final p95 = micros[((micros.length - 1) * 0.95).floor()] / 1000;
     print('lát tìm cú thủ: trung vị $median ms, p95 $p95 ms, '
         'dài nhất ${micros.last / 1000} ms, ${micros.length} lát');
-    expect(median, lessThan(sliceBudget.inMicroseconds / 1000 * 1.5));
+    expect(median, lessThan(safetySliceBudget.inMicroseconds / 1000 * 1.5));
   });
 }

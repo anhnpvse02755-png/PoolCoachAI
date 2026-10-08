@@ -22,6 +22,9 @@ void main() {
   SafetyContext contextOf(TableSetup s) =>
       SafetyContext(game: s.game, cue: s.cue, balls: s.balls, table: s.table);
 
+  /// Số phương án của một đường A băng mở: kiểu đánh × lực.
+  final kickGroup = kickStrokes.length * safetyPowers.length;
+
   void dump(String name, TableSetup s) {
     final c = contextOf(s);
     final pot = CandidateFinder(game: s.game).easiest(s.cue, s.balls);
@@ -33,7 +36,7 @@ void main() {
     }
     // A băng luôn thử, kể cả khi không đui (chủ sản phẩm chốt 08/10/2026).
     for (var n = 1; n <= 4; n++) {
-      final groups = kickOptions(c, fromRails: n, toRails: n).length ~/ 10;
+      final groups = kickOptions(c, fromRails: n, toRails: n).length ~/ kickGroup;
       print('  $n băng: $groups đường hình học mở');
     }
     final w = Stopwatch()..start();
@@ -112,7 +115,7 @@ void main() {
           final next = [...balls, PlacedBall(number: balls.length + 1, pos: at)];
           if (open(next, 1) > 0) continue;
           final three = open(next, 3);
-          if (three < 30) continue;
+          if (three < 3 * kickGroup) continue;
           final score = open(next, 2) * 100 - three;
           if (score < best) {
             best = score;
@@ -122,7 +125,7 @@ void main() {
       }
       if (pick == null) break;
       balls = [...balls, pick];
-      print('thêm ${pick.pos}: 2 băng còn ${open(balls, 2) ~/ 10} nhóm, 3 băng ${open(balls, 3) ~/ 10}');
+      print('thêm ${pick.pos}: 2 băng còn ${open(balls, 2) ~/ kickGroup} nhóm, 3 băng ${open(balls, 3) ~/ kickGroup}');
     }
   });
 }

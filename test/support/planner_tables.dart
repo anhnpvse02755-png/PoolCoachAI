@@ -409,7 +409,9 @@ TableSetup eightSafetyTable() {
 /// hợp lệ: lúc hỏi có mở chặng áp phê không, những cú bị cắt tỉa trước khi
 /// dò vẫn phải dò. Đo trên 3ea6f92 (mỗi chặng 30 phương án): chọn bi 4, tổng
 /// 0.58; khi cắt tỉa, cú cu lê 90 % của bi 5 và 6 bị bỏ lúc chấm rồi được
-/// dò lúc hỏi chặng áp phê.
+/// dò lúc hỏi chặng áp phê. Đo lại với lực 30 · 60 · 90 (Task 25a): từ 45
+/// phương án mỗi chặng, bi 1 cho tổng ≈ 0, và cú trô 90 % của các bi kẹt bị
+/// bỏ lúc chấm rồi được dò lúc hỏi chặng áp phê; 30 phương án thì không.
 TableSetup eightRingSafetyTable() {
   const opponent = Vec2(190, 64);
   final ring = ringAround(opponent);

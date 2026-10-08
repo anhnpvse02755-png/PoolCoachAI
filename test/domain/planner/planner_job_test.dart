@@ -242,6 +242,14 @@ void main() {
       expect(job.searchingSafety, isFalse);
     });
 
+    test('lát mặc định: sliceBudget khi tính bước, safetySliceBudget khi tìm cú thủ', () {
+      final job = PlannerJob(noPotTable(), safety: noSafetyPhysics);
+      expect(job.defaultBudget, sliceBudget);
+      job.step(maxSimulations: 1);
+      expect(job.searchingSafety, isTrue);
+      expect(job.defaultBudget, safetySliceBudget);
+    });
+
     test('hủy giữa lúc tìm cú thủ thì không báo thêm gì', () {
       final job = PlannerJob(noPotTable());
       while (!job.searchingSafety) {

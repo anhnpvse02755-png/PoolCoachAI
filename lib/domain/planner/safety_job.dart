@@ -186,7 +186,7 @@ class SafetyJob {
   /// test), luôn ít nhất một đơn vị; không bắt đầu đơn vị mới nếu đơn vị dài
   /// nhất của lát này không còn vừa ngân sách. Stopwatch chỉ quyết định
   /// *khi nào* dừng, không bao giờ quyết định *tính gì*.
-  void step({Duration budget = sliceBudget, int? maxSimulations}) {
+  void step({Duration budget = safetySliceBudget, int? maxSimulations}) {
     final clock = Stopwatch()..start();
     var simulated = 0;
     var longest = Duration.zero;

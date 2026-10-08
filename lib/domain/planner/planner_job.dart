@@ -166,6 +166,11 @@ class PlannerJob {
   /// Mẫu số của "Đang tính bước X/N".
   int get totalSteps => plannedStepCount(setup);
 
+  /// Lát của [step] khi không truyền `budget`: [safetySliceBudget] trong lúc
+  /// tìm cú thủ — người dùng đang chờ "Đang tìm cú thủ…", không kéo bi (chủ
+  /// sản phẩm chốt 08/10/2026 sau Task 25) — còn lại [sliceBudget].
+  Duration get defaultBudget => _search != null ? safetySliceBudget : sliceBudget;
+
   /// Rời màn hay sửa bàn: bỏ việc đang tính, không báo thêm gì.
   void cancel() {
     _cancelled = true;
@@ -176,7 +181,9 @@ class PlannerJob {
   /// mới, cho test), luôn ít nhất một đơn vị. Không bắt đầu đơn vị mới nếu
   /// đơn vị dài nhất của lát này không còn vừa ngân sách: một lần mô phỏng
   /// trên Chrome mất vài mili giây, chạy quá là rớt khung hình.
-  List<PlannerEvent> step({Duration budget = sliceBudget, int? maxSimulations}) {
+  ///
+  /// [budget] null là [defaultBudget].
+  List<PlannerEvent> step({Duration? budget, int? maxSimulations}) {
     if (_done || _cancelled) return const [];
     final events = <PlannerEvent>[];
     final clock = Stopwatch()..start();
@@ -213,7 +220,7 @@ class PlannerJob {
       final unit = clock.elapsed - started;
       if (unit > longest) longest = unit;
       if (maxSimulations != null && simulated >= maxSimulations) break;
-      if (clock.elapsed + longest > budget) break;
+      if (clock.elapsed + longest > (budget ?? defaultBudget)) break;
     }
     return events;
   }

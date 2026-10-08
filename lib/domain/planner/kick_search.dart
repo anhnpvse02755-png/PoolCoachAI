@@ -45,12 +45,12 @@ List<SafetyOption> kickOptions(SafetyContext c, {required int fromRails, require
     for (final target in c.legal) {
       for (final rails in railSequences(n)) {
         for (final (f, side) in kickContactOrder) {
-          if (kickOption(c, target, rails, f, side, kickStrokes.first, powerCandidates.first) ==
+          if (kickOption(c, target, rails, f, side, kickStrokes.first, safetyPowers.first) ==
               null) {
             continue;
           }
           for (final stroke in kickStrokes) {
-            for (final power in powerCandidates) {
+            for (final power in safetyPowers) {
               out.add(kickOption(c, target, rails, f, side, stroke, power)!);
             }
           }
