@@ -576,6 +576,20 @@ abstract final class Vi {
   static const planResetHint = 'Kéo bi cái tới đúng chỗ nó dừng ngoài bàn.';
   static const planRecompute = 'Tính lại từ đây';
 
+  // Cú phòng thủ: lượt thô và điểm hỏi (chủ sản phẩm chốt 08/10/2026 sau
+  // Task 25 của kế hoạch cú phòng thủ).
+  static const planSearchingSafety = 'Đang tìm cú thủ…';
+
+  /// Lời của chủ sản phẩm, nguyên văn.
+  static const planSafetyCheckpoint = 'Tính toán cơ bản thì đánh như thế này là thủ tốt, '
+      'có thể có phương án tối ưu hơn nhưng sẽ mất thời gian tính toán. '
+      'Bạn muốn tính tiếp hay không?';
+  static const planSafetyContinue = 'Tính tiếp';
+  static const planSafetyKeep = 'Dùng cú này';
+
+  /// Lượt thô chưa ra cú thủ tốt: hiện cú tốt nhất tạm thời, máy tự tìm tiếp.
+  static const planSafetyProvisional = 'Cú thủ tạm tính — đang tìm cú tốt hơn…';
+
   /// Chú giải các lớp trên bàn (spec mục 7.1). Ngưỡng lấy từ hằng số planner.
   static List<String> get planLegend => [
         'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',

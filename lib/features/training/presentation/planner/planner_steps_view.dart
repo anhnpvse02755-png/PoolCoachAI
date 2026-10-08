@@ -36,6 +36,8 @@ class PlannerStepsView extends StatefulWidget {
   static const tableKey = Key('planner-steps-table');
   static const shotDoneKey = Key('planner-shot-done');
   static const backKey = Key('planner-back');
+  static const continueSafetyKey = Key('planner-continue-safety');
+  static const keepSafetyKey = Key('planner-keep-safety');
 
   final TableSetup setup;
 
@@ -126,23 +128,42 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
   void _pump(PlannerJob job) {
     // Rời màn, sửa bàn hay tính lại từ chỗ mới: bỏ việc cũ.
     if (!mounted || !identical(job, _job)) return;
+    final searching = job.searchingSafety;
     final events = job.step(maxSimulations: widget.maxSimulationsPerFrame);
-    if (events.isNotEmpty) {
-      setState(() {
-        for (final e in events) {
-          switch (e) {
-            case StepReady(:final step):
-              _steps = [..._steps, step];
-            case PlanDone():
-              _done = true;
-          }
-        }
-      });
-    }
-    if (!job.isDone) _schedule(job);
+    // Bắt đầu tìm cú thủ không kèm sự kiện nào, nhưng dòng tiến độ phải đổi.
+    if (events.isNotEmpty || job.searchingSafety != searching) setState(() => _apply(events));
+    // Điểm hỏi của cú thủ: đứng chờ người dùng chọn, không tính gì thêm.
+    if (!job.isDone && !job.safetyCheckpoint) _schedule(job);
   }
 
-  int get _total => _done ? _steps.length : (_job?.totalSteps ?? _steps.length);
+  void _apply(List<PlannerEvent> events) {
+    for (final e in events) {
+      switch (e) {
+        // Bước phòng thủ được báo lại cùng chỉ số khi "Tính tiếp" ra cú tốt
+        // hơn hẳn cú lượt thô.
+        case StepReady(:final index, :final step):
+          _steps = [..._steps.take(index), step];
+        case PlanDone():
+          _done = true;
+      }
+    }
+  }
+
+  /// "Tính tiếp": tìm tiếp trên cùng việc tìm (chủ sản phẩm chốt 08/10/2026).
+  void _continueSafety() {
+    final job = _job!;
+    setState(job.continueSafety);
+    _schedule(job);
+  }
+
+  /// "Dùng cú này": giữ cú lượt thô, kế hoạch xong.
+  void _keepSafety() => setState(() => _apply(_job!.keepSafety()));
+
+  /// Kế hoạch dừng sau bước phòng thủ, kể cả khi còn đang hỏi hay tìm tiếp
+  /// cú thủ của bước đó.
+  int get _total => _done || _steps.lastOrNull?.kind == PlanStepKind.safety
+      ? _steps.length
+      : (_job?.totalSteps ?? _steps.length);
 
   /// Bi còn trên bàn trước bước [index].
   List<PlacedBall> _ballsBefore(int index) {
@@ -262,6 +283,7 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
     final resetting = _resetCue != null;
     final step = _steps.isEmpty ? null : _steps[_view];
     final atEnd = _done && _view == _steps.length - 1;
+    final asking = (_job?.safetyCheckpoint ?? false) && _view == _steps.length - 1 && !resetting;
 
     return TablePanelLayout(
       table: _planned.table,
@@ -285,10 +307,40 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
           // Chú giải các lớp ngay dưới bàn (spec mục 7.1).
           for (final line in Vi.planLegend) Text(line, style: text.bodySmall),
           const SizedBox(height: 12),
-          if (!_done) Text(Vi.planComputing(_steps.length + 1, _total), style: text.bodyMedium),
+          if (!_done && !(_job?.safetyCheckpoint ?? false))
+            Text(
+                (_job?.provisionalSafety ?? false)
+                    ? Vi.planSafetyProvisional
+                    : (_job?.searchingSafety ?? false)
+                        ? Vi.planSearchingSafety
+                        : Vi.planComputing(_steps.length + 1, _total),
+                style: text.bodyMedium),
           if (step != null && !resetting)
             _LinesCard(
                 lines: planStepLines(step, index: _view, total: _total, table: _planned.table)),
+          // Lượt thô đã ra cú thủ tốt: hỏi có tính tiếp không (chủ sản phẩm
+          // chốt 08/10/2026 sau Task 25).
+          if (asking) ...[
+            const SizedBox(height: 8),
+            Text(Vi.planSafetyCheckpoint, style: text.bodyMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  key: PlannerStepsView.continueSafetyKey,
+                  onPressed: _continueSafety,
+                  child: const Text(Vi.planSafetyContinue),
+                ),
+                OutlinedButton(
+                  key: PlannerStepsView.keepSafetyKey,
+                  onPressed: _keepSafety,
+                  child: const Text(Vi.planSafetyKeep),
+                ),
+              ],
+            ),
+          ],
           if (scene.preview case final preview?)
             _PreviewCard(
                 lines: planStepLines(preview,

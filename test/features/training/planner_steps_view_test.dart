@@ -376,6 +376,96 @@ void main() {
     expect(legendBottom, lessThan(headerTop));
   });
 
+  group('cú thủ: lượt thô và điểm hỏi (chủ sản phẩm chốt 08/10/2026 sau Task 25)', () {
+    testWidgets('đang tìm cú thủ: dòng Đang tìm cú thủ… thay Đang tính bước, xong thì hiện bước',
+        (tester) async {
+      await open(tester, noPotTable(), maxSimulationsPerFrame: 1, safety: noSafetyPhysics);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text(Vi.planSearchingSafety), findsOneWidget);
+      expect(find.textContaining('Đang tính bước'), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSearchingSafety), findsNothing);
+      expect(find.text(Vi.planSafety(1)), findsOneWidget);
+      expect(find.text(Vi.planSafetyCheckpoint), findsNothing);
+    });
+
+    testWidgets('lượt thô thủ tốt: hiện bước và câu hỏi, không tính gì thêm; Dùng cú này thì xong',
+        (tester) async {
+      await open(tester, noPotTable());
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSafetyCheckpoint), findsOneWidget);
+      expect(find.text(Vi.planSafetyContinue), findsOneWidget);
+      expect(find.text(Vi.planSafetyKeep), findsOneWidget);
+      expect(find.text(Vi.planSearchingSafety), findsNothing);
+      expect(find.textContaining('Đang tính bước'), findsNothing);
+      // Kế hoạch dừng sau bước phòng thủ: bước 1 / 1, dù còn đang hỏi.
+      expect(find.text(Vi.planStepHeader(1, 1)), findsOneWidget);
+      final rough = sceneOf(tester).step!.safety!;
+      await tester.ensureVisible(find.byKey(PlannerStepsView.keepSafetyKey));
+      await tester.tap(find.byKey(PlannerStepsView.keepSafetyKey));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSafetyCheckpoint), findsNothing);
+      expect(find.text(Vi.planFinish), findsOneWidget);
+      expect(sceneOf(tester).step!.safety, same(rough));
+    });
+
+    testWidgets('Tính tiếp: Đang tìm cú thủ…, rồi cú của lượt đầy đủ khi tốt hơn hẳn',
+        (tester) async {
+      final expected = planToEnd(noPotTable()).single.safety;
+      await open(tester, noPotTable());
+      await tester.pumpAndSettle();
+      final rough = sceneOf(tester).step!.safety!;
+      await tester.ensureVisible(find.byKey(PlannerStepsView.continueSafetyKey));
+      await tester.tap(find.byKey(PlannerStepsView.continueSafetyKey));
+      await tester.pump();
+      expect(find.text(Vi.planSafetyCheckpoint), findsNothing);
+      expect(find.text(Vi.planSearchingSafety), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSearchingSafety), findsNothing);
+      expect(find.text(Vi.planFinish), findsOneWidget);
+      final shown = sceneOf(tester).step!.safety;
+      expect(safetyFingerprint(shown), safetyFingerprint(expected));
+      // Đo với Task 25a–25b: trên bàn này lượt đầy đủ tốt hơn hẳn lượt thô.
+      expect(shown!.total, lessThan(rough.total));
+    });
+
+    testWidgets('lượt thô chưa thủ tốt: hiện cú tạm và dòng đang tìm, không hỏi; xong thì tắt dòng',
+        (tester) async {
+      await open(tester, snookerTwoRailTable());
+      for (var i = 0; i < 2000 && sceneOf(tester).step == null; i++) {
+        await tester.pump();
+      }
+      final first = sceneOf(tester).step!;
+      expect(first.safety, isNotNull);
+      expect(find.text(Vi.planSafetyProvisional), findsOneWidget);
+      expect(find.text(Vi.planSafetyCheckpoint), findsNothing);
+      expect(find.text(Vi.planSearchingSafety), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSafetyProvisional), findsNothing);
+      expect(find.text(Vi.planFinish), findsOneWidget);
+      // Đo với Task 25a–25b: bàn này không có cú tốt hơn hẳn, cú tạm ở lại.
+      expect(sceneOf(tester).step!.safety, same(first.safety));
+    });
+
+    testWidgets('rời màn ở điểm hỏi hay giữa lúc tìm tiếp: không lỗi', (tester) async {
+      await open(tester, noPotTable());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await open(tester, noPotTable());
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(PlannerStepsView.continueSafetyKey));
+      await tester.tap(find.byKey(PlannerStepsView.continueSafetyKey));
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   test('painter vẽ lại khi cảnh đổi', () {
     const a = PlannerScene(cue: Vec2(10, 10));
     const b = PlannerScene(cue: Vec2(20, 10));

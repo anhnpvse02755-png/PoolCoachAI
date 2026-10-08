@@ -59,6 +59,15 @@ void main() {
     expect(legend, contains('±${powerJitter.round()}%'));
   });
 
+  test('điểm hỏi của cú thủ: lời chủ sản phẩm nguyên văn (08/10/2026)', () {
+    expect(Vi.planSearchingSafety, 'Đang tìm cú thủ…');
+    expect(Vi.planSafetyCheckpoint,
+        'Tính toán cơ bản thì đánh như thế này là thủ tốt, có thể có phương án tối ưu hơn '
+        'nhưng sẽ mất thời gian tính toán. Bạn muốn tính tiếp hay không?');
+    expect((Vi.planSafetyContinue, Vi.planSafetyKeep), ('Tính tiếp', 'Dùng cú này'));
+    expect(Vi.planSafetyProvisional, 'Cú thủ tạm tính — đang tìm cú tốt hơn…');
+  });
+
   test('nhãn semantics tóm tắt bước đang xem', () {
     final g = geometryFor(tableCenter, Pocket.topRight, 20);
     final step = PlanStep(
