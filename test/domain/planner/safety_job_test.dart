@@ -10,6 +10,8 @@ import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 import '../../support/planner_tables.dart';
@@ -41,6 +43,56 @@ void main() {
               prune: prune,
               physics: physics)
           .result;
+
+  /// Chạy hết một job và ghi thứ tự các lần dò, theo chỉ số phương án. Lõi
+  /// thật, chỉ bọc hàm dò để biết lần dò nào của phương án nào: lần gọi đầu
+  /// của mỗi đơn vị dò dùng đúng hướng cơ, `b`, lực và áp phê ban đầu của
+  /// phương án (aimSafety), nên so được bằng giá trị. Con trỏ chấm dò theo
+  /// chỉ số tăng dần; chỉ việc hỏi chặng áp phê mới quay lại dò một phương án
+  /// đứng trước một phương án đã dò.
+  ({SafetyJob job, List<int> aimed}) traceAims(SafetyContext c,
+      {required int maxOptions, bool prune = true}) {
+    late final SafetyJob job;
+    final firstProbe = <int, (ShotInput, int)>{};
+    const real = SafetyPhysics();
+    job = SafetyJob(c,
+        maxOptions: maxOptions,
+        prune: prune,
+        physics: SafetyPhysics(probe: (input, {required maxRails}) {
+          // Mỗi đơn vị việc có một giá trị simulations riêng.
+          firstProbe.putIfAbsent(job.simulations, () => (input, maxRails));
+          return real.probe(input, maxRails: maxRails);
+        }));
+    while (!job.isDone) {
+      job.step(budget: const Duration(days: 1));
+    }
+    final r = c.table.radius;
+    final aimed = <int>[];
+    for (final (input, rails) in firstProbe.values) {
+      aimed.add(Iterable<int>.generate(job.options.length).firstWhere((i) {
+        final o = job.options[i];
+        return !aimed.contains(i) &&
+            o.rails.length == rails &&
+            o.ball == input.object &&
+            o.power == input.power &&
+            o.spin == input.spin &&
+            strokeVerticalOffset(o.stroke, r) == input.verticalOffset &&
+            o.initialAim + squirtAngle(sideOffsetOf(o.spin), r) == input.aimAngle;
+      }));
+    }
+    return (job: job, aimed: aimed);
+  }
+
+  /// Các phương án được dò sau một phương án có chỉ số lớn hơn.
+  List<int> aimedBack(List<int> aimed) {
+    final back = <int>[];
+    var highest = -1;
+    for (final i in aimed) {
+      if (i < highest) back.add(i);
+      if (i > highest) highest = i;
+    }
+    return back;
+  }
 
   const direct1 = (tier: SafetyTier.direct, ballNum: 1);
   const directSpin1 = (tier: SafetyTier.directSpin, ballNum: 1);
@@ -119,14 +171,18 @@ void main() {
 
   group('chia lát', () {
     test('chạy từng lát cho đúng y kết quả chạy một mạch, với mọi cỡ lát', () {
-      for (final s in [noPotTable(), snookerOneRailTable()]) {
+      // eightRingSafetyTable có cú bị cắt tỉa rồi được dò lúc hỏi chặng áp phê
+      // (test bên dưới chứng minh), nên đường đó cũng được chạy từng lát.
+      for (final s in [noPotTable(), snookerOneRailTable(), eightRingSafetyTable()]) {
         final c = contextOf(s);
-        final whole = safetyFingerprint(run(c, maxOptions: 40));
+        final whole = runJob(c, maxOptions: 40);
+        final shot = safetyFingerprint(whole.result);
         for (final n in [1, 3]) {
-          expect(safetyFingerprint(run(c, maxOptions: 40, maxSimulations: n)), whole,
-              reason: 'lát $n');
+          final sliced = runJob(c, maxOptions: 40, maxSimulations: n);
+          expect(safetyFingerprint(sliced.result), shot, reason: 'lát $n');
+          expect(sliced.openedStages, whole.openedStages, reason: 'lát $n');
         }
-        expect(safetyFingerprint(run(c, maxOptions: 40, budget: Duration.zero)), whole);
+        expect(safetyFingerprint(run(c, maxOptions: 40, budget: Duration.zero)), shot);
       }
     });
 
@@ -166,13 +222,43 @@ void main() {
     });
 
     test('cắt tỉa không đổi cú được chọn và các chặng được mở, chỉ bớt mô phỏng', () {
-      final c = contextOf(noPotTable());
-      for (final physics in [const SafetyPhysics(), noPlain]) {
+      for (final (s, physics) in [
+        (noPotTable(), const SafetyPhysics()),
+        (noPotTable(), noPlain),
+        (eightRingSafetyTable(), const SafetyPhysics()),
+      ]) {
+        final c = contextOf(s);
         final pruned = runJob(c, maxOptions: 75, physics: physics);
         final full = runJob(c, maxOptions: 75, physics: physics, prune: false);
         expect(safetyFingerprint(pruned.result), safetyFingerprint(full.result));
         expect(pruned.openedStages, full.openedStages);
-        expect(pruned.simulations, lessThanOrEqualTo(full.simulations));
+        // Nhỏ hơn hẳn: cắt tỉa thật sự bỏ được mô phỏng, không chỉ vô hại.
+        expect(pruned.simulations, lessThan(full.simulations));
+      }
+    });
+
+    test('cú bị cắt tỉa trước khi dò vẫn được dò khi hỏi bi đó có mở chặng áp phê không', () {
+      // Bi 4 cho cú thủ tốt, nên cú cu lê nặng (phạt cao) của bi 5, 6 bị bỏ
+      // lúc chấm mà chưa dò; bi 5, 6 không có cú không áp phê nào hợp lệ,
+      // nên lúc hỏi chặng áp phê việc tìm phải quay lại dò chúng.
+      final c = contextOf(eightRingSafetyTable());
+      for (final cap in [30, 75]) {
+        final pruned = traceAims(c, maxOptions: cap);
+        final full = traceAims(c, maxOptions: cap, prune: false);
+        final back = aimedBack(pruned.aimed);
+        expect(back, isNotEmpty, reason: 'mỗi chặng $cap');
+        for (final i in back) {
+          final o = pruned.job.options[i];
+          expect((o.kind, o.spin.isNone), (SafetyKind.direct, true));
+          // Chặng áp phê của bi đó đã được hỏi và được mở.
+          expect(pruned.job.openedStages,
+              contains((tier: SafetyTier.directSpin, ballNum: o.ballNum)));
+        }
+        // Không cắt tỉa thì mọi lần dò theo đúng thứ tự, không quay lại.
+        expect(aimedBack(full.aimed), isEmpty);
+        expect(full.aimed.toSet().containsAll(back), isTrue);
+        expect(pruned.job.openedStages, full.job.openedStages);
+        expect(safetyFingerprint(pruned.job.result), safetyFingerprint(full.job.result));
       }
     });
   });

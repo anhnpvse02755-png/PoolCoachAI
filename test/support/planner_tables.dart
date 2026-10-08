@@ -401,6 +401,29 @@ TableSetup eightSafetyTable() {
   );
 }
 
+/// 8 bi, nhiều bi nhóm mình nhìn thấy được (bi 1–6), để chặng của bi sau bị
+/// cắt tỉa bởi cú tốt của bi trước. Bi đối thủ 9 bị vòng bi 2–7
+/// ([ringAround]) chắn mọi lỗ, nên cú thủ tốt để đối thủ hết đường ăn; bi 1
+/// nằm tự do. Bi 2, 3, 5, 6 kẹt trong vòng nên không có cú không áp phê nào
+/// hợp lệ: lúc hỏi có mở chặng áp phê không, những cú bị cắt tỉa trước khi
+/// dò vẫn phải dò. Đo trên 3ea6f92 (mỗi chặng 30 phương án): chọn bi 4, tổng
+/// 0.58; khi cắt tỉa, cú cu lê 90 % của bi 5 và 6 bị bỏ lúc chấm rồi được
+/// dò lúc hỏi chặng áp phê.
+TableSetup eightRingSafetyTable() {
+  const opponent = Vec2(190, 64);
+  final ring = ringAround(opponent);
+  return TableSetup(
+    game: GameType.eightBall,
+    cue: const Vec2(50, 40),
+    balls: [
+      const PlacedBall(number: 1, pos: Vec2(100, 90)),
+      for (var i = 0; i < ring.length; i++) PlacedBall(number: i + 2, pos: ring[i]),
+      const PlacedBall(number: 9, pos: opponent, role: BallRole.opponent),
+      const PlacedBall(number: 8, pos: Vec2(20, 110), role: BallRole.eight),
+    ],
+  );
+}
+
 /// Lõi thủ không bao giờ chạm bi và mô phỏng nào cũng quá giờ: mọi phương án
 /// thủ bị bỏ nhanh, bước phòng thủ ra với safety = null. Cho test chỉ cần biết
 /// kế hoạch dừng (spec cú phòng thủ 9.1.10).
