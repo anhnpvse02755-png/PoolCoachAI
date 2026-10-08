@@ -106,6 +106,15 @@ const safetySideSpins = <SideSpin>[
 /// 08/10/2026 sau Task 25 — bớt 40 % số phương án).
 const safetyPowers = <double>[30, 60, 90];
 
+/// Lượt thô (chủ sản phẩm chốt 08/10/2026 sau Task 25): "thử các mốc, mức
+/// lực trước". Trực tiếp: trọn bi, ½ bi hai bên, không áp phê. A băng: chạm
+/// trọn bi, 1–2 băng. Cả hai đủ kiểu đánh và [safetyPowers]. Thủ tốt thì
+/// dừng hỏi người dùng có tính tiếp không; chưa thủ tốt thì hiện cú đó tạm
+/// và tự tìm tiếp.
+const coarseThicknesses = <double>[1, 0.5];
+const coarseKickThicknesses = <double>[1];
+const coarseKickRails = 2;
+
 /// A băng chỉ đánh đứng bi hoặc cu lê (spec 3.4).
 const kickStrokes = <Stroke>[Stroke.stun, Stroke.follow];
 

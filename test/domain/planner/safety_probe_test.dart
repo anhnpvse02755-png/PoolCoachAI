@@ -8,6 +8,7 @@ import 'package:poolcoachai/domain/planner/kick_search.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_job.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -39,25 +40,42 @@ void main() {
       final groups = kickOptions(c, fromRails: n, toRails: n).length ~/ kickGroup;
       print('  $n băng: $groups đường hình học mở');
     }
+    String line(SafetyShot r) {
+      final o = r.opponent;
+      return '${r.kind.name} ${r.rails} băng, bi ${r.ballNum}, ${r.thickness} ${r.side.name}, '
+          '${r.stroke.name} ${r.spin} ${r.power.round()}%, tổng ${r.total.toStringAsFixed(2)}, '
+          'chấm ${r.railAim?.diamond} ${r.railAim?.rail.name}; đối thủ: '
+          '${o.snookered ? 'đui' : '${o.easiest?.angle.toStringAsFixed(1) ?? 'hết đường'}° bi ${o.ball?.number}'}; '
+          'chịu sai số ${r.tolerance}/7';
+    }
+
+    // Lượt thô xong là lúc bước thủ hiện ra — ở điểm hỏi, hay làm cú tạm.
+    // Lượt thô không có cú nào thì bước hiện ra ở cuối lượt đầy đủ. Từng đơn
+    // vị việc như PlannerJob, nên đo cả đơn vị đầu của lượt đầy đủ đi cùng.
     final w = Stopwatch()..start();
     final job = SafetyJob(c);
+    while (!job.coarseDone) {
+      job.work();
+    }
+    final coarseMs = w.elapsedMilliseconds;
+    final coarseUnits = job.simulations;
+    final rough = job.coarseResult;
+    print('  lượt thô: ${job.coarseOptions.length} phương án, xong sau $coarseUnits lần '
+        'dò/mô phỏng, $coarseMs ms; ${rough == null ? 'không có cú hợp lệ, chờ lượt đầy đủ' : job.atCheckpoint ? 'thủ tốt, dừng hỏi' : 'chưa thủ tốt, hiện tạm và tìm tiếp'}');
+    if (rough != null) print('  lượt thô chọn: ${line(rough)}');
+    job.resume();
     while (!job.isDone) {
       job.step(budget: const Duration(days: 1));
     }
     final r = job.result;
-    print('  ${job.simulations} lần dò/mô phỏng, ${w.elapsedMilliseconds} ms, '
+    print('  đầy đủ: ${job.simulations} lần dò/mô phỏng, ${w.elapsedMilliseconds} ms, '
         '${job.options.length} phương án, thử ${job.triedRailCounts.toList()..sort()} băng; '
         'chặng ${job.openedStages.map((s) => '${s.tier.name}${s.ballNum ?? ''}').join(' → ')}');
     if (r == null) {
       print('  không có cú thủ hợp lệ');
       return;
     }
-    final o = r.opponent;
-    print('  chọn: ${r.kind.name} ${r.rails} băng, bi ${r.ballNum}, ${r.thickness} ${r.side.name}, '
-        '${r.stroke.name} ${r.spin} ${r.power.round()}%, tổng ${r.total.toStringAsFixed(2)}');
-    print('  chấm ${r.railAim?.diamond} ${r.railAim?.rail.name}; đối thủ: '
-        '${o.snookered ? 'đui' : '${o.easiest?.angle.toStringAsFixed(1)}° bi ${o.ball?.number}'}; '
-        'chịu sai số ${r.tolerance}/7');
+    print('  ${identical(r, rough) ? 'giữ cú lượt thô' : 'đầy đủ chọn: ${line(r)}'}');
   }
 
   test('bảng cú thủ của các bàn test', () {

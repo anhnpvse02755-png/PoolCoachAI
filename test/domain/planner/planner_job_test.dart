@@ -283,9 +283,118 @@ void main() {
       test('chạy từng lát cho đúng y một mạch, cả bước phòng thủ', () {
         final job = PlannerJob(noPotTable());
         while (!job.isDone) {
+          if (job.safetyCheckpoint) job.continueSafety();
           job.step(maxSimulations: 7);
         }
         expect(fingerprint(job.steps), fingerprint(whole));
+      });
+
+      // Chủ sản phẩm chốt 08/10/2026 sau Task 25: lượt thô thủ tốt thì báo
+      // bước ngay với cú đó và hỏi có tính tiếp không.
+      PlannerJob toCheckpoint(List<PlannerEvent> events) {
+        final job = PlannerJob(noPotTable());
+        while (!job.safetyCheckpoint) {
+          events.addAll(job.step(maxSimulations: 7));
+        }
+        return job;
+      }
+
+      test('điểm hỏi: báo bước phòng thủ với cú lượt thô, chưa xong, không tính gì thêm', () {
+        final events = <PlannerEvent>[];
+        final job = toCheckpoint(events);
+        final step = job.steps.single;
+        expect(events, [isA<StepReady>()]);
+        expect((events.single as StepReady).step, same(step));
+        expect(step.kind, PlanStepKind.safety);
+        expect(step.safety, isNotNull);
+        expect(job.isDone, isFalse);
+        expect(job.searchingSafety, isFalse);
+        final sims = job.simulations;
+        expect(job.step(), isEmpty);
+        expect(job.simulations, sims);
+      });
+
+      test('Dùng cú này: giữ cú lượt thô, kế hoạch xong', () {
+        final job = toCheckpoint([]);
+        final step = job.steps.single;
+        final events = job.keepSafety();
+        expect(events, [isA<PlanDone>()]);
+        expect((events.single as PlanDone).steps.single, same(step));
+        expect(job.isDone, isTrue);
+        expect(job.safetyCheckpoint, isFalse);
+        expect(job.step(), isEmpty);
+      });
+
+      test('Tính tiếp: tìm tiếp trên cùng việc tìm, báo lại bước khi cú mới tốt hơn hẳn', () {
+        final job = toCheckpoint([]);
+        final rough = job.steps.single.safety!;
+        final sims = job.simulations;
+        job.continueSafety();
+        expect(job.searchingSafety, isTrue);
+        final events = <PlannerEvent>[];
+        while (!job.isDone) {
+          events.addAll(job.step(maxSimulations: 7));
+        }
+        // Đo với Task 25a–25b: lượt đầy đủ ra cú trực tiếp tốt hơn hẳn cú A
+        // băng của lượt thô.
+        final s = job.steps.single.safety!;
+        expect(s.total, lessThan(rough.total));
+        expect(events, [isA<StepReady>(), isA<PlanDone>()]);
+        expect((events.first as StepReady).index, 0);
+        expect(fingerprint(job.steps), fingerprint(whole));
+        expect(job.simulations, greaterThan(sims));
+      });
+    });
+
+    // Chủ sản phẩm chốt 08/10/2026 sau Task 25: lượt thô chưa thủ tốt thì
+    // hiện cú đó tạm, không hỏi, tự tìm tiếp.
+    group('cú tạm', () {
+      /// Chạy tới khi bước phòng thủ hiện ra, rồi tới hết; trả sự kiện từ lúc
+      /// bước hiện ra và bước lúc đó.
+      ({PlannerJob job, PlanStep first, List<PlannerEvent> after}) runProvisional(
+          TableSetup setup) {
+        final job = PlannerJob(setup);
+        while (job.steps.isEmpty) {
+          job.step(maxSimulations: 7);
+        }
+        final first = job.steps.single;
+        expect(job.provisionalSafety, isTrue);
+        expect(job.searchingSafety, isTrue);
+        expect(job.safetyCheckpoint, isFalse);
+        expect(job.isDone, isFalse);
+        final after = <PlannerEvent>[];
+        while (!job.isDone) {
+          after.addAll(job.step(maxSimulations: 7));
+        }
+        expect(job.provisionalSafety, isFalse);
+        return (job: job, first: first, after: after);
+      }
+
+      test('không có cú tốt hơn hẳn: cú tạm thành cú cuối, không báo lại bước', () {
+        // Đo với Task 25a–25b: bàn 2 băng, lượt thô để đối thủ 39.1°, lượt đầy
+        // đủ không tốt hơn hẳn.
+        final r = runProvisional(snookerTwoRailTable());
+        expect(r.after, [isA<PlanDone>()]);
+        expect(r.job.steps.single, same(r.first));
+        final alone = searchToEnd(SafetyContext(
+            game: GameType.nineBall,
+            cue: snookerTwoRailTable().cue,
+            balls: snookerTwoRailTable().balls));
+        expect(safetyFingerprint(r.first.safety), safetyFingerprint(alone));
+      });
+
+      test('có cú tốt hơn hẳn: báo lại đúng bước đó với cú của lượt đầy đủ', () {
+        // Đo với Task 25a–25b: bàn 8 bi, cú tạm trọn bi đứng bi 30 %, lượt đầy
+        // đủ ra ⅛ bi lệch phải tốt hơn hẳn.
+        final setup = eightSafetyTable();
+        final r = runProvisional(setup);
+        expect(r.after, [isA<StepReady>(), isA<PlanDone>()]);
+        expect((r.after.first as StepReady).index, 0);
+        final s = r.job.steps.single.safety!;
+        expect(s.total, lessThan(r.first.safety!.total));
+        final alone = searchToEnd(
+            SafetyContext(game: setup.game, cue: setup.cue, balls: setup.balls));
+        expect(safetyFingerprint(s), safetyFingerprint(alone));
       });
     });
   });

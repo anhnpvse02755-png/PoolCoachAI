@@ -326,6 +326,7 @@ Vec2 jawBlocker(Vec2 ball, Pocket pocket, {double distance = 14}) {
 /// cho 1 / 2 / 3 băng; đường 1 băng (băng dài trên, dưới) dò hội tụ ở 6–8
 /// trên 10 phương án. Đo trên a35667b với mã của kế hoạch: chọn A băng 1
 /// băng (băng dài dưới, chấm 3,5), cu lê 90 %.
+/// Đo lại với Task 25a–25b (lực 30 · 60 · 90, lượt thô): lượt thô ra đúng cú đó, đối thủ 72.7°, dừng hỏi; tìm tiếp không có cú tốt hơn hẳn.
 TableSetup snookerOneRailTable() => TableSetup(
       game: GameType.nineBall,
       cue: const Vec2(30, 80),
@@ -335,6 +336,7 @@ TableSetup snookerOneRailTable() => TableSetup(
 /// Như [snookerOneRailTable], thêm bi 3, 4 chắn hai đường 1 băng. Nguyên
 /// mẫu: đường mở 0 / 13 / 8. Đo trên a35667b: chọn A băng 2 băng (băng ngắn
 /// trái, chấm 2), cu lê 45 %.
+/// Đo lại với Task 25a–25b: A băng 2 băng (băng dài dưới, chấm 5,5), đứng bi 60 %, đối thủ 39.1° — lượt thô chưa thủ tốt nên tìm tiếp luôn, không hỏi.
 TableSetup snookerTwoRailTable() => TableSetup(
       game: GameType.nineBall,
       cue: const Vec2(30, 80),
@@ -345,6 +347,7 @@ TableSetup snookerTwoRailTable() => TableSetup(
 /// lưới tham lam, safety_probe_test.dart làm lại được). Nguyên mẫu: đường mở
 /// 0 / 0 / 8. Đo trên a35667b: chọn A băng 3 băng (băng ngắn phải, chấm 0,5),
 /// đối thủ bị đui.
+/// Đo lại với Task 25a–25b: A băng 3 băng (băng ngắn trái, chấm 2), ½ bi lệch trái, cu lê 60 %, đối thủ 44.5° — lượt thô không có phương án nào (không đường 1–2 băng) nên tìm tiếp luôn.
 TableSetup snookerThreeRailTable() => TableSetup(
       game: GameType.nineBall,
       cue: const Vec2(30, 80),
@@ -372,6 +375,7 @@ TableSetup partlyVisibleTable() => TableSetup(
 /// nên bi 1 vẫn lăn tự do trên bàn. Nguyên mẫu trên a35667b: 233–277 cú thủ
 /// trực tiếp hợp lệ. Đo với mã của kế hoạch: chọn ¼ bi lệch phải, đứng bi
 /// 45 %, đối thủ không còn đường ăn.
+/// Đo lại với Task 25a–25b: lượt thô ra A băng 1 băng cu lê 60 %, đối thủ 56.0° (vừa qua opponentHardAngle), dừng hỏi; tìm tiếp ra ¼ bi lệch phải, trô 60 %, đối thủ hết đường ăn.
 TableSetup noPotTable() {
   const ball = Vec2(150, 40);
   return TableSetup(
@@ -388,6 +392,7 @@ TableSetup noPotTable() {
 /// 8 bi Trơn, cùng thế với [noPotTable]: hai bi chắn miệng lỗ là bi đối thủ 9,
 /// 10; bi 8 ở xa. Sau cú thủ đối thủ phải đánh bi 9 hoặc 10, không phải bi 1.
 /// Đo trên a35667b: chọn ¾ bi lệch phải, đứng bi 45 %; đối thủ đánh bi 10.
+/// Đo lại với Task 25a–25b: lượt thô chưa thủ tốt (đối thủ 0.7°) nên tìm tiếp luôn; chọn ⅛ bi lệch phải, trô 90 %, đối thủ đánh bi 9 (23.9°).
 TableSetup eightSafetyTable() {
   const ball = Vec2(150, 40);
   return TableSetup(

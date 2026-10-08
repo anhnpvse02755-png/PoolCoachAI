@@ -16,22 +16,34 @@ import '../../support/planner_tables.dart';
 void main() {
   late Map<String, (SafetyContext, SafetyJob)> runs;
 
+  /// Bàn nào dừng ở điểm hỏi sau lượt thô (chủ sản phẩm chốt 08/10/2026 sau
+  /// Task 25).
+  late Map<String, bool> paused;
+
   setUpAll(() {
-    (SafetyContext, SafetyJob) run(TableSetup s) {
+    paused = {};
+    // Chạy hết, qua điểm hỏi như người dùng bấm "Tính tiếp": các test dưới
+    // kiểm cú cuối cùng.
+    (SafetyContext, SafetyJob) run(String name, TableSetup s) {
       final c = SafetyContext(game: s.game, cue: s.cue, balls: s.balls, table: s.table);
       final job = SafetyJob(c);
       while (!job.isDone) {
+        if (job.atCheckpoint) {
+          paused[name] = true;
+          job.resume();
+        }
         job.step(budget: const Duration(days: 1));
       }
+      paused.putIfAbsent(name, () => false);
       return (c, job);
     }
 
     runs = {
-      'one': run(snookerOneRailTable()),
-      'two': run(snookerTwoRailTable()),
-      'three': run(snookerThreeRailTable()),
-      'noPot': run(noPotTable()),
-      'eight': run(eightSafetyTable()),
+      'one': run('one', snookerOneRailTable()),
+      'two': run('two', snookerTwoRailTable()),
+      'three': run('three', snookerThreeRailTable()),
+      'noPot': run('noPot', noPotTable()),
+      'eight': run('eight', eightSafetyTable()),
     };
   });
 
@@ -106,6 +118,21 @@ void main() {
       expect(job.openedStages.map((st) => st.tier), isNot(contains(SafetyTier.directSpin)),
           reason: key);
       expect(job.options.every((o) => o.spin.isNone), isTrue, reason: key);
+    }
+  });
+
+  test('lượt thô: thủ tốt thì dừng hỏi, không thì tìm tiếp luôn; cú cuối không kém cú lượt thô',
+      () {
+    // Đo với Task 25a–25b: bàn 1 băng (đối thủ 72.7°) và bàn hết đường ăn
+    // (56.0°) có cú lượt thô để đối thủ khó; bàn 2 băng (39.1°), bàn 3 băng
+    // (lượt thô không có đường 1–2 băng nào) và bàn 8 bi (0.7°) thì không.
+    expect(paused, {'one': true, 'two': false, 'three': false, 'noPot': true, 'eight': false});
+    for (final MapEntry(:key, value: (_, job)) in runs.entries) {
+      final rough = job.coarseResult;
+      if (paused[key]!) expect(isGoodSafety(rough!), isTrue, reason: key);
+      if (rough != null) {
+        expect(job.result!.total, lessThanOrEqualTo(rough.total), reason: key);
+      }
     }
   });
 

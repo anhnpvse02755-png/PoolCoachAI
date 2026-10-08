@@ -23,12 +23,26 @@ void main() {
   SafetyContext contextOf(TableSetup s) =>
       SafetyContext(game: s.game, cue: s.cue, balls: s.balls, table: s.table);
 
+  /// Chạy tới hết; ở điểm hỏi thì "Tính tiếp" như người dùng bấm.
   SafetyJob runJob(SafetyContext c,
       {int? maxSimulations, Duration budget = const Duration(days: 1), int? maxOptions,
-      bool prune = true, SafetyPhysics physics = const SafetyPhysics()}) {
-    final job = SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics);
+      bool prune = true, SafetyPhysics physics = const SafetyPhysics(), bool coarse = true}) {
+    final job =
+        SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics, coarse: coarse);
     while (!job.isDone) {
+      job.resume();
       job.step(budget: budget, maxSimulations: maxSimulations);
+    }
+    return job;
+  }
+
+  /// Chạy tới lúc lượt thô xong: điểm hỏi, cú tạm, hay không có cú nào.
+  SafetyJob runToFirstShot(SafetyContext c,
+      {int? maxSimulations, int? maxOptions, bool prune = true,
+      SafetyPhysics physics = const SafetyPhysics()}) {
+    final job = SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics);
+    while (!job.coarseDone) {
+      job.step(budget: const Duration(days: 1), maxSimulations: maxSimulations ?? 1);
     }
     return job;
   }
@@ -44,7 +58,7 @@ void main() {
               physics: physics)
           .result;
 
-  /// Chạy hết một job và ghi thứ tự các lần dò, theo chỉ số phương án. Lõi
+  /// Chạy hết lượt đầy đủ (không lượt thô) và ghi thứ tự các lần dò theo chỉ số. Lõi
   /// thật, chỉ bọc hàm dò để biết lần dò nào của phương án nào: lần gọi đầu
   /// của mỗi đơn vị dò dùng đúng hướng cơ, `b`, lực và áp phê ban đầu của
   /// phương án (aimSafety), nên so được bằng giá trị. Con trỏ chấm dò theo
@@ -58,6 +72,7 @@ void main() {
     job = SafetyJob(c,
         maxOptions: maxOptions,
         prune: prune,
+        coarse: false,
         physics: SafetyPhysics(probe: (input, {required maxRails}) {
           // Mỗi đơn vị việc có một giá trị simulations riêng.
           firstProbe.putIfAbsent(job.simulations, () => (input, maxRails));
@@ -199,6 +214,7 @@ void main() {
     test('mỗi đơn vị việc chạy đúng một lần mô phỏng mới, hoặc không lần nào', () {
       final job = SafetyJob(contextOf(noPotTable()), maxOptions: 30);
       while (!job.isDone) {
+        job.resume();
         final before = job.simulations;
         final ran = job.work();
         expect(job.simulations - before, ran ? 1 : 0);
@@ -262,6 +278,144 @@ void main() {
         expect(full.aimed.toSet().containsAll(back), isTrue);
         expect(pruned.job.openedStages, full.job.openedStages);
         expect(safetyFingerprint(pruned.job.result), safetyFingerprint(full.job.result));
+      }
+    });
+  });
+
+  group('lượt thô và điểm hỏi (chủ sản phẩm chốt 08/10/2026 sau Task 25)', () {
+    test('lượt thô: trọn bi và ½ bi không áp phê, A băng chạm trọn bi 1–2 băng; '
+        'cùng đối tượng, cùng thứ tự với lượt đầy đủ', () {
+      for (final s in [noPotTable(), snookerOneRailTable()]) {
+        final c = contextOf(s);
+        final job = runJob(c, maxOptions: 40);
+        final rough = job.coarseOptions;
+        expect(rough, isNotEmpty);
+        for (final o in rough) {
+          expect(o.spin.isNone, isTrue);
+          if (o.kind == SafetyKind.direct) {
+            expect(coarseThicknesses, contains(o.thickness));
+          } else {
+            expect(o.rails.length, lessThanOrEqualTo(coarseKickRails));
+            expect(coarseKickThicknesses, contains(o.thickness));
+          }
+        }
+        // Đúng các đối tượng của lượt đầy đủ, cùng thứ tự: bộ nhớ dò dùng
+        // chung theo đối tượng phương án.
+        final at = [for (final o in rough) job.options.indexWhere((f) => identical(f, o))];
+        expect(at.every((i) => i >= 0), isTrue);
+        expect(at, [...at]..sort());
+        expect(job.options.where(isCoarseOption), hasLength(rough.length));
+      }
+    });
+
+    test('thủ tốt: dừng ở điểm hỏi với cú lượt thô, không làm gì thêm cho tới khi tìm tiếp', () {
+      final job = runToFirstShot(contextOf(snookerOneRailTable()), maxOptions: 40);
+      expect(job.atCheckpoint, isTrue);
+      expect(job.isDone, isFalse);
+      expect(job.result, isNull);
+      final rough = job.coarseResult!;
+      expect(isGoodSafety(rough), isTrue);
+      final sims = job.simulations;
+      job.step();
+      expect(job.work(), isFalse);
+      expect(job.simulations, sims);
+      expect(job.options, isEmpty);
+      job.resume();
+      while (!job.isDone) {
+        job.step(budget: const Duration(days: 1));
+      }
+      expect(job.result!.total, lessThanOrEqualTo(rough.total));
+    });
+
+    test('tìm tiếp ra đúng lượt đầy đủ chạy một mạch, không làm lại lượt thô; '
+        'chỉ thay cú khi tốt hơn hẳn', () {
+      // 60 phương án mỗi chặng: đủ để lượt thô của cả hai bàn thủ tốt.
+      for (final s in [snookerOneRailTable(), noPotTable()]) {
+        final c = contextOf(s);
+        final paused = runToFirstShot(c, maxOptions: 60);
+        expect(paused.atCheckpoint, isTrue, reason: '${s.cue}');
+        final atPause = paused.simulations;
+        final rough = paused.coarseResult!;
+        paused.resume();
+        while (!paused.isDone) {
+          paused.step(budget: const Duration(days: 1));
+        }
+        final alone = runJob(c, maxOptions: 60, coarse: false);
+        // Lượt đầy đủ giống hệt: cùng phương án, cùng chặng, cùng cú tốt nhất.
+        expect(paused.options.map((o) => '$o'), alone.options.map((o) => '$o'));
+        expect(paused.openedStages, alone.openedStages);
+        expect(paused.bestIndex, alone.bestIndex);
+        final full = alone.result!;
+        if (full.total < rough.total) {
+          expect(safetyFingerprint(paused.result), safetyFingerprint(full));
+        } else {
+          expect(identical(paused.result, rough), isTrue);
+        }
+        // Bộ nhớ đệm dùng chung: sau điểm hỏi chạy ít hơn lượt đầy đủ một mình.
+        expect(paused.simulations - atPause, lessThan(alone.simulations));
+      }
+    });
+
+    test('lượt thô không có cú hợp lệ: tìm tiếp luôn, không hỏi, không có cú tạm', () {
+      final job = runToFirstShot(contextOf(noPotTable()), maxOptions: 30, physics: noSafetyPhysics);
+      expect(job.coarseOptions, isNotEmpty);
+      expect(job.coarseResult, isNull);
+      expect(job.atCheckpoint, isFalse);
+      while (!job.isDone) {
+        job.step(budget: const Duration(days: 1));
+      }
+      expect(job.result, isNull);
+    });
+
+    test('lượt thô chưa thủ tốt: không hỏi; cú tạm là cú lượt thô, tự tìm tiếp ra đúng lượt '
+        'đầy đủ một mạch, chỉ thay khi tốt hơn hẳn', () {
+      // 40 phương án mỗi chặng: cú lượt thô của bàn hết đường ăn để đối thủ
+      // cắt 31.4° (đo với Task 25a–25b), chưa thủ tốt.
+      final c = contextOf(noPotTable());
+      final job = runToFirstShot(c, maxOptions: 40);
+      expect(job.atCheckpoint, isFalse);
+      final rough = job.coarseResult!;
+      expect(isGoodSafety(rough), isFalse);
+      while (!job.isDone) {
+        job.step(budget: const Duration(days: 1));
+      }
+      final alone = runJob(c, maxOptions: 40, coarse: false);
+      expect(job.options.map((o) => '$o'), alone.options.map((o) => '$o'));
+      expect(job.openedStages, alone.openedStages);
+      expect(job.bestIndex, alone.bestIndex);
+      final full = alone.result!;
+      if (full.total < rough.total) {
+        expect(safetyFingerprint(job.result), safetyFingerprint(full));
+      } else {
+        expect(identical(job.result, rough), isTrue);
+      }
+      // Chạy từng lát: cùng cú tạm, cùng cú cuối.
+      for (final n in [1, 3]) {
+        final sliced = runToFirstShot(c, maxOptions: 40, maxSimulations: n);
+        expect(safetyFingerprint(sliced.coarseResult), safetyFingerprint(rough), reason: 'lát $n');
+        while (!sliced.isDone) {
+          sliced.step(budget: const Duration(days: 1), maxSimulations: n);
+        }
+        expect(safetyFingerprint(sliced.result), safetyFingerprint(job.result), reason: 'lát $n');
+      }
+    });
+
+    test('lượt thô: chạy từng lát và có cắt tỉa hay không đều cho cùng điểm hỏi, '
+        'cùng cú lượt thô, cùng cú cuối', () {
+      for (final s in [noPotTable(), snookerOneRailTable(), eightRingSafetyTable()]) {
+        final c = contextOf(s);
+        final whole = runToFirstShot(c, maxOptions: 40);
+        for (final other in [
+          runToFirstShot(c, maxOptions: 40, maxSimulations: 1),
+          runToFirstShot(c, maxOptions: 40, maxSimulations: 3),
+          runToFirstShot(c, maxOptions: 40, prune: false),
+        ]) {
+          expect(other.atCheckpoint, whole.atCheckpoint);
+          expect(safetyFingerprint(other.coarseResult), safetyFingerprint(whole.coarseResult));
+        }
+        final end = safetyFingerprint(runJob(c, maxOptions: 40).result);
+        expect(safetyFingerprint(runJob(c, maxOptions: 40, maxSimulations: 3).result), end);
+        expect(safetyFingerprint(runJob(c, maxOptions: 40, prune: false).result), end);
       }
     });
   });

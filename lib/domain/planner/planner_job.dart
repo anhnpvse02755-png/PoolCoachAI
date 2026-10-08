@@ -6,6 +6,7 @@ import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/safety_job.dart';
 import 'package:poolcoachai/domain/planner/safety_options.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/shot_options.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
@@ -111,7 +112,9 @@ sealed class PlannerEvent {
   const PlannerEvent();
 }
 
-/// Bước [index] vừa tính xong.
+/// Bước [index] vừa tính xong. Bước phòng thủ báo lại cùng [index] khi lượt
+/// đầy đủ (sau "Tính tiếp", hay tự tìm tiếp sau cú tạm) ra cú thủ tốt hơn
+/// hẳn cú lượt thô.
 final class StepReady extends PlannerEvent {
   const StepReady(this.index, this.step);
   final int index;
@@ -145,6 +148,13 @@ class PlannerJob {
   /// Việc tìm cú thủ của bước phòng thủ đang chờ báo ra (spec cú phòng thủ 3.6).
   SafetyJob? _search;
   PlanStep? _bareSafety;
+
+  /// Đã báo bước phòng thủ với cú lượt thô (điểm hỏi hay cú tạm).
+  bool _reportedRough = false;
+
+  /// Cú lượt thô được báo như cú tạm: lượt thô chưa thủ tốt, việc tìm tự
+  /// chạy tiếp (chủ sản phẩm chốt 08/10/2026 sau Task 25).
+  bool _provisional = false;
   final CandidateFinder _finder;
   final _sims = <ShotKey, AimedShot?>{};
   final _steps = <PlanStep>[];
@@ -158,7 +168,30 @@ class PlannerJob {
   bool get isCancelled => _cancelled;
 
   /// Đang tìm cú thủ: màn hình nói "Đang tìm cú thủ…" thay "Đang tính bước".
-  bool get searchingSafety => _search != null && !_done;
+  bool get searchingSafety => _search != null && !_done && !safetyCheckpoint;
+
+  /// Bước phòng thủ đang hiện cú lượt thô tạm, việc tìm vẫn chạy: màn hình
+  /// nói "Cú thủ tạm tính — đang tìm cú tốt hơn…". Xong thì tắt; cú chỉ đổi
+  /// khi lượt đầy đủ tốt hơn hẳn.
+  bool get provisionalSafety => _provisional && searchingSafety;
+
+  /// Lượt thô đã ra cú thủ tốt và bước phòng thủ đã báo với cú đó: chờ
+  /// người dùng chọn [continueSafety] ("Tính tiếp") hay [keepSafety] ("Dùng
+  /// cú này"). Trong lúc chờ, [step] không làm gì.
+  bool get safetyCheckpoint => !_done && !_cancelled && (_search?.atCheckpoint ?? false);
+
+  /// "Tính tiếp": chạy lượt đầy đủ trên cùng việc tìm, không làm lại lượt
+  /// thô; xong thì báo lại bước phòng thủ nếu cú mới tốt hơn hẳn.
+  void continueSafety() => _search?.resume();
+
+  /// "Dùng cú này": giữ cú lượt thô, kế hoạch xong.
+  List<PlannerEvent> keepSafety() {
+    if (!safetyCheckpoint) return const [];
+    _search!.cancel();
+    final events = <PlannerEvent>[];
+    _finish(events);
+    return events;
+  }
 
   /// Số lần mô phỏng đã chạy, kể cả lần dò và mô phỏng của việc tìm cú thủ.
   int get simulations => _sims.length + (_search?.simulations ?? 0);
@@ -189,16 +222,23 @@ class PlannerJob {
     final clock = Stopwatch()..start();
     var simulated = 0;
     var longest = Duration.zero;
-    while (!_done) {
+    while (!_done && !safetyCheckpoint) {
       final started = clock.elapsed;
       final search = _search;
       if (search != null) {
         if (search.work()) simulated++;
+        final rough = search.coarseResult;
+        // Lượt thô xong mà có cú: báo bước ngay — ở điểm hỏi, hay làm cú tạm.
+        if (!_reportedRough && rough != null) {
+          _provisional = !search.atCheckpoint;
+          _reportSafety(rough, events);
+        }
         if (search.isDone) {
-          final bare = _bareSafety!;
-          _commit(
-              PlanStep.safety(cbFrom: bare.cbFrom, ballNum: bare.ballNum, safety: search.result),
-              events);
+          // Cú cuối chỉ khác cú lượt thô khi tốt hơn hẳn: chỉ khi đó báo lại.
+          if (!_reportedRough || !identical(search.result, rough)) {
+            _reportSafety(search.result, events);
+          }
+          _finish(events);
         }
       } else {
         try {
@@ -225,13 +265,27 @@ class PlannerJob {
     return events;
   }
 
+  /// Báo bước phòng thủ với cú [shot]: lần đầu thêm bước, lần sau thay cú
+  /// của chính bước đó (cùng chỉ số).
+  void _reportSafety(SafetyShot? shot, List<PlannerEvent> events) {
+    final bare = _bareSafety!;
+    final step = PlanStep.safety(cbFrom: bare.cbFrom, ballNum: bare.ballNum, safety: shot);
+    if (_reportedRough) {
+      _steps[_steps.length - 1] = step;
+    } else {
+      _steps.add(step);
+      _reportedRough = true;
+    }
+    events.add(StepReady(_steps.length - 1, step));
+  }
+
   AimedShot? _lookup(ShotKey key) {
     if (_sims.containsKey(key)) return _sims[key];
     throw _Missing(key);
   }
 
   void _commit(PlanStep step, List<PlannerEvent> events) {
-    if (step.kind == PlanStepKind.safety && _search == null) {
+    if (step.kind == PlanStepKind.safety) {
       // Bước phòng thủ: tìm cú thủ trước khi báo bước ra. Kế hoạch vẫn dừng
       // sau bước này vì tới lượt đối thủ (spec cú phòng thủ 3.1).
       _bareSafety = step;
@@ -243,10 +297,6 @@ class PlannerJob {
     }
     _steps.add(step);
     events.add(StepReady(_steps.length - 1, step));
-    if (step.kind == PlanStepKind.safety) {
-      _finish(events);
-      return;
-    }
     _remaining = [for (final b in _remaining) if (b.number != step.ballNum) b];
     // Bất biến của kế hoạch: bước sau bắt đầu đúng đối tượng này, không
     // tính lại, không sao chép (spec mục 4.4).
@@ -265,11 +315,22 @@ class _Missing implements Exception {
   final ShotKey key;
 }
 
-/// Chạy một mạch tới hết — cho test, công cụ dò bàn và đo tốc độ.
+/// Chạy một mạch tới hết — cho test, công cụ dò bàn và đo tốc độ. Ở điểm
+/// hỏi của cú thủ thì "Tính tiếp" ([continueSafety], mặc định) hay "Dùng cú
+/// này".
 List<PlanStep> planToEnd(TableSetup setup,
-    {AimShotFn aim = aimShot, SafetyPhysics safety = const SafetyPhysics()}) {
+    {AimShotFn aim = aimShot,
+    SafetyPhysics safety = const SafetyPhysics(),
+    bool continueSafety = true}) {
   final job = PlannerJob(setup, aim: aim, safety: safety);
   while (!job.isDone) {
+    if (job.safetyCheckpoint) {
+      if (continueSafety) {
+        job.continueSafety();
+      } else {
+        job.keepSafety();
+      }
+    }
     job.step(budget: const Duration(days: 1));
   }
   return job.steps;
