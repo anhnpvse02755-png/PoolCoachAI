@@ -5,7 +5,7 @@
 **Goal:** On the branch that already holds *Kế hoạch dọn bàn*, before it merges:
 - set the planner's slice to 4 ms (owner decision);
 - replace the bare *phòng thủ* step with a real safety-shot search: direct safeties on every legal ball the cue ball sees (no-spin options first, *áp phê* only when none of them is legal), then *A băng* kicks of 1–3 rails whether or not the cue ball is *bị đui*, all in one search; 4 rails only as the last resort (owner decisions 2026-10-08);
-- after Task 25 (owner decisions 2026-10-08, after Task 25): safety powers 30 · 60 · 90, a 12 ms slice only while the safety search runs, and a **coarse pass first** that stops and asks *"… Bạn muốn tính tiếp hay không?"* when it already found a good safety;
+- after Task 25 (owner decisions 2026-10-08, after Task 25): safety powers 30 · 60 · 90, a 12 ms slice only while the safety search runs, and a **coarse pass first** that stops and asks *"… Bạn muốn tính tiếp hay không?"* when it already found a good safety, and otherwise shows its best shot as provisional while the full search runs on;
 - ask *Chờ / Chỉ vẽ đường ngắm* when the Cut Angle Simulator times out.
 
 **Architecture:** The safety search is plain Dart in `lib/domain/planner/`, built on the physics core.
@@ -14,7 +14,7 @@
 - `safety_rules.dart` rejects fouls; `safety_scoring.dart` scores the opponent's position (worst of ±15 %) plus the owner's penalties.
 - `SafetyJob` slices the search like `PlannerJob`: every unit re-runs the pure evaluation over a memo and does exactly one new simulation, so slicing never changes the result. A cursor keeps evaluated options, so replay cost stays flat. Options are added stage by stage in a fixed order (per ball: direct without spin, then direct with *áp phê* only if needed; then kicks of 1–3 rails; then 4 rails only if nothing is legal), and whether a stage opens depends only on memoised results, never on pruning.
 - `PlannerJob` hands its safety step to a `SafetyJob` and reports the step when the search ends.
-- Since Task 25b the `SafetyJob` runs a coarse pass first (a filtered subset of the same option objects). A *thủ tốt* coarse shot pauses the job at a checkpoint: the planner reports the step with it and the screen asks whether to keep searching. *Tính tiếp* runs the full search above on the same memo; its shot replaces the coarse one only when strictly better.
+- Since Task 25b the `SafetyJob` runs a coarse pass first (a filtered subset of the same option objects). A *thủ tốt* coarse shot pauses the job at a checkpoint: the planner reports the step with it and the screen asks whether to keep searching. Any other coarse shot is reported at once as provisional and the search continues by itself. Either way the full search above runs on the same memo, and its shot replaces the coarse one only when strictly better.
 - The simulator gains an optional time limit on `simulateShot` / `aimShot` and a wait flow that paints *Đang tính…* before it computes.
 
 **Tech Stack:** Flutter 3.47 / Dart 3.13, `flutter_test`, `package:test` tags via `dart_test.yaml`; Node 26 + Chrome DevTools Protocol for the browser check (`tool/e2e/`).
@@ -35,7 +35,7 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
    - The plan's own code (see "How this plan was checked") took 1.6–10.2 s per safety step on the VM over the five fixtures, 4.2–5.0 s for the two tables of the perf test.
    - Chrome runs about 2× the VM. With a 4 ms slice per 16.7 ms frame, the wall time is about 4× the CPU time. So one safety step would take roughly 15–90 s in Chrome, and 3–22 s even in a Web Worker.
    - The plan builds what the spec says, measures it in Task 25, and stops there with these numbers. Candidate changes for the owner are listed in Task 25. A Web Worker is a separate project after merge and out of scope here.
-   - **After Task 25 (owner decisions 2026-10-08, after Task 25)** the search uses 3 power levels, a 12 ms slice while it runs (wall ≈ 2.8× the VM instead of ≈ 8×), and a coarse pass that shows a good safety early. Task 25b re-measures: the first shown step is ≈ 0.4–0.8 s on the VM for the one-rail and no-pot tables, but ≈ 3.7–5.1 s for `eightSafetyTable` (≈ 10–14 s in Chrome) and 1.7–2.2 s for `snookerTwoRailTable` (≈ 4.8–6.1 s), so Task 25b stops for the owner again.
+   - **After Task 25 (owner decisions 2026-10-08, after Task 25)** the search uses 3 power levels, a 12 ms slice while it runs (wall ≈ 2.8× the VM instead of ≈ 8×), and a coarse pass that shows a good safety early. With the coarse shot shown as provisional when it is not *thủ tốt* (owner decision 5 after Task 25), Task 25b measures the first shown step at ≈ 0.3–1.2 s on the VM for every fixture with a coarse shot (≈ 1–3.5 s in Chrome); `snookerThreeRailTable` has none and shows its step after the full search, ≈ 1.1 s (≈ 3 s in Chrome).
    - **After the owner decisions of 2026-10-08** (áp phê as a fallback, kicks always tried), the numbers above are historical and Task 25 re-measures them. A plan-time re-run of the amended code on the VM (see "How this plan was checked") gave: `noPotTable` 394 units, about 1.1 s (was 1146 units, 3.8–4.2 s); `eightSafetyTable` 904 units, 4.9 s (was 1412, 10.2 s); the three kick tables unchanged (689 / 399 / 137 units). So "vài giây" is still out of reach on the kick tables.
 2. **Units of work.** One unit is either an *aim* unit or a *sim* unit. An aim unit is a contact refinement (cheap probes, plus a stun solve) for one option, like one `aimShot` is one unit in `PlannerJob`. A sim unit is one full `simulateShot`. Either way, a unit performs exactly one new memo entry.
 3. **`SafetyJob` keeps a cursor instead of replaying from step 1.**
@@ -67,7 +67,7 @@ The spec was checked against the code at `a35667b`. The numbers below were measu
 17. **`AimShotFn` gains `double maxTime`.** Every fake in the tests must accept it (three in `test/support/planner_tables.dart`, three in `test/features/training/simulator_screen_test.dart`).
 18. **The simulator's *Đang tính…* line reuses `Vi.simComputing`.** The spec's wording is the same text.
 19. **PRD:** spec §8 says to amend "§5.4 / §5.5". In `PRD_RunOutPlanner.md` the fallback order lives in §5.3 and the loop in §5.4; §5.5 is the miss advice. The plan amends §4, §5.1, §5.3, §5.4, adds §5.6 and §6.7, and changes §8. §8 has no line that names *cú phòng thủ* as out of scope, so the plan adds one rather than removing one.
-20. **"Vài giây"** is read as at most 5 s of wall time in Chrome mobile emulation, from *Lập kế hoạch* to the safety step. Task 25 derives a VM gate of 600 ms from it. Since Task 25b the gate is on the **first shown step** (the checkpoint, or the end of the search when the coarse pass does not pause), and with the 12 ms safety slice the VM gate is 1800 ms (5000 ÷ (2 × 16.7 / 12)).
+20. **"Vài giây"** is read as at most 5 s of wall time in Chrome mobile emulation, from *Lập kế hoạch* to the safety step. Task 25 derives a VM gate of 600 ms from it. Since Task 25b the gate is on the **first shown step** (the end of the coarse pass when it has a shot — checkpoint or provisional — else the end of the search), and with the 12 ms safety slice the VM gate is 1800 ms (5000 ÷ (2 × 16.7 / 12)).
 
 ## Owner decisions (2026-10-08)
 
@@ -97,14 +97,17 @@ Task 25 measured the safety search alone on the Dart VM: `snookerOneRailTable` 4
    - *"Thủ tốt"* = the opponent is *bị đui*, or the opponent's easiest cut is at least `opponentHardAngle`. If the coarse best is *thủ tốt*, the job pauses at a checkpoint and the planner reports the step with that shot plus the question; otherwise it continues into the full search automatically.
    - *Tính tiếp* resumes the **same** `SafetyJob` (memo reused, nothing redone) through the full stages as already built (direct per ball no-spin → *áp phê* fallback → kicks 1–3 → 4-rail fallback), and replaces the step's shot only if the final best is strictly better. Determinism, sliced == one-shot and prune == no-prune hold for the coarse result and for the full result; the full result after *Tính tiếp* equals a one-shot full search's (tested in Task 25b).
    - On screen: the owner's sentence (it needed no typo fix, so it is kept word for word), and the buttons *Tính tiếp* and *Dùng cú này*. All strings in `vi.dart`. While continuing: the *Đang tìm cú thủ…* line.
-4. **Choices this plan makes inside those rulings** (the controller may overrule):
+5. **A provisional shot when the coarse pass is not *thủ tốt*** (owner, 2026-10-08, answering Task 25b's first STOP). When the coarse best exists but is not *thủ tốt* (measured: `eightSafetyTable`, `snookerTwoRailTable`), the app shows it at once as a provisional shot with the line *"Cú thủ tạm tính — đang tìm cú tốt hơn…"* (`Vi.planSafetyProvisional`), keeps computing with no question, and when the full search ends replaces the step's shot only if strictly better; otherwise the provisional shot becomes final and the line goes away. The *thủ tốt* branch (pause, *Tính tiếp* / *Dùng cú này*) is unchanged. The provisional shot is exactly `coarseResult`; the final shot equals a one-shot full search's under the strictly-better rule; sliced == one-shot holds for both (Task 25b tests).
+   - **Rule of this plan when the coarse pass finds nothing legal** (`snookerThreeRailTable`): no provisional shot. *Đang tìm cú thủ…* stays until the full search ends, then the step appears with its final shot. Simplest consistent rule: a provisional shot is always the coarse result, and nothing is shown mid-way through the full stages (that would need a second, order-dependent "first legal" rule). Measured cost: ≈ 1.1 s on a quiet VM, ≈ 3 s in Chrome.
+6. **Choices this plan makes inside those rulings** (accepted by the controller on 2026-10-08, except where noted):
    - *Thủ tốt* is `OpponentView.hard`, the rule the tolerance line already uses: *bị đui*, no pocket left, or easiest cut **>** `opponentHardAngle`. One definition of "khó cho đối thủ" instead of two; it differs from "≥" only at exactly 55.0°, and it also counts "no pocket left" (scored like 95°) as *thủ tốt*.
    - The screen part is Task 25c, before Task 26, so *Đang tìm cú thủ…* moves there from Tasks 26–27. The question shows under the safety step's card, only while that step is the one viewed.
-   - The 5 s target is on the **first shown step**: the checkpoint, or the end of the search when the coarse pass does not pause. The full search after *Tính tiếp* is printed, not gated, because the owner's sentence already warns that it takes time.
+   - The 5 s target is on the **first shown step**: the checkpoint or the provisional shot, or the end of the search when the coarse pass has no shot. The full search after it is printed, not gated.
+   - After *Tính tiếp* the line stays *Đang tìm cú thủ…* (earlier ruling); the provisional line is only for the automatic continuation.
    - Chrome frames while the safety search runs are printed, not gated (decision 1 trades smoothness during that wait). The frame gate of normal planning (table 2) stays.
    - The coarse pass is built from the same option objects as the full lists (a filter), so one identity-keyed memo serves both passes.
 
-**Result at plan time** (Task 25b): the first shown step comes after ≈ 0.4–0.6 s (one-rail, pauses) and ≈ 0.7–0.8 s (no-pot, pauses) on the VM, ≈ 1.0–2.2 s in Chrome. `eightSafetyTable` does not pause (its coarse best leaves a 0.7° cut) and shows its step only after the full search, ≈ 3.7–5.1 s on the VM, **≈ 10–14 s in Chrome**; `snookerTwoRailTable` does not pause either (39.1°), ≈ 1.7–2.2 s on the VM, **≈ 4.8–6.1 s in Chrome**. Task 25b ends with a STOP for the owner on those numbers.
+**Result at plan time** (Task 25b, perf test alone, three runs, all passing the 1800 ms VM gate): first shown step one-rail 458–767 ms (checkpoint), no-pot 910–1184 ms (checkpoint), 8-ball 765–1234 ms (provisional); probe: two-rail 0.25–0.45 s (provisional), three-rail 1.1 s quiet (no coarse shot, end of search). Chrome ≈ × 2.8: all ≈ 0.7–3.5 s.
 
 ## How this plan was checked
 
@@ -144,7 +147,7 @@ Task 25 measured the safety search alone on the Dart VM: `snookerOneRailTable` 4
     | `eightSafetyTable` | unchanged (¾ bi lệch phải, đứng bi 45 %, đối thủ bi 10); kicks of 1–3 rails aimed | 904 | direct 1 → kick | 4.9 s |
 
   - Task 25's perf test: 6242 ms (kick table, a noisy run; the probe read 4.2 s for the same search) and 1074 ms (no-pot table) against the 600 ms gate, so it still fails. Slice median 3.8 ms, p95 8.0 ms (gate on the median: 6 ms).
-- **Re-checked after the owner's answer to Task 25 (2026-10-08).** The temporary worktree was reset to `adf2ca3` (Tasks 16–25 done there), and the code and tests of Tasks 25a, 25b and 25c were applied exactly as written here:
+- **Re-checked after the owner's answer to Task 25 (2026-10-08).** The temporary worktree was reset to `adf2ca3` (Tasks 16–25 done there), and the code and tests of Tasks 25a, 25b and 25c were applied exactly as written here (first version, with a STOP at the end of Task 25b):
   - `flutter analyze`: `No issues found!`;
   - `flutter test` (whole project, perf and probe skipped): 774 passed, 5 skipped. That includes `safety_job_test.dart` (20), `safety_spec_test.dart` (10: Task 23's nine plus the checkpoint test), `planner_job_test.dart` (the default-budget test and the three checkpoint tests), and `planner_steps_view_test.dart` (22, four of them Task 25c's);
   - Task 25a alone: with the coarse pass switched off, Task 23's nine spec tests pass with the three power levels (only the new checkpoint test fails, as it must).
@@ -161,6 +164,11 @@ Task 25 measured the safety search alone on the Dart VM: `snookerOneRailTable` 4
 
   - Task 25b's perf test, six alone-runs while other sessions kept Chrome busy (so slower than the probe): first shown step 500–1260 ms (one-rail), 939–2797 ms (no-pot), 6779–11994 ms (8-ball, never pauses); full search 6.0–11.5 s, 2.5–6.0 s and 6.8–12.0 s. The 1800 ms gate failed on the 8-ball table every run (and on no-pot in the three most loaded runs). Slices: median 9.5–15.1 ms (gate 18 ms, passed), p95 35–81 ms, longest 102–408 ms.
   - Chrome estimate (VM × 2 × 16.7 / 12 ≈ × 2.8, probe figures): first shown step ≈ 1.0–1.7 s (one-rail), ≈ 2.0–2.2 s (no-pot), ≈ 3.0–3.4 s (three-rail), **≈ 4.8–6.1 s (two-rail)**, **≈ 10–14 s (8-ball)**.
+  - **Re-checked again for the provisional shot (owner decision 5).** The temporary worktree was reset to `d21f7b4` (Task 25a committed on the branch, identical to the plan's Task 25a) and Tasks 25b–25c applied as written now:
+    - `flutter analyze`: `No issues found!`; `flutter test`: 778 passed, 5 skipped (`safety_job_test.dart` 21, `planner_steps_view_test.dart` 23, the two `cú tạm` tests in `planner_job_test.dart`);
+    - every Dart block of Tasks 25b–25c, including the two whole files, was checked to appear verbatim in the validated code;
+    - probe (one-shot, three runs, load varied): first shown step one-rail 83 units 0.35–0.60 s (checkpoint), two-rail 53 units 0.25–0.45 s (provisional, kept), three-rail 81 units 1.1–2.1 s (no coarse shot), no-pot 156 units 0.71–1.66 s (checkpoint), 8-ball 150 units 1.3–2.9 s (provisional, replaced after 607 units);
+    - perf test alone, three runs, **all passed**: first shown step 458–767 ms (one-rail), 910–1184 ms (no-pot), 765–1234 ms (8-ball, provisional) against 1800 ms; full search 4.1–6.8 s, 2.8–3.5 s, 5.7–6.0 s; slice median 9.7–10.0 ms (gate 18 ms), p95 30–48 ms, longest 55–114 ms.
   - Tasks 26–29 were still not run; their amended parts (strings moved to Task 25c, the steps-view hunk, the PRD numbers, the Chrome checkpoint flow) follow the code validated here.
 
 ## Global Constraints
@@ -210,7 +218,7 @@ Task 25 measured the safety search alone on the Dart VM: `snookerOneRailTable` 4
    - Owner: Task 21 (`lực 90 %: mức +15 % kẹp về 100 %, đủ 7 mức`).
 6. **The checkpoint question (Task 25c).** Leaving the planner, *Sửa bàn*, or re-placing the cue ball while the question is shown or after *Tính tiếp*; viewing an earlier step while the plan is paused.
    - Expected: no `setState` after dispose; the question shows only under the safety step; *Dùng cú này* ends the plan; *Tính tiếp* replaces the step only with a strictly better shot.
-   - Owner: Task 25b (`Dùng cú này: …`, `Tính tiếp: …`) and Task 25c (`rời màn ở điểm hỏi hay giữa lúc tìm tiếp: không lỗi`).
+   - Owner: Task 25b (`Dùng cú này: …`, `Tính tiếp: …`, the `cú tạm` group) and Task 25c (`rời màn ở điểm hỏi hay giữa lúc tìm tiếp: không lỗi`, `lượt thô chưa thủ tốt: hiện cú tạm …`).
 
 ---
 
@@ -4409,22 +4417,23 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 25b: The coarse pass first, and a checkpoint in `SafetyJob` and `PlannerJob`
 
-Owner decision 3 after Task 25: *"Thử các mốc, mức lực trước. Nếu có thể ra cú thủ tốt thì dừng luôn và thông báo cho người dùng."*
+Owner decisions 3 and 5 after Task 25: *"Thử các mốc, mức lực trước. Nếu có thể ra cú thủ tốt thì dừng luôn và thông báo cho người dùng."* — and when the coarse best is not *thủ tốt*, show it at once as a provisional shot while the full search runs.
 
 **How it works.**
 - `SafetyJob` first runs a **coarse pass** over a fixed subset of the full option lists: direct options at thickness full, ½ left, ½ right with no *áp phê*, and kicks with full contact at 1–2 rails; every stroke of the stage (đứng / cu lê / trô for direct, đứng / cu lê for kicks) at 30 · 60 · 90. Order: the full order, filtered (`isCoarseOption`).
 - When the coarse pass ends, its best option is built into a `SafetyShot` (`coarseResult`).
   - If it is **thủ tốt** (`isGoodSafety`: the opponent is *bị đui*, has no pocket, or their easiest cut is harder than `opponentHardAngle` — exactly `OpponentView.hard`), the job **pauses at a checkpoint** (`atCheckpoint`). The planner reports the safety step with that shot and asks the owner's question (Task 25c).
-  - If the coarse pass found nothing legal, or its best is not *thủ tốt*, the job continues into the full search at once, with no question.
+  - If its best is legal but not *thủ tốt*, the job continues into the full search at once, with no question, and the planner reports the step with that shot as a **provisional** shot (`PlannerJob.provisionalSafety`; the screen says *"Cú thủ tạm tính — đang tìm cú tốt hơn…"*, Task 25c). When the full search ends, the step's shot is replaced only if strictly better; otherwise the provisional shot is the final one.
+  - If the coarse pass found nothing legal, there is no provisional shot: the job continues into the full search and the step appears when it ends, with *Đang tìm cú thủ…* meanwhile (rule of this plan, see the owner block).
 - **Tính tiếp** (`resume`) runs the **full search exactly as built in Tasks 21–23** (per ball no-spin → *áp phê* fallback → kicks 1–3 → 4-rail fallback), from the start of its own option list, with its own cursor, best and stage state. Only the memo is shared, so nothing done by the coarse pass is redone, and the full pass's result is the same as a one-shot full search's (`SafetyJob(coarse: false)`).
 - The final `result` is the full pass's shot only if its total is **strictly lower** than the coarse shot's; otherwise it is the coarse shot itself (same object). The coarse options are a subset of the full ones, so the full best is never worse.
 - To share the memo across the two passes, aims are keyed by the option object (an identity map), and each stage's option list is built once (`_listOf`), so both passes hold the same objects. Sims were already keyed by `SimKey`.
-- Determinism, sliced == one-shot and prune == no-prune hold for each pass: each pass is the same pure cursor evaluation over the memo, with its own bound; the checkpoint decision reads only the coarse result.
+- Determinism, sliced == one-shot and prune == no-prune hold for each pass: each pass is the same pure cursor evaluation over the memo, with its own bound; the checkpoint decision reads only the coarse result. The provisional shot **is** `coarseResult`, and the final shot after the automatic continuation equals a one-shot full search's under the same strictly-better rule (tested).
 
 **Files:**
 - Modify: `lib/domain/planner/planner_constants.dart` (coarse constants)
 - Modify: `lib/domain/planner/safety_job.dart` (whole file below)
-- Modify: `lib/domain/planner/planner_job.dart` (checkpoint, `continueSafety`, `keepSafety`, `planToEnd`)
+- Modify: `lib/domain/planner/planner_job.dart` (checkpoint, provisional shot, `continueSafety`, `keepSafety`, `planToEnd`)
 - Test: `test/domain/planner/safety_job_test.dart`, `test/domain/planner/safety_spec_test.dart` (Task 23 rerun), `test/domain/planner/planner_job_test.dart`
 - Modify: `test/domain/planner/safety_probe_test.dart` (dump), `test/domain/planner/safety_perf_test.dart` (whole file below, Task 25 rerun), `test/support/planner_tables.dart` (fixture comments)
 - Modify: `docs/superpowers/logs/2026-10-07-run-out-planner.md`
@@ -4434,14 +4443,14 @@ Owner decision 3 after Task 25: *"Thử các mốc, mức lực trước. Nếu 
 - Produces:
   - constants `coarseThicknesses = [1, 0.5]`, `coarseKickThicknesses = [1]`, `coarseKickRails = 2`;
   - `bool isCoarseOption(SafetyOption o)`, `bool isGoodSafety(SafetyShot s)` (in `safety_job.dart`);
-  - `SafetyJob(context, {physics, prune, maxOptions, bool coarse = true})` with new `atCheckpoint`, `coarseResult`, `coarseOptions`, `bestIndex`, `resume()`; `options`, `openedStages` describe the full pass; `simulations` counts both passes; `step` stops at the checkpoint; `searchToEnd` resumes through it;
-  - `PlannerJob.safetyCheckpoint`, `continueSafety()`, `List<PlannerEvent> keepSafety()`; `searchingSafety` is false at the checkpoint; `StepReady(index, step)` is sent again with the **same index** when *Tính tiếp* ends with a strictly better shot; `planToEnd(setup, {aim, safety, bool continueSafety = true})`.
-- The steps view learns the checkpoint in Task 25c. Between the two commits a checkpoint keeps the view polling; do not hand the app to anyone in between.
+  - `SafetyJob(context, {physics, prune, maxOptions, bool coarse = true})` with new `atCheckpoint`, `coarseDone`, `coarseResult`, `coarseOptions`, `bestIndex`, `resume()`; `options`, `openedStages` describe the full pass; `simulations` counts both passes; `step` stops at the checkpoint; `searchToEnd` resumes through it;
+  - `PlannerJob.safetyCheckpoint`, `provisionalSafety`, `continueSafety()`, `List<PlannerEvent> keepSafety()`; `searchingSafety` is false at the checkpoint and true while a provisional shot is shown; the step is reported as soon as the coarse pass has a shot (checkpoint or provisional); `StepReady(index, step)` is sent again with the **same index** when the full search (after *Tính tiếp* or automatic) ends with a strictly better shot; `planToEnd(setup, {aim, safety, bool continueSafety = true})`.
+- The steps view learns the checkpoint and the provisional line in Task 25c. Between the two commits a checkpoint keeps the view polling; do not hand the app to anyone in between.
 
 - [ ] **Step 1: Write the failing tests**
 
 1. `test/domain/planner/safety_job_test.dart`:
-   - replace `runJob` and add `runToFirstShot` after it:
+   - replace `runJob` and add `runToFirstShot` after it (it stops when the coarse pass is done: checkpoint, provisional shot, or nothing legal):
 
 ```dart
   /// Chạy tới hết; ở điểm hỏi thì "Tính tiếp" như người dùng bấm.
@@ -4457,13 +4466,13 @@ Owner decision 3 after Task 25: *"Thử các mốc, mức lực trước. Nếu 
     return job;
   }
 
-  /// Chạy tới điểm hỏi, hoặc tới hết khi lượt thô chưa thủ tốt.
+  /// Chạy tới lúc lượt thô xong: điểm hỏi, cú tạm, hay không có cú nào.
   SafetyJob runToFirstShot(SafetyContext c,
       {int? maxSimulations, int? maxOptions, bool prune = true,
       SafetyPhysics physics = const SafetyPhysics()}) {
     final job = SafetyJob(c, maxOptions: maxOptions, prune: prune, physics: physics);
-    while (!job.isDone && !job.atCheckpoint) {
-      job.step(budget: const Duration(days: 1), maxSimulations: maxSimulations);
+    while (!job.coarseDone) {
+      job.step(budget: const Duration(days: 1), maxSimulations: maxSimulations ?? 1);
     }
     return job;
   }
@@ -4548,13 +4557,48 @@ Owner decision 3 after Task 25: *"Thử các mốc, mức lực trước. Nếu 
       }
     });
 
-    test('lượt thô không có cú hợp lệ: tìm tiếp luôn, không hỏi', () {
+    test('lượt thô không có cú hợp lệ: tìm tiếp luôn, không hỏi, không có cú tạm', () {
       final job = runToFirstShot(contextOf(noPotTable()), maxOptions: 30, physics: noSafetyPhysics);
       expect(job.coarseOptions, isNotEmpty);
       expect(job.coarseResult, isNull);
       expect(job.atCheckpoint, isFalse);
-      expect(job.isDone, isTrue);
+      while (!job.isDone) {
+        job.step(budget: const Duration(days: 1));
+      }
       expect(job.result, isNull);
+    });
+
+    test('lượt thô chưa thủ tốt: không hỏi; cú tạm là cú lượt thô, tự tìm tiếp ra đúng lượt '
+        'đầy đủ một mạch, chỉ thay khi tốt hơn hẳn', () {
+      // 40 phương án mỗi chặng: cú lượt thô của bàn hết đường ăn để đối thủ
+      // cắt 31.4° (đo với Task 25a–25b), chưa thủ tốt.
+      final c = contextOf(noPotTable());
+      final job = runToFirstShot(c, maxOptions: 40);
+      expect(job.atCheckpoint, isFalse);
+      final rough = job.coarseResult!;
+      expect(isGoodSafety(rough), isFalse);
+      while (!job.isDone) {
+        job.step(budget: const Duration(days: 1));
+      }
+      final alone = runJob(c, maxOptions: 40, coarse: false);
+      expect(job.options.map((o) => '$o'), alone.options.map((o) => '$o'));
+      expect(job.openedStages, alone.openedStages);
+      expect(job.bestIndex, alone.bestIndex);
+      final full = alone.result!;
+      if (full.total < rough.total) {
+        expect(safetyFingerprint(job.result), safetyFingerprint(full));
+      } else {
+        expect(identical(job.result, rough), isTrue);
+      }
+      // Chạy từng lát: cùng cú tạm, cùng cú cuối.
+      for (final n in [1, 3]) {
+        final sliced = runToFirstShot(c, maxOptions: 40, maxSimulations: n);
+        expect(safetyFingerprint(sliced.coarseResult), safetyFingerprint(rough), reason: 'lát $n');
+        while (!sliced.isDone) {
+          sliced.step(budget: const Duration(days: 1), maxSimulations: n);
+        }
+        expect(safetyFingerprint(sliced.result), safetyFingerprint(job.result), reason: 'lát $n');
+      }
     });
 
     test('lượt thô: chạy từng lát và có cắt tỉa hay không đều cho cùng điểm hỏi, '
@@ -4636,7 +4680,7 @@ void main() {
   });
 ```
 
-3. `test/domain/planner/planner_job_test.dart`, group `'trên lõi thật, bàn hết đường ăn'`: in `'chạy từng lát cho đúng y một mạch, cả bước phòng thủ'` add `if (job.safetyCheckpoint) job.continueSafety();` as the first line of the loop body, and append after that test:
+3. `test/domain/planner/planner_job_test.dart`, group `'trên lõi thật, bàn hết đường ăn'`: in `'chạy từng lát cho đúng y một mạch, cả bước phòng thủ'` add `if (job.safetyCheckpoint) job.continueSafety();` as the first line of the loop body, and append after that test (the closing of the real-core group, then a new group `'cú tạm'` inside the safety group):
 
 ```dart
       // Chủ sản phẩm chốt 08/10/2026 sau Task 25: lượt thô thủ tốt thì báo
@@ -4694,12 +4738,64 @@ void main() {
         expect(fingerprint(job.steps), fingerprint(whole));
         expect(job.simulations, greaterThan(sims));
       });
+    });
+
+    // Chủ sản phẩm chốt 08/10/2026 sau Task 25: lượt thô chưa thủ tốt thì
+    // hiện cú đó tạm, không hỏi, tự tìm tiếp.
+    group('cú tạm', () {
+      /// Chạy tới khi bước phòng thủ hiện ra, rồi tới hết; trả sự kiện từ lúc
+      /// bước hiện ra và bước lúc đó.
+      ({PlannerJob job, PlanStep first, List<PlannerEvent> after}) runProvisional(
+          TableSetup setup) {
+        final job = PlannerJob(setup);
+        while (job.steps.isEmpty) {
+          job.step(maxSimulations: 7);
+        }
+        final first = job.steps.single;
+        expect(job.provisionalSafety, isTrue);
+        expect(job.searchingSafety, isTrue);
+        expect(job.safetyCheckpoint, isFalse);
+        expect(job.isDone, isFalse);
+        final after = <PlannerEvent>[];
+        while (!job.isDone) {
+          after.addAll(job.step(maxSimulations: 7));
+        }
+        expect(job.provisionalSafety, isFalse);
+        return (job: job, first: first, after: after);
+      }
+
+      test('không có cú tốt hơn hẳn: cú tạm thành cú cuối, không báo lại bước', () {
+        // Đo với Task 25a–25b: bàn 2 băng, lượt thô để đối thủ 39.1°, lượt đầy
+        // đủ không tốt hơn hẳn.
+        final r = runProvisional(snookerTwoRailTable());
+        expect(r.after, [isA<PlanDone>()]);
+        expect(r.job.steps.single, same(r.first));
+        final alone = searchToEnd(SafetyContext(
+            game: GameType.nineBall,
+            cue: snookerTwoRailTable().cue,
+            balls: snookerTwoRailTable().balls));
+        expect(safetyFingerprint(r.first.safety), safetyFingerprint(alone));
+      });
+
+      test('có cú tốt hơn hẳn: báo lại đúng bước đó với cú của lượt đầy đủ', () {
+        // Đo với Task 25a–25b: bàn 8 bi, cú tạm trọn bi đứng bi 30 %, lượt đầy
+        // đủ ra ⅛ bi lệch phải tốt hơn hẳn.
+        final setup = eightSafetyTable();
+        final r = runProvisional(setup);
+        expect(r.after, [isA<StepReady>(), isA<PlanDone>()]);
+        expect((r.after.first as StepReady).index, 0);
+        final s = r.job.steps.single.safety!;
+        expect(s.total, lessThan(r.first.safety!.total));
+        final alone = searchToEnd(
+            SafetyContext(game: setup.game, cue: setup.cue, balls: setup.balls));
+        expect(safetyFingerprint(s), safetyFingerprint(alone));
+      });
 ```
 
 - [ ] **Step 2: Run them to verify they fail**
 
 Run: `"$FLUTTER" test test/domain/planner/safety_job_test.dart test/domain/planner/safety_spec_test.dart test/domain/planner/planner_job_test.dart`
-Expected: compile errors (`coarse`, `atCheckpoint`, `coarseResult`, `isGoodSafety`, `safetyCheckpoint`, … missing).
+Expected: compile errors (`coarse`, `coarseDone`, `atCheckpoint`, `coarseResult`, `isGoodSafety`, `safetyCheckpoint`, `provisionalSafety`, … missing).
 
 - [ ] **Step 3: Coarse constants**
 
@@ -4709,7 +4805,8 @@ In `planner_constants.dart`, after `safetyPowers`:
 /// Lượt thô (chủ sản phẩm chốt 08/10/2026 sau Task 25): "thử các mốc, mức
 /// lực trước". Trực tiếp: trọn bi, ½ bi hai bên, không áp phê. A băng: chạm
 /// trọn bi, 1–2 băng. Cả hai đủ kiểu đánh và [safetyPowers]. Thủ tốt thì
-/// dừng hỏi người dùng có tính tiếp không.
+/// dừng hỏi người dùng có tính tiếp không; chưa thủ tốt thì hiện cú đó tạm
+/// và tự tìm tiếp.
 const coarseThicknesses = <double>[1, 0.5];
 const coarseKickThicknesses = <double>[1];
 const coarseKickRails = 2;
@@ -4781,7 +4878,7 @@ enum _Phase { coarse, checkpoint, full, done }
 /// [coarseOptions] trước. Cú tốt nhất của nó mà thủ tốt ([isGoodSafety]) thì
 /// việc tìm dừng ở [atCheckpoint] cho người dùng chọn: [resume] tìm tiếp,
 /// hay dùng luôn [coarseResult]. Không thì đi thẳng vào lượt đầy đủ, không
-/// hỏi. Lượt đầy đủ là đúng việc tìm cũ, từ đầu danh sách, với con trỏ và
+/// hỏi; [coarseResult] khi đó là cú tạm để hiện trong lúc chờ. Lượt đầy đủ là đúng việc tìm cũ, từ đầu danh sách, với con trỏ và
 /// điểm tốt nhất riêng; chỉ bộ nhớ đệm là dùng chung, nên lượt thô không
 /// phải làm lại và lượt đầy đủ ra đúng như khi không có lượt thô.
 ///
@@ -4854,6 +4951,10 @@ class SafetyJob {
   /// Lượt thô xong và cú tốt nhất của nó thủ tốt: việc tìm đứng chờ người
   /// dùng chọn tìm tiếp ([resume]) hay dùng [coarseResult].
   bool get atCheckpoint => _phase == _Phase.checkpoint;
+
+  /// Lượt thô đã xong (hay không chạy): từ lúc này [coarseResult] không đổi
+  /// nữa.
+  bool get coarseDone => _phase != _Phase.coarse;
 
   /// Cú tốt nhất của lượt thô; null khi lượt thô chưa xong, không chạy, hay
   /// không có phương án hợp lệ nào.
@@ -4958,7 +5059,8 @@ class SafetyJob {
     final best = _coarseBest;
     final shot = best == null ? null : buildSafetyShot(context, best, _coarseLookup.trace);
     _coarseResult = shot;
-    // Không có cú hợp lệ, hay có mà chưa thủ tốt: tìm tiếp luôn, không hỏi.
+    // Không có cú hợp lệ, hay có mà chưa thủ tốt: tìm tiếp luôn, không hỏi
+    // (có cú thì PlannerJob hiện nó tạm trong lúc tìm).
     _phase = shot != null && isGoodSafety(shot) ? _Phase.checkpoint : _Phase.full;
   }
 
@@ -5082,13 +5184,17 @@ SafetyShot? searchToEnd(SafetyContext c, {SafetyPhysics physics = const SafetyPh
 
 In `planner_job.dart`:
 1. Add `import 'package:poolcoachai/domain/planner/safety_shot.dart';`.
-2. `StepReady`'s doc: `/// Bước [index] vừa tính xong. Bước phòng thủ báo lại cùng [index] khi` / `/// "Tính tiếp" tìm được cú thủ tốt hơn hẳn cú lượt thô.`
+2. `StepReady`'s doc: `/// Bước [index] vừa tính xong. Bước phòng thủ báo lại cùng [index] khi lượt` / `/// đầy đủ (sau "Tính tiếp", hay tự tìm tiếp sau cú tạm) ra cú thủ tốt hơn` / `/// hẳn cú lượt thô.`
 3. After `PlanStep? _bareSafety;`:
 
 ```dart
 
-  /// Đã báo bước phòng thủ với cú lượt thô, đang chờ người dùng chọn.
+  /// Đã báo bước phòng thủ với cú lượt thô (điểm hỏi hay cú tạm).
   bool _reportedRough = false;
+
+  /// Cú lượt thô được báo như cú tạm: lượt thô chưa thủ tốt, việc tìm tự
+  /// chạy tiếp (chủ sản phẩm chốt 08/10/2026 sau Task 25).
+  bool _provisional = false;
 ```
 
 4. Replace `searchingSafety`:
@@ -5096,6 +5202,11 @@ In `planner_job.dart`:
 ```dart
   /// Đang tìm cú thủ: màn hình nói "Đang tìm cú thủ…" thay "Đang tính bước".
   bool get searchingSafety => _search != null && !_done && !safetyCheckpoint;
+
+  /// Bước phòng thủ đang hiện cú lượt thô tạm, việc tìm vẫn chạy: màn hình
+  /// nói "Cú thủ tạm tính — đang tìm cú tốt hơn…". Xong thì tắt; cú chỉ đổi
+  /// khi lượt đầy đủ tốt hơn hẳn.
+  bool get provisionalSafety => _provisional && searchingSafety;
 
   /// Lượt thô đã ra cú thủ tốt và bước phòng thủ đã báo với cú đó: chờ
   /// người dùng chọn [continueSafety] ("Tính tiếp") hay [keepSafety] ("Dùng
@@ -5121,11 +5232,18 @@ In `planner_job.dart`:
 ```dart
       if (search != null) {
         if (search.work()) simulated++;
+        final rough = search.coarseResult;
+        // Lượt thô xong mà có cú: báo bước ngay — ở điểm hỏi, hay làm cú tạm.
+        if (!_reportedRough && rough != null) {
+          _provisional = !search.atCheckpoint;
+          _reportSafety(rough, events);
+        }
         if (search.isDone) {
-          _reportSafety(search, search.result, events);
+          // Cú cuối chỉ khác cú lượt thô khi tốt hơn hẳn: chỉ khi đó báo lại.
+          if (!_reportedRough || !identical(search.result, rough)) {
+            _reportSafety(search.result, events);
+          }
           _finish(events);
-        } else if (search.atCheckpoint) {
-          _reportSafety(search, search.coarseResult, events);
         }
       } else {
 ```
@@ -5134,17 +5252,16 @@ In `planner_job.dart`:
 
 ```dart
 
-  /// Báo bước phòng thủ với cú [shot]: lần đầu thêm bước; sau "Tính tiếp"
-  /// chỉ báo lại khi cú cuối khác cú lượt thô (tốt hơn hẳn).
-  void _reportSafety(SafetyJob search, SafetyShot? shot, List<PlannerEvent> events) {
-    if (_reportedRough && identical(shot, search.coarseResult)) return;
+  /// Báo bước phòng thủ với cú [shot]: lần đầu thêm bước, lần sau thay cú
+  /// của chính bước đó (cùng chỉ số).
+  void _reportSafety(SafetyShot? shot, List<PlannerEvent> events) {
     final bare = _bareSafety!;
     final step = PlanStep.safety(cbFrom: bare.cbFrom, ballNum: bare.ballNum, safety: shot);
     if (_reportedRough) {
       _steps[_steps.length - 1] = step;
     } else {
       _steps.add(step);
-      _reportedRough = search.atCheckpoint;
+      _reportedRough = true;
     }
     events.add(StepReady(_steps.length - 1, step));
   }
@@ -5198,7 +5315,7 @@ List<PlanStep> planToEnd(TableSetup setup,
 - [ ] **Step 6: Run the tests (Task 23's spec tests rerun here)**
 
 Run: `"$FLUTTER" test test/domain && "$FLUTTER" test test/features/training && "$FLUTTER" analyze`
-Expected: all pass, `No issues found!`. At plan time `safety_job_test.dart` had 20 tests and `safety_spec_test.dart` 10 (Task 23's nine plus the checkpoint test); the whole of `test/domain` took about 3 minutes. The checkpoint test pins which fixtures pause: one-rail and no-pot pause; two-rail, three-rail and 8-ball do not.
+Expected: all pass, `No issues found!`. At plan time `safety_job_test.dart` had 21 tests and `safety_spec_test.dart` 10 (Task 23's nine plus the checkpoint test); the whole of `test/domain` took about 3 minutes. The checkpoint test pins which fixtures pause: one-rail and no-pot pause; two-rail and 8-ball show a provisional shot; three-rail has no coarse shot.
 
 - [ ] **Step 7: Probe and fixture comments**
 
@@ -5214,20 +5331,20 @@ Expected: all pass, `No issues found!`. At plan time `safety_job_test.dart` had 
           'chịu sai số ${r.tolerance}/7';
     }
 
-    // Lượt thô tới điểm hỏi (hay tới hết, khi lượt thô chưa thủ tốt) là lúc
-    // bước thủ hiện ra; "Tính tiếp" chạy nốt lượt đầy đủ.
+    // Lượt thô xong là lúc bước thủ hiện ra — ở điểm hỏi, hay làm cú tạm.
+    // Lượt thô không có cú nào thì bước hiện ra ở cuối lượt đầy đủ. Từng đơn
+    // vị việc như PlannerJob, nên đo cả đơn vị đầu của lượt đầy đủ đi cùng.
     final w = Stopwatch()..start();
     final job = SafetyJob(c);
-    while (!job.isDone && !job.atCheckpoint) {
-      job.step(budget: const Duration(days: 1));
+    while (!job.coarseDone) {
+      job.work();
     }
-    final firstMs = w.elapsedMilliseconds;
-    final firstUnits = job.simulations;
+    final coarseMs = w.elapsedMilliseconds;
+    final coarseUnits = job.simulations;
     final rough = job.coarseResult;
-    print('  lượt thô: ${job.coarseOptions.length} phương án, '
-        '${job.atCheckpoint ? 'dừng hỏi' : 'không thủ tốt, tìm tiếp luôn'}; '
-        'bước hiện sau $firstUnits lần dò/mô phỏng, $firstMs ms');
-    print(rough == null ? '  lượt thô: không có cú hợp lệ' : '  lượt thô chọn: ${line(rough)}');
+    print('  lượt thô: ${job.coarseOptions.length} phương án, xong sau $coarseUnits lần '
+        'dò/mô phỏng, $coarseMs ms; ${rough == null ? 'không có cú hợp lệ, chờ lượt đầy đủ' : job.atCheckpoint ? 'thủ tốt, dừng hỏi' : 'chưa thủ tốt, hiện tạm và tìm tiếp'}');
+    if (rough != null) print('  lượt thô chọn: ${line(rough)}');
     job.resume();
     while (!job.isDone) {
       job.step(budget: const Duration(days: 1));
@@ -5246,13 +5363,15 @@ Expected: all pass, `No issues found!`. At plan time `safety_job_test.dart` had 
 
 2. Run: `"$FLUTTER" test --tags probe --run-skipped test/domain/planner/safety_probe_test.dart --plain-name "bảng cú thủ"`. At plan time (VM, one-shot, two runs):
 
-| Fixture | Coarse pass | First shown step | Coarse shot | Full search (after *Tính tiếp*) | Final shot |
+| Fixture | Coarse pass | First shown step | Coarse shot | Full search | Final shot |
 |---|---|---|---|---|---|
-| `snookerOneRailTable` | 42 options, **pauses** | 83 units, 0.36–0.60 s | A băng 1 băng, chấm 3,5 băng dài dưới, cu lê 90 %, đối thủ 72.7° | 388 units, 3.2–3.6 s; kicks 1–3 | coarse shot kept (nothing strictly better) |
-| `snookerTwoRailTable` | 24 options, best not *thủ tốt* | 238 units, 1.7–2.2 s (full search) | A băng 2 băng, chấm 5,5 băng dài dưới, đứng bi 60 %, đối thủ 39.1° | — | coarse shot kept |
-| `snookerThreeRailTable` | 0 options (no 1–2-rail path) | 81 units, 1.1–1.2 s (full search) | — | — | A băng 3 băng, chấm 2 băng ngắn trái, ½ bi lệch trái, cu lê 60 %, đối thủ 44.5° |
-| `noPotTable` | 63 options, **pauses** | 156 units, 0.71–0.80 s | A băng 1 băng, chấm 2,5 băng dài dưới, cu lê 60 %, đối thủ 56.0° | 428 units, 2.1–2.4 s; direct 1 → kick | ¼ bi lệch phải, trô 60 %, đối thủ không còn đường ăn |
-| `eightSafetyTable` | 63 options, best not *thủ tốt* (đối thủ 0.7°) | 607 units, 3.7–5.1 s (full search) | trọn bi, đứng bi 30 % | — | ⅛ bi lệch phải, trô 90 %, đối thủ bi 9 (23.9°) |
+| `snookerOneRailTable` | 42 options, **pauses** | 83 units, 0.35–0.60 s (checkpoint) | A băng 1 băng, chấm 3,5 băng dài dưới, cu lê 90 %, đối thủ 72.7° | after *Tính tiếp*: 388 units, 2.9–3.6 s; kicks 1–3 | coarse shot kept (nothing strictly better) |
+| `snookerTwoRailTable` | 24 options, best not *thủ tốt* | 53 units, 0.25–0.45 s (**provisional**) | A băng 2 băng, chấm 5,5 băng dài dưới, đứng bi 60 %, đối thủ 39.1° | automatic: 238 units, 1.7–2.8 s | provisional shot kept |
+| `snookerThreeRailTable` | 0 options (no 1–2-rail path) | 81 units, 1.1–2.1 s (end of the full search) | — | 81 units | A băng 3 băng, chấm 2 băng ngắn trái, ½ bi lệch trái, cu lê 60 %, đối thủ 44.5° |
+| `noPotTable` | 63 options, **pauses** | 156 units, 0.71–1.66 s (checkpoint) | A băng 1 băng, chấm 2,5 băng dài dưới, cu lê 60 %, đối thủ 56.0° | after *Tính tiếp*: 428 units, 2.1–4.3 s; direct 1 → kick | ¼ bi lệch phải, trô 60 %, đối thủ không còn đường ăn (replaces) |
+| `eightSafetyTable` | 63 options, best not *thủ tốt* (đối thủ 0.7°) | 150 units, 1.3–2.9 s in the probe (**provisional**) | trọn bi, đứng bi 30 % | automatic: 607 units, 3.7–9.5 s | ⅛ bi lệch phải, trô 90 %, đối thủ bi 9 (23.9°) (replaces) |
+
+(Probe times vary with load; the higher figures were taken while other sessions kept Chrome busy.)
 
 3. `planner_tables.dart`: append the measured result to each fixture's doc comment, after its `Đo trên a35667b …` sentence:
    - `snookerOneRailTable`: `Đo lại với Task 25a–25b (lực 30 · 60 · 90, lượt thô): lượt thô ra đúng cú đó, đối thủ 72.7°, dừng hỏi; tìm tiếp không có cú tốt hơn hẳn.`
@@ -5263,7 +5382,7 @@ Expected: all pass, `No issues found!`. At plan time `safety_job_test.dart` had 
 
 - [ ] **Step 8: The perf test, re-derived (Task 25 rerun)**
 
-**The VM gate.** The gate now applies to the **time to the first shown step**: the coarse pass to its checkpoint, or the whole search when the coarse pass does not pause. With the 12 ms slice, Chrome's wall time ≈ CPU × 16.7 / 12 × 2 (Chrome ≈ 2× the VM) ≈ 2.8 × the VM time, so 5 s in Chrome ≈ 5000 / 2.78 ≈ **1800 ms on the VM**. The full search after *Tính tiếp* is printed, not gated: the owner's sentence already tells the user it takes time.
+**The VM gate.** The gate now applies to the **time to the first shown step**: the end of the coarse pass when it has a shot (checkpoint or provisional), or the end of the whole search when it has none. With the 12 ms slice, Chrome's wall time ≈ CPU × 16.7 / 12 × 2 (Chrome ≈ 2× the VM) ≈ 2.8 × the VM time, so 5 s in Chrome ≈ 5000 / 2.78 ≈ **1800 ms on the VM**. The full search after *Tính tiếp* is printed, not gated: the owner's sentence already tells the user it takes time.
 
 Replace `test/domain/planner/safety_perf_test.dart`:
 
@@ -5297,29 +5416,34 @@ void main() {
     '8 bi thủ': eightSafetyTable(),
   };
 
-  test('tìm cú thủ trên Dart VM: lượt thô tới lúc bước hiện ra gác ≤ $safetyVmBudgetMs ms; '
+  test('tìm cú thủ trên Dart VM: bước hiện ra gác ≤ $safetyVmBudgetMs ms; '
       'in cả lượt đầy đủ', () {
     planToEnd(railTable()); // làm nóng JIT
     final over = <String>[];
     for (final MapEntry(key: name, value: setup) in tables.entries) {
       final job = SafetyJob(contextOf(setup));
       final w = Stopwatch()..start();
-      // Bước hiện ra ở điểm hỏi; lượt thô chưa thủ tốt thì ở cuối lượt đầy đủ.
-      while (!job.isDone && !job.atCheckpoint) {
-        job.step(budget: const Duration(days: 1));
+      // Từng đơn vị việc như PlannerJob: lượt thô xong mà có cú thì bước
+      // hiện ra (điểm hỏi hay cú tạm); không có cú thì ở cuối lượt đầy đủ.
+      while (!job.coarseDone) {
+        job.work();
       }
-      final firstMs = w.elapsedMilliseconds;
-      final firstUnits = job.simulations;
+      final coarseMs = w.elapsedMilliseconds;
+      final coarseUnits = job.simulations;
+      final rough = job.coarseResult;
       final asked = job.atCheckpoint;
       job.resume();
       while (!job.isDone) {
         job.step(budget: const Duration(days: 1));
       }
-      print('$name: bước hiện sau $firstMs ms, $firstUnits lần dò/mô phỏng '
-          '(${asked ? 'dừng hỏi' : 'không hỏi, đã tìm hết'}); '
-          'lượt đầy đủ xong sau ${w.elapsedMilliseconds} ms, ${job.simulations} lần, '
+      final fullMs = w.elapsedMilliseconds;
+      final firstMs = rough == null ? fullMs : coarseMs;
+      print('$name: bước hiện sau $firstMs ms '
+          '(${rough == null ? 'lượt thô không có cú' : asked ? 'dừng hỏi' : 'cú tạm'}; '
+          'lượt thô $coarseUnits lần); lượt đầy đủ xong sau $fullMs ms, ${job.simulations} lần, '
           '${job.coarseOptions.length} + ${job.options.length} phương án, '
-          'thử ${job.triedRailCounts.toList()..sort()} băng');
+          'thử ${job.triedRailCounts.toList()..sort()} băng'
+          '${rough != null && !identical(job.result, rough) ? ', thay cú' : ''}');
       if (firstMs > safetyVmBudgetMs) over.add('$name $firstMs ms');
     }
     expect(over, isEmpty, reason: 'bước thủ hiện ra quá $safetyVmBudgetMs ms: $over');
@@ -5347,13 +5471,13 @@ void main() {
 
 Run it alone, three times: `"$FLUTTER" test --tags perf --run-skipped test/domain/planner/safety_perf_test.dart`. Copy the printed lines.
 
-At plan time (six alone-runs, but other sessions kept Chrome busy; the probe runs of Step 7 are the better reading):
-- `đui A băng`: first step after 500–1260 ms (83 units, pauses); full search 6.0–11.5 s (388 units).
-- `hết đường ăn`: first step after 939–2797 ms (156 units, pauses); full search 2.5–6.0 s (428 units).
-- `8 bi thủ`: first step = full search, 6.8–12.0 s (607 units, no pause). **Fails the 1800 ms gate on every run.**
-- Slices: median 9.5–15.1 ms (gate 18 ms, passed), p95 35–81 ms, longest 102–408 ms.
+At plan time (three alone-runs on the validated code; all passed):
+- `đui A băng`: first step after 458–767 ms (checkpoint, 83 units); full search 4.1–6.8 s (388 units).
+- `hết đường ăn`: first step after 910–1184 ms (checkpoint, 156 units); full search 2.8–3.5 s (428 units), shot replaced.
+- `8 bi thủ`: first step after 765–1234 ms (**provisional**, 150 units); full search 5.7–6.0 s (607 units), shot replaced.
+- Slices: median 9.7–10.0 ms (gate 18 ms), p95 30–48 ms, longest 55–114 ms.
 
-Chrome estimate (× 2.78, probe figures): one-rail ≈ 1.0–1.7 s, no-pot ≈ 2.0–2.2 s, three-rail ≈ 3.0–3.4 s, **two-rail ≈ 4.8–6.1 s** (in neither the gated set nor Task 29's Chrome tables), **8-ball ≈ 10–14 s**. After *Tính tiếp*, in total: one-rail ≈ 9–10 s, no-pot ≈ 5.8–6.7 s.
+Chrome estimate (× 2.78): first shown step one-rail ≈ 1.3–2.1 s, no-pot ≈ 2.5–3.3 s, 8-ball ≈ 2.1–3.4 s (provisional), two-rail ≈ 0.7–1.3 s (provisional, probe), three-rail ≈ 3.0 s on a quiet machine (no coarse shot; up to ≈ 5.8 s under load, probe). The full search after the first shown step, in total: one-rail ≈ 11–19 s, no-pot ≈ 8–10 s, 8-ball ≈ 16–17 s.
 
 - [ ] **Step 9: Log and commit**
 
@@ -5362,9 +5486,10 @@ Append to the build log:
 ```markdown
 ## Safety search speed after the owner's answer (Tasks 25a–25b)
 
-- Owner (2026-10-08): 12 ms slice only while the safety search runs; safety powers 30 · 60 · 90; coarse pass first, pause and ask when it is *thủ tốt* (opponent *bị đui*, no pocket, or easiest cut > `opponentHardAngle`).
+- Owner (2026-10-08): 12 ms slice only while the safety search runs; safety powers 30 · 60 · 90; coarse pass first, pause and ask when it is *thủ tốt* (opponent *bị đui*, no pocket, or easiest cut > `opponentHardAngle`), otherwise show it as a provisional shot and keep searching.
 - VM gate re-derived: first shown step ≤ 1800 ms (5 s ÷ (2 × 16.7 / 12)).
 - Probe (one-shot): <paste the five `lượt thô:` / `đầy đủ:` blocks>.
+- First shown step per fixture (VM and × 2.8 for Chrome), and the full-search time after it: <one line per fixture>.
 - Perf, alone: <paste the three lines of the first test and the slice line, for each run>.
 - Chrome estimate (× 2.8): <one line per fixture>.
 - Over the gate: <fixtures, or "none">.
@@ -5377,29 +5502,25 @@ git commit -m "Run a coarse safety pass first and pause at a checkpoint when it 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 10: STOP for the owner if a fixture still misses the 5 s target**
+- [ ] **Step 10: Report the numbers**
 
-At plan time it does, on two fixtures:
-- **`eightSafetyTable`** shows its first step after 3.7–5.1 s in the probe (6.8–12 s in the loaded perf runs), about **10–14 s in Chrome**, against 5 s. The coarse pass does not help there: its best direct shot leaves the opponent a 0.7° cut, so it is not *thủ tốt* and the full search runs before anything is shown (607 units).
-- **`snookerTwoRailTable`** shows its first step after 1.7–2.2 s in the probe, about **4.8–6.1 s in Chrome**: at or over the target, for the same reason (its coarse best leaves a 39.1° cut). It is not in the perf test's gated set or in Task 29's Chrome tables.
-
-Report to the owner, through the controller: the probe table of Step 7, the perf lines of Step 8, the Chrome estimates, and these facts. **Do not cut the search further, and do not change the *thủ tốt* rule yourself.** Continue with Task 25c only after the owner's answer; Task 29's `SAFETY_MAX_MS` takes whatever the owner decides here.
+The owner already answered the earlier STOP (2026-10-08: provisional shot, decision 5). Report the probe table of Step 7, the perf lines of Step 8 and the Chrome estimates to the controller with the task. If a fixture's first shown step is over 1800 ms on a quiet machine, say so with the numbers; do not cut the search further and do not change the *thủ tốt* rule.
 
 ---
 
-### Task 25c: Ask *"Tính tiếp?"* at the checkpoint, and show *Đang tìm cú thủ…*
+### Task 25c: Ask *"Tính tiếp?"* at the checkpoint, show the provisional shot, and show *Đang tìm cú thủ…*
 
 **Files:**
-- Modify: `lib/core/strings/vi.dart` (`planSearchingSafety`, `planSafetyCheckpoint`, `planSafetyContinue`, `planSafetyKeep`)
+- Modify: `lib/core/strings/vi.dart` (`planSearchingSafety`, `planSafetyCheckpoint`, `planSafetyContinue`, `planSafetyKeep`, `planSafetyProvisional`)
 - Modify: `lib/features/training/presentation/planner/planner_steps_view.dart`
 - Test: `test/core/strings/vi_planner_test.dart`, `test/features/training/planner_steps_view_test.dart`
 
 **Interfaces:**
-- Consumes: `PlannerJob.safetyCheckpoint`, `continueSafety`, `keepSafety`, `searchingSafety`; `StepReady` re-sent with the same index (Task 25b).
+- Consumes: `PlannerJob.safetyCheckpoint`, `provisionalSafety`, `continueSafety`, `keepSafety`, `searchingSafety`; `StepReady` re-sent with the same index (Task 25b).
 - Produces:
-  - `Vi.planSearchingSafety` (moved here from Task 26), `Vi.planSafetyCheckpoint` (the owner's sentence, verbatim), `Vi.planSafetyContinue` = *Tính tiếp*, `Vi.planSafetyKeep` = *Dùng cú này*;
+  - `Vi.planSearchingSafety` (moved here from Task 26), `Vi.planSafetyCheckpoint` (the owner's sentence, verbatim), `Vi.planSafetyContinue` = *Tính tiếp*, `Vi.planSafetyKeep` = *Dùng cú này*, `Vi.planSafetyProvisional` = *"Cú thủ tạm tính — đang tìm cú tốt hơn…"* (wording of this plan, in the owner's words "tạm" / "tìm cú tốt hơn");
   - `PlannerStepsView.continueSafetyKey`, `PlannerStepsView.keepSafetyKey`;
-  - the steps view: *Đang tìm cú thủ…* instead of *Đang tính bước* while the search runs (also after *Tính tiếp*); at the checkpoint, under the safety step's card (only when that step is the one shown), the question and the two buttons; no progress line while asking; *Tính tiếp* resumes and replaces the step if the new shot is strictly better; *Dùng cú này* ends the plan (*Xong bàn*). The step header counts the safety step as the last one (`Bước 1 / 1`) as soon as it is shown.
+  - the steps view: *Đang tìm cú thủ…* instead of *Đang tính bước* while the search runs (also after *Tính tiếp*); at the checkpoint, under the safety step's card (only when that step is the one shown), the question and the two buttons; no progress line while asking; *Tính tiếp* resumes and replaces the step if the new shot is strictly better; *Dùng cú này* ends the plan (*Xong bàn*); while a provisional shot is shown, the progress line reads *"Cú thủ tạm tính — đang tìm cú tốt hơn…"* and goes away when the search ends (the shot changes only if strictly better). The step header counts the safety step as the last one (`Bước 1 / 1`) as soon as it is shown.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -5412,6 +5533,7 @@ Report to the owner, through the controller: the probe table of Step 7, the perf
         'Tính toán cơ bản thì đánh như thế này là thủ tốt, có thể có phương án tối ưu hơn '
         'nhưng sẽ mất thời gian tính toán. Bạn muốn tính tiếp hay không?');
     expect((Vi.planSafetyContinue, Vi.planSafetyKeep), ('Tính tiếp', 'Dùng cú này'));
+    expect(Vi.planSafetyProvisional, 'Cú thủ tạm tính — đang tìm cú tốt hơn…');
   });
 
 ```
@@ -5473,6 +5595,24 @@ Report to the owner, through the controller: the probe table of Step 7, the perf
       expect(shown!.total, lessThan(rough.total));
     });
 
+    testWidgets('lượt thô chưa thủ tốt: hiện cú tạm và dòng đang tìm, không hỏi; xong thì tắt dòng',
+        (tester) async {
+      await open(tester, snookerTwoRailTable());
+      for (var i = 0; i < 2000 && sceneOf(tester).step == null; i++) {
+        await tester.pump();
+      }
+      final first = sceneOf(tester).step!;
+      expect(first.safety, isNotNull);
+      expect(find.text(Vi.planSafetyProvisional), findsOneWidget);
+      expect(find.text(Vi.planSafetyCheckpoint), findsNothing);
+      expect(find.text(Vi.planSearchingSafety), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.planSafetyProvisional), findsNothing);
+      expect(find.text(Vi.planFinish), findsOneWidget);
+      // Đo với Task 25a–25b: bàn này không có cú tốt hơn hẳn, cú tạm ở lại.
+      expect(sceneOf(tester).step!.safety, same(first.safety));
+    });
+
     testWidgets('rời màn ở điểm hỏi hay giữa lúc tìm tiếp: không lỗi', (tester) async {
       await open(tester, noPotTable());
       await tester.pumpAndSettle();
@@ -5514,6 +5654,9 @@ In `vi.dart`, after `static const planRecompute = 'Tính lại từ đây';`:
       'Bạn muốn tính tiếp hay không?';
   static const planSafetyContinue = 'Tính tiếp';
   static const planSafetyKeep = 'Dùng cú này';
+
+  /// Lượt thô chưa ra cú thủ tốt: hiện cú tốt nhất tạm thời, máy tự tìm tiếp.
+  static const planSafetyProvisional = 'Cú thủ tạm tính — đang tìm cú tốt hơn…';
 ```
 
 The owner's sentence had no typo to fix; it is kept word for word.
@@ -5581,9 +5724,11 @@ In `planner_steps_view.dart`:
 ```dart
           if (!_done && !(_job?.safetyCheckpoint ?? false))
             Text(
-                (_job?.searchingSafety ?? false)
-                    ? Vi.planSearchingSafety
-                    : Vi.planComputing(_steps.length + 1, _total),
+                (_job?.provisionalSafety ?? false)
+                    ? Vi.planSafetyProvisional
+                    : (_job?.searchingSafety ?? false)
+                        ? Vi.planSearchingSafety
+                        : Vi.planComputing(_steps.length + 1, _total),
                 style: text.bodyMedium),
           if (step != null && !resetting)
             _LinesCard(
@@ -5616,13 +5761,13 @@ In `planner_steps_view.dart`:
 - [ ] **Step 5: Run the tests and the analyzer**
 
 Run: `"$FLUTTER" test test/core/strings test/features/training && "$FLUTTER" test test/architecture_test.dart && "$FLUTTER" analyze`
-Expected: all pass, `No issues found!`. Three of the new widget tests run the real search on `noPotTable` (1–3 s each).
+Expected: all pass, `No issues found!`. Four of the new widget tests run the real search (`noPotTable`, `snookerTwoRailTable`; 1–3 s each).
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add lib/core/strings/vi.dart lib/features/training/presentation/planner/planner_steps_view.dart test/core/strings/vi_planner_test.dart test/features/training/planner_steps_view_test.dart
-git commit -m "Ask whether to keep searching once the coarse safety pass finds a good safety, and show the search line
+git commit -m "Ask whether to keep searching once the coarse safety pass finds a good safety, show a provisional shot otherwise, and show the search line
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -5837,7 +5982,7 @@ In `vi.dart`, add imports `package:poolcoachai/domain/planner/safety_shot.dart` 
   }
 ```
 
-2. Add after Task 25c's `planSafetyKeep` (Task 25c already added `planSearchingSafety`; do not add it twice):
+2. Add after Task 25c's `planSafetyProvisional` (Task 25c already added `planSearchingSafety`; do not add it twice):
 
 ```dart
   // Cú phòng thủ — docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md.
@@ -6313,7 +6458,7 @@ Chạy ở bước phòng thủ (tầng 4 của §5.3, hoặc khi không có c�
 - **Cú thủ trực tiếp** (mỗi bi hợp lệ nhìn thấy được, bi số nhỏ trước): độ dày trọn bi, ¾, ½, ¼, ⅛ (trừ trọn bi, mỗi mức lệch hai bên) × đứng / cu lê / trô × 3 mức lực 30 · 60 · 90%, **không áp phê** = tối đa 81 phương án mỗi bi; bỏ trước độ dày mà đường bi cái tới bi ảo bị chắn. Chỉ khi không phương án nào của bi đó hợp lệ mới thử thêm áp phê (trái ½, trái 1, phải ½, phải 1 đầu cơ) = tối đa 324 phương án *(sửa 2026-10-08: áp phê là đường lui; cú thủ chỉ 3 mức lực)*.
 - **A băng — luôn thử, kể cả khi không đui** *(sửa 2026-10-08)*: mọi chuỗi băng không lặp băng liền nhau (1 băng 4, 2 băng 12, 3 băng 36, 4 băng 108) vào mọi bi hợp lệ; hướng ban đầu soi gương bi hợp lệ qua chuỗi, bỏ chuỗi bị chắn hoặc chạm băng ở miệng lỗ; mỗi chuỗi: đứng / cu lê × 3 mức lực 30 · 60 · 90% × chạm trọn bi hoặc ½ bi hai bên, không áp phê. Thử 1–3 băng; chỉ khi không còn phương án hợp lệ nào (trực tiếp hay 1–3 băng) mới thử 4 băng. Bị đui thì không có cú trực tiếp, chỉ còn A băng.
 - **Thứ tự cố định:** cú trực tiếp trước (từng bi: không áp phê, rồi áp phê nếu cần), rồi A băng 1–3 băng, rồi 4 băng. Cú trực tiếp và A băng chấm cùng một thang điểm; phạt A băng giữ cú trực tiếp thắng khi gần ngang *(sửa 2026-10-08)*.
-- **Lượt thô trước** *(sửa 2026-10-08: lượt thô)*: trước hết chỉ thử trực tiếp trọn bi và ½ bi hai bên không áp phê, cùng A băng 1–2 băng chạm trọn bi (đủ kiểu đánh, 30 · 60 · 90%). Cú tốt nhất của lượt thô mà thủ tốt (đối thủ bị đui, hết đường ăn, hay góc dễ nhất > 55°) thì hiện bước ngay với cú đó và hỏi: *"Tính toán cơ bản thì đánh như thế này là thủ tốt, có thể có phương án tối ưu hơn nhưng sẽ mất thời gian tính toán. Bạn muốn tính tiếp hay không?"* — *Tính tiếp* chạy đủ các bước tìm bên dưới (không làm lại phần đã tính) và chỉ đổi cú khi điểm tốt hơn hẳn; *Dùng cú này* giữ cú lượt thô. Lượt thô không ra cú hợp lệ, hay ra mà chưa thủ tốt, thì tìm tiếp luôn, không hỏi. Trong lúc tìm cú thủ, mỗi khung hình tính 12 ms thay 4 ms (người dùng đang chờ, không kéo bi).
+- **Lượt thô trước** *(sửa 2026-10-08: lượt thô)*: trước hết chỉ thử trực tiếp trọn bi và ½ bi hai bên không áp phê, cùng A băng 1–2 băng chạm trọn bi (đủ kiểu đánh, 30 · 60 · 90%). Cú tốt nhất của lượt thô mà thủ tốt (đối thủ bị đui, hết đường ăn, hay góc dễ nhất > 55°) thì hiện bước ngay với cú đó và hỏi: *"Tính toán cơ bản thì đánh như thế này là thủ tốt, có thể có phương án tối ưu hơn nhưng sẽ mất thời gian tính toán. Bạn muốn tính tiếp hay không?"* — *Tính tiếp* chạy đủ các bước tìm bên dưới (không làm lại phần đã tính) và chỉ đổi cú khi điểm tốt hơn hẳn; *Dùng cú này* giữ cú lượt thô. Lượt thô ra cú mà chưa thủ tốt thì hiện cú đó **tạm** (*"Cú thủ tạm tính — đang tìm cú tốt hơn…"*), tự tìm tiếp không hỏi, xong thì chỉ đổi cú khi tốt hơn hẳn. Lượt thô không ra cú hợp lệ nào thì chờ *"Đang tìm cú thủ…"* tới khi tìm xong. Trong lúc tìm cú thủ, mỗi khung hình tính 12 ms thay 4 ms (người dùng đang chờ, không kéo bi).
 - **Dò hướng cơ bằng mô phỏng thật** cho bi cái chạm bi hợp lệ đúng độ dày, sau đúng chuỗi băng; không hội tụ thì bỏ phương án.
 - **Luật WPA:** loại phương án nếu bi cái chạm bi khác trước, sai số băng trước va chạm (A băng), sau va chạm không bi nào chạm băng, chết cái, bi hợp lệ rơi lỗ, đường bi hợp lệ hoặc bi cái sau va chạm đi qua bi chắn, hoặc lõi quá giờ.
 - **Chấm điểm** (thấp là tốt), mỗi mức lực (chọn, −15%, +15%, kẹp ≤ 100%): phần đối thủ (đui → 0; không đui → 95 − góc cắt dễ nhất của đối thủ; không lỗ nào → 0) − 5 cho mỗi bi sát băng (cách băng ≤ một bi: bi cái, bi đối thủ phải đánh dễ nhất) − khoảng cách bi cái → bi đó (cm) × 0,01; mức phạm luật tính 95. Lấy mức xấu nhất, cộng phạt kỹ thuật (như §5.3, áp phê cộng dồn) + phạt A băng (1 băng 10, 2 băng 20, 3 băng 45, 4 băng 55) + lực × 0,04. Bằng điểm giữ phương án thử trước.
@@ -6328,7 +6473,7 @@ Chạy ở bước phòng thủ (tầng 4 của §5.3, hoặc khi không có c�
 
 - **Trên bàn**, từ dưới lên: bi khác vẽ mờ; cú dễ nhất của đối thủ mờ màu đỏ (bi cái → bi ảo → lỗ), hoặc đường bị chắn kèm chữ *"Đối thủ bị đui"*; đường bi cái đúng từ mô phỏng (trước va chạm nét đứt trắng qua các băng, chấm vàng ở mỗi lần chạm băng; sau va chạm nét đứt ngọc; vòng trắng chỗ dừng); A băng: vòng vàng đậm ở điểm ngắm trên băng đầu và số chấm ở mép bàn (băng dài 0–8, băng ngắn 0–4); đường bi hợp lệ sau va chạm và chỗ nó dừng; thanh sai số lực.
 - **Bảng thông tin:** *"Bi cái bị đui bi N — đánh A băng để thủ."* hoặc *"Không còn đường ăn bi — nên thủ bi."*; A băng *"A băng K băng: ngắm chấm X băng Y."*; trực tiếp *"Ăn ½ bi, lệch bên trái."* (hoặc *"Ăn trọn bi."*); kiểu đánh, lực; áp phê như màn mô phỏng; kết quả cho đối thủ (*"Đối thủ bị đui."* · *"Cú dễ nhất của đối thủ: bi N vào lỗ X, góc cắt Y°."* · *"Đối thủ không còn đường ăn."*); *"k/7 mức lực vẫn để đối thủ khó."*; cảnh báo lực ≥ 85% hoặc trô.
-- Đang tìm thì hiện *"Đang tìm cú thủ…"*. Lượt thô ra cú thủ tốt thì dưới bảng thông tin hiện câu hỏi của chủ sản phẩm và hai nút *Tính tiếp* · *Dùng cú này* *(sửa 2026-10-08: lượt thô)*. Không tìm được cú thủ hợp lệ thì giữ câu *"… nên chơi an toàn (safety) thay vì cố đánh."*. Bước phòng thủ là bước cuối: nút *Xong bàn*.
+- Đang tìm thì hiện *"Đang tìm cú thủ…"*. Lượt thô ra cú thủ tốt thì dưới bảng thông tin hiện câu hỏi của chủ sản phẩm và hai nút *Tính tiếp* · *Dùng cú này*; ra cú chưa thủ tốt thì hiện cú tạm kèm *"Cú thủ tạm tính — đang tìm cú tốt hơn…"* *(sửa 2026-10-08: lượt thô)*. Không tìm được cú thủ hợp lệ thì giữ câu *"… nên chơi an toàn (safety) thay vì cố đánh."*. Bước phòng thủ là bước cuối: nút *Xong bàn*.
 - Không câu nào khuyên ngắm theo độ; số độ chỉ ở kết quả cho đối thủ.
 ```
 
@@ -6350,7 +6495,7 @@ Expected: at least 8, and 5 (direct options, kicks, order, coarse pass, §6.7 qu
 At the top of `docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md`, under the title, add:
 
 ```markdown
-> **Sửa 2026-10-08 (chủ sản phẩm, trong lúc làm kế hoạch).** Quyết định 4 và mục 3.3: áp phê chỉ là đường lui cho từng bi. Mục 3.2: A băng luôn được thử, cả khi không đui; trực tiếp và A băng thi trong một lần tìm. Sau Task 25: cú thủ chỉ dùng 3 mức lực 30 · 60 · 90 %; lát 12 ms mỗi khung hình chỉ trong lúc tìm cú thủ; lượt thô trước (trực tiếp trọn bi và ½ bi không áp phê, A băng 1–2 băng chạm trọn bi), thủ tốt thì hiện bước và hỏi có tính tiếp không. Mục 6: "vài giây" tính tới lúc bước thủ hiện ra. Mã và PRD_RunOutPlanner.md §5.6 là bản đúng.
+> **Sửa 2026-10-08 (chủ sản phẩm, trong lúc làm kế hoạch).** Quyết định 4 và mục 3.3: áp phê chỉ là đường lui cho từng bi. Mục 3.2: A băng luôn được thử, cả khi không đui; trực tiếp và A băng thi trong một lần tìm. Sau Task 25: cú thủ chỉ dùng 3 mức lực 30 · 60 · 90 %; lát 12 ms mỗi khung hình chỉ trong lúc tìm cú thủ; lượt thô trước (trực tiếp trọn bi và ½ bi không áp phê, A băng 1–2 băng chạm trọn bi), thủ tốt thì hiện bước và hỏi có tính tiếp không, chưa thủ tốt thì hiện cú tạm và tự tìm tiếp. Mục 6: "vài giây" tính tới lúc bước thủ hiện ra. Mã và PRD_RunOutPlanner.md §5.6 là bản đúng.
 ```
 
 
@@ -6378,11 +6523,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - lays out `5-9bi-dui-a-bang` (= `snookerOneRailTable`), `6-9bi-het-duong` (= `noPotTable`) and `7-8bi-thu` (= `eightSafetyTable`);
   - prints each safety table's time from *Lập kế hoạch* to the safety step and the card lines; screenshots go to `%TMP%/pcai-planner` as before;
   - records frames while searching on table 6 (with the same input agitation as table 2) and prints them; they are not gated (owner decision 1 after Task 25 trades smoothness during that wait);
-  - at the checkpoint (Task 25c): checks that tables 5 and 6 ask and table 7 does not (as measured on the VM in Task 25b), screenshots the question, presses *Dùng cú này* on table 5 and *Tính tiếp* on table 6, and prints how long *Tính tiếp* took.
+  - at the checkpoint (Task 25c): checks that tables 5 and 6 ask and table 7 does not (as measured on the VM in Task 25b), screenshots the question, presses *Dùng cú này* on table 5 and *Tính tiếp* on table 6, and prints how long *Tính tiếp* took;
+  - table 7 (provisional, owner decision 5 after Task 25): checks that its first label comes with *"Cú thủ tạm tính — đang tìm cú tốt hơn…"*, screenshots it, waits for the line to go, and prints both times (provisional shot, final shot) and the final label.
   It also fails when:
-  - a safety table's **first shown step** (the checkpoint, or the end of the search) takes more than `SAFETY_MAX_MS` (5000 ms, deviation 20, or what the owner set at Task 25b);
+  - a safety table's **first shown step** (the checkpoint, the provisional shot, or the end of the search when the coarse pass has no shot) takes more than `SAFETY_MAX_MS` (5000 ms, deviation 20);
   - table 5's label lacks *"Bi cái bị đui bi 1 — đánh A băng để thủ."* or *"A băng"*; table 6's lacks *"Không còn đường ăn bi — nên thủ bi."* or an *"Ăn … bi"* line; table 7's opponent sentence names ball 1;
-  - a table asks at the checkpoint when the VM said it would not, or the other way round.
+  - a table asks at the checkpoint when the VM said it would not, or the other way round; table 7 shows no provisional line with its first step.
 
 - [ ] **Step 1: Extend `planner.mjs`**
 
@@ -6390,8 +6536,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ```js
 // Spec cú phòng thủ mục 6: bước thủ ra trong "vài giây" — đọc là ≤ 5 s
-// (độ lệch 20 của kế hoạch), tính tới lúc bước thủ hiện ra (điểm hỏi hay
-// hết lượt tìm); chủ sản phẩm có thể đổi ở bước dừng Task 25b.
+// (độ lệch 20 của kế hoạch), tính tới lúc bước thủ hiện ra (điểm hỏi, cú tạm,
+// hay hết lượt tìm khi lượt thô không có cú).
 const SAFETY_MAX_MS = 5000;
 
 // Bi chắn ở miệng lỗ — đúng jawBlocker của test/support/planner_tables.dart.
@@ -6401,8 +6547,9 @@ const jaw = (ball, [px, py], d = 14) => {
 };
 const NO_POT_BALL = [150, 40];
 
-// Điểm hỏi của cú thủ (chủ sản phẩm chốt 08/10/2026 sau Task 25).
+// Điểm hỏi và cú tạm của cú thủ (chủ sản phẩm chốt 08/10/2026 sau Task 25).
 const CHECKPOINT = 'Bạn muốn tính tiếp hay không?';
+const PROVISIONAL = 'đang tìm cú tốt hơn';
 ```
 
 2. Append three tables to `TABLES`:
@@ -6416,7 +6563,7 @@ const CHECKPOINT = 'Bạn muốn tính tiếp hay không?';
     balls: [NO_POT_BALL, jaw(NO_POT_BALL, [254, 0]), jaw(NO_POT_BALL, [254, 127])],
   },
   {
-    name: '7-8bi-thu', game: '8 bi', group: 'Trơn', cue: [60, 100], safety: true,
+    name: '7-8bi-thu', game: '8 bi', group: 'Trơn', cue: [60, 100], safety: true, provisional: true,
     balls: [
       ['Bi của tôi', NO_POT_BALL], ['Bi đối thủ', jaw(NO_POT_BALL, [254, 0])],
       ['Bi đối thủ', jaw(NO_POT_BALL, [254, 127])], ['Bi 8', [40, 20]],
@@ -6430,7 +6577,7 @@ const CHECKPOINT = 'Bạn muốn tính tiếp hay không?';
 async function waitPlanDone() {
   for (let i = 0; i < 1200; i++) {
     const text = await tab.text();
-    if (!text.includes('Đang tính bước') && !text.includes('Đang tìm cú thủ')) return;
+    if (!text.includes('Đang tính bước') && !text.includes('Đang tìm cú thủ') && !text.includes(PROVISIONAL)) return;
     await sleep(250);
   }
 }
@@ -6449,7 +6596,17 @@ async function waitPlanDone() {
     const first = await waitLabel('Bàn kế hoạch. Bước 1 /', t.safety ? 300000 : 15000);
 ```
 
-and after the existing `if (t.gate) { … }` block add:
+Right after the line that logs `bước 1 sau …` add (the provisional line must be on screen with the first step; read it before `waitPlanDone`):
+
+```js
+    const sawProvisional = (await tab.text()).includes(PROVISIONAL);
+    if (sawProvisional) await tab.shot(path.join(shots, `${t.name}-cu-tam.png`));
+    if (Boolean(t.provisional) !== sawProvisional) {
+      throw new Error(`${t.name}: ${sawProvisional ? 'có' : 'không có'} cú tạm — khác lúc đo trên VM`);
+    }
+```
+
+and right after the next `await waitPlanDone();` add `const doneMs = Date.now() - t0;`. Then, after the existing `if (t.gate) { … }` block add:
 
 ```js
     if (t.gateSafety) {
@@ -6474,10 +6631,14 @@ and after the existing `if (t.gate) { … }` block add:
         continueMs = Date.now() - t2;
         console.log(`  điểm hỏi → ${t.ask}: xong sau ${continueMs} ms`);
       }
+      if (sawProvisional) {
+        const last = await labelStarting('Bàn kế hoạch. Bước 1 /');
+        console.log(`  cú tạm sau ${firstMs} ms, cú cuối sau ${doneMs} ms — ${last === first ? 'giữ cú tạm' : last}`);
+      }
     }
 ```
 
-   and replace `results.push({ table: t.name, firstMs, steps: labels.length });` with `results.push({ table: t.name, firstMs, steps: labels.length, continueMs });`.
+   and replace `results.push({ table: t.name, firstMs, steps: labels.length });` with `results.push({ table: t.name, firstMs, doneMs, steps: labels.length, continueMs });`.
 
 6. Replace the table-4 check and add the safety checks, after `results.push(…)`:
 
@@ -6532,7 +6693,7 @@ Load the secrets from the main checkout's `.claude/settings.local.json` `env` bl
 - tables 5–7 each print one `Bàn kế hoạch. Bước 1 / 1: …` label with the safety sentences and their card lines;
 - no console errors; `simulator.mjs` passes.
 - Tables 5 and 6 stop at the question (screenshot `…-diem-hoi.png`); table 5 keeps the coarse *A băng*, table 6 ends with a direct *"Ăn … bi"* line after *Tính tiếp*.
-- The safety timing gate is expected to fail on table 7 (8-ball: no checkpoint, ≈ 10–14 s estimated in Task 25b) unless the owner changed something at Task 25b's stop. If it fails, report the printed lines; do not optimise.
+- Table 7 shows a provisional shot first (≈ 2–3.5 s estimated in Task 25b), then the final shot (≈ 16–17 s in total); both times are printed. The safety timing gate is on the first shown step and is expected to pass on tables 5–7. If it fails, report the printed lines; do not optimise.
 
 - [ ] **Step 3: The owner's eye check — STOP here.**
 
@@ -6541,6 +6702,7 @@ The controller shows the owner the screenshots of tables 4–7, the printed labe
 - Are the kick penalties (10 / 20 / 45 / 55), `nearRailBonus` and the ±15 % worst case giving the right balance between "simple" and "hard for the opponent"?
 - Tables 6–7: kicks now compete with direct shots (owner decision 2026-10-08) and the direct shot still won. Does the margin `kickRailPenalty` gives a direct shot feel right?
 - The checkpoint (owner decisions after Task 25): on table 6 the coarse pass stopped on a 1-rail kick that leaves a 56.0° cut, just past `opponentHardAngle`, and *Tính tiếp* found a much better direct shot. Is "thủ tốt" drawn at the right place? Is the question's place on screen and the *Tính tiếp* wait acceptable?
+- Table 7: the provisional shot (trọn bi, đứng bi 30 %, opponent 0.7°) shows first and is replaced about 15 s later. Is the wording *"Cú thủ tạm tính — đang tìm cú tốt hơn…"* right, and is that wait acceptable?
 - The opponent's degree number on screen (spec decision 9) and the legend wording.
 
 Do not change any constant or string without the owner's answer.
@@ -6561,6 +6723,7 @@ Append to the build log:
 
 - Safety step times (planner.mjs): <paste the "Thời gian ra bước 1" line for tables 5–7>.
 - Checkpoint: <paste the `điểm hỏi → …` lines for tables 5–6>.
+- Provisional: <paste the `cú tạm sau …` line for table 7>.
 - Frames while searching (table 6): <paste the line>.
 
 ## Cú phòng thủ — owner's eye check
@@ -6606,7 +6769,7 @@ git status --short
 
 Expected:
 - All tests pass. Write the count down.
-- The perf files pass (`aim_perf_test`, `planner_perf_test`, `safety_perf_test`), or `safety_perf_test` fails exactly as the owner accepted at Task 25b's stop (quote the decision from the log).
+- The perf files pass (`aim_perf_test`, `planner_perf_test`, `safety_perf_test`), including `safety_perf_test` (it passed all three alone-runs at plan time; a failure is reported to the owner with the numbers, not hidden).
 - The analyzer prints `No issues found!`.
 - `git status` is clean.
 
@@ -6617,7 +6780,7 @@ Use superpowers:requesting-code-review on `main...feat/run-out-planner`, with bo
 - that slicing cannot change results, in `PlannerJob` and in `SafetyJob` (one new memo entry per unit, the cursor, exact pruning), and that pruning cannot change which stages open (`isLegalOption`, `_scan`);
 - the safety rules and score against spec §3.5 and §4, with the owner's numbers;
 - the owner decisions of 2026-10-08: *áp phê* only after a ball's no-spin options found nothing legal; kicks always tried after the direct stages; the 4-rail fallback only after direct and 1–3 rails found nothing;
-- the owner decisions after Task 25: `safetyPowers` everywhere in the safety search and nowhere else; `safetySliceBudget` only while the safety search runs (`PlannerJob.defaultBudget`, `SafetyJob.step`); the coarse pass is a subset of the full option objects and shares the memo by identity; the checkpoint opens only on `isGoodSafety`; the full pass after *Tính tiếp* equals a one-shot full search, and the shot is replaced only when strictly better (`StepReady` re-sent with the same index); *Dùng cú này* ends the plan; the view rebuilds when `searchingSafety` flips;
+- the owner decisions after Task 25: `safetyPowers` everywhere in the safety search and nowhere else; `safetySliceBudget` only while the safety search runs (`PlannerJob.defaultBudget`, `SafetyJob.step`); the coarse pass is a subset of the full option objects and shares the memo by identity; the checkpoint opens only on `isGoodSafety`; the full pass after *Tính tiếp* equals a one-shot full search, and the shot is replaced only when strictly better (`StepReady` re-sent with the same index); *Dùng cú này* ends the plan; a coarse shot that is not *thủ tốt* is reported at once as provisional (`provisionalSafety`) and replaced only when strictly better, and nothing is shown early when the coarse pass has no shot; the view rebuilds when `searchingSafety` flips;
 - every Review Focus item of both plans;
 - no degree aim instruction on any screen (the opponent's cut angle is the only degree number added);
 - every visible string in `Vi`, and the owner's terms used exactly (*bị đui*, *A băng*, *chấm*, rail names, *"Ăn ½ bi, lệch bên trái"*);
@@ -6672,7 +6835,7 @@ The same sequence as the physics feature (memory: poolcoachai-deploy). Do not de
    | §9.3 Chrome and owner | 29 |
    | Owner decision: 4 ms slice | 16 |
    | Owner decisions 2026-10-08: áp phê fallback, kicks always, deviations 5 and 9 confirmed | 19, 21, 22, 23, 25, 28 |
-   | Owner decisions 2026-10-08 after Task 25: 12 ms safety slice, powers 30 · 60 · 90, coarse pass and checkpoint | 25a, 25b, 25c, 28, 29 |
+   | Owner decisions 2026-10-08 after Task 25: 12 ms safety slice, powers 30 · 60 · 90, coarse pass and checkpoint, provisional shot | 25a, 25b, 25c, 28, 29 |
    | Run-out Task 15 moved to the end | 30 |
 
    Gaps the spec leaves open are the Deviations. Deviations 5, 9 and 13 were answered by the owner on 2026-10-08; the rest carry their owner question in Task 25 or Task 29.
@@ -6685,7 +6848,7 @@ The same sequence as the physics feature (memory: poolcoachai-deploy). Do not de
    - `SafetyFoul` values; `safetyFoulOf(t, {rails, obstacles, table})`; `SafetyLevel`, `levelOf(c, o, t)`; `evaluateOption(c, index, o, lookup, {bound})`; `isLegalOption(c, index, o, lookup)`; `beats`; `safetyToleranceOf(c, o, key, trace)`; `buildSafetyShot(c, e, trace)`.
    - `SafetyTier { direct, directSpin, kick, kickFallback }`, `SafetyStage = ({tier, ballNum})`; `SafetyJob(context, {physics, prune, maxOptions})` with `work`, `step({budget, maxSimulations})`, `cancel`, `isDone`, `isCancelled`, `result`, `simulations`, `triedRailCounts`, `stages`, `openedStages`, `options`; `searchToEnd(c, {physics})`; `directOptions(c, target, spins)`, `kickOptions(c, {fromRails, toRails})`; constant `safetySideSpins` (no `safetySpins`).
    - `PlanStep.safety({cbFrom, ballNum, safety})`; `PlannerJob(setup, {aim, safety})`, `searchingSafety`; `planToEnd(setup, {aim, safety})`; `PlannerStepsView(safety:)`.
-   - Since Tasks 25a–25c: `safetySliceBudget`, `safetyPowers`, `coarseThicknesses`, `coarseKickThicknesses`, `coarseKickRails`; `isCoarseOption`, `isGoodSafety`; `SafetyJob(…, {coarse})` with `atCheckpoint`, `coarseResult`, `coarseOptions`, `bestIndex`, `resume()`; `PlannerJob.defaultBudget`, `safetyCheckpoint`, `continueSafety()`, `keepSafety()`, `step({Duration? budget, …})`; `planToEnd(…, {continueSafety})`; `Vi.planSearchingSafety`, `Vi.planSafetyCheckpoint`, `Vi.planSafetyContinue`, `Vi.planSafetyKeep`; `PlannerStepsView.continueSafetyKey`, `keepSafetyKey`.
+   - Since Tasks 25a–25c: `safetySliceBudget`, `safetyPowers`, `coarseThicknesses`, `coarseKickThicknesses`, `coarseKickRails`; `isCoarseOption`, `isGoodSafety`; `SafetyJob(…, {coarse})` with `atCheckpoint`, `coarseDone`, `coarseResult`, `coarseOptions`, `bestIndex`, `resume()`; `PlannerJob.defaultBudget`, `safetyCheckpoint`, `provisionalSafety`, `continueSafety()`, `keepSafety()`, `step({Duration? budget, …})`; `planToEnd(…, {continueSafety})`; `Vi.planSearchingSafety`, `Vi.planSafetyCheckpoint`, `Vi.planSafetyContinue`, `Vi.planSafetyKeep`, `Vi.planSafetyProvisional`; `PlannerStepsView.continueSafetyKey`, `keepSafetyKey`.
    - `SimTimeoutState`, `simTimeoutLine`, `SimulatorPanel.waitKey/aimOnlyKey`, `Vi.simSummary(…, notice:)`; `squirtLineFor(spin, aimOffsetDeg, distance, table, stroke, power)`.
    - Fixtures `snookerOneRailTable`, `snookerTwoRailTable`, `snookerThreeRailTable`, `partlyVisibleTable`, `noPotTable`, `eightSafetyTable`, `jawBlocker`, `noSafetyPhysics`, `safetyFingerprint`.
 4. **Review Focus.** Each of the six items has its named test in its owning task: 18; 24 and 27; 19 and 22; 21; 21; 25b and 25c.
