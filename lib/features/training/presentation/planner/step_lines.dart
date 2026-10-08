@@ -9,17 +9,39 @@ import 'package:poolcoachai/features/training/presentation/simulator/info_lines.
 ///
 /// Hàm thuần, tách khỏi widget để test thẳng. Mọi số lấy từ [step]; dòng
 /// áp phê dùng chung [squirtLine] của màn mô phỏng. Không dòng nào nói độ
-/// lệch ngắm: `aimOffsetDeg` chỉ dùng bên trong. Bước dự phòng không có
+/// lệch ngắm: `aimOffsetDeg` chỉ dùng bên trong. Bước phòng thủ có cú thủ
+/// thì nói cú thủ (spec cú phòng thủ 5.2); không có thì giữ câu cũ. Bước dự phòng không có
 /// điểm, sai số lực hay lời khuyên trượt (spec mục 5.5), nên chỉ có dòng
 /// "không có vị trí tốt".
 List<String> planStepLines(PlanStep step,
     {required int index, required int total, TableSpec table = TableSpec.nineFoot}) {
   final header = Vi.planStepHeader(index + 1, total);
   if (step.kind == PlanStepKind.safety) {
+    final s = step.safety;
+    if (s == null) {
+      return [
+        header,
+        if (step.ballNum case final n?) Vi.planBallLine(n),
+        Vi.planSafety(step.ballNum),
+      ];
+    }
+    // Cú thủ (spec cú phòng thủ 5.2): không câu nào khuyên ngắm theo độ;
+    // số độ chỉ ở kết quả cho đối thủ. % BHE đọc từ cú thủ, không tính lại.
     return [
       header,
-      if (step.ballNum case final n?) Vi.planBallLine(n),
-      Vi.planSafety(step.ballNum),
+      Vi.safetyHeadline(s),
+      Vi.planBallLine(s.ballNum),
+      Vi.safetyAimLine(s),
+      Vi.simStrokeLine(s.stroke),
+      Vi.simPowerLine(s.power),
+      if (!s.spin.isNone) ...[
+        Vi.simSpinLine(s.spin),
+        squirtLineFor(s.spin, s.aimed.aimOffsetDeg, s.contactDistance, table,
+            bhePercent: s.sawsBhePercent),
+      ],
+      Vi.safetyOpponent(s.opponent),
+      Vi.safetyTolerance(s.tolerance, toleranceSamples),
+      if (s.power >= riskPower || s.stroke == Stroke.draw) Vi.planRiskWarning,
     ];
   }
   final g = step.geometry!;

@@ -3,10 +3,13 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/cushion.dart';
 
 import '../../support/table_layouts.dart';
 
@@ -87,5 +90,41 @@ void main() {
     expect(Vi.planSummary(null, index: 0, total: 9), 'Bàn kế hoạch. Đang tính bước 1/9…');
     expect(Vi.planSetupSummary(hasCue: false, balls: 0), 'Bàn bày bi. Chưa đặt bi cái.');
     expect(Vi.planSetupSummary(hasCue: true, balls: 3), 'Bàn bày bi. Đã đặt bi cái, 3 bi mục tiêu.');
+  });
+
+  group('cú phòng thủ (spec cú phòng thủ mục 5.2, thuật ngữ)', () {
+    test('câu đầu: bị đui hay hết đường ăn', () {
+      expect(Vi.safetySnookered(3), 'Bi cái bị đui bi 3 — đánh A băng để thủ.');
+      expect(Vi.safetyNoPot, 'Không còn đường ăn bi — nên thủ bi.');
+      expect(Vi.planSearchingSafety, 'Đang tìm cú thủ…');
+    });
+
+    test('A băng: số băng, chấm (dấu phẩy thập phân), tên băng theo hướng nhìn trên màn', () {
+      expect(Vi.safetyKick(2, const RailAim(rail: Rail.top, diamond: 2.5, at: Vec2(80, 3))),
+          'A băng 2 băng: ngắm chấm 2,5 băng dài trên.');
+      expect(Vi.safetyKick(1, const RailAim(rail: Rail.right, diamond: 3, at: Vec2(251, 95))),
+          'A băng 1 băng: ngắm chấm 3 băng ngắn phải.');
+      expect(Rail.values.map(Vi.safetyRail),
+          ['băng ngắn trái', 'băng ngắn phải', 'băng dài trên', 'băng dài dưới']);
+    });
+
+    test('độ dày: trọn bi, hoặc phân số kèm bên lệch', () {
+      expect(Vi.safetyThickness(1, ThicknessSide.full), 'Ăn trọn bi.');
+      expect(Vi.safetyThickness(0.5, ThicknessSide.left), 'Ăn ½ bi, lệch bên trái.');
+      expect(Vi.safetyThickness(0.75, ThicknessSide.right), 'Ăn ¾ bi, lệch bên phải.');
+      expect(Vi.safetyThickness(0.25, ThicknessSide.left), 'Ăn ¼ bi, lệch bên trái.');
+      expect(Vi.safetyThickness(0.125, ThicknessSide.right), 'Ăn ⅛ bi, lệch bên phải.');
+    });
+
+    test('kết quả cho đối thủ: đui, cú dễ nhất có số độ, hoặc hết đường ăn', () {
+      const ball = PlacedBall(number: 4, pos: Vec2(127, 100));
+      expect(Vi.safetyOpponent(const OpponentView(snookered: true, ball: ball)), 'Đối thủ bị đui.');
+      expect(Vi.safetyOpponent(const OpponentView(snookered: false, ball: ball)),
+          'Đối thủ không còn đường ăn.');
+      final g = bestPocket(cue: const Vec2(127, 63.5), object: ball.pos)!;
+      expect(Vi.safetyOpponent(OpponentView(snookered: false, ball: ball, easiest: g)),
+          'Cú dễ nhất của đối thủ: bi 4 vào lỗ ${Vi.simPocket(g.pocket)}, góc cắt ${g.angle.round()}°.');
+      expect(Vi.safetyTolerance(5, 7), '5/7 mức lực vẫn để đối thủ khó.');
+    });
   });
 }

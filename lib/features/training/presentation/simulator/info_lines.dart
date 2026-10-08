@@ -123,18 +123,23 @@ String squirtLine(
     TableSpec table,
     Stroke stroke,
     double power) {
-  final deg = squirtAngle(sideOffsetOf(spin), table.radius) * 180 / math.pi;
   final distance = geometry.cue.distanceTo(geometry.ghost);
-  final units = aimed == null
+  return squirtLineFor(spin, aimed?.aimOffsetDeg, distance, table,
+      bhePercent: sawsBhePercent(distance: distance, power: power, stroke: stroke));
+}
+
+/// Cùng dòng áp phê ở quãng [distance] (bi cái → bi ảo hình học, cm). % BHE
+/// do người gọi đưa vào: cú thủ đọc đúng số lõi đã tính (một nguồn, spec
+/// 3.7) thay vì tính lại ở đây. SAWS chỉ đi kèm khi có lượng dịch điểm ngắm
+/// để bù: cùng điều kiện với phần ngoặc, nên không có vết hay lệch bằng 0
+/// thì không gợi ý. Số độ của lệch ngắm không bao giờ nói ra.
+String squirtLineFor(SideSpin spin, double? aimOffsetDeg, double distance, TableSpec table,
+    {required int? bhePercent}) {
+  final deg = squirtAngle(sideOffsetOf(spin), table.radius) * 180 / math.pi;
+  final units = aimOffsetDeg == null
       ? null
       : aimShiftUnits(
-          distance * math.tan(aimed.aimOffsetDeg.abs() * math.pi / 180),
-          table.ballDiameter);
-  // SAWS chỉ đi kèm khi có lượng dịch điểm ngắm để bù: cùng điều kiện với
-  // phần ngoặc, nên không có vết hay lệch bằng 0 thì không gợi ý.
-  final bhe = units == null
-      ? null
-      : sawsBhePercent(distance: distance, power: power, stroke: stroke);
-  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator, bhe,
-      units?.ballCount);
+          distance * math.tan(aimOffsetDeg.abs() * math.pi / 180), table.ballDiameter);
+  return Vi.simSquirt(
+      deg, units?.tips, units?.ballDenominator, units == null ? null : bhePercent, units?.ballCount);
 }
