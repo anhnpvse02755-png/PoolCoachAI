@@ -576,12 +576,18 @@ void main() {
     });
 
     test('cú dễ nhất của đối thủ vẽ mờ màu đỏ; đối thủ đui thì ghi chữ', () {
+      var reds = 0;
       for (final step in [kick, direct]) {
         final red = draw(step).lines.where((p) =>
             p.color.toARGB32() & 0xFFFFFF == AppColors.danger.toARGB32() & 0xFFFFFF &&
             p.color.a < 1);
-        if (step.safety!.opponent.easiest != null) expect(red, isNotEmpty);
+        if (step.safety!.opponent.easiest != null) {
+          expect(red, isNotEmpty);
+          reds += red.length;
+        }
       }
+      // Phải có ít nhất một bước thật sự cho nét đỏ, không để test qua suông.
+      expect(reds, greaterThan(0));
       final op = snookered.safety!.opponent;
       expect(op.snookered, isTrue);
       expect(op.ball, isNotNull);
@@ -596,10 +602,17 @@ void main() {
       bool isRed(Paint p) =>
           p.color.toARGB32() & 0xFFFFFF == AppColors.danger.toARGB32() & 0xFFFFFF &&
           p.color.a < 1;
+      var checked = 0;
       for (final step in [kick, direct, snookered]) {
         final order = draw(step).order;
         final firstRed = order.indexWhere(isRed);
+        // Bước có cú dễ nhất hay đối thủ đui đều phải có nét đỏ.
+        final op = step.safety!.opponent;
+        if (op.easiest != null || (op.snookered && op.ball != null)) {
+          expect(firstRed, greaterThanOrEqualTo(0));
+        }
         if (firstRed < 0) continue;
+        checked++;
         final lastCue = order.lastIndexWhere((p) => p.color == AppColors.cuePath);
         final lastGrey = order.lastIndexWhere((p) => p.color == AppColors.textSecondary);
         expect(lastCue, lessThan(firstRed));
@@ -609,6 +622,8 @@ void main() {
             p.color.toARGB32() == AppColors.railHit.withValues(alpha: 0.8).toARGB32());
         if (jitter >= 0) expect(jitter, greaterThan(order.lastIndexWhere(isRed)));
       }
+      // Cú dễ nhất (kick) và đường đỏ nét đứt của đối thủ đui đều được kiểm.
+      expect(checked, greaterThanOrEqualTo(2));
     });
 
     test('painter vẽ được bước phòng thủ không có cú thủ', () {
