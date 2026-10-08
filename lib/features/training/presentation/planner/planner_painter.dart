@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
@@ -51,6 +55,11 @@ class PlannerPainter extends CustomPainter {
   static const _missDot = 1.4; // cm
   static const _jitterWidth = 1.2; // cm
   static const _jitterEnd = 0.8; // cm
+  static const _opponentAlpha = 0.45;
+
+  /// Bán kính vòng vàng A băng, tính theo bán kính bi.
+  static const railAimRing = 1.4;
+  static const _railAimWidth = 3.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -84,6 +93,7 @@ class PlannerPainter extends CustomPainter {
     final preview = scene.preview;
     if (preview != null) _shot(canvas, layout, preview, alpha: _previewAlpha, full: false);
     if (step != null) _shot(canvas, layout, step, alpha: 1, full: true);
+    if (step?.safety case final shot?) _safety(canvas, layout, shot);
 
     for (final b in scene.balls) {
       drawPoolBall(canvas, layout.toCanvas(b.pos), r, b.number);
@@ -167,22 +177,9 @@ class PlannerPainter extends CustomPainter {
       );
     }
 
-    // 4. Thanh sai số lực: nối điểm dừng ±15 % qua điểm dừng chuẩn. Bước dự
-    // phòng không có sai số lực (jitterEnds null) nên không có thanh.
-    final ends = step.jitterEnds;
-    if (ends != null) {
-      final bar = Paint()
-        ..color = AppColors.railHit.withValues(alpha: 0.8)
-        ..strokeWidth = _jitterWidth * s
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke;
-      for (final end in [ends.minus, ends.plus]) {
-        if (end == null) continue;
-        canvas.drawLine(layout.toCanvas(trace.cueEnd), layout.toCanvas(end), bar);
-        canvas.drawCircle(
-            layout.toCanvas(end), _jitterEnd * s, Paint()..color = AppColors.railHit);
-      }
-    }
+    // 4. Thanh sai số lực. Bước dự phòng không có sai số lực (jitterEnds
+    // null) nên không có thanh.
+    _jitterBar(canvas, layout, trace.cueEnd, step.jitterEnds);
 
     // 5. Hai điểm "nếu trượt", chấm đặc là hướng được khuyên.
     final miss = step.missAdvice;
@@ -198,6 +195,133 @@ class PlannerPainter extends CustomPainter {
         );
       }
     }
+  }
+
+  /// Thanh sai số lực: nối điểm dừng ±15 % qua điểm dừng chuẩn.
+  void _jitterBar(Canvas canvas, TableLayout layout, Vec2 from, JitterEnds? ends) {
+    if (ends == null) return;
+    final s = layout.scale;
+    final bar = Paint()
+      ..color = AppColors.railHit.withValues(alpha: 0.8)
+      ..strokeWidth = _jitterWidth * s
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (final end in [ends.minus, ends.plus]) {
+      if (end == null) continue;
+      canvas.drawLine(layout.toCanvas(from), layout.toCanvas(end), bar);
+      canvas.drawCircle(layout.toCanvas(end), _jitterEnd * s, Paint()..color = AppColors.railHit);
+    }
+  }
+
+  /// Cú thủ (spec cú phòng thủ 5.1), từ dưới lên. Mọi đường là chuỗi điểm của
+  /// mô phỏng. Thứ tự lớp theo spec: đường đỏ của đối thủ nằm trên đường của
+  /// mình để không bị che.
+  void _safety(Canvas canvas, TableLayout layout, SafetyShot shot) {
+    final s = layout.scale;
+    final r = layout.table.radius * s;
+    final trace = shot.aimed.trace;
+    List<Offset> px(List<Vec2> pts) => [for (final p in pts) layout.toCanvas(p)];
+
+    // 2. Bi cái đúng từ mô phỏng.
+    drawDashedPolyline(
+        canvas, px(trace.cueBefore), Paint()..color = AppColors.aimLine..strokeWidth = 1.5, s);
+    drawDashedPolyline(
+        canvas, px(trace.cueAfter), Paint()..color = AppColors.cuePath..strokeWidth = 2, s);
+    for (final hit in trace.rails) {
+      if (hit.ball != ShotBall.cue) continue;
+      canvas.drawCircle(layout.toCanvas(hit.pos), _railDot * s, Paint()..color = AppColors.railHit);
+    }
+    if (trace.cuePocket == null) {
+      drawDashedCircle(
+          canvas,
+          layout.toCanvas(trace.cueEnd),
+          r,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = AppColors.ballCue);
+    }
+
+    // 3. A băng: vòng vàng đậm ở điểm ngắm trên băng đầu, số chấm ở mép bàn.
+    // Dựa vào railAim, không dựa vào lý do thủ: bàn không đui cũng có thể A băng.
+    final aim = shot.railAim;
+    if (aim != null) {
+      canvas.drawCircle(
+          layout.toCanvas(aim.at),
+          railAimRing * r,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = _railAimWidth
+            ..color = AppColors.railHit);
+      _diamondNumbers(canvas, layout);
+    }
+
+    // 4. Bi hợp lệ sau va chạm và chỗ nó dừng.
+    drawPolyline(canvas, px(trace.objectPath),
+        Paint()..color = AppColors.textSecondary..strokeWidth = 1.5);
+    if (trace.objectPath.isNotEmpty) {
+      drawDashedCircle(
+          canvas,
+          layout.toCanvas(trace.objectPath.last),
+          r,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = AppColors.textSecondary);
+    }
+
+    // 5. Cú dễ nhất của đối thủ, mờ đỏ, trên các đường của mình.
+    final opp = Paint()
+      ..color = AppColors.danger.withValues(alpha: _opponentAlpha)
+      ..strokeWidth = 1.5;
+    final view = shot.opponent;
+    final easiest = view.easiest;
+    if (easiest != null) {
+      canvas.drawLine(layout.toCanvas(easiest.cue), layout.toCanvas(easiest.ghost), opp);
+      canvas.drawLine(layout.toCanvas(easiest.object),
+          layout.toCanvas(layout.table.pocketPosition(easiest.pocket)), opp);
+    } else if (view.snookered) {
+      final ball = view.ball;
+      if (ball != null) {
+        drawDashedPolyline(
+            canvas, [layout.toCanvas(trace.cueEnd), layout.toCanvas(ball.pos)], opp, s);
+        _label(canvas, layout.toCanvas(trace.cueEnd) + Offset(0, -2.4 * r),
+            Vi.safetyOpponentSnookered, r, AppColors.danger);
+      }
+    }
+
+    // 6. Thanh sai số lực.
+    _jitterBar(canvas, layout, trace.cueEnd, shot.jitterEnds);
+  }
+
+  /// Số chấm trên khung bàn: băng dài 0–8 từ góc trái, băng ngắn 0–4 từ góc trên.
+  void _diamondNumbers(Canvas canvas, TableLayout layout) {
+    final t = layout.table;
+    const f = TableLayout.frame;
+    final size = math.max(8.0, f * 0.55 * layout.scale);
+    void put(int n, Vec2 at) =>
+        _label(canvas, layout.toCanvas(at), '$n', size / 0.8, AppColors.textPrimary);
+    for (var i = 0; i <= longRailDiamonds; i++) {
+      final x = t.length * i / longRailDiamonds;
+      put(i, Vec2(x, -f / 2));
+      put(i, Vec2(x, t.width + f / 2));
+    }
+    for (var j = 0; j <= shortRailDiamonds; j++) {
+      final y = t.width * j / shortRailDiamonds;
+      put(j, Vec2(-f / 2, y));
+      put(j, Vec2(t.length + f / 2, y));
+    }
+  }
+
+  /// Chữ căn giữa tại [center], cỡ theo bán kính [radius] px như số trên bi.
+  void _label(Canvas canvas, Offset center, String text, double radius, Color color) {
+    final tp = TextPainter(
+      text: TextSpan(
+          text: text,
+          style: TextStyle(color: color, fontSize: radius * 0.8, fontWeight: FontWeight.w600)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
   @override

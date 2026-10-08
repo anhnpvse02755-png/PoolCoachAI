@@ -211,7 +211,11 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
     final step = _steps[_view];
     // Bi của bước đang xem và 2 bước kế tiếp vẽ rõ; các bi khác còn trên bàn
     // vẽ mờ (PRD §6.3).
-    final shown = {for (final s in _steps.skip(_view).take(3)) ?s.ballNum};
+    final shown = {
+      for (final s in _steps.skip(_view).take(3)) ?s.ballNum,
+      // 8 bi: bước phòng thủ không gắn số bi, bi được chạm nằm trong cú thủ.
+      ?step.safety?.ballNum,
+    };
     return PlannerScene(
       cue: step.cbFrom,
       balls: [for (final n in shown) _ball(n)],
@@ -290,7 +294,10 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
       tableBuilder: (layout) => Semantics(
         label: resetting
             ? Vi.planResetSummary
-            : Vi.planSummary(step, index: step == null ? _steps.length : _view, total: _total),
+            : Vi.planSummary(step,
+                index: step == null ? _steps.length : _view,
+                total: _total,
+                searchingSafety: _job?.searchingSafety ?? false),
         child: GestureDetector(
           key: PlannerStepsView.tableKey,
           dragStartBehavior: DragStartBehavior.down,
@@ -305,7 +312,11 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Chú giải các lớp ngay dưới bàn (spec mục 7.1).
-          for (final line in Vi.planLegend) Text(line, style: text.bodySmall),
+          for (final line in [
+            ...Vi.planLegend,
+            if (step?.safety != null) ...Vi.planSafetyLegend,
+          ])
+            Text(line, style: text.bodySmall),
           const SizedBox(height: 12),
           if (!_done && !(_job?.safetyCheckpoint ?? false))
             Text(

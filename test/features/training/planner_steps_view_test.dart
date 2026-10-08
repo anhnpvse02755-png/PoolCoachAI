@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -8,6 +10,7 @@ import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/planner_job.dart';
 import 'package:poolcoachai/domain/planner/safety_aim.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
@@ -28,8 +31,24 @@ class _SpyCanvas implements Canvas {
   /// Tâm mỗi hình tròn kèm độ mờ của lớp bọc nó (1 khi không có lớp).
   final circles = <(Offset, double)>[];
 
+  /// Bán kính mọi hình tròn, theo thứ tự vẽ — để thấy vòng vàng 1,4 bán kính bi.
+  final radii = <double>[];
+
+  /// Paint của mọi nét/đường/hình tròn theo thứ tự vẽ, để kiểm thứ tự lớp.
+  final order = <Paint>[];
+  var paragraphs = 0;
+
   @override
-  void drawLine(Offset p1, Offset p2, Paint paint) => lines.add(paint);
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) => paragraphs++;
+
+  @override
+  void drawPath(Path path, Paint paint) => order.add(paint);
+
+  @override
+  void drawLine(Offset p1, Offset p2, Paint paint) {
+    lines.add(paint);
+    order.add(paint);
+  }
 
   @override
   void saveLayer(Rect? bounds, Paint paint) => _layers.add(paint.color.a);
@@ -41,8 +60,11 @@ class _SpyCanvas implements Canvas {
   void restore() => _layers.removeLast();
 
   @override
-  void drawCircle(Offset c, double radius, Paint paint) =>
-      circles.add((c, _layers.fold(1.0, (a, b) => a * b)));
+  void drawCircle(Offset c, double radius, Paint paint) {
+    circles.add((c, _layers.fold(1.0, (a, b) => a * b)));
+    radii.add(radius);
+    order.add(paint);
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -480,5 +502,122 @@ void main() {
     const b = PlannerScene(cue: Vec2(20, 10));
     expect(PlannerPainter(b).shouldRepaint(PlannerPainter(a)), isTrue);
     expect(PlannerPainter(a).shouldRepaint(PlannerPainter(a)), isFalse);
+  });
+
+  group('bước phòng thủ có cú thủ (spec cú phòng thủ 5.1)', () {
+    late PlanStep kick;
+    late PlanStep direct;
+    late PlanStep snookered;
+
+    setUpAll(() {
+      // planToEnd bấm "Tính tiếp" ở điểm hỏi; bàn 1 băng giữ cú lượt thô.
+      kick = planToEnd(snookerOneRailTable()).single;
+      // A băng nay cũng được xét ở bàn hết đường ăn (chủ sản phẩm chốt
+      // 08/10/2026), nhưng cú trực tiếp vẫn thắng — test 7 của
+      // safety_spec_test giữ điều đó, nên bước này không có điểm ngắm băng.
+      direct = planToEnd(noPotTable()).single;
+      // Không bàn mẫu nào của lõi chọn cú thủ để đối thủ bị đui (đo lại sau
+      // Task 25: bàn 3 băng còn 44,5°), nên dựng cú thủ có đối thủ bị đui từ
+      // cú A băng thật — painter chỉ vẽ lại những gì SafetyShot nói.
+      final k = kick.safety!;
+      snookered = PlanStep.safety(
+        cbFrom: kick.cbFrom,
+        ballNum: kick.ballNum,
+        safety: SafetyShot(
+          reason: k.reason,
+          kind: k.kind,
+          rails: k.rails,
+          ballNum: k.ballNum,
+          thickness: k.thickness,
+          side: k.side,
+          stroke: k.stroke,
+          spin: k.spin,
+          power: k.power,
+          aimed: k.aimed,
+          railAim: k.railAim,
+          opponent: OpponentView(snookered: true, ball: k.opponent.ball),
+          jitterEnds: k.jitterEnds,
+          tolerance: k.tolerance,
+          sawsBhePercent: k.sawsBhePercent,
+          contactDistance: k.contactDistance,
+          total: k.total,
+        ),
+      );
+    });
+
+    const size = Size(540, 286);
+    const layout = TableLayout(size: size);
+
+    _SpyCanvas draw(PlanStep s) {
+      final canvas = _SpyCanvas();
+      PlannerPainter(PlannerScene(cue: s.cbFrom, step: s)).paint(canvas, size);
+      return canvas;
+    }
+
+    test('A băng: vòng vàng 1,4 bán kính bi ở điểm ngắm trên băng, số chấm ở mép bàn', () {
+      final withKick = draw(kick);
+      final withDirect = draw(direct);
+      final at = layout.toCanvas(kick.safety!.railAim!.at);
+      final r = layout.table.radius * layout.scale;
+      final ring = [
+        for (var i = 0; i < withKick.circles.length; i++)
+          if ((withKick.circles[i].$1 - at).distance < 1e-6 &&
+              (withKick.radii[i] - PlannerPainter.railAimRing * r).abs() < 1e-6)
+            i
+      ];
+      expect(PlannerPainter.railAimRing, 1.4);
+      expect(ring, isNotEmpty);
+      expect(withDirect.radii.where((x) => (x - 1.4 * r).abs() < 1e-6), isEmpty);
+      // Chữ "Đối thủ bị đui" cũng là một đoạn chữ: trừ ra trước khi đếm số chấm.
+      int label(PlanStep s) => s.safety!.opponent.snookered && s.safety!.opponent.ball != null ? 1 : 0;
+      // 9 + 9 số trên hai băng dài, 5 + 5 trên hai băng ngắn.
+      expect((withKick.paragraphs - label(kick)) - (withDirect.paragraphs - label(direct)),
+          2 * (longRailDiamonds + 1) + 2 * (shortRailDiamonds + 1));
+    });
+
+    test('cú dễ nhất của đối thủ vẽ mờ màu đỏ; đối thủ đui thì ghi chữ', () {
+      for (final step in [kick, direct]) {
+        final red = draw(step).lines.where((p) =>
+            p.color.toARGB32() & 0xFFFFFF == AppColors.danger.toARGB32() & 0xFFFFFF &&
+            p.color.a < 1);
+        if (step.safety!.opponent.easiest != null) expect(red, isNotEmpty);
+      }
+      final op = snookered.safety!.opponent;
+      expect(op.snookered, isTrue);
+      expect(op.ball, isNotNull);
+      // Đoạn chữ duy nhất ngoài số chấm là "Đối thủ bị đui".
+      final diamonds = snookered.safety!.railAim == null
+          ? 0
+          : 2 * (longRailDiamonds + 1) + 2 * (shortRailDiamonds + 1);
+      expect(draw(snookered).paragraphs, 1 + diamonds);
+    });
+
+    test('thứ tự lớp theo spec 5.1: đường đỏ của đối thủ nằm trên đường bi cái, bi hợp lệ', () {
+      bool isRed(Paint p) =>
+          p.color.toARGB32() & 0xFFFFFF == AppColors.danger.toARGB32() & 0xFFFFFF &&
+          p.color.a < 1;
+      for (final step in [kick, direct, snookered]) {
+        final order = draw(step).order;
+        final firstRed = order.indexWhere(isRed);
+        if (firstRed < 0) continue;
+        final lastCue = order.lastIndexWhere((p) => p.color == AppColors.cuePath);
+        final lastGrey = order.lastIndexWhere((p) => p.color == AppColors.textSecondary);
+        expect(lastCue, lessThan(firstRed));
+        expect(lastGrey, lessThan(firstRed));
+        final jitter = order.indexWhere((p) =>
+            p.strokeCap == StrokeCap.round &&
+            p.color.toARGB32() == AppColors.railHit.withValues(alpha: 0.8).toARGB32());
+        if (jitter >= 0) expect(jitter, greaterThan(order.lastIndexWhere(isRed)));
+      }
+    });
+
+    test('painter vẽ được bước phòng thủ không có cú thủ', () {
+      final canvas = _SpyCanvas();
+      expect(
+          () => PlannerPainter(const PlannerScene(
+                  cue: Vec2(40, 100), step: PlanStep.safety(cbFrom: Vec2(40, 100))))
+              .paint(canvas, const Size(540, 286)),
+          returnsNormally);
+    });
   });
 }
