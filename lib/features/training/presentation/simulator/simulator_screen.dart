@@ -329,6 +329,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final showRed = canToggle && _showUncompensated;
     // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
     // khi nó thật sự được vẽ.
+    // Không có cú đánh được thì bỏ cả khoá cũ: lần Chờ đang treo sẽ bị bỏ
+    // (khoá không còn khớp), và khi quay lại đúng cú đó thì dò lại từ đầu,
+    // không trả kết quả nhớ kèm trạng thái Đang tính… không còn ai tính.
+    if (geometry == null) _aimKey = null;
     final aimed = geometry == null ? null : _aimFor(geometry, showRed);
     final timeout = geometry == null ? SimTimeoutState.none : _timeout;
     final scene = SimulatorScene(

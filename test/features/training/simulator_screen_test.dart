@@ -518,6 +518,36 @@ void main() {
       expect(find.text(Vi.simTimeoutQuestion), findsOneWidget);
     });
 
+    testWidgets('chờ rồi chạm lỗ không đánh được, chạm lại lỗ cũ: không kẹt Đang tính…',
+        (tester) async {
+      // Lỗ không đánh được trên bố cục mở màn: phải có, không thì test vô nghĩa.
+      final blocked = Pocket.values.firstWhere(
+          (p) =>
+              evaluateShot(
+                  cue: SimulatorScreen.initialCue,
+                  object: SimulatorScreen.initialObject,
+                  pocket: p) is Unmakeable,
+          orElse: () => throw StateError('không có lỗ nào không đánh được'));
+      final limits = <double>[];
+      await openWithAim(tester, slowAim(limits));
+      await tapKey(tester, SimulatorPanel.waitKey);
+      await tester.pump();
+      expect(find.text(Vi.simComputing), findsOneWidget);
+
+      // Đổi sang lỗ không đánh được trước khi lần tính chạy.
+      await tester.tapAt(onTable(tester, table.pocketPosition(blocked)));
+      await tester.pump();
+      await tester.pump(Duration.zero);
+      expect(limits, isNot(contains(extendedSimTime)));
+
+      // Quay lại lỗ cũ: câu hỏi hiện lại, không kẹt ở Đang tính….
+      await tester.tapAt(onTable(tester, table.pocketPosition(initial.pocket)));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.simComputing), findsNothing);
+      expect(find.text(Vi.simTimeoutQuestion), findsOneWidget);
+      expect(find.byKey(SimulatorPanel.waitKey), findsOneWidget);
+    });
+
     testWidgets('đổi kiểu đánh trong lúc chờ: kết quả cũ không đè lên cú mới', (tester) async {
       final limits = <double>[];
       await openWithAim(tester, slowAim(limits, slow: (s) => s == Stroke.stun));
