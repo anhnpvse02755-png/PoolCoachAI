@@ -69,5 +69,8 @@ const toleranceSamples = 7;
 /// Từ lực này trở lên thì cảnh báo lực cao (PRD §6.5).
 const riskPower = 85.0;
 
-/// Mỗi lát tính giữa hai khung hình (spec quyết định 4).
-const sliceBudget = Duration(milliseconds: 8);
+/// Mỗi lát tính giữa hai khung hình (spec quyết định 4). 4 ms, không phải
+/// 8 ms như spec gốc: đo sạch trên Chrome (task 14), 4 ms qua cổng khung
+/// hình (trung vị ≤ 17 ms, p95 ≤ 20 ms) ở cả 7 lượt yên máy, 8 ms chỉ 3/7;
+/// bước 1 vẫn 0,36–0,46 s. Chủ sản phẩm chốt 07/10/2026.
+const sliceBudget = Duration(milliseconds: 4);

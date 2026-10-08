@@ -59,8 +59,8 @@ class PlannerStepsView extends StatefulWidget {
 }
 
 class _PlannerStepsViewState extends State<PlannerStepsView> {
-  /// Ngân sách lưới vùng điều mỗi khung hình. Nhỏ hơn `sliceBudget`: cùng
-  /// khung hình còn lát tính kế hoạch và vẽ, cộng lại phải dưới 16 ms.
+  /// Ngân sách lưới vùng điều mỗi khung hình, bằng `sliceBudget`: cùng
+  /// khung hình còn một lát kế hoạch và phần vẽ, cộng lại vẫn dưới 16 ms.
   static const _zoneBudget = Duration(milliseconds: 4);
 
   late TableSetup _planned;
