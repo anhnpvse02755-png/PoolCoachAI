@@ -1,5 +1,7 @@
 # PoolCoachAI — Thiết kế cú phòng thủ cho Kế hoạch dọn bàn, và nút Chờ khi mô phỏng quá giờ
 
+> **Sửa 2026-10-08 (chủ sản phẩm, trong lúc làm kế hoạch).** Quyết định 4 và mục 3.3: áp phê chỉ là đường lui cho từng bi. Mục 3.2: A băng luôn được thử, cả khi không đui; trực tiếp và A băng thi trong một lần tìm. Sau Task 25: cú thủ chỉ dùng 3 mức lực 30 · 60 · 90 %; lát 12 ms mỗi khung hình chỉ trong lúc tìm cú thủ; lượt thô trước (trực tiếp trọn bi và ½ bi không áp phê, A băng 1–2 băng chạm trọn bi), thủ tốt thì hiện bước và hỏi có tính tiếp không, chưa thủ tốt thì hiện cú tạm và tự tìm tiếp. Mục 6: "vài giây" tính tới lúc bước thủ hiện ra. Chấm điểm: mức lực phạm luật tính 95 (không cộng sát băng và khoảng cách), đã xác nhận. Mã và PRD_RunOutPlanner.md §5.6 là bản đúng.
+
 **Ngày:** 07/10/2026
 **Trạng thái:** đã duyệt bản viết (07/10/2026), gồm cả 5 chỗ người viết tự điền: đui ở 8 bi khi mọi bi nhóm mình bị chắn; 1–3 băng chấm chung; chỉ bỏ đường chạm băng vào miệng lỗ; sát băng và khoảng cách tính với bi đối thủ dễ nhất; thứ tự giữ phương án thử trước
 **Tiền đề:** spec gốc `2026-10-07-poolcoachai-run-out-planner-design.md` đã xây xong trên nhánh `feat/run-out-planner` (bước 0–13, bước 14 đang ở vòng chủ sản phẩm xem bằng mắt). Spec gốc để "lập kế hoạch cho cú phòng thủ" **ngoài phạm vi**. Khi xem ảnh, chủ sản phẩm quyết định đưa phần này vào **ngay trên nhánh này, trước khi merge**.
