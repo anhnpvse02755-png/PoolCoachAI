@@ -11,6 +11,7 @@ import 'package:poolcoachai/domain/planner/safety_aim.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
+import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_painter.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_steps_view.dart';
@@ -52,6 +53,14 @@ class _SpyCanvas implements Canvas {
 void main() {
   const table = TableSpec.nineFoot;
   late int edits;
+
+  // Mô phỏng thật nhưng nhớ theo đầu vào (tất định): cùng một bàn bị tìm cú
+  // thủ nhiều lần trong file này (lõi tính sẵn kết quả mong đợi, rồi màn tính
+  // lại), mỗi lần chỉ cần trả lời một lần.
+  final simCache = <SimKey, ShotTrace>{};
+  final cachedSafety = SafetyPhysics(
+    simulate: (input) => simCache.putIfAbsent(keyOf(input), () => simulateShot(input)),
+  );
 
   Future<void> open(WidgetTester tester, TableSetup setup,
       {int? maxSimulationsPerFrame,
@@ -392,7 +401,7 @@ void main() {
 
     testWidgets('lượt thô thủ tốt: hiện bước và câu hỏi, không tính gì thêm; Dùng cú này thì xong',
         (tester) async {
-      await open(tester, noPotTable());
+      await open(tester, noPotTable(), safety: cachedSafety);
       await tester.pumpAndSettle();
       expect(find.text(Vi.planSafetyCheckpoint), findsOneWidget);
       expect(find.text(Vi.planSafetyContinue), findsOneWidget);
@@ -412,8 +421,8 @@ void main() {
 
     testWidgets('Tính tiếp: Đang tìm cú thủ…, rồi cú của lượt đầy đủ khi tốt hơn hẳn',
         (tester) async {
-      final expected = planToEnd(noPotTable()).single.safety;
-      await open(tester, noPotTable());
+      final expected = planToEnd(noPotTable(), safety: cachedSafety).single.safety;
+      await open(tester, noPotTable(), safety: cachedSafety);
       await tester.pumpAndSettle();
       final rough = sceneOf(tester).step!.safety!;
       await tester.ensureVisible(find.byKey(PlannerStepsView.continueSafetyKey));
@@ -432,7 +441,7 @@ void main() {
 
     testWidgets('lượt thô chưa thủ tốt: hiện cú tạm và dòng đang tìm, không hỏi; xong thì tắt dòng',
         (tester) async {
-      await open(tester, snookerTwoRailTable());
+      await open(tester, snookerTwoRailTable(), safety: cachedSafety);
       for (var i = 0; i < 2000 && sceneOf(tester).step == null; i++) {
         await tester.pump();
       }
@@ -449,12 +458,12 @@ void main() {
     });
 
     testWidgets('rời màn ở điểm hỏi hay giữa lúc tìm tiếp: không lỗi', (tester) async {
-      await open(tester, noPotTable());
+      await open(tester, noPotTable(), safety: cachedSafety);
       await tester.pumpAndSettle();
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
       await tester.pump();
       expect(tester.takeException(), isNull);
-      await open(tester, noPotTable());
+      await open(tester, noPotTable(), safety: cachedSafety);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(PlannerStepsView.continueSafetyKey));
       await tester.tap(find.byKey(PlannerStepsView.continueSafetyKey));
