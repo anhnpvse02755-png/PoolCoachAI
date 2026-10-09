@@ -334,11 +334,13 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
               children: [
                 FilledButton(
                   key: PlannerStepsView.continueSafetyKey,
+                  style: _tapTarget,
                   onPressed: _continueSafety,
                   child: const Text(Vi.planSafetyContinue),
                 ),
                 OutlinedButton(
                   key: PlannerStepsView.keepSafetyKey,
+                  style: _tapTarget,
                   onPressed: _keepSafety,
                   child: const Text(Vi.planSafetyKeep),
                 ),
@@ -402,6 +404,14 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
   }
 }
 
+/// Vùng chạm cao tối thiểu 48 px: trên web/desktop Flutter mặc định thu nút
+/// về cỡ chữ (~32–40 px), ngón tay khó bấm trúng.
+final _tapTarget = ButtonStyle(
+  minimumSize: WidgetStateProperty.all(const Size(48, 48)),
+  tapTargetSize: MaterialTapTargetSize.padded,
+  visualDensity: VisualDensity.standard,
+);
+
 class _LegendToggle extends StatelessWidget {
   const _LegendToggle({required this.open, required this.onTap});
   final bool open;
@@ -411,6 +421,7 @@ class _LegendToggle extends StatelessWidget {
   Widget build(BuildContext context) => Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
+          style: _tapTarget,
           onPressed: onTap,
           child: Text(open ? Vi.planLegendOpen : Vi.planLegendClosed),
         ),

@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
@@ -424,6 +425,8 @@ void main() {
 
   testWidgets('điểm hỏi: câu hỏi và hai nút nằm trên nút Chú thích, thấy ngay ở 412×915',
       (tester) async {
+    // Chrome/desktop: Flutter mặc định thu vùng chạm nút về cỡ chữ (shrinkWrap).
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     await open(tester, noPotTable(), safety: cachedSafety, size: const Size(412, 915));
     await tester.pumpAndSettle();
     final screen = Offset.zero & const Size(412, 915);
@@ -437,6 +440,16 @@ void main() {
       expect(screen.contains(r.topLeft) && screen.contains(r.bottomRight), isTrue, reason: '$r');
       expect(r.bottom, lessThanOrEqualTo(toggle.top));
     }
+    // Vùng chạm tối thiểu 48 px cho nút Chú thích và hai nút của điểm hỏi.
+    for (final f in [
+      find.ancestor(of: find.text(Vi.planLegendClosed), matching: find.byType(TextButton)),
+      find.byKey(PlannerStepsView.continueSafetyKey),
+      find.byKey(PlannerStepsView.keepSafetyKey),
+    ]) {
+      expect(tester.getSize(f).height, greaterThanOrEqualTo(48));
+    }
+    // Phải trả lại trước khi test kết thúc (binding kiểm biến debug).
+    debugDefaultTargetPlatformOverride = null;
     final card = tester.getTopLeft(find.text(Vi.planStepHeader(1, 1))).dy;
     expect(tester.getBottomLeft(find.byKey(PlannerStepsView.keepSafetyKey)).dy,
         lessThanOrEqualTo(card));
