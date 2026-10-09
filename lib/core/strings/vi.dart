@@ -1,12 +1,18 @@
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/planner/miss_advice.dart';
+import 'package:poolcoachai/domain/planner/plan_step.dart';
+import 'package:poolcoachai/domain/planner/planner_constants.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart';
+import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
-import 'package:poolcoachai/domain/table_geometry/scratch.dart';
+import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/cushion.dart';
 
 /// Toàn bộ chuỗi tiếng Việt hiển thị cho người dùng.
 ///
@@ -462,8 +468,14 @@ abstract final class Vi {
   }
 
   static const simShowingUncompensated = 'Đang xem đường không bù ném.';
-  static const simCannotSimulate =
-      'Không mô phỏng được cú này — chỉ vẽ đường ngắm.';
+
+  // Lõi quá maxSimTime — docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md mục 7.
+  static const simTimeoutQuestion =
+      'Cú này tính quá lâu, bạn muốn chờ hay bỏ qua chỉ vẽ đường ngắm?';
+  static const simWait = 'Chờ';
+  static const simAimOnly = 'Chỉ vẽ đường ngắm';
+  static const simAimOnlyLine = 'Chỉ vẽ đường ngắm.';
+  static const simTooLong = 'Cú này quá dài để mô phỏng.';
 
   /// Nhãn semantics của bàn: trình đọc màn hình và E2E đọc từ đây — nên
   /// có đủ số lần chạm băng và độ dốc cơ để phân biệt từng cảnh.
@@ -472,7 +484,7 @@ abstract final class Vi {
     AimedShot? aimed, {
     required CueElevation elevation,
     bool showingUncompensated = false,
-    bool cannotSimulate = false,
+    String? notice,
   }) {
     const head = 'Bàn mô phỏng.';
     return switch (shot) {
@@ -482,7 +494,7 @@ abstract final class Vi {
           '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
               '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
           '${simElevationLine(elevation)}.',
-          if (cannotSimulate) simCannotSimulate,
+          ?notice,
           if (aimed != null && aimed.trace.cueRailCount > 0)
             simRailCount(aimed.trace.cueRailCount),
           if (aimed?.trace.cuePocket != null) 'Chết cái.',
@@ -490,4 +502,203 @@ abstract final class Vi {
         ].join(' '),
     };
   }
+
+  // Kế hoạch dọn bàn — docs/superpowers/specs/2026-10-07-poolcoachai-run-out-planner-design.md.
+  // Câu nào có số thì số do lõi planner tính ra; ở đây chỉ ghép chữ.
+  static const planTitle = 'Kế hoạch dọn bàn';
+  static const planCardBody = 'Bày bàn, xem cách dọn hết bi từng bước.';
+  static const planGameLabel = 'Loại bàn';
+  static const planGroupLabel = 'Nhóm của tôi';
+  static const planPlacingLabel = 'Đang đặt';
+
+  static String planGame(GameType game) => switch (game) {
+        GameType.nineBall => '9 bi',
+        GameType.tenBall => '10 bi',
+        GameType.eightBall => '8 bi',
+      };
+
+  static String planGroup(BallGroup group) => switch (group) {
+        BallGroup.solids => 'Trơn',
+        BallGroup.stripes => 'Sọc',
+      };
+
+  static String planPlacing(BallRole role) => switch (role) {
+        BallRole.mine => 'Bi của tôi',
+        BallRole.opponent => 'Bi đối thủ',
+        BallRole.eight => 'Bi 8',
+      };
+
+  static const planCueHint = 'Chạm lên bàn để đặt bi cái trước.';
+
+  /// PRD §6.2: số bi gán theo thứ tự chạm.
+  static const planOrderHint = 'Chạm theo đúng thứ tự số: bi 1 trước, bi 2 sau…';
+  static const planUndo = 'Xoá bi cuối';
+  static const planClear = 'Xoá hết';
+  static const planStart = 'Lập kế hoạch';
+
+  static String planComputing(int step, int total) => 'Đang tính bước $step/$total…';
+  static String planStepHeader(int step, int total) => 'Bước $step / $total';
+  static String planBallLine(int number) => 'Bi $number';
+
+  /// Số mức lực (trong [samples] mức) mà điểm dừng vẫn trong vùng điều tốt.
+  static String planTolerance(int good, int samples) =>
+      '$good/$samples mức lực vẫn trong vùng điều tốt';
+
+  /// Thông tin, không phải cảnh báo. Không còn vế "hao khoảng 15% lực":
+  /// lõi vật lý tính hao lực thật (spec quyết định 7).
+  static String planRailInfo(int count) => 'Bi cái chạm băng $count lần rồi tới vùng điều.';
+
+  /// Bước cuối: không có bi kế tiếp, nên không có vùng điều để tới.
+  static String planRailInfoLast(int count) => 'Bi cái chạm băng $count lần.';
+
+  /// PRD §6.5, nguyên văn.
+  static const planRiskWarning = 'Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái '
+      'hoặc sai số lớn hơn bình thường.';
+
+  static String planMissAdvice(MissSide side) =>
+      'Nếu trượt: nên đánh dư ${side == MissSide.thick ? 'dày' : 'mỏng'} một chút — '
+      'bi sẽ khó cho đối thủ hơn.';
+
+  static const planNoPosition = 'Không có vị trí tốt cho bi sau.';
+
+  /// Bước phòng thủ. [ballNum] là bi bắt buộc (9 / 10 bi); null khi 8 bi
+  /// không bi nào của mình có đường (không bi cụ thể nào bị ép).
+  static String planSafety(int? ballNum) =>
+      '${ballNum == null ? 'Không bi nào có' : 'Bi $ballNum không có'} đường đánh rõ ràng '
+      'vào lỗ nào (bị chắn hoặc góc quá khó) — nên chơi an toàn (safety) thay vì cố đánh.';
+
+  static const planPreviewLabel = 'XEM TRƯỚC';
+  static const planBack = '← Quay lại';
+  static const planShotDone = 'Đã đánh xong → Bi tiếp theo';
+  static const planFinish = 'Xong bàn';
+  static const planEditTable = 'Sửa bàn';
+  static const planCueStoppedQuestion = 'Bi cái dừng đúng chỗ dự kiến?';
+  static const planYes = 'Đúng';
+  static const planResetCue = 'Đặt lại bi cái';
+  static const planResetHint = 'Kéo bi cái tới đúng chỗ nó dừng ngoài bàn.';
+  static const planRecompute = 'Tính lại từ đây';
+
+  // Cú phòng thủ: lượt thô và điểm hỏi (chủ sản phẩm chốt 08/10/2026 sau
+  // Task 25 của kế hoạch cú phòng thủ).
+  static const planSearchingSafety = 'Đang tìm cú thủ…';
+
+  /// Lời của chủ sản phẩm, nguyên văn.
+  static const planSafetyCheckpoint = 'Tính toán cơ bản thì đánh như thế này là thủ tốt, '
+      'có thể có phương án tối ưu hơn nhưng sẽ mất thời gian tính toán. '
+      'Bạn muốn tính tiếp hay không?';
+  static const planSafetyContinue = 'Tính tiếp';
+  static const planSafetyKeep = 'Dùng cú này';
+
+  /// Lượt thô chưa ra cú thủ tốt: hiện cú tốt nhất tạm thời, máy tự tìm tiếp.
+  static const planSafetyProvisional = 'Cú thủ tạm tính — đang tìm cú tốt hơn…';
+
+  /// Nút gập/mở chú giải; gập sẵn để câu hỏi và nút không rớt dưới màn.
+  static const planLegendClosed = 'Chú thích ▸';
+  static const planLegendOpen = 'Chú thích ▾';
+
+  /// Chú giải các lớp trên bàn (spec mục 7.1). Ngưỡng lấy từ hằng số planner.
+  static List<String> get planLegend => [
+        'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',
+        'Ô vàng: tạm được — góc cắt bi sau ≤ ${zoneFair.round()}°.',
+        'Nét đứt trắng: bi cái tới bi mục tiêu. Nét đứt ngọc: bi cái sau va chạm.',
+        'Chấm vàng: bi cái chạm băng. Vòng trắng nét đứt: chỗ bi cái dừng.',
+        'Thanh vàng: chỗ bi cái dừng nếu lực lệch ±${powerJitter.round()}%.',
+        'Hai chấm cam: bi mục tiêu trôi tới đâu nếu trượt (dư dày / dư mỏng); '
+            'chấm đặc là hướng nên chọn.',
+      ];
+
+  /// Nhãn semantics của bàn khi bày bi — E2E đọc từ đây.
+  static String planSetupSummary({required bool hasCue, required int balls}) => hasCue
+      ? 'Bàn bày bi. Đã đặt bi cái, $balls bi mục tiêu.'
+      : 'Bàn bày bi. Chưa đặt bi cái.';
+
+  static const planResetSummary = 'Bàn kế hoạch. Đang đặt lại bi cái.';
+
+  /// Nhãn semantics của bàn ở màn từng bước (spec mục 7.4): bi, lỗ, kiểu
+  /// đánh, lực của bước đang xem; bước phòng thủ có cú thủ thì câu đầu, câu
+  /// ngắm và kết quả cho đối thủ. [step] null khi bước đầu còn đang tính.
+  static String planSummary(PlanStep? step,
+      {required int index, required int total, bool searchingSafety = false}) {
+    const head = 'Bàn kế hoạch.';
+    if (step == null) {
+      return '$head ${searchingSafety ? planSearchingSafety : planComputing(index + 1, total)}';
+    }
+    final at = planStepHeader(index + 1, total);
+    if (step.kind == PlanStepKind.safety) {
+      final s = step.safety;
+      if (s == null) return '$head $at: ${planSafety(step.ballNum)}';
+      return '$head $at: ${safetyHeadline(s)} ${safetyAimLine(s)} ${safetyOpponent(s.opponent)}';
+    }
+    return '$head $at: bi ${step.ballNum}, lỗ ${simPocket(step.pocket!)}, '
+        '${simStroke(step.stroke)}, lực ${step.power.round()}%.';
+  }
+
+  // Cú phòng thủ — docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md.
+  // Câu nào có số thì số do lõi tìm cú thủ tính ra; ở đây chỉ ghép chữ.
+  // planSearchingSafety đã có từ Task 25c, cạnh câu hỏi của điểm hỏi.
+  static String safetySnookered(int ballNum) => 'Bi cái bị đui bi $ballNum — đánh A băng để thủ.';
+  static const safetyNoPot = 'Không còn đường ăn bi — nên thủ bi.';
+
+  static String safetyHeadline(SafetyShot s) =>
+      s.reason == SafetyReason.snookered ? safetySnookered(s.ballNum) : safetyNoPot;
+
+  /// Câu ngắm: A băng nói chấm, trực tiếp nói độ dày. Không bao giờ nói độ.
+  static String safetyAimLine(SafetyShot s) => switch (s.railAim) {
+        final aim? => safetyKick(s.rails, aim),
+        null => safetyThickness(s.thickness, s.side),
+      };
+
+  /// Tên băng theo hướng nhìn trên màn.
+  static String safetyRail(Rail rail) => switch (rail) {
+        Rail.left => 'băng ngắn trái',
+        Rail.right => 'băng ngắn phải',
+        Rail.top => 'băng dài trên',
+        Rail.bottom => 'băng dài dưới',
+      };
+
+  /// Số chấm, làm tròn nửa chấm sẵn ở lõi; dấu phẩy thập phân: "2,5".
+  static String safetyDiamond(double d) =>
+      d == d.roundToDouble() ? '${d.round()}' : '${d.floor()},5';
+
+  static String safetyKick(int rails, RailAim aim) =>
+      'A băng $rails băng: ngắm chấm ${safetyDiamond(aim.diamond)} ${safetyRail(aim.rail)}.';
+
+  static String _fraction(double thickness) => switch ((thickness * 8).round()) {
+        6 => '¾',
+        4 => '½',
+        2 => '¼',
+        1 => '⅛',
+        _ => '${(thickness * 100).round()}%',
+      };
+
+  /// Độ dày chạm bi, theo hướng nhìn từ bi cái.
+  static String safetyThickness(double thickness, ThicknessSide side) => switch (side) {
+        ThicknessSide.full => 'Ăn trọn bi.',
+        ThicknessSide.left => 'Ăn ${_fraction(thickness)} bi, lệch bên trái.',
+        ThicknessSide.right => 'Ăn ${_fraction(thickness)} bi, lệch bên phải.',
+      };
+
+  /// Kết quả cho đối thủ. Số độ ở đây là độ khó của đối thủ, không phải lời
+  /// khuyên ngắm (spec quyết định 9).
+  static String safetyOpponent(OpponentView o) {
+    if (o.snookered) return 'Đối thủ bị đui.';
+    final g = o.easiest;
+    final ball = o.ball;
+    if (g == null || ball == null) return 'Đối thủ không còn đường ăn.';
+    return 'Cú dễ nhất của đối thủ: bi ${ball.number} vào lỗ ${simPocket(g.pocket)}, '
+        'góc cắt ${g.angle.round()}°.';
+  }
+
+  static String safetyTolerance(int hard, int samples) =>
+      '$hard/$samples mức lực vẫn để đối thủ khó.';
+
+  /// Chữ trên bàn cạnh đường bị chắn của đối thủ.
+  static const safetyOpponentSnookered = 'Đối thủ bị đui';
+
+  /// Chú giải thêm khi bước đang xem là cú thủ (spec mục 5.1).
+  static List<String> get planSafetyLegend => const [
+        'Vòng vàng đậm: điểm ngắm trên băng đầu tiên (A băng); số ở mép bàn là chấm.',
+        'Nét xám và vòng nét đứt xám: bi hợp lệ sau va chạm và chỗ nó dừng.',
+        'Nét đỏ mờ: cú dễ nhất của đối thủ sau cú thủ.',
+      ];
 }

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
+import 'package:poolcoachai/domain/table_physics/ball_state.dart';
 import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
@@ -75,6 +76,14 @@ class AimSolution {
   }
 }
 
+/// `b` ban đầu của kiểu đánh, cm: cu lê trên tâm, trô dưới tâm. Đánh đứng
+/// bi bắt đầu từ tâm rồi mới dò ([solveStun]).
+double strokeVerticalOffset(Stroke stroke, double radius) => switch (stroke) {
+      Stroke.follow => strokeOffset * radius,
+      Stroke.draw => -strokeOffset * radius,
+      Stroke.stun => 0,
+    };
+
 /// Dò hướng cơ và điểm đặt cơ cho cú đánh [object] vào [pocket].
 AimSolution solveAim({
   required Vec2 cue,
@@ -100,11 +109,7 @@ AimSolution solveAim({
     object: object,
     aimAngle: aim0,
     power: power,
-    verticalOffset: switch (stroke) {
-      Stroke.follow => strokeOffset * radius,
-      Stroke.draw => -strokeOffset * radius,
-      Stroke.stun => 0,
-    },
+    verticalOffset: strokeVerticalOffset(stroke, radius),
     spin: spin,
     elevation: elevation.radians,
     table: table,
@@ -112,7 +117,7 @@ AimSolution solveAim({
 
   var stunReached = true;
   if (!compensate) {
-    if (stroke == Stroke.stun) (input, stunReached) = _solveStun(input);
+    if (stroke == Stroke.stun) (input, stunReached) = solveStun(input);
     return AimSolution(
         aimed: input,
         geometric: input,
@@ -131,7 +136,7 @@ AimSolution solveAim({
   // hướng bù đổi quãng đường nên đổi `b`. Dò xen kẽ hai vòng, kết thúc
   // bằng dò bù ném để hướng cơ khớp đúng `b` cuối cùng.
   for (var round = 0; round < (stroke == Stroke.stun ? 2 : 1); round++) {
-    if (stroke == Stroke.stun) (input, stunReached) = _solveStun(input);
+    if (stroke == Stroke.stun) (input, stunReached) = solveStun(input);
     final (aim, ok) = _solveThrow(input, pocketPos);
     input = input.copyWith(aimAngle: aim);
     converged = ok;
@@ -144,11 +149,30 @@ AimSolution solveAim({
   );
 }
 
+/// Cùng chữ ký với [aimShot], để màn mô phỏng, Planner và test thay lõi
+/// (vd lõi quá giờ, hay đếm số lần gọi).
+typedef AimShotFn = AimedShot Function({
+  required Vec2 cue,
+  required Vec2 object,
+  required Pocket pocket,
+  required Stroke stroke,
+  SideSpin spin,
+  required double power,
+  CueElevation elevation,
+  TableSpec table,
+  bool compensate,
+  bool withUncompensated,
+  double maxTime,
+});
+
 /// Dò bù ném và Đánh đứng bi, rồi mô phỏng đủ (spec mục 4.6).
 ///
 /// [withUncompensated] false thì bỏ mô phỏng cú ngắm hình học (đường đỏ):
 /// mỗi khung kéo thả tiết kiệm một lần mô phỏng đủ, và màn hình chỉ cần
 /// nó khi đang vẽ đường đỏ. Cú đã bù (`trace`) không đổi.
+///
+/// [maxTime] là giới hạn giây mô phỏng của hai lần mô phỏng đủ; dò bù
+/// ném chỉ chạy tới lúc chạm nên không cần.
 AimedShot aimShot({
   required Vec2 cue,
   required Vec2 object,
@@ -160,6 +184,7 @@ AimedShot aimShot({
   TableSpec table = TableSpec.nineFoot,
   bool compensate = true,
   bool withUncompensated = true,
+  double maxTime = maxSimTime,
 }) {
   final s = solveAim(
     cue: cue,
@@ -173,9 +198,9 @@ AimedShot aimShot({
     compensate: compensate,
   );
   return AimedShot(
-    trace: simulateShot(s.aimed),
+    trace: simulateShot(s.aimed, maxTime: maxTime),
     uncompensated: compensate && withUncompensated
-        ? simulateShot(s.geometric)
+        ? simulateShot(s.geometric, maxTime: maxTime)
         : null,
     aimOffsetDeg: compensate ? s.aimOffsetDeg : 0,
     verticalOffset: s.aimed.verticalOffset,
@@ -184,27 +209,34 @@ AimedShot aimShot({
   );
 }
 
-/// Xoáy dọc (trên +, dưới −) của bi cái lúc chạm, rad/s; null nếu trượt.
-double? topspinAtContact(ShotInput input) {
-  final probe = probeContact(input);
-  if (probe == null) return null;
-  final s = probe.cueAtContact;
+/// Xoáy dọc (trên +, dưới −) của bi cái ở trạng thái [s], rad/s.
+double topspinOf(BallState s) {
   final dir = s.vel.normalized;
   // Xoáy lăn đều là ẑ × v / R: chiếu xoáy lên ẑ × v̂.
   return -s.spin.x * dir.y + s.spin.y * dir.x;
 }
 
+/// Xoáy dọc của bi cái lúc chạm, rad/s; null nếu trượt.
+double? topspinAtContact(ShotInput input) {
+  final probe = probeContact(input);
+  return probe == null ? null : topspinOf(probe.cueAtContact);
+}
+
 /// Đánh đứng bi: `b ∈ [−stunMaxOffset·R, 0]` để bi cái tới bi mục tiêu
 /// đúng lúc hết xoáy dọc (spec quyết định 10).
+///
+/// [topspin] đo xoáy lúc chạm cho một `b`; mặc định là cú thẳng. Planner
+/// thủ bi truyền hàm đo sau đúng chuỗi băng của cú A băng.
 ///
 /// Xoáy lúc chạm gần như tuyến tính theo `b` (thời gian tới bi mục tiêu
 /// không phụ thuộc xoáy khi còn trượt), nên dò kiểu chia đôi có nội suy
 /// (Illinois): giữ khoảng kẹp như chia đôi nhưng 2–4 vòng là đủ.
 ///
 /// Trả thêm false khi chạm sàn `b` mà bi cái vẫn tới nơi còn xoáy trên.
-(ShotInput, bool) _solveStun(ShotInput input) {
+(ShotInput, bool) solveStun(ShotInput input,
+    {double? Function(ShotInput input) topspin = topspinAtContact}) {
   final lo = -stunMaxOffset * input.table.radius;
-  double? f(double b) => topspinAtContact(input.copyWith(verticalOffset: b));
+  double? f(double b) => topspin(input.copyWith(verticalOffset: b));
 
   final fHi = f(0);
   if (fHi == null || fHi <= stopSpin / 4) {

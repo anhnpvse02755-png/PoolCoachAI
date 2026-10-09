@@ -8,6 +8,7 @@ import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/cloth.dart';
 import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/cue_strike.dart';
+import 'package:poolcoachai/domain/table_physics/cushion.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
 
 import '../../support/table_layouts.dart';
@@ -382,6 +383,45 @@ void main() {
       final input = shot(const Vec2(60, 63.5), const Vec2(200, 20),
           toward: const Vec2(0, 63.5));
       expect(probeContact(input), isNull);
+    });
+  });
+
+  group('giới hạn thời gian mô phỏng (spec cú phòng thủ mục 7)', () {
+    test('mặc định là maxSimTime; giới hạn ngắn hơn thì ném SimulationTimeout', () {
+      final input = shot(const Vec2(60, 63.5), const Vec2(127, 63.5), power: 90);
+      expect(() => simulateShot(input), returnsNormally);
+      expect(() => simulateShot(input, maxTime: 0.05), throwsA(isA<SimulationTimeout>()));
+    });
+  });
+
+  group('probeKick', () {
+    // Bi cái và bi mục tiêu cùng y = 80: ngắm điểm soi gương qua băng dài
+    // trên. Đo trên a35667b: cu lê 60 % chạm bi sau đúng một băng.
+    const cue = Vec2(30, 80);
+    const object = Vec2(180, 80);
+    final image = Vec2(object.x, 2 * table.minY - object.y);
+
+    test('không chạm băng thì giống probeContact', () {
+      final input = shot(const Vec2(60, 63.5), const Vec2(127, 63.5));
+      final kick = probeKick(input, maxRails: 0);
+      expect(kick.cueAtContact!.pos, probeContact(input)!.cueAtContact.pos);
+      expect(kick.railsBefore, isEmpty);
+      expect(kick.cuePocket, isNull);
+    });
+
+    test('đi qua một băng rồi chạm bi: ghi đúng băng, probeContact coi là hỏng', () {
+      final input = shot(cue, object, toward: image, power: 60, b: strokeOffset * radius);
+      final kick = probeKick(input, maxRails: 1);
+      expect(kick.railsBefore, [Rail.top]);
+      expect(kick.cueAtContact, isNotNull);
+      expect(probeContact(input), isNull);
+    });
+
+    test('chạm quá số băng cho phép thì dừng, không chạm bi', () {
+      final input = shot(cue, object, toward: image, power: 60, b: strokeOffset * radius);
+      final kick = probeKick(input, maxRails: 0);
+      expect(kick.railsBefore, [Rail.top]);
+      expect(kick.cueAtContact, isNull);
     });
   });
 }

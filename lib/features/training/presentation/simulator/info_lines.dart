@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/saws.dart';
-import 'package:poolcoachai/domain/table_geometry/scratch.dart';
+import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
@@ -45,16 +45,29 @@ AimShiftUnits? aimShiftUnits(double shiftCm, double ballDiameter) {
   );
 }
 
+/// Lõi quá giờ cho cú đang xem (spec cú phòng thủ mục 7): đang hỏi, đang
+/// chờ tính lại, chờ rồi vẫn quá giờ, hay người chơi chọn chỉ vẽ đường ngắm.
+enum SimTimeoutState { none, asking, waiting, tooLong, aimOnly }
+
+/// Câu của bảng thông tin cho [s]; null khi không quá giờ.
+String? simTimeoutLine(SimTimeoutState s) => switch (s) {
+      SimTimeoutState.none => null,
+      SimTimeoutState.asking => Vi.simTimeoutQuestion,
+      SimTimeoutState.waiting => Vi.simComputing,
+      SimTimeoutState.tooLong => Vi.simTooLong,
+      SimTimeoutState.aimOnly => Vi.simAimOnlyLine,
+    };
+
 /// Các dòng của bảng thông tin (spec 2026-10-02 mục 6.3).
 ///
 /// Hàm thuần, tách khỏi widget để test thẳng từng ngưỡng. Mọi số đều lấy
 /// từ [aimed] và lõi; ở đây chỉ chọn dòng nào hiện. [advice] null nghĩa
-/// là gợi ý chống chết cái đang tính. [cannotSimulate] là lõi chạy quá
-/// `maxSimTime` cho cú này ([aimed] khi đó null).
+/// là gợi ý chống chết cái đang tính. [timeout] là trạng thái lõi quá
+/// giờ ([aimed] khi đó null).
 List<String> simulatorInfoLines({
   required ShotResult? shot,
   required AimedShot? aimed,
-  bool cannotSimulate = false,
+  SimTimeoutState timeout = SimTimeoutState.none,
   required List<Advice>? advice,
   required Stroke stroke,
   required double power,
@@ -78,13 +91,13 @@ List<String> simulatorInfoLines({
         Vi.simPowerLine(power),
         Vi.simSpinLine(spin),
         Vi.simElevationLine(elevation),
-        if (cannotSimulate) Vi.simCannotSimulate,
+        ?simTimeoutLine(timeout),
         if (aimed != null &&
             stroke == Stroke.stun &&
             aimed.stunReached &&
             aimed.verticalOffset.abs() >= stunOffsetShownTips * tipWidth)
           Vi.simStunOffset(aimed.verticalOffset),
-        if (!spin.isNone) _squirtLine(spin, aimed, geometry, table, stroke, power),
+        if (!spin.isNone) squirtLine(spin, aimed, geometry, table, stroke, power),
         if (trace != null && trace.cueRailCount > 0)
           Vi.simRailCount(trace.cueRailCount),
         if (trace?.cuePocket case final pocket?) Vi.simScratch(pocket),
@@ -96,31 +109,37 @@ List<String> simulatorInfoLines({
   }
 }
 
-/// Dòng áp phê. Độ lệch điểm ngắm là bề ngang hướng cơ đã bù xê dịch so với
+/// Dòng áp phê — màn Mô phỏng góc cắt và màn Kế hoạch dọn bàn dùng chung,
+/// không viết lại (spec 2026-10-07 mục 7.2). Độ lệch điểm ngắm là bề ngang hướng cơ đã bù xê dịch so với
 /// hướng hình học, tại quãng cơ tới bi ảo: gộp cả squirt, swerve lẫn ném,
 /// đúng lượng người chơi phải dịch. Không lấy hiệu điểm chạm thật với bi ảo
 /// hình học vì cú đã bù để vào lỗ nên hai điểm đó gần như trùng nhau. Không
 /// có vết (không mô phỏng được) thì chỉ nói góc; số độ của lệch ngắm không
 /// bao giờ nói ra, chỉ đổi thành đầu cơ.
-String _squirtLine(
+String squirtLine(
     SideSpin spin,
     AimedShot? aimed,
     ShotGeometry geometry,
     TableSpec table,
     Stroke stroke,
     double power) {
-  final deg = squirtAngle(sideOffsetOf(spin), table.radius) * 180 / math.pi;
   final distance = geometry.cue.distanceTo(geometry.ghost);
-  final units = aimed == null
+  return squirtLineFor(spin, aimed?.aimOffsetDeg, distance, table,
+      bhePercent: sawsBhePercent(distance: distance, power: power, stroke: stroke));
+}
+
+/// Cùng dòng áp phê ở quãng [distance] (bi cái → bi ảo hình học, cm). % BHE
+/// do người gọi đưa vào: cú thủ đọc đúng số lõi đã tính (một nguồn, spec
+/// 3.7) thay vì tính lại ở đây. SAWS chỉ đi kèm khi có lượng dịch điểm ngắm
+/// để bù: cùng điều kiện với phần ngoặc, nên không có vết hay lệch bằng 0
+/// thì không gợi ý. Số độ của lệch ngắm không bao giờ nói ra.
+String squirtLineFor(SideSpin spin, double? aimOffsetDeg, double distance, TableSpec table,
+    {required int? bhePercent}) {
+  final deg = squirtAngle(sideOffsetOf(spin), table.radius) * 180 / math.pi;
+  final units = aimOffsetDeg == null
       ? null
       : aimShiftUnits(
-          distance * math.tan(aimed.aimOffsetDeg.abs() * math.pi / 180),
-          table.ballDiameter);
-  // SAWS chỉ đi kèm khi có lượng dịch điểm ngắm để bù: cùng điều kiện với
-  // phần ngoặc, nên không có vết hay lệch bằng 0 thì không gợi ý.
-  final bhe = units == null
-      ? null
-      : sawsBhePercent(distance: distance, power: power, stroke: stroke);
-  return Vi.simSquirt(deg, units?.tips, units?.ballDenominator, bhe,
-      units?.ballCount);
+          distance * math.tan(aimOffsetDeg.abs() * math.pi / 180), table.ballDiameter);
+  return Vi.simSquirt(
+      deg, units?.tips, units?.ballDenominator, units == null ? null : bhePercent, units?.ballCount);
 }

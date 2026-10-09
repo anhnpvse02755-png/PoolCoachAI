@@ -5,3 +5,8 @@ tags:
   #   flutter test --tags perf --run-skipped
   perf:
     skip: "Đo hiệu năng: chạy riêng bằng flutter test --tags perf --run-skipped"
+  # In bảng phương án của các bàn test Planner, để dò lại toạ độ khi một bàn
+  # hết đúng điều kiện. Không phải test; chạy riêng bằng:
+  #   flutter test --tags probe --run-skipped test/domain/planner/fixture_probe_test.dart
+  probe:
+    skip: "Công cụ dò bàn: chạy riêng bằng flutter test --tags probe --run-skipped"

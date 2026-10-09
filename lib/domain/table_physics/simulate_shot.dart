@@ -151,12 +151,15 @@ class ContactProbe {
 /// Mô phỏng tới khi cả hai bi đứng hẳn hoặc rơi lỗ (spec mục 4.5).
 ///
 /// Tất định: cùng [input] thì cùng trace. [onStep] (cho test) nhận trạng
-/// thái hai bi sau mỗi bước.
+/// thái hai bi sau mỗi bước. Quá [maxTime] giây mô phỏng thì ném
+/// [SimulationTimeout]; màn mô phỏng truyền `extendedSimTime` khi người
+/// chơi chọn *Chờ*.
 ShotTrace simulateShot(
   ShotInput input, {
   void Function(BallState cue, BallState object)? onStep,
+  double maxTime = maxSimTime,
 }) {
-  final run = _Run(input, record: true, onStep: onStep);
+  final run = _Run(input, record: true, onStep: onStep, maxTime: maxTime);
   run.go(untilContact: false);
   return run.trace();
 }
@@ -171,6 +174,39 @@ ContactProbe? probeContact(ShotInput input) {
   // Băng chạm sau va chạm (cùng bước 1 ms, vd bi mục tiêu nằm sát băng)
   // không làm hỏng cú dò; chỉ băng chạm trước va chạm mới loại nó.
   return run.rails.any((h) => !h.afterContact) ? null : run.probe;
+}
+
+/// Hai thứ Planner thủ bi cần để dò cú A băng: bi cái lúc chạm bi mục tiêu
+/// (null nếu không chạm), các băng bi cái chạm trước đó, và lỗ nếu bi cái
+/// rơi trước khi chạm.
+class KickProbe {
+  const KickProbe({
+    required this.cueAtContact,
+    required this.railsBefore,
+    required this.cuePocket,
+  });
+
+  final BallState? cueAtContact;
+  final List<Rail> railsBefore;
+  final Pocket? cuePocket;
+}
+
+/// Như [probeContact] nhưng cho bi cái chạm tới [maxRails] băng trước khi
+/// chạm bi mục tiêu (spec cú phòng thủ mục 3.4). Chạm băng thứ
+/// [maxRails] + 1 thì dừng ngay: đường đó đã sai chuỗi băng. [maxRails] = 0
+/// là cú thẳng.
+KickProbe probeKick(ShotInput input,
+    {required int maxRails, double maxTime = maxSimTime}) {
+  final run = _Run(input, record: false, maxTime: maxTime);
+  run.go(untilContact: true, railsAllowed: maxRails);
+  return KickProbe(
+    cueAtContact: run.probe?.cueAtContact,
+    railsBefore: [
+      for (final h in run.rails)
+        if (h.ball == ShotBall.cue && !h.afterContact) h.rail,
+    ],
+    cuePocket: run.cue.pocket,
+  );
 }
 
 /// Chỉ cần biết bi cái có rơi lỗ không: mô phỏng đủ nhưng không ghi
@@ -203,7 +239,10 @@ class _Ball {
 enum _Event { none, balls, rail }
 
 class _Run {
-  _Run(this.input, {required this.record, this.onStep})
+  _Run(this.input,
+      {required this.record,
+      this.onStep,
+      this.maxTime = maxSimTime})
       : table = input.table,
         radius = input.table.radius,
         cue = _Ball(
@@ -228,6 +267,7 @@ class _Run {
   final ShotInput input;
   final bool record;
   final void Function(BallState, BallState)? onStep;
+  final double maxTime;
   final TableSpec table;
   final double radius;
   final _Ball cue;
@@ -239,13 +279,17 @@ class _Run {
   ContactProbe? probe;
   final rails = <RailHit>[];
 
-  void go({required bool untilContact}) {
+  void go({required bool untilContact, int railsAllowed = 0}) {
     var steps = 0;
-    final maxSteps = (maxSimTime / timeStep).round();
+    final maxSteps = (maxTime / timeStep).round();
     while (cue.moving || object.moving) {
       if (steps++ >= maxSteps) throw SimulationTimeout(input);
       _step();
-      if (untilContact && (contact != null || rails.isNotEmpty)) return;
+      // Dò chạm: dừng khi chạm bi, hoặc khi chạm quá số băng cho phép
+      // (cú thẳng: băng đầu tiên đã là hỏng).
+      if (untilContact && (contact != null || rails.length > railsAllowed)) {
+        return;
+      }
       for (final ball in [cue, object]) {
         if (!ball.moving) continue;
         if (ball.state.isStopped) {

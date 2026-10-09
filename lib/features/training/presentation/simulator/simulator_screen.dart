@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -6,31 +6,21 @@ import 'package:flutter/scheduler.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/table_geometry/pocket_choice.dart';
-import 'package:poolcoachai/domain/table_geometry/scratch.dart';
+import 'package:poolcoachai/domain/table_geometry/separate.dart';
+import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/domain/table_physics/aim.dart';
+import 'package:poolcoachai/domain/table_physics/constants.dart';
 import 'package:poolcoachai/domain/table_physics/simulate_shot.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/info_lines.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_panel.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/table_panel_layout.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_painter.dart';
 
 enum _Ball { cue, object }
-
-/// Cùng chữ ký với `aimShot`, để test thay lõi (vd lõi quá giờ).
-typedef AimShotFn = AimedShot Function({
-  required Vec2 cue,
-  required Vec2 object,
-  required Pocket pocket,
-  required Stroke stroke,
-  SideSpin spin,
-  required double power,
-  CueElevation elevation,
-  TableSpec table,
-  bool compensate,
-  bool withUncompensated,
-});
 
 /// Mô phỏng góc cắt — spec 2026-10-01 mục 5, chạy trên lõi vật lý của
 /// spec 2026-10-02 mục 6.
@@ -70,27 +60,8 @@ class SimulatorScreen extends StatefulWidget {
   /// không cách nào tách được thì giữ [previous] — bi không nhảy.
   @visibleForTesting
   static Vec2 separate(Vec2 p, Vec2 other, Vec2 previous,
-      {TableSpec table = TableSpec.nineFoot}) {
-    final d = table.ballDiameter;
-    if ((p - other).length >= d) return p;
-    bool clear(Vec2 v) => v.distanceTo(other) >= d;
-
-    final gap = p - other;
-    final dir = gap.isZero ? const Vec2(1, 0) : gap.normalized;
-    final direct = table.clamp(other + dir * (d + 1e-6));
-    if (clear(direct)) return direct;
-
-    final sx = gap.x < 0 ? -1.0 : 1.0;
-    final sy = gap.y < 0 ? -1.0 : 1.0;
-    final slides = [
-      Vec2(sx, 0), Vec2(-sx, 0), Vec2(0, sy), Vec2(0, -sy), //
-    ];
-    for (final s in slides) {
-      final slid = table.clamp(other + s * (d + 1e-6));
-      if (clear(slid)) return slid;
-    }
-    return previous;
-  }
+          {TableSpec table = TableSpec.nineFoot}) =>
+      separateBalls(p, other, previous, table: table);
 
   @override
   State<SimulatorScreen> createState() => _SimulatorScreenState();
@@ -99,20 +70,8 @@ class SimulatorScreen extends StatefulWidget {
 class _SimulatorScreenState extends State<SimulatorScreen> {
   static const _table = TableSpec.nineFoot;
 
-  /// Chạm trong 1.5 bán kính quanh tâm bi là bắt được bi — ngón tay
-  /// không phải trúng từng milimét.
-  static const _grabRadii = 1.5;
-
   /// Chạm trong bán kính này quanh điểm lỗ là chọn lỗ đó, cm.
   static const _pocketTapRadius = 10.0;
-
-  /// Sàn bán kính chạm trên màn, tính bằng px logic. Trên điện thoại bàn co
-  /// còn ~1.3 px/cm, nên bán kính tính theo cm chỉ còn vài px — nhỏ hơn
-  /// đầu ngón tay. Lấy lớn hơn giữa bán kính cm và sàn này.
-  static const _minTouchPx = 24.0;
-
-  /// Lề quanh bàn — kích thước bàn tính trên phần còn lại sau lề này.
-  static const _tablePadding = EdgeInsets.fromLTRB(16, 16, 16, 8);
 
   Vec2 _cue = SimulatorScreen.initialCue;
   Vec2 _object = SimulatorScreen.initialObject;
@@ -135,6 +94,10 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   /// null khi lõi quá maxSimTime cho cú này.
   AimedShot? _aimed;
+
+  /// Lõi quá giờ cho cú đang xem. Mỗi cú mới bắt đầu lại từ đầu: không nhớ
+  /// lựa chọn Chờ hay Chỉ vẽ đường ngắm (spec cú phòng thủ quyết định 10).
+  SimTimeoutState _timeout = SimTimeoutState.none;
 
   @override
   void initState() {
@@ -226,7 +189,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onPanStart(DragStartDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
-    final grab = math.max(_table.radius * _grabRadii, _minTouchPx / layout.scale);
+    final grab = layout.ballGrab;
     final toCue = p.distanceTo(_cue);
     final toObject = p.distanceTo(_object);
     if (toCue > grab && toObject > grab) return;
@@ -264,7 +227,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   void _onTapUp(TapUpDetails details, TableLayout layout) {
     final p = layout.toTable(details.localPosition);
-    final reach = math.max(_pocketTapRadius, _minTouchPx / layout.scale);
+    final reach = layout.touchReach(_pocketTapRadius);
     for (final pocket in Pocket.values) {
       if (p.distanceTo(_table.pocketPosition(pocket)) <= reach) {
         _change(() => _pocketOverride = pocket);
@@ -278,25 +241,81 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final key =
         (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
     if (key == _aimKey) return _aimed;
-    _aimKey = key;
+    AimedShot? aimed;
+    var timeout = SimTimeoutState.none;
     try {
-      return _aimed = widget.aim(
-        cue: g.cue,
-        object: g.object,
-        pocket: g.pocket,
-        stroke: _stroke,
-        spin: _spin,
-        power: _power,
-        elevation: _elevation,
-        table: _table,
-        withUncompensated: showRed,
-      );
+      aimed = _aim(key, maxSimTime);
     } on SimulationTimeout {
-      // Lõi chạy quá maxSimTime (spec mục 4.5): không có đường đi để vẽ.
-      // Ném tiếp trong build thì cả màn thành ô lỗi; vẽ hình học thôi.
-      return _aimed = null;
+      // Quá giờ (spec mục 4.5): không ném tiếp trong build, vẽ hình học
+      // và hỏi người chơi có muốn chờ không (spec cú phòng thủ mục 7).
+      timeout = SimTimeoutState.asking;
     }
+    // Chỉ gán khoá khi đã có kết quả (spec 2026-10-07 mục 8): lỗi khác ném
+    // ra giữa chừng mà khoá đã đổi thì lần dựng sau trả nhầm cú cũ dưới
+    // khoá mới.
+    _aimKey = key;
+    _timeout = timeout;
+    return _aimed = aimed;
   }
+
+  AimedShot _aim(
+          (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool) key,
+          double maxTime) =>
+      widget.aim(
+        cue: key.$1,
+        object: key.$2,
+        pocket: key.$3,
+        stroke: key.$4,
+        spin: key.$5,
+        power: key.$6,
+        elevation: key.$7,
+        table: _table,
+        withUncompensated: key.$8,
+        maxTime: maxTime,
+      );
+
+  /// *Chờ*: vẽ xong khung hình có chữ "Đang tính…" rồi mới tính — tính
+  /// ngay trong lúc bấm thì màn đứng 1–3 giây mà không có chữ nào báo.
+  /// Lần tính này không chia lát được.
+  void _wait() {
+    final key = _aimKey;
+    if (key == null) return;
+    setState(() => _timeout = SimTimeoutState.waiting);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      // Sau khung hình, nhường trình duyệt vẽ ra màn rồi mới tính.
+      Timer.run(() => _computeLonger(key));
+    });
+  }
+
+  /// Khoá của cú đang chỉnh trên màn, tính từ trạng thái hiện tại — không từ
+  /// [_aimKey], vì đổi nút chỉnh chỉ cập nhật [_aimKey] ở lần dựng sau, mà
+  /// lần tính chờ có thể chạy trước lần dựng đó.
+  (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool)? _currentKey() {
+    final shot = _shot();
+    if (shot is! Makeable) return null;
+    final g = shot.geometry;
+    final showRed = SimulatorScreen.canShowUncompensated(g, _spin) && _showUncompensated;
+    return (g.cue, g.object, g.pocket, _stroke, _spin, _power, _elevation, showRed);
+  }
+
+  void _computeLonger(
+      (Vec2, Vec2, Pocket, Stroke, SideSpin, double, CueElevation, bool) key) {
+    // Đã đổi cú hay rời màn trong lúc chờ: bỏ, không đè lên cú mới.
+    if (!mounted || key != _currentKey() || _timeout != SimTimeoutState.waiting) return;
+    AimedShot? aimed;
+    var timeout = SimTimeoutState.none;
+    try {
+      aimed = _aim(key, extendedSimTime);
+    } on SimulationTimeout {
+      timeout = SimTimeoutState.tooLong;
+    }
+    setState(() {
+      _aimed = aimed;
+      _timeout = timeout;
+    });
+  }
+
+  void _aimOnly() => setState(() => _timeout = SimTimeoutState.aimOnly);
 
   @override
   Widget build(BuildContext context) {
@@ -310,8 +329,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final showRed = canToggle && _showUncompensated;
     // Đường đỏ tốn thêm một lần mô phỏng đủ mỗi khung kéo thả: chỉ tính
     // khi nó thật sự được vẽ.
+    // Không có cú đánh được thì bỏ cả khoá cũ: lần Chờ đang treo sẽ bị bỏ
+    // (khoá không còn khớp), và khi quay lại đúng cú đó thì dò lại từ đầu,
+    // không trả kết quả nhớ kèm trạng thái Đang tính… không còn ai tính.
+    if (geometry == null) _aimKey = null;
     final aimed = geometry == null ? null : _aimFor(geometry, showRed);
-    final cannotSimulate = geometry != null && aimed == null;
+    final timeout = geometry == null ? SimTimeoutState.none : _timeout;
     final scene = SimulatorScene(
       cue: _cue,
       object: _object,
@@ -324,91 +347,46 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
     return PcRootScaffold(
       title: Vi.simTitle,
-      // Bàn nằm ngoài vùng cuộn: kéo dọc trên bàn là kéo bi, không cuộn trang.
-      body: LayoutBuilder(
-        builder: (context, bodyConstraints) {
-          // Trên Chrome desktop, cửa sổ ngang hơn dọc: bàn cao theo chiều
-          // rộng mà không trần thì tràn RenderFlex và bảng điều khiển biến
-          // mất. Ghim chiều cao bàn theo cái nhỏ hơn giữa "vừa bề ngang" và
-          // "tối đa 55% chiều cao thân màn" — còn lại luôn dành cho bảng.
-          //
-          // Trần tính trên phần còn lại sau Padding của bàn: tính theo cả bề
-          // ngang thì SizedBox bị ép hẹp mà giữ chiều cao, bàn méo tỉ lệ.
-          final aspectRatio = TableLayout.aspectRatio(_table);
-          final availableWidth = (bodyConstraints.maxWidth -
-                  _tablePadding.horizontal)
-              .clamp(0.0, double.infinity);
-          final maxTableHeight = (bodyConstraints.maxHeight * 0.55 -
-                  _tablePadding.vertical)
-              .clamp(0.0, double.infinity);
-          final widthLimitedHeight = availableWidth / aspectRatio;
-          final tableHeight = widthLimitedHeight < maxTableHeight
-              ? widthLimitedHeight
-              : maxTableHeight;
-          final tableWidth = tableHeight * aspectRatio;
-
-          return Column(
-            children: [
-              Padding(
-                padding: _tablePadding,
-                child: Center(
-                  child: SizedBox(
-                    width: tableWidth,
-                    height: tableHeight,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final layout = TableLayout(
-                            size: constraints.biggest, table: _table);
-                        return Semantics(
-                          label: Vi.simSummary(shot, aimed,
-                              elevation: _elevation,
-                              showingUncompensated: showRed,
-                              cannotSimulate: cannotSimulate),
-                          child: GestureDetector(
-                            key: SimulatorScreen.tableKey,
-                            dragStartBehavior: DragStartBehavior.down,
-                            onPanStart: (d) => _onPanStart(d, layout),
-                            onPanUpdate: (d) => _onPanUpdate(d, layout),
-                            onPanEnd: (_) => _onPanEnd(),
-                            onPanCancel: _onPanEnd,
-                            onTapUp: (d) => _onTapUp(d, layout),
-                            child: CustomPaint(
-                              size: constraints.biggest,
-                              painter: TablePainter(scene),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: SimulatorPanel(
-                    shot: shot,
-                    aimed: aimed,
-                    cannotSimulate: cannotSimulate,
-                    advice: _advice,
-                    stroke: _stroke,
-                    power: _power,
-                    spin: _spin,
-                    elevation: _elevation,
-                    showUncompensated: _showUncompensated,
-                    onStroke: (v) => _change(() => _stroke = v),
-                    onPower: (v) => _change(() => _power = v),
-                    onSpin: (v) => _change(() => _spin = v),
-                    onElevation: (v) => _change(() => _elevation = v),
-                    onShowUncompensated: canToggle
-                        ? (v) => setState(() => _showUncompensated = v)
-                        : null,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      body: TablePanelLayout(
+        table: _table,
+        tableBuilder: (layout) => Semantics(
+          label: Vi.simSummary(shot, aimed,
+              elevation: _elevation,
+              showingUncompensated: showRed,
+              notice: simTimeoutLine(timeout)),
+          child: GestureDetector(
+            key: SimulatorScreen.tableKey,
+            dragStartBehavior: DragStartBehavior.down,
+            onPanStart: (d) => _onPanStart(d, layout),
+            onPanUpdate: (d) => _onPanUpdate(d, layout),
+            onPanEnd: (_) => _onPanEnd(),
+            onPanCancel: _onPanEnd,
+            onTapUp: (d) => _onTapUp(d, layout),
+            child: CustomPaint(
+              size: layout.size,
+              painter: TablePainter(scene),
+            ),
+          ),
+        ),
+        panel: SimulatorPanel(
+          shot: shot,
+          aimed: aimed,
+          timeout: timeout,
+          onWait: _wait,
+          onAimOnly: _aimOnly,
+          advice: _advice,
+          stroke: _stroke,
+          power: _power,
+          spin: _spin,
+          elevation: _elevation,
+          showUncompensated: _showUncompensated,
+          onStroke: (v) => _change(() => _stroke = v),
+          onPower: (v) => _change(() => _power = v),
+          onSpin: (v) => _change(() => _spin = v),
+          onElevation: (v) => _change(() => _elevation = v),
+          onShowUncompensated:
+              canToggle ? (v) => setState(() => _showUncompensated = v) : null,
+        ),
       ),
     );
   }

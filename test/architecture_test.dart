@@ -185,4 +185,40 @@ void main() {
           'thì không còn chạy và đo hiệu năng được trên Dart VM thuần',
     );
   });
+
+  test('lõi hình học bàn không import lõi vật lý', () {
+    // table_physics đã import table_geometry (Vec2, TableSpec, Stroke…).
+    // Chiều ngược lại là vòng phụ thuộc: sửa lõi vật lý thì phải dựng lại cả
+    // lõi hình học, và Planner không còn biết tầng nào là nền.
+    final offenders = [
+      for (final file in dartFilesIn('lib/domain/table_geometry'))
+        if (codeOnly(file.readAsStringSync())
+            .contains('package:poolcoachai/domain/table_physics/'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'table_geometry là nền của table_physics; lõi vật lý được '
+          'import hình học, không có chiều ngược lại (spec 2026-10-07 mục 8)',
+    );
+  });
+
+  test('lõi Planner không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/planner');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'Planner phải chạy và đo được trên Dart VM thuần, và sau này '
+          'chuyển sang Web Worker hay điện thoại mà không đổi lõi (spec mục 2)',
+    );
+  });
 }
