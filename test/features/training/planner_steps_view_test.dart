@@ -509,6 +509,30 @@ void main() {
       expect(shown!.total, lessThan(rough.total));
     });
 
+    testWidgets('Tính tiếp hai lần trước khi dựng lại: chỉ một vòng tìm, không gấp đôi việc mỗi khung',
+        (tester) async {
+      var calls = 0;
+      final counting = SafetyPhysics(simulate: (input) {
+        calls++;
+        return cachedSafety.simulate(input);
+      });
+      await open(tester, noPotTable(), safety: counting, maxSimulationsPerFrame: 1);
+      for (var i = 0; i < 4000 && find.byKey(PlannerStepsView.continueSafetyKey).evaluate().isEmpty; i++) {
+        await tester.pump();
+      }
+      final button = tester.widget<FilledButton>(find.byKey(PlannerStepsView.continueSafetyKey));
+      // Hai lần bấm trong cùng một khung, trước khi màn dựng lại.
+      button.onPressed!();
+      button.onPressed!();
+      calls = 0;
+      const frames = 20;
+      for (var i = 0; i < frames; i++) {
+        await tester.pump();
+      }
+      // Mỗi khung tối đa một lần mô phỏng; hai vòng bơm thì gấp đôi.
+      expect(calls, lessThanOrEqualTo(frames));
+    });
+
     testWidgets('lượt thô chưa thủ tốt: hiện cú tạm và dòng đang tìm, không hỏi; xong thì tắt dòng',
         (tester) async {
       await open(tester, snookerTwoRailTable(), safety: cachedSafety);

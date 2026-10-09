@@ -155,6 +155,8 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
   /// "Tính tiếp": tìm tiếp trên cùng việc tìm (chủ sản phẩm chốt 08/10/2026).
   void _continueSafety() {
     final job = _job!;
+    // Bấm lần hai trước khi màn dựng lại: việc tìm đã chạy tiếp, đừng bơm thêm một vòng.
+    if (!job.safetyCheckpoint) return;
     setState(job.continueSafety);
     _schedule(job);
   }
