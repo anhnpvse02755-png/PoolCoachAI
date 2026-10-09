@@ -592,6 +592,10 @@ abstract final class Vi {
   /// Lượt thô chưa ra cú thủ tốt: hiện cú tốt nhất tạm thời, máy tự tìm tiếp.
   static const planSafetyProvisional = 'Cú thủ tạm tính — đang tìm cú tốt hơn…';
 
+  /// Nút gập/mở chú giải; gập sẵn để câu hỏi và nút không rớt dưới màn.
+  static const planLegendClosed = 'Chú thích ▸';
+  static const planLegendOpen = 'Chú thích ▾';
+
   /// Chú giải các lớp trên bàn (spec mục 7.1). Ngưỡng lấy từ hằng số planner.
   static List<String> get planLegend => [
         'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',

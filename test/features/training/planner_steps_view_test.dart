@@ -87,9 +87,10 @@ void main() {
   Future<void> open(WidgetTester tester, TableSetup setup,
       {int? maxSimulationsPerFrame,
       int? maxZoneRowsPerFrame,
-      SafetyPhysics safety = const SafetyPhysics()}) async {
+      SafetyPhysics safety = const SafetyPhysics(),
+      Size size = const Size(1200, 2600)}) async {
     edits = 0;
-    tester.view.physicalSize = const Size(1200, 2600);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
@@ -395,6 +396,7 @@ void main() {
     await open(tester, railTable());
     await tester.pumpAndSettle();
     expect(find.text(Vi.simDisclaimer), findsOneWidget);
+    await tapText(tester, Vi.planLegendClosed);
     for (final line in Vi.planLegend) {
       expect(find.text(line), findsOneWidget);
     }
@@ -403,8 +405,41 @@ void main() {
     final legendBottom = tester.getBottomLeft(find.text(Vi.planLegend.last)).dy;
     final headerTop = tester.getTopLeft(find.text(Vi.planStepHeader(1, 2))).dy;
     expect(legendTop, greaterThan(tableBottom));
-    expect(legendTop - tableBottom, lessThan(40));
+    // Có nút Chú thích (cao tối thiểu 48) nằm giữa bàn và chú giải.
+    expect(legendTop - tableBottom, lessThan(80));
     expect(legendBottom, lessThan(headerTop));
+  });
+
+  testWidgets('chú giải gập sẵn, chạm "Chú thích" thì mở, chạm lại thì gập', (tester) async {
+    await open(tester, railTable());
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.planLegendClosed), findsOneWidget);
+    expect(find.text(Vi.planLegend.first), findsNothing);
+    await tapText(tester, Vi.planLegendClosed);
+    expect(find.text(Vi.planLegendOpen), findsOneWidget);
+    expect(find.text(Vi.planLegend.first), findsOneWidget);
+    await tapText(tester, Vi.planLegendOpen);
+    expect(find.text(Vi.planLegend.first), findsNothing);
+  });
+
+  testWidgets('điểm hỏi: câu hỏi và hai nút nằm trên nút Chú thích, thấy ngay ở 412×915',
+      (tester) async {
+    await open(tester, noPotTable(), safety: cachedSafety, size: const Size(412, 915));
+    await tester.pumpAndSettle();
+    final screen = Offset.zero & const Size(412, 915);
+    final toggle = tester.getRect(find.text(Vi.planLegendClosed));
+    for (final f in [
+      find.text(Vi.planSafetyCheckpoint),
+      find.byKey(PlannerStepsView.continueSafetyKey),
+      find.byKey(PlannerStepsView.keepSafetyKey),
+    ]) {
+      final r = tester.getRect(f);
+      expect(screen.contains(r.topLeft) && screen.contains(r.bottomRight), isTrue, reason: '$r');
+      expect(r.bottom, lessThanOrEqualTo(toggle.top));
+    }
+    final card = tester.getTopLeft(find.text(Vi.planStepHeader(1, 1))).dy;
+    expect(tester.getBottomLeft(find.byKey(PlannerStepsView.keepSafetyKey)).dy,
+        lessThanOrEqualTo(card));
   });
 
   group('cú thủ: lượt thô và điểm hỏi (chủ sản phẩm chốt 08/10/2026 sau Task 25)', () {

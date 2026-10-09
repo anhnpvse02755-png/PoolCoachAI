@@ -78,6 +78,9 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
   bool _done = false;
   int _view = 0;
 
+  /// Chú giải đang mở hay gập.
+  bool _legendOpen = false;
+
   /// Đang đặt lại bi cái: chỗ bi cái đang kéo tới; null khi không.
   Vec2? _resetCue;
 
@@ -311,13 +314,6 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
       panel: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Chú giải các lớp ngay dưới bàn (spec mục 7.1).
-          for (final line in [
-            ...Vi.planLegend,
-            if (step?.safety != null) ...Vi.planSafetyLegend,
-          ])
-            Text(line, style: text.bodySmall),
-          const SizedBox(height: 12),
           if (!_done && !(_job?.safetyCheckpoint ?? false))
             Text(
                 (_job?.provisionalSafety ?? false)
@@ -326,9 +322,6 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
                         ? Vi.planSearchingSafety
                         : Vi.planComputing(_steps.length + 1, _total),
                 style: text.bodyMedium),
-          if (step != null && !resetting)
-            _LinesCard(
-                lines: planStepLines(step, index: _view, total: _total, table: _planned.table)),
           // Lượt thô đã ra cú thủ tốt: hỏi có tính tiếp không (chủ sản phẩm
           // chốt 08/10/2026 sau Task 25).
           if (asking) ...[
@@ -352,6 +345,21 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
               ],
             ),
           ],
+          // Chú giải gập sẵn: bản đầy đủ dài, đẩy câu hỏi và nút xuống dưới màn.
+          _LegendToggle(
+            open: _legendOpen,
+            onTap: () => setState(() => _legendOpen = !_legendOpen),
+          ),
+          if (_legendOpen)
+            for (final line in [
+              ...Vi.planLegend,
+              if (step?.safety != null) ...Vi.planSafetyLegend,
+            ])
+              Text(line, style: text.bodySmall),
+          const SizedBox(height: 12),
+          if (step != null && !resetting)
+            _LinesCard(
+                lines: planStepLines(step, index: _view, total: _total, table: _planned.table)),
           if (scene.preview case final preview?)
             _PreviewCard(
                 lines: planStepLines(preview,
@@ -392,6 +400,21 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
       ),
     );
   }
+}
+
+class _LegendToggle extends StatelessWidget {
+  const _LegendToggle({required this.open, required this.onTap});
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          onPressed: onTap,
+          child: Text(open ? Vi.planLegendOpen : Vi.planLegendClosed),
+        ),
+      );
 }
 
 class _LinesCard extends StatelessWidget {
