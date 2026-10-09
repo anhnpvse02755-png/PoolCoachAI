@@ -57,3 +57,11 @@ Plans: `docs/superpowers/plans/2026-10-07-poolcoachai-run-out-planner.md`, `docs
 - Console errors: not verified. The console check sits after the old frame and step-1 gates in the script, so no run reached it.
 - Screenshots for the eye check: `%TMP%/pcai-planner` (run 4); run 2 kept in `%TMP%/pcai-planner-run2`.
 - Status: STOPPED for the owner's eye check (Task 29 step 3); no constant or string changed.
+
+## Chrome rerun after layout fix
+
+- Build: `flutter build web --release` at 6b826d8 (checkpoint question and buttons directly under the table, collapsed "Chú thích" legend below, buttons at least 48 px), served by `tool/e2e/serve.mjs build/web 5555`, headless Chrome 412 × 915 mobile. `planner.mjs` unchanged. Total CPU before the run: about 29 % average at first sample (30, 38, 20), about 18 % at the re-check just before the run.
+- Run 1: reached the console-error check, no errors; then FAILED the table 2 frame gate: p95 33.3 ms (gate 20), median 16.7, max 116.8; step 1 681 ms. Tables 4–7: 4 first (provisional) 339 ms, not asked, final 1123 ms, kept the provisional shot; 5 first (checkpoint) 783 ms, asked, Dùng cú này done 429 ms, final 1420 ms; 6 first (checkpoint) 1075 ms, asked, Tính tiếp done 2185 ms, final label `Ăn ¼ bi, lệch bên phải. Đối thủ không còn đường ăn.`; 7 first (provisional) 934 ms, not asked, final 4033 ms, final label `Ăn ⅛ bi, lệch bên phải`.
+- Run 2: passed everything, "Xong". Table 2 frames: median 16.7, p95 17, max 50.1 ms; step 1 544 ms. Tables 4–7: 4 first (provisional) 273 ms, not asked, final 905 ms, kept the provisional shot; 5 first (checkpoint) 660 ms, asked, Dùng cú này done 416 ms, final 1283 ms; 6 first (checkpoint) 787 ms, asked, Tính tiếp done 1592 ms, final 1406 ms, label `Ăn ¼ bi, lệch bên phải. Đối thủ không còn đường ăn.`; 7 first (provisional) 925 ms, not asked, final 3996 ms, final label `Ăn ⅛ bi, lệch bên phải`. Frames while searching (table 6): p95 16.9, max 50.2. 4× CPU reference 1772 ms.
+- Console errors: none in either run (the check was reached in both).
+- Screenshots (run 2): `%TEMP%\pcai-planner-layout`. In `5-9bi-dui-a-bang-diem-hoi.png` and `6-9bi-het-duong-diem-hoi.png` the question and both buttons (Tính tiếp, Dùng cú này) are fully visible without scrolling, with "Chú thích ▸" below them; the coach FAB and bottom nav do not cover them.
