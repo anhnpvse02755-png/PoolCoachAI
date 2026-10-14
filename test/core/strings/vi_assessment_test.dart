@@ -1,0 +1,31 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/assessment/bu_exams.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+
+void main() {
+  test('tên bài đúng thuật ngữ chủ sản phẩm đã chốt (spec mục 5.1, 5.2, 11.3)', () {
+    expect(Vi.buDrillName('F2'), 'Đánh đứng bi (Stop Shot)');
+    expect(Vi.buDrillName('F3'), 'Đánh cu lê (Follow Shot)');
+    expect(Vi.buDrillName('F4'), 'Đánh trô bi (Draw Shot)');
+    expect(Vi.buDrillName('F5'), 'Đánh tâm tiến (Stun Shot)');
+    expect(Vi.buDrillName('F6'), 'Ăn bi (Ball Pocketing)');
+    expect(Vi.buDrillName('S5'), 'Phòng thủ / bắt đui (Safety)');
+    expect(Vi.buDrillName('S6'), 'A băng (Kicks)');
+    expect(Vi.buDrillName('S7'), 'Cân bi (Banks)');
+    expect(Vi.buDrillName('S8'), 'Dựng cơ (Elevated cue)');
+    expect(Vi.buDrillName('S9'), 'Nhảy bi (Jump) hoặc Mát xê (Massé)');
+    expect(Vi.buDrillName('S10'), 'Phá (Break)');
+  });
+
+  test('mọi bài đều có tên, không dùng từ cấm', () {
+    final all = [...examIDrills, ...examIIDrills(ExamIIVersion.doctorate)];
+    for (final d in all) {
+      final name = Vi.buDrillName(d.id).toLowerCase();
+      for (final banned in ['kim cương', 'bi ma', 'lọt bi cái']) {
+        expect(name, isNot(contains(banned)), reason: d.id);
+      }
+      expect(Vi.buDrillTitle(d.id), startsWith('${d.id} · '));
+    }
+  });
+}

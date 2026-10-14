@@ -1,3 +1,5 @@
+import 'package:poolcoachai/domain/assessment/bu_exams.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
@@ -701,4 +703,44 @@ abstract final class Vi {
         'Nét xám và vòng nét đứt xám: bi hợp lệ sau va chạm và chỗ nó dừng.',
         'Nét đỏ mờ: cú dễ nhất của đối thủ sau cú thủ.',
       ];
+
+  // ─── Đánh giá + hạng — tên bài BU (spec mục 5.1, 5.2, 11.3) ───────────────
+  //
+  // Tên tiếng Việt do chủ sản phẩm chốt ngày 14/10/2026; tên tiếng Anh trong
+  // ngoặc là tên bài của Billiard University, để đối chiếu với đề.
+
+  static String buDrillName(String drillId) => switch (drillId) {
+        'F1' => 'Cắt góc (Cut Shot)',
+        'F2' => 'Đánh đứng bi (Stop Shot)',
+        'F3' => 'Đánh cu lê (Follow Shot)',
+        'F4' => 'Đánh trô bi (Draw Shot)',
+        'F5' => 'Đánh tâm tiến (Stun Shot)',
+        'F6' => 'Ăn bi (Ball Pocketing)',
+        'F7' => 'Bánh xe (Wagon Wheel)',
+        'F8' => 'Lưới đích (Grid Target)',
+        'S1' => 'Hàng bi (Line of Balls)',
+        'S2' => 'Ngắm bi sát băng (Rail Cuts)',
+        'S3' => 'Thế 9 bi (9-Ball Patterns)',
+        'S4' => 'Thế 8 bi (8-Ball Patterns)',
+        'S5' => 'Phòng thủ / bắt đui (Safety)',
+        'S6' => 'A băng (Kicks)',
+        'S7' => 'Cân bi (Banks)',
+        'S8' => 'Dựng cơ (Elevated cue)',
+        'S9' => 'Nhảy bi (Jump) hoặc Mát xê (Massé)',
+        'S10' => 'Phá (Break)',
+        _ => throw ArgumentError.value(drillId, 'drillId', 'không có bài này'),
+      };
+
+  static String buDrillTitle(String drillId) => '$drillId · ${buDrillName(drillId)}';
+
+  static String buExamName(BuExam exam) => switch (exam) {
+        BuExam.fundamentals => 'Đề I — Cơ bản',
+        BuExam.skills => 'Đề II — Kỹ năng',
+      };
+
+  static String buVersionName(ExamIIVersion v) => switch (v) {
+        ExamIIVersion.bachelors => 'Bachelors',
+        ExamIIVersion.masters => 'Masters',
+        ExamIIVersion.doctorate => 'Doctorate',
+      };
 }
