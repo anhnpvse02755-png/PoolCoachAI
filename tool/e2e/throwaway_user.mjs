@@ -1,5 +1,5 @@
 // Tạo user thử qua giao diện và xoá nó qua Directus admin — dùng chung cho các bài E2E.
-export async function registerThrowaway(tab, app, { email, password, name = 'Người thử E2E' }) {
+export async function registerThrowaway(tab, app, { email, password, name = 'Người thử E2E', keepOnboarding = false }) {
   await tab.goto(app);
   await tab.waitForText('Đăng nhập');
   await tab.click('Chưa có tài khoản');
@@ -8,6 +8,12 @@ export async function registerThrowaway(tab, app, { email, password, name = 'Ng�
   await tab.type('Nhập lại mật khẩu', password);
   await tab.type('Mật khẩu', password);
   await tab.click('Tạo tài khoản');
+  // Tài khoản mới được đưa vào bộ câu hỏi xác định hạng khi máy chủ báo chưa
+  // có hạng (spec 2026-10-14 mục 7.1). "câu hỏi ngắn" chỉ có ở màn giới thiệu
+  // của bộ câu hỏi, không có ở thẻ trên Trang chủ.
+  await tab.waitForText('Trả lời 8 câu hỏi ngắn', 45000);
+  if (keepOnboarding) return;
+  await tab.click('Để sau');
   await tab.waitForText('Xin chào');
 }
 
