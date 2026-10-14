@@ -803,4 +803,138 @@ abstract final class Vi {
         RankGroup.competitive => 'thi đấu',
         RankGroup.pro => 'chuyên nghiệp',
       };
+
+  // ─── Đánh giá + hạng — cách chấm và cách xếp bài ───────────────────────────
+  //
+  // Cách chấm: chữ của spec mục 5.1, 5.2 (đã đối chiếu PDF ở Task 11).
+  // Cách xếp bài: dịch từ PDF của Billiard University, chủ sản phẩm duyệt
+  // khi xem sơ đồ trên Chrome (D13 của kế hoạch).
+
+  static const _ladderRule = 'Thang vị trí: bắt đầu ở vị trí 4, vào thì lên một vị trí, '
+      'trượt thì xuống một (trong khoảng 1–7). Đánh đủ 10 cú. Điểm = vị trí cuối + '
+      'số lần vào khi đang ở vị trí 7, tối đa 10.';
+
+  static String buDrillScoring(String drillId, ExamIIVersion? v) => switch (drillId) {
+        'F1' => _ladderRule,
+        'F2' => '$_ladderRule Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo.',
+        'F3' => '$_ladderRule Bi cái dừng trong hoặc chồng lên khung giấy đích.',
+        'F4' => '$_ladderRule Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa.',
+        'F5' => '$_ladderRule Đích di chuyển thay cho bi cái: vị trí 1–3 đi thẳng tới đích, '
+            '5–7 phải bật băng cuối.',
+        'F6' => '10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm.',
+        'F7' => '10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ và chạm đúng bi đích được 1 điểm.',
+        'F8' => '5 đích, mỗi đích 4 lượt. Vào lỗ và bi cái dừng trong hoặc chồng lên đích '
+            'được 1 điểm.',
+        'S1' => 'Đánh theo thứ tự số, 2 lượt, lấy lượt cao hơn. Lượt 1 trọn điểm thì '
+            'không cần lượt 2.',
+        'S2' => '2 lượt, thứ tự tùy ý, lấy lượt cao hơn. Lượt 1 trọn điểm thì không cần lượt 2.',
+        'S3' => '3 thế, mỗi bi hợp lệ theo thứ tự được 1 điểm, cộng 2 thế thấp nhất. Bi 9 '
+            'vào sớm thì vẫn đánh nốt các bi còn lại theo thứ tự.'
+            '${v == ExamIIVersion.doctorate ? ' Thế 3: phải tới bi 7 và bi 9 bằng 3–4 băng.' : ''}',
+        'S4' => '3 thế, mỗi bi trước khi trượt được 1 điểm, cộng 2 thế thấp nhất. '
+            'Được chạm bi chướng ngại.',
+        'S5' => 'Mỗi vị trí bi cái 2 lượt, mỗi lần bắt đui được 1 điểm.',
+        'S6' || 'S7' || 'S8' => 'Mỗi cú thành công 1 điểm.',
+        // PDF bản Doctorate: "1 point for each successful shot (CB pocketed, no
+        // obstacle-ball contact)" và hình ghi "scratch in the corner" — bản này
+        // không có bi mục tiêu, cú thành công là đưa bi cái vào lỗ góc.
+        'S9' => 'Dùng nhảy bi (Jump) hoặc mát xê (Massé). Mỗi cú thành công 1 điểm.'
+            '${v == ExamIIVersion.doctorate ? ' Bản Doctorate: không có bi mục tiêu, cú thành công '
+                'là đưa bi cái vào lỗ góc mà không chạm bi chướng ngại.' : ' Được chết cái.'}',
+        'S10' => '3 lần phá, mỗi lần chấm 5 tiêu chí a–e, lấy trung vị điểm của 3 lần.',
+        _ => throw ArgumentError.value(drillId, 'drillId'),
+      };
+
+  static String buBreakCriterion(int index) => switch (index) {
+        0 => 'a: không chết cái',
+        1 => 'b: a, và bi cái không chạm băng',
+        2 => 'c: a, và bi cái dừng trong vùng 4 chấm ở giữa bàn',
+        3 => 'd: a, và có ít nhất 1 bi vào',
+        4 => 'e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn',
+        _ => throw RangeError.range(index, 0, 4, 'index'),
+      };
+
+  /// Cách xếp bài, dịch từ PDF (Task 11 Step 3). Một nhánh cho mỗi bài; bài
+  /// Đề II mà các bản khác nhau thì rẽ theo [v].
+  static String buDrillSetup(String drillId, ExamIIVersion? v) => switch (drillId) {
+        'F1' => 'Bi cái bắt đầu ở vị trí 4 trên đường chấm 1. Bi mục tiêu trên đường chấm 3, '
+            'cách băng cuối một khe bằng một bi; ăn bi mục tiêu vào lỗ góc gần nó. Vào thì '
+            'lên một vị trí (xa lỗ hơn), trượt thì xuống một vị trí. Được chết cái. '
+            'Có thể đánh từ phía bên kia bàn.',
+        'F2' => 'Bi cái và bi mục tiêu sát băng trên (bi cái cách băng không quá một chấm); '
+            'bi mục tiêu ở nửa chấm cạnh lỗ góc. Dán vòng đánh dấu chỗ bi mục tiêu và bi ảo. '
+            'Đánh đứng bi: ăn bi, bi cái dừng chồng lên vòng bi ảo. Bi cái được chạm băng. Ở vị trí 1 '
+            'được đặt bi cái trong khoảng vị trí 1–2.',
+        'F3' => 'Bi cái và bi mục tiêu luôn cách nhau 1 chấm, sát băng trên (bi cái cách băng '
+            'không quá một chấm). Khung giấy đích 8.5"×11" (bỏ lõi, chừa viền 1") đặt ở góc. '
+            'Đánh cu lê: ăn bi, bi cái theo vào khung. Bi cái và bi mục tiêu được chạm băng.',
+        'F4' => 'Bi cái và bi mục tiêu sát băng trên; bi mục tiêu ở nửa chấm cạnh lỗ góc. '
+            'Hình chữ nhật 2×1 chấm cạnh lỗ giữa cố định, góc đánh dấu bằng vòng dán. Đánh '
+            'trô bi: ăn bi, tâm bi cái dừng trong hình. Ở vị trí 1 được đặt bi cái '
+            'trong khoảng vị trí 1–2.',
+        'F5' => 'Bi mục tiêu ở dưới tâm bàn một bi, ăn vào lỗ giữa. Bi cái đặt tự do mỗi cú. '
+            'Đánh tâm tiến. Khung giấy đích bắt đầu ở vị trí 4 (cạnh dài áp băng cuối); các vị trí khác có '
+            'tâm thẳng chấm băng dài. Vị trí 1–3: bi cái đi thẳng tới đích; 5–7: bật băng cuối.',
+        'F6' => 'Hai vị trí bi cái, mỗi vị trí 5 cú vào các lỗ như hình. Mỗi cú một lần, '
+            'đánh theo thứ tự, không được chết cái.',
+        'F7' => 'Bi mục tiêu trên đường chấm 1 dưới lỗ giữa; 10 bi đích áp sát băng. Bi cái '
+            'đặt tự do mỗi cú. Ăn bi mục tiêu rồi cho bi cái chạm bi đích đang đánh; được '
+            'chạm băng ngay cạnh bi đích, không được chạm băng khác. Mỗi bi đích 2 lượt, xong '
+            'thì nhấc bi đích ra, bi bị xô lệch thì đặt lại.',
+        'F8' => 'Bi mục tiêu (bi 1) ở chấm (1, 1), ăn vào lỗ góc gần nó; bi cái như hình. '
+            'Năm khung giấy đích: hai cái sát băng trên, hai cái sát băng dưới, một cái giữa '
+            'bàn. Mỗi đích 4 lượt, đi đường nào tới đích cũng được.',
+        'S1' => 'Bi cái đặt tự do. Các bi xếp trên đường giữa bàn, bi 1 cách băng cuối một khe '
+            'một bi, giữa các bi là khe ${switch (v) {
+              ExamIIVersion.bachelors => 'ba bi',
+              ExamIIVersion.masters => 'hai bi',
+              _ => 'một bi',
+            }}. Ăn theo thứ tự số vào lỗ bất kỳ, không chết cái, không chạm bi còn lại; '
+            'chạm bi khác thì bi vừa vào vẫn tính nhưng lượt dừng.',
+        'S2' => 'Bi cái đặt tự do. Các bi áp sát băng như hình (và một bi ở tâm bàn). Ăn theo '
+            'thứ tự tùy ý, không chết cái, không đánh bi kết hợp, không chạm bi còn lại.',
+        'S3' => 'Bi cái đặt tự do. Xếp bi như hình của từng thế, ăn theo luật 9 bi: luôn chạm '
+            'bi số nhỏ nhất trước.',
+        'S4' => 'Bi cái đặt tự do. Ăn hết bi sọc theo thứ tự tùy ý rồi tới bi 8. Bi xám là bi '
+            'chướng ngại.',
+        'S5' => 'Bi 1 ở (2, 3). Cụm 9 bi chướng ngại xếp khít trong khung giấy đích 8.5"×11" '
+            'tâm (6, 1). Từ mỗi vị trí bi cái (${switch (v) {
+              ExamIIVersion.bachelors => '3',
+              ExamIIVersion.masters => '5',
+              _ => '7',
+            }} vị trí), đánh hợp lệ để bi 1 bị cụm bi che khỏi bi cái. Không được ăn bi 1; được '
+            'chạm cụm bi nhưng mọi bi phải còn trong hoặc chồng lên khung.',
+        'S6' => switch (v) {
+            ExamIIVersion.bachelors => 'Bi cái cố định ở (1, 1). A băng (băng dài dưới) vào '
+                'từng bi 1–3. Không chết cái, bi chạm băng sau va chạm.',
+            ExamIIVersion.masters => 'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài '
+                'vào từng bi 1–4. Cú 5: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1.',
+            _ => 'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài vào từng bi 1–4. Cú 5, '
+                '6: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1 và bi 3. Cú 7: bi cái đặt '
+                'tự do, A băng ba băng bất kỳ vào bi 2.',
+          },
+        'S7' => switch (v) {
+            ExamIIVersion.bachelors => 'Bi cái đặt tự do mỗi cú. Cân bi từng bi (cách nhau '
+                'một khe một bi) chéo bàn vào lỗ giữa.',
+            ExamIIVersion.masters => 'Bi mục tiêu ở (3, 3). Từ mỗi vị trí trong 5 vị trí bi '
+                'cái, cân bi chéo bàn vào lỗ giữa.',
+            _ => 'Bi mục tiêu ở (6, 3). Từ mỗi vị trí trong 7 vị trí bi cái, cân bi chéo bàn '
+                'vào lỗ góc.',
+          },
+        'S8' => 'Dựng cơ: ăn từng bi mục tiêu vào lỗ góc dưới phải từ vị trí bi cái đã chỉ, '
+            'không chết cái. Bi mục tiêu ở giữa bi cái và lỗ. Bi cái áp sát băng, hoặc áp '
+            'sát bi chướng ngại thẳng hướng cú đánh.',
+        'S9' => switch (v) {
+            ExamIIVersion.bachelors => 'Bi cái ở (1, 1); hai bi chướng ngại cách nhau một khe '
+                'một bi. Nhảy bi qua khe, hoặc mát xê vòng qua một bi (khi mát xê thì nhấc một '
+                'bi chướng ngại ra), rồi ăn bi treo miệng lỗ góc.',
+            ExamIIVersion.masters => 'Bi cái ở (1, 1), một bi chướng ngại trên đường bắn. Nhảy '
+                'bi hoặc mát xê qua/vòng bi chướng ngại, rồi ăn bi treo miệng lỗ góc.',
+            _ => 'Bi cái ở (1, 1), bi chướng ngại cách bi cái một khe hai bi trên đường bắn. '
+                'Nhảy bi hoặc mát xê qua/vòng bi chướng ngại, đưa bi cái vào lỗ góc.',
+          },
+        'S10' => 'Phá giá 9 bi, bi cái đặt tự do sau vạch đầu bàn. Vùng đích của bi cái là 4 '
+            'chấm ở giữa bàn. Phá 3 lần, chấm từng lần theo tiêu chí a–e.',
+        _ => throw ArgumentError.value(drillId, 'drillId', 'chưa dịch cách xếp bài'),
+      };
 }

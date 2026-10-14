@@ -52,4 +52,40 @@ void main() {
       expect(Vi.rankDescription(r), isNotEmpty);
     }
   });
+
+  test('mọi bài, mọi bản đều có cách chấm và cách xếp bài', () {
+    for (final d in examIDrills) {
+      expect(Vi.buDrillScoring(d.id, null), isNotEmpty, reason: d.id);
+      expect(Vi.buDrillSetup(d.id, null), isNotEmpty, reason: d.id);
+    }
+    for (final v in ExamIIVersion.values) {
+      for (final d in examIIDrills(v)) {
+        expect(Vi.buDrillScoring(d.id, v), isNotEmpty, reason: '${d.id} $v');
+        expect(Vi.buDrillSetup(d.id, v), isNotEmpty, reason: '${d.id} $v');
+      }
+    }
+  });
+
+  test('cách chấm theo đúng chữ của spec', () {
+    expect(Vi.buDrillScoring('S3', ExamIIVersion.doctorate), contains('3–4 băng'));
+    expect(Vi.buDrillScoring('S3', ExamIIVersion.bachelors), isNot(contains('3–4 băng')));
+    expect(Vi.buDrillScoring('S4', ExamIIVersion.masters), contains('chướng ngại'));
+    expect(Vi.buDrillScoring('S1', ExamIIVersion.masters), contains('không cần lượt 2'));
+    expect(Vi.buBreakCriterion(0), 'a: không chết cái');
+    expect(Vi.buBreakCriterion(4),
+        'e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn');
+  });
+
+  test('không chữ nào dùng từ cấm', () {
+    final all = <String>[
+      for (final d in examIDrills) ...[Vi.buDrillScoring(d.id, null), Vi.buDrillSetup(d.id, null)],
+      for (final v in ExamIIVersion.values)
+        for (final d in examIIDrills(v)) ...[Vi.buDrillScoring(d.id, v), Vi.buDrillSetup(d.id, v)],
+    ];
+    for (final s in all) {
+      for (final banned in ['kim cương', 'bi ma', 'lọt bi cái']) {
+        expect(s.toLowerCase(), isNot(contains(banned)), reason: s);
+      }
+    }
+  });
 }
