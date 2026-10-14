@@ -258,4 +258,21 @@ void main() {
     expect(body['rank'], 'b');
     expect(body['warning_test_id'], 'tv');
   });
+
+  test('máy chủ đã có lần kiểm tra và kết quả (RECORD_NOT_UNIQUE): coi như đã đồng bộ', () async {
+    // Directus thật trả 400 RECORD_NOT_UNIQUE khi gửi lại cùng id (verify.mjs, 14/10/2026).
+    serve();
+    server.routes['POST /items/bu_tests'] = (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+    server.routes['POST /items/bu_drill_results'] =
+        (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+          id: 'xong', userId: 'u1', startedAt: older, tableSize: 'nineFootPlus',
+          completedAt: Value(newer), totalScore: const Value(137), resultRank: const Value('d')));
+    await db.into(db.buDrillResultRows).insert(BuDrillResultRowsCompanion.insert(
+          id: 'r-xong', testId: 'xong', drillId: 'F1', attempts: '{"shots":[]}', recordedAt: older));
+
+    expect(await build().syncNow(), SyncOutcome.done);
+    expect((await db.select(db.buTestRows).getSingle()).syncedAt, now);
+    expect((await db.select(db.buDrillResultRows).getSingle()).syncedAt, now);
+  });
 }

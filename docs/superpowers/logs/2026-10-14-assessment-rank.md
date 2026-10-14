@@ -35,3 +35,21 @@ Pages rendered with pdftoppm into a temp dir outside the repo and read one by on
 **Measured off the figure, not on a line — owner to check at the Task 17 HOLD:** F2–F4 CB/OB row at 0.25 chấm from the top rail (figure ≈ 0.33); F7 balls 4 and 8 at (7.8, 0.15)/(7.8, 3.85); S3 Bachelors layout 3 ball 5 at (5.9, 2.5); S4 Masters/Doctorate layout 3 ball 8 at x 0.4; S4 Doctorate layout 1 stripes at x 4.3; S9 hanger at (7.8, 3.85); S6 kick path rail point x 1.6.
 
 **PDF vs plan wording:** S9 Doctorate is "scratch in the corner" (score "CB pocketed"), no object ball. The plan's line "Bản Doctorate không cho chết cái" was wrong; the app now says the Doctorate shot succeeds by pocketing the cue ball in the corner without touching the obstacle. S3 Doctorate layout 3 (3–4 rails), S4 "allowed to contact the obstacle balls" and S9 "jump or massé" confirmed.
+
+## Directus (14/10/2026)
+
+Run from the main session with the owner's approval. First attempt: `POST /collections → 400` ("Validation failed for field collection / field"), fixed by 1dc7277 (every field sent with its own meta). Second run:
+
+`bootstrap.mjs` (exit 0):
+```
+Tạo collection player_ranks
+Tạo quan hệ player_ranks.user_created → directus_users
+Tạo collection bu_tests
+Tạo quan hệ bu_tests.user_created → directus_users
+Tạo collection bu_drill_results
+Tạo quan hệ bu_drill_results.user_created → directus_users
+Đặt 11 quyền cho Player policy (xoá 4 quyền cũ)
+Xong.
+```
+
+`verify.mjs` (exit 0): all 10 new rank/test checks OK, `NOTE gửi lại lần kiểm tra cùng id → status 400, code RECORD_NOT_UNIQUE`, ended with `Tất cả kiểm tra đều qua`. The app treats RECORD_NOT_UNIQUE on a re-push as already synced (test `máy chủ đã có lần kiểm tra và kết quả (RECORD_NOT_UNIQUE): coi như đã đồng bộ`).
