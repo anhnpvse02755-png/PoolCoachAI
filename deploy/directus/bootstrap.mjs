@@ -162,15 +162,36 @@ async function exists(path) {
   );
 }
 
+// Mỗi trường mang sẵn meta có `collection` và `field`. Directus tự thêm cờ
+// (vd. cờ ngày giờ cho trường timestamp) vào meta SAU bước tự điền
+// collection/field; trường gửi lên không có meta thì meta mới đó thiếu hai
+// khoá này và POST /collections trả 400 "Validation failed for field
+// collection / field" (lần chạy 14/10/2026).
+const withMeta = (name, f) => ({
+  ...f,
+  collection: name,
+  meta: { ...(f.meta ?? {}), collection: name, field: f.field },
+});
+
 async function ensureCollection(name, note, fields) {
+  const all = [...fields, ...ownerFields].map((f) => withMeta(name, f));
   if (!(await exists(`/collections/${name}`))) {
     await api('POST', '/collections', {
       collection: name,
       meta: { icon: 'military_tech', note },
       schema: {},
-      fields: [...fields, ...ownerFields],
+      fields: all,
     }, token);
     console.log(`Tạo collection ${name}`);
+  } else {
+    // Collection có từ lần chạy trước mà thiếu trường (lần đó hỏng giữa
+    // chừng, hoặc file này thêm trường mới): bù từng trường còn thiếu.
+    for (const f of all) {
+      if (!(await exists(`/fields/${name}/${f.field}`))) {
+        await api('POST', `/fields/${name}`, f, token);
+        console.log(`Thêm trường ${name}.${f.field}`);
+      }
+    }
   }
   if (!(await exists(`/relations/${name}/user_created`))) {
     // Xoá người dùng thì xoá luôn hạng và bài kiểm tra của họ.
