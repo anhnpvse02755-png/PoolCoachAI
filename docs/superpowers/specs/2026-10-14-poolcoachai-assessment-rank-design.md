@@ -103,7 +103,7 @@ Không file PDF nào có dòng giấy phép.
 | F2 | Đánh đứng bi (Stop Shot) | Thang vị trí. Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo | 10 |
 | F3 | Đánh cu lê (Follow Shot) | Thang vị trí. Bi cái dừng trong hoặc chồng lên khung giấy đích | 10 |
 | F4 | Đánh trô bi (Draw Shot) | Thang vị trí. Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa | 10 |
-| F5 | Đánh đứng bi (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
+| F5 | Đánh tâm tiến (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
 | F6 | Ăn bi (Ball Pocketing) | 10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm | 10 |
 | F7 | Bánh xe (Wagon Wheel) | 10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ **và** chạm đúng bi đích được 1 điểm | 20 |
 | F8 | Lưới đích (Grid Target) | 5 đích, mỗi đích 4 lượt. Vào lỗ **và** bi cái dừng trong hoặc chồng lên đích được 1 điểm | 20 |
@@ -337,7 +337,7 @@ Mục 1 và 2 đã có (14/10/2026). Mục 3 còn 2 tên chờ chủ sản phẩ
    Q1, Q2, Q3, Q7 và Q8 vẫn được hỏi và lưu trong `questionnaireAnswers` để Lộ trình dùng sau, nhưng **không tính hạng**. Có unit test cho từng dòng của bảng.
 
 3. **Tên bài.** Chủ sản phẩm sửa ngày 14/10/2026:
-   - F5 (stun) là **Đánh đứng bi**, trùng tên với F2 (stop). Hai bài phân biệt bằng tên tiếng Anh trong ngoặc.
+   - F5 (stun) là **Đánh tâm tiến**: kỹ thuật cao hơn đánh đứng bi (F2), sau va chạm bi cái nhích lên một chút. Không gộp với đánh đứng bi.
    - S5 là **Phòng thủ / bắt đui**.
    - S9 là **Nhảy bi (Jump)** hoặc **Mát xê (Massé)**. Đây là hai kỹ thuật khác nhau; S9 của BU cho phép dùng một trong hai.
 
@@ -345,4 +345,4 @@ Mục 1 và 2 đã có (14/10/2026). Mục 3 còn 2 tên chờ chủ sản phẩ
    - F6 "Ăn bi";
    - S8 "Dựng cơ".
 
-   Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
+   Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh tâm tiến, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
