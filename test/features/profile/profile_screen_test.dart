@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
@@ -16,6 +17,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
+import 'package:poolcoachai/data/sync/assessment_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
 
@@ -57,12 +59,28 @@ void main() {
       now: () => today,
     );
     addTearDown(sync.dispose);
+    server
+      ..routes['GET /items/player_ranks'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/player_ranks'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/bu_tests'] = ((_) => FakeDirectus.ok([]))
+      ..routes['GET /items/bu_drill_results'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/bu_tests'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['POST /items/bu_drill_results'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)));
+    final assessmentSync = AssessmentSyncService(
+      db: db,
+      auth: auth,
+      api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+      now: () => today,
+      onRankFetch: (_, _) {},
+    );
+    addTearDown(assessmentSync.dispose);
 
     final container = ProviderContainer(overrides: [
       appDatabaseProvider.overrideWithValue(db),
       nowProvider.overrideWithValue(() => today),
       authRepositoryProvider.overrideWithValue(auth),
       syncServiceProvider.overrideWithValue(sync),
+      assessmentSyncProvider.overrideWithValue(assessmentSync),
     ]);
     addTearDown(container.dispose);
     final gate = AuthGate(auth);
@@ -229,5 +247,28 @@ void main() {
 
     expect(find.widgetWithText(FilledButton, Vi.signOutSyncFirst), findsOneWidget);
     expect(find.widgetWithText(TextButton, Vi.signOutAnyway), findsOneWidget);
+  });
+
+  testWidgets('đăng xuất khi có lần kiểm tra dở: cảnh báo sẽ mất, Vẫn đăng xuất thì xoá', (tester) async {
+    final (db, auth, _) = await openProfile(tester);
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 'do', userId: 'u1', startedAt: today, tableSize: 'nineFootPlus'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.signOutActiveTest), findsOneWidget);
+    await tester.tap(find.text(Vi.signOutAnyway));
+    await tester.pumpAndSettle();
+
+    expect(auth.calls, ['signOut']);
+    expect(await db.select(db.buTestRows).get(), isEmpty);
+  });
+
+  testWidgets('Hồ sơ hiện thẻ hạng thay cho chỗ trống cũ', (tester) async {
+    await openProfile(tester);
+    expect(find.text(Vi.rankNone), findsOneWidget);
+    expect(find.text(Vi.rankDetermine), findsOneWidget);
+    expect(find.text(Vi.profileComing), findsNothing);
   });
 }

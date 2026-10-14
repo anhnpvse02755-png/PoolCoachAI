@@ -1,3 +1,5 @@
+import 'dart:ui' show Size;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -29,6 +31,11 @@ void main() {
     );
     addTearDown(container.dispose);
 
+    // Trang chủ có thêm thẻ hạng ở đầu (spec mục 7.4): màn cao hơn để các
+    // thẻ cũ vẫn nằm trong khung, không phải cuộn.
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,

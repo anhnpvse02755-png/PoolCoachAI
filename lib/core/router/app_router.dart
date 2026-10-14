@@ -20,6 +20,7 @@ import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
+import 'package:poolcoachai/features/rank/presentation/rank_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
@@ -135,6 +136,10 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
     GoRoute(
       path: Routes.notifications,
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: Routes.rank,
+      builder: (context, state) => const RankScreen(),
     ),
     GoRoute(
       path: Routes.rankLayouts,

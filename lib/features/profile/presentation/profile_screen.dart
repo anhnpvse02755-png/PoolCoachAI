@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
-import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 
 enum _SignOutChoice { syncFirst, anyway }
 
@@ -20,13 +21,23 @@ class ProfileScreen extends ConsumerWidget {
     final db = ref.read(appDatabaseProvider);
 
     final pending = await pendingLogCount(db, userId);
-    if (pending > 0) {
+    final pendingRank = await pendingAssessmentCount(db, userId);
+    final active = await hasActiveTest(db, userId);
+    if (pending > 0 || pendingRank > 0 || active) {
       if (!context.mounted) return;
       final choice = await showDialog<_SignOutChoice>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text(Vi.signOutPendingTitle),
-          content: Text(Vi.signOutPendingBody(pending)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (pending > 0) Text(Vi.signOutPendingBody(pending)),
+              if (pendingRank > 0) Text(Vi.signOutPendingAssessment(pendingRank)),
+              if (active) const Text(Vi.signOutActiveTest),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, _SignOutChoice.anyway),
@@ -42,14 +53,16 @@ class ProfileScreen extends ConsumerWidget {
       if (choice == null) return;
       if (choice == _SignOutChoice.syncFirst) {
         await ref.read(syncServiceProvider).syncNow();
+        await ref.read(assessmentSyncProvider).syncNow();
         final left = await pendingLogCount(db, userId);
-        if (left > 0) {
+        final leftRank = await pendingAssessmentCount(db, userId);
+        if (left > 0 || leftRank > 0) {
           // Chỉ còn buổi không bao giờ lên được thì mạng không phải lý do:
           // thử lại mãi cũng vậy, phải chỉ người chơi tới chỗ bỏ chúng.
           final unsyncable = await unsyncableLogCount(db, userId);
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(left == unsyncable
+            content: Text(left == unsyncable && leftRank == 0
                 ? Vi.syncBlockedByUnsyncable
                 : Vi.syncFailed),
           ));
@@ -81,15 +94,24 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           if (unsyncable > 0) _UnsyncableNotice(count: unsyncable),
           Expanded(
-            child: PcEmptyState(
-              icon: Icons.person_outline,
-              title: Vi.profileSignedInAs(name),
-              body: Vi.profileComing,
-              action: OutlinedButton.icon(
-                onPressed: () => _signOut(context, ref),
-                icon: const Icon(Icons.logout),
-                label: const Text(Vi.profileSignOut),
-              ),
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [
+                Text(Vi.profileSignedInAs(name)),
+                const SizedBox(height: AppSpacing.md),
+                const RankCard(),
+                const SizedBox(height: AppSpacing.lg),
+                const TestHistoryList(),
+              ],
+            ),
+          ),
+          // Đăng xuất ghim ở đáy: thẻ hạng và lịch sử dài ra thì nút vẫn ở chỗ cũ.
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: OutlinedButton.icon(
+              onPressed: () => _signOut(context, ref),
+              icon: const Icon(Icons.logout),
+              label: const Text(Vi.profileSignOut),
             ),
           ),
         ],

@@ -13,7 +13,7 @@ void main() {
       ]);
     });
 
-    test('all gom đủ năm tab, năm màn mở đè, ba đường dẫn có tham số và bốn màn tài khoản', () {
+    test('all gom đủ năm tab, sáu màn mở đè, ba đường dẫn có tham số và bốn màn tài khoản', () {
       expect(Routes.all, [
         ...Routes.tabs,
         Routes.coach,
@@ -22,6 +22,7 @@ void main() {
         Routes.drillSessionPattern,
         Routes.simulator,
         Routes.planner,
+        Routes.rank,
         Routes.rankLayouts,
         Routes.onboardingRank,
         Routes.rankTest,

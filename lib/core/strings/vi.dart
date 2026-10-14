@@ -1,6 +1,7 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
@@ -1069,4 +1070,40 @@ abstract final class Vi {
   static const buCancelConfirmBody =
       'Hủy lần này? Các cú đã nhập không được tính và hạng không đổi.';
   static const buCancelConfirm = 'Hủy lần này';
+
+  // Hạng trên Hồ sơ, Trang chủ và màn Hạng — spec mục 4.3, 7.4.
+  static String rankSource(RankSource s) => switch (s) {
+        RankSource.estimated => 'ước lượng',
+        RankSource.selfDeclared => 'tự khai',
+        RankSource.verified => 'đã kiểm chứng',
+      };
+  static const rankInfo = 'Về bảng hạng';
+  static const rankInfoTitle = 'Bảng hạng PoolCoachAI';
+  static const rankTableTitle = 'Quy đổi điểm Billiard University sang hạng';
+  static String rankBandRange(BuRankBand b) => '${b.min}–${b.max} điểm';
+  static String rankBandLevels(BuRankBand b) => 'Mức BU: ${b.buLevels} · Fargo ${b.fargo}';
+  static const rankProNote = 'PRO chỉ có khi tự khai. Bài kiểm tra BU cao nhất ra hạng A.';
+  static const rankNone = 'Bạn chưa có hạng.';
+  static String rankWarning(Rank w) => 'Lần kiểm tra gần nhất cho kết quả tương đương hạng '
+      '${w.label}, thấp hơn hạng hiện tại.';
+  static String rankLastTest(DateTime d, int total, Rank r) =>
+      'Lần kiểm tra gần nhất: ${shortDate(d)} · $total điểm · hạng ${r.label}';
+  static const rankContinueTest = 'Làm tiếp';
+  static const rankDetermine = 'Xác định hạng';
+  static const rankTakeTest = 'Làm bài kiểm tra';
+  static const rankDetails = 'Xem chi tiết hạng';
+  static const rankScreenTitle = 'Hạng của bạn';
+  static const rankRetakeQuestionnaire = 'Làm lại bộ câu hỏi';
+  static const rankShowLayouts = 'Xem sơ đồ các bài';
+  static const rankHistoryTitle = 'Lịch sử kiểm tra';
+  static const rankHistoryEmpty = 'Chưa có lần kiểm tra nào.';
+  static String rankHistoryCompleted(DateTime d, int total, Rank r) =>
+      '${shortDate(d)} · $total điểm · hạng ${r.label}';
+  static String rankHistoryCancelled(DateTime d) => '${shortDate(d)} · đã hủy';
+  static const homeRankCardTitle = 'Xác định hạng của bạn';
+  static const homeRankCardBody = 'Trả lời 8 câu hỏi để có hạng gợi ý, hoặc làm bài kiểm tra '
+      'Billiard University để có hạng đã kiểm chứng.';
+  static String signOutPendingAssessment(int n) =>
+      'Còn $n mục hạng hoặc bài kiểm tra chưa đồng bộ, đăng xuất sẽ mất.';
+  static const signOutActiveTest = 'Lần kiểm tra đang làm dở sẽ mất khi đăng xuất.';
 }

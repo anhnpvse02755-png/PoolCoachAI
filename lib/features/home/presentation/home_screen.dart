@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
+import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 
 /// AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
 ///
@@ -27,6 +28,7 @@ class HomeScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                const HomeRankHeader(),
                 // Chuỗi ngày tập liên tiếp. 0 là con số thật, hiện bình thường.
                 PcCard(
                   child: Row(
