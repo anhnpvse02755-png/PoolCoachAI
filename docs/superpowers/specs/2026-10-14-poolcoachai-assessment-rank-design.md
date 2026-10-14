@@ -103,7 +103,7 @@ Không file PDF nào có dòng giấy phép.
 | F2 | Đánh đứng bi (Stop Shot) | Thang vị trí. Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo | 10 |
 | F3 | Đánh cu lê (Follow Shot) | Thang vị trí. Bi cái dừng trong hoặc chồng lên khung giấy đích | 10 |
 | F4 | Đánh trô bi (Draw Shot) | Thang vị trí. Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa | 10 |
-| F5 | Đánh đứng bi trượt (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
+| F5 | Đánh đứng bi (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
 | F6 | Ăn bi (Ball Pocketing) | 10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm | 10 |
 | F7 | Bánh xe (Wagon Wheel) | 10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ **và** chạm đúng bi đích được 1 điểm | 20 |
 | F8 | Lưới đích (Grid Target) | 5 đích, mỗi đích 4 lượt. Vào lỗ **và** bi cái dừng trong hoặc chồng lên đích được 1 điểm | 20 |
@@ -116,11 +116,11 @@ Không file PDF nào có dòng giấy phép.
 | S2 | Ngắm bi sát băng (Rail Cuts) | 2 lượt, thứ tự tùy ý, lấy lượt cao hơn | 7 | 11 | 15 |
 | S3 | Thế 9 bi | 3 thế, mỗi bi hợp lệ theo thứ tự 1 điểm, cộng 2 thế thấp nhất | 10 (bi 5–9) | 12 (bi 4–9) | 14 (bi 3–9) |
 | S4 | Thế 8 bi | 3 thế, mỗi bi trước khi trượt 1 điểm, cộng 2 thế thấp nhất | 10 | 12 | 14 |
-| S5 | Phòng thủ làm đui (Safety) | Mỗi vị trí bi cái 2 lượt, mỗi lần làm đui được 1 điểm | 6 (3 vị trí) | 10 (5) | 14 (7) |
+| S5 | Phòng thủ / bắt đui (Safety) | Mỗi vị trí bi cái 2 lượt, mỗi lần bắt đui được 1 điểm | 6 (3 vị trí) | 10 (5) | 14 (7) |
 | S6 | A băng (Kicks) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
 | S7 | Cân bi (Banks) | Mỗi cú thành công 1 điểm | 3 (bi qua lỗ giữa) | 5 | 7 (bi qua lỗ góc) |
 | S8 | Dựng cơ (Elevated cue) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
-| S9 | Nhảy bi / massé | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
+| S9 | Nhảy bi (Jump) hoặc Mát xê (Massé) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
 | S10 | Phá (Break) | 3 lần phá, mỗi lần chấm 5 tiêu chí a–e (0/1 mỗi tiêu chí), lấy **trung vị** | 5 | 5 | 5 |
 | | **Tổng** | | **54** | **77** | **100** |
 
@@ -288,7 +288,7 @@ Có nút **Hủy lần kiểm tra này**. Lần bị hủy không tính vào gi�
 
 ## 11. Đầu vào từ chủ sản phẩm
 
-Mục 1 và 2 đã có (14/10/2026). Còn mục 3 chờ chủ sản phẩm; mục này không chặn việc triển khai, vì tên bài chỉ là chuỗi hiển thị.
+Mục 1 và 2 đã có (14/10/2026). Mục 3 còn 2 tên chờ chủ sản phẩm; không chặn việc triển khai, vì tên bài chỉ là chuỗi hiển thị.
 
 1. **Mô tả từng hạng.** Lấy nguyên văn từ PoolOS v2, `lib/core/constants/app_constants.dart` (`AppConstants.playerLevels`, chú thích "HỆ THỐNG XẾP HẠNG - THEO CHUẨN HÀ NỘI / Tham khảo từ cộng đồng Pool Hà Nội"). Chủ sản phẩm chỉ định nguồn này ngày 14/10/2026.
 
@@ -336,11 +336,13 @@ Mục 1 và 2 đã có (14/10/2026). Còn mục 3 chờ chủ sản phẩm; mụ
 
    Q1, Q2, Q3, Q7 và Q8 vẫn được hỏi và lưu trong `questionnaireAnswers` để Lộ trình dùng sau, nhưng **không tính hạng**. Có unit test cho từng dòng của bảng.
 
-3. **Sửa tên bài chưa có trong bộ thuật ngữ.** Các tên sau do Claude tạm đặt:
-   - F5 "Đánh đứng bi trượt" (stun);
+3. **Tên bài.** Chủ sản phẩm sửa ngày 14/10/2026:
+   - F5 (stun) là **Đánh đứng bi**, trùng tên với F2 (stop). Hai bài phân biệt bằng tên tiếng Anh trong ngoặc.
+   - S5 là **Phòng thủ / bắt đui**.
+   - S9 là **Nhảy bi (Jump)** hoặc **Mát xê (Massé)**. Đây là hai kỹ thuật khác nhau; S9 của BU cho phép dùng một trong hai.
+
+   Còn chờ chủ sản phẩm (không chặn triển khai):
    - F6 "Ăn bi";
-   - S5 "Phòng thủ làm đui";
-   - S8 "Dựng cơ";
-   - S9 "Nhảy bi / massé".
+   - S8 "Dựng cơ".
 
    Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
