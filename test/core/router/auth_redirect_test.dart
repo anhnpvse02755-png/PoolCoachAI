@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
+import 'package:poolcoachai/domain/assessment/onboarding_check.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
 void main() {
@@ -32,5 +33,25 @@ void main() {
 
   test('đã đăng nhập thì mọi màn khác giữ nguyên', () {
     expect(authRedirect(inn, at('/training')), isNull);
+  });
+
+  test('cần onboarding thì mọi màn đã đăng nhập chuyển tới /onboarding/rank', () {
+    const need = OnboardingCheck.required;
+    expect(authRedirect(inn, at('/home'), onboarding: need), Routes.onboardingRank);
+    expect(authRedirect(inn, at('/profile'), onboarding: need), Routes.onboardingRank);
+    expect(authRedirect(inn, at(Routes.onboardingRank), onboarding: need), isNull);
+  });
+
+  test('cần onboarding mà đang ở màn tài khoản: về Trang chủ trước, lượt sau mới sang onboarding', () {
+    expect(authRedirect(inn, at('/login'), onboarding: OnboardingCheck.required), Routes.home);
+  });
+
+  test('chưa đăng nhập thì onboarding không quan trọng', () {
+    expect(authRedirect(out, at(Routes.onboardingRank), onboarding: OnboardingCheck.required),
+        Routes.login);
+  });
+
+  test('không cần onboarding thì vẫn vào lại được màn câu hỏi (làm lại)', () {
+    expect(authRedirect(inn, at(Routes.onboardingRank)), isNull);
   });
 }

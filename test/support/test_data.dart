@@ -7,9 +7,11 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -117,4 +119,19 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
     await tester.pumpAndSettle();
   }
   return (router, auth);
+}
+
+/// Như [testContainer] nhưng hạng và bài kiểm tra đọc từ [db] thật (SQLite
+/// trong bộ nhớ) — cho widget test cần ghi rồi đọc lại.
+ProviderContainer dbContainer(AppDatabase db, {AuthRepository? auth, DateTime? now}) {
+  return ProviderContainer(
+    overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+      nowProvider.overrideWithValue(() => now ?? testToday),
+      drillsProvider.overrideWith((ref) => Stream.value(testDrills)),
+      knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),
+      drillLogsProvider.overrideWith((ref) => Stream.value(const <DrillLog>[])),
+      authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
+    ],
+  );
 }

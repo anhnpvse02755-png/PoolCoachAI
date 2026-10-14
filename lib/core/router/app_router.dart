@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
+import 'package:poolcoachai/domain/assessment/onboarding_check.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/features/auth/presentation/forgot_password_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
@@ -17,6 +19,7 @@ import 'package:poolcoachai/features/notifications/presentation/notifications_sc
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
+import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
@@ -34,10 +37,11 @@ import 'package:poolcoachai/features/training/presentation/training_screen.dart'
 /// trạng thái**: nó nhớ đang đứng ở đâu. Một router dùng chung toàn
 /// chương trình khiến hai màn hình không thể tồn tại độc lập, và trong
 /// kiểm thử thì test trước để lại vị trí điều hướng cho test sau.
-GoRouter createAppRouter({required AuthGate auth}) => GoRouter(
+GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) => GoRouter(
   initialLocation: Routes.home,
-  refreshListenable: auth,
-  redirect: (context, state) => authRedirect(auth.state, state.uri),
+  refreshListenable: onboarding == null ? auth : Listenable.merge([auth, onboarding]),
+  redirect: (context, state) => authRedirect(auth.state, state.uri,
+      onboarding: onboarding?.check ?? OnboardingCheck.notRequired),
   // Đường dẫn lạ thì dựng màn tiếng Việt của mình, không để go_router
   // đổ trang lỗi mặc định — trang đó là tiếng Anh và in thẳng nội dung
   // ngoại lệ ra trước mặt người chơi.
@@ -137,6 +141,10 @@ GoRouter createAppRouter({required AuthGate auth}) => GoRouter(
         index: int.tryParse(state.uri.queryParameters['i'] ?? ''),
       ),
     ),
+    GoRoute(
+      path: Routes.onboardingRank,
+      builder: (context, state) => const OnboardingScreen(),
+    ),
     // Bài đọc mở đè lên shell: vào được từ AI Home và từ bài tập, nên
     // không thuộc riêng nhánh tab nào.
     GoRoute(
@@ -168,14 +176,22 @@ GoRouter createAppRouter({required AuthGate auth}) => GoRouter(
 ///
 /// Chưa đăng nhập thì chỉ vào được ba màn tài khoản; đã đăng nhập thì
 /// không vào lại chúng. Link đặt lại mật khẩu mở được ở cả hai trạng
-/// thái, vì người ta có thể bấm nó trên máy vẫn đang đăng nhập.
-String? authRedirect(AuthState auth, Uri location) {
+/// thái. Đã đăng nhập mà tài khoản chắc chắn chưa có hạng thì vào bộ câu
+/// hỏi trước (spec mục 7.1); go_router chạy lại redirect trên đích mới,
+/// nên từ màn tài khoản sẽ đi Trang chủ rồi mới sang bộ câu hỏi.
+String? authRedirect(
+  AuthState auth,
+  Uri location, {
+  OnboardingCheck onboarding = OnboardingCheck.notRequired,
+}) {
   final path = location.path;
   if (path == Routes.resetPassword) return null;
   final onAuthPage = Routes.signedOutOnly.contains(path);
   return switch (auth) {
     SignedOut() when !onAuthPage => Routes.login,
     SignedIn() when onAuthPage => Routes.home,
+    SignedIn() when onboarding == OnboardingCheck.required && path != Routes.onboardingRank =>
+      Routes.onboardingRank,
     _ => null,
   };
 }

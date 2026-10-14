@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -29,8 +30,11 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
   /// Router truyền từ ngoài vào thuộc về người gọi — kiểm thử tự dựng
   /// rồi tự dọn. Dispose hộ sẽ giết router ngay dưới chân người gọi.
   bool get _ownsRouter => widget.router == null;
-  late final GoRouter _router =
-      widget.router ?? createAppRouter(auth: ref.read(authGateProvider));
+  late final GoRouter _router = widget.router ??
+      createAppRouter(
+        auth: ref.read(authGateProvider),
+        onboarding: ref.read(onboardingGateProvider),
+      );
 
   @override
   void dispose() {
@@ -42,6 +46,10 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Riverpod 3 tạm dừng provider không ai nghe: cổng onboarding chỉ được
+    // router giữ (ngoài Riverpod), nên app phải nghe nó thì nó mới theo kịp
+    // hạng và kết quả lấy hạng từ máy chủ.
+    if (_ownsRouter) ref.watch(onboardingGateProvider);
     return MaterialApp.router(
       title: Vi.appName,
       theme: AppTheme.dark(),

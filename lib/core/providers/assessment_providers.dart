@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
@@ -78,4 +79,41 @@ final assessmentSyncProvider = Provider<AssessmentSyncService>((ref) {
   )..start();
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Cầu nối từ trạng thái hạng sang `refreshListenable` của router, như
+/// [AuthGate] với trạng thái đăng nhập.
+class OnboardingGate extends ChangeNotifier {
+  OnboardingCheck _check = OnboardingCheck.notRequired;
+
+  OnboardingCheck get check => _check;
+
+  void update(OnboardingCheck next) {
+    if (next == _check) return;
+    _check = next;
+    notifyListeners();
+  }
+}
+
+final onboardingGateProvider = Provider<OnboardingGate>((ref) {
+  final gate = OnboardingGate();
+  void recompute() {
+    final userId = ref.read(currentUserIdProvider);
+    final rank = ref.read(playerRankProvider);
+    gate.update(userId == null
+        ? OnboardingCheck.notRequired
+        : decideOnboarding(
+            // Đang tải lại (vừa đổi người) thì giá trị cũ là của người trước.
+            rankLoaded: rank.hasValue && !rank.isLoading,
+            local: rank.value,
+            fetch: rankFetchFor(ref.read(rankFetchProvider), userId),
+          ));
+  }
+
+  ref.listen(playerRankProvider, (_, _) => recompute());
+  ref.listen(rankFetchProvider, (_, _) => recompute());
+  ref.listen(currentUserIdProvider, (_, _) => recompute());
+  recompute();
+  ref.onDispose(gate.dispose);
+  return gate;
 });

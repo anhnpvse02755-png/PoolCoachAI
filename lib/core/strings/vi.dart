@@ -948,4 +948,26 @@ abstract final class Vi {
       '${l.version == null ? '' : ' · ${buVersionName(l.version!)}'} · hình ${l.variant}';
 
   static String buLayoutSource(String source) => 'Nguồn: Billiard University — $source';
+
+  // Bộ câu hỏi xác định hạng — spec mục 7.2.
+  static const onboardingTitle = 'Xác định hạng';
+  static const onboardingLater = 'Để sau';
+  static const onboardingIntroTitle = 'Xác định hạng của bạn';
+  static const onboardingIntroBody = 'Trả lời 8 câu hỏi ngắn, app gợi ý một hạng. Bạn '
+      'xác nhận hoặc tự chọn hạng khác. Muốn có hạng đã kiểm chứng, hãy làm bài kiểm tra '
+      'Billiard University ở mục Hồ sơ.';
+  static const onboardingStart = 'Bắt đầu';
+  static String onboardingQuestionCounter(int q) => 'Câu $q / 8';
+  static const onboardingBack = 'Quay lại';
+  static const onboardingNext = 'Tiếp';
+  static const onboardingSuggestTitle = 'Hạng gợi ý cho bạn';
+  static const onboardingConfirm = 'Xác nhận';
+  static const onboardingChooseOther = 'Chọn hạng khác';
+  static const onboardingChooseTitle = 'Chọn hạng của bạn';
+  static const onboardingLocked = 'Hạng của bạn đã được kiểm chứng bằng bài kiểm tra '
+      'Billiard University. Từ giờ chỉ bài kiểm tra mới đổi được hạng.';
+
+  /// Câu miễn trừ bắt buộc ở mọi màn hiện hạng (spec mục 4.3).
+  static const rankDisclaimer =
+      'Đây là bảng hạng riêng của PoolCoachAI, tham khảo cách hiểu ở Hà Nội.';
 }

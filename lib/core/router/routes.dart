@@ -51,6 +51,9 @@ abstract final class Routes {
   /// Mở từ link trong email; vào được cả khi đã hay chưa đăng nhập.
   static const resetPassword = '/reset-password';
 
+  /// Bộ câu hỏi xác định hạng — mở đè lên shell (spec mục 7.1).
+  static const onboardingRank = '/onboarding/rank';
+
   /// Đã đăng nhập thì không vào lại mấy màn này.
   static const signedOutOnly = <String>[login, register, forgotPassword];
 
@@ -75,6 +78,7 @@ abstract final class Routes {
     simulator,
     planner,
     rankLayouts,
+    onboardingRank,
     articlePattern,
     login,
     register,
