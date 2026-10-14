@@ -221,4 +221,21 @@ void main() {
           'chuyển sang Web Worker hay điện thoại mà không đổi lõi (spec mục 2)',
     );
   });
+
+  test('lõi đánh giá không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/assessment');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'luật hạng và bộ chấm BU phải chạy và test được trên Dart VM '
+          'thuần (spec 2026-10-14 mục 5)',
+    );
+  });
 }
