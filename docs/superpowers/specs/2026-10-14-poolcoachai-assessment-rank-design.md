@@ -288,7 +288,7 @@ Có nút **Hủy lần kiểm tra này**. Lần bị hủy không tính vào gi�
 
 ## 11. Đầu vào từ chủ sản phẩm
 
-Mục 1 và 2 đã có (14/10/2026). Mục 3 còn 2 tên chờ chủ sản phẩm; không chặn việc triển khai, vì tên bài chỉ là chuỗi hiển thị.
+Cả ba mục đã chốt ngày 14/10/2026.
 
 1. **Mô tả từng hạng.** Lấy nguyên văn từ PoolOS v2, `lib/core/constants/app_constants.dart` (`AppConstants.playerLevels`, chú thích "HỆ THỐNG XẾP HẠNG - THEO CHUẨN HÀ NỘI / Tham khảo từ cộng đồng Pool Hà Nội"). Chủ sản phẩm chỉ định nguồn này ngày 14/10/2026.
 
@@ -341,8 +341,6 @@ Mục 1 và 2 đã có (14/10/2026). Mục 3 còn 2 tên chờ chủ sản phẩ
    - S5 là **Phòng thủ / bắt đui**.
    - S9 là **Nhảy bi (Jump)** hoặc **Mát xê (Massé)**. Đây là hai kỹ thuật khác nhau; S9 của BU cho phép dùng một trong hai.
 
-   Còn chờ chủ sản phẩm (không chặn triển khai):
-   - F6 "Ăn bi";
-   - S8 "Dựng cơ".
+   - F6 là **Ăn bi** và S8 là **Dựng cơ** (chủ sản phẩm đồng ý tên Claude đề xuất).
 
    Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh tâm tiến, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
