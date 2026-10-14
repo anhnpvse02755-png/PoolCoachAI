@@ -45,7 +45,7 @@ Thành công nghĩa là:
 | Q9 | Mỗi lần kiểm tra làm **đủ Đề I + Đề II** (thang 200) |
 | Q10 | Câu hỏi onboarding soạn từ **mô tả từng hạng do chủ sản phẩm viết**, chủ sản phẩm duyệt từng dòng |
 | Q11 | Quy đổi BU sang hạng: gộp các mức của bảng chính thức cho khớp mô tả hạng (mục 5.4) |
-| Q12 | Bài kiểm tra luôn được làm, nhưng hai lần **hoàn tất** phải cách nhau tối thiểu **14 ngày** (quy định của app, không phải luật BU). Dữ liệu luyện tập chỉ dùng để gợi ý kiểm tra lại |
+| Q12 | Bài kiểm tra luôn được làm, nhưng hai lần **hoàn tất** phải cách nhau tối thiểu **14 ngày** (quy định của app, không phải luật BU). Giãn cách chặn cả lúc **bắt đầu** lẫn lúc **hoàn tất** (bài bắt đầu trên máy khác có thể kết thúc trong khoảng chặn). Tính theo ngày lịch địa phương: hoàn tất 21:00 ngày 1/10 thì được làm lại từ 0:00 ngày 15/10. Dữ liệu luyện tập chỉ dùng để gợi ý kiểm tra lại |
 | Q13 | Onboarding hiện sau lần đăng nhập đầu tiên, có nút "Để sau" |
 | Q14 | Kiến trúc: module đánh giá riêng, không nhét bài BU vào mô hình `Drill`/`DrillLog` |
 | Q15 | Cảnh báo chỉ phát ra khi một lần kiểm tra BU cho hạng thấp hơn hạng hiện tại. Không suy cảnh báo từ dữ liệu luyện tập |
@@ -145,7 +145,7 @@ Bản kế hoạch triển khai phải đối chiếu lại từng luật với 
 
 1. **Thang vị trí** (F1–F5): nhận chuỗi kết quả vào/trượt. Bắt đầu ở vị trí 4, vào thì +1, trượt thì −1, kẹp trong khoảng 1–7. Tổng cộng 10 cú, kết quả cú thứ 10 vẫn được áp dụng. Điểm = vị trí cuối + số lần vào khi đang ở vị trí 7, tối đa 10. Được **dừng sớm** khi đã chắc chắn đạt 10.
 2. **Đếm lượt thành công** (F6, F7, F8, S5–S9): mỗi lượt thành công 1 điểm.
-3. **Lấy lượt cao hơn trong 2 lượt** (S1, S2): mỗi lượt là số bi.
+3. **Lấy lượt cao hơn trong 2 lượt** (S1, S2): mỗi lượt là số bi. Lượt 1 đạt điểm tối đa thì không cần đánh lượt 2 (theo phiếu điểm BU: "The 2nd attempt is not required with a perfect score on the 1st attempt").
 4. **Cộng hai lượt thấp nhất trong 3 thế** (S3, S4).
 5. **Trung vị 3 lần phá** (S10).
 
@@ -153,8 +153,9 @@ Bản kế hoạch triển khai phải đối chiếu lại từng luật với 
 
 - Làm Đề I trước. Điểm Đề I xếp bản Đề II: **0–49 Bachelors, 50–69 Masters, 70–100 Doctorate**.
 - Bản Doctorate phải đánh trên bàn **9 feet trở lên**. Bàn 7–8 feet mà Đề I đạt mức Doctorate thì làm bản Masters.
+- Bàn mặc định của bài kiểm tra là **bàn 9 feet chuẩn thi đấu pool (bi-a Mỹ)**. Người chơi chỉ chọn bàn 7–8 feet khi thật sự đánh trên bàn nhỏ. Chủ sản phẩm chốt ngày 14/10/2026.
 - Đề II được làm vào buổi khác Đề I. Một lần kiểm tra chỉ **hoàn tất** khi đã có điểm cả hai đề.
-- **Điểm BU = Đề I + Đề II, cộng điểm thô.** Đây là **giả định**: PDF không nói có quy đổi bản Bachelors (tối đa 54) và Masters (tối đa 77) sang thang 100 hay không. Hệ quả: người làm bản thấp bị giới hạn tổng điểm, muốn lên tiếp thì phải đạt Đề I cao hơn. Kế hoạch triển khai nên kiểm tra phiếu điểm (score sheet) chính thức nếu tìm được.
+- **Điểm BU = Đề I + Đề II, cộng điểm thô.** Đã đối chiếu phiếu điểm chính thức: mỗi phiếu Đề II ghi "Total Score = Exam I + Exam II" với tổng tối đa 54 / 77 / 100, không quy đổi. Người làm bản thấp bị giới hạn tổng điểm; muốn lên tiếp thì phải đạt Đề I cao hơn.
 - Quy đổi sang hạng theo `BU_Rating_Comparisons.pdf` (không dùng bảng trên trang web, vì hai bảng lệch nhau ở các mức dưới 140). Bảng dưới **chỉ gộp các mức có sẵn của BU**, không thêm mốc tự đặt. Cách gộp bám theo mô tả hạng ở mục 11.1. Chủ sản phẩm chốt ngày 14/10/2026, thay cho bản khớp 1–1 trước đó vì bản đó đặt hạng A ("Top đầu trong nước") ở mức Fargo 600, quá thấp.
 
 | Hạng | Điểm BU | Mức BU | Fargo (tham chiếu) |
@@ -176,10 +177,11 @@ Căn cứ cho mốc A/B (tra ngày 14/10/2026). Dữ liệu còn mỏng; chủ s
 - Dương Quốc Hoàng có Fargo khoảng 805–839. Con số chỉ thấy qua trích đoạn kết quả tìm kiếm, **chưa kiểm chứng**.
 - Không tìm được Fargo của các cơ thủ Việt Nam khác, cũng không có bảng nào quy đổi hạng CLB Việt Nam sang Fargo. Các nguồn Việt Nam hiểu cùng một chữ cái hạng khác nhau, nên câu miễn trừ ở mục 4.3 là bắt buộc.
 
-Hệ quả theo luật BU:
+Hệ quả theo luật BU (app không đặt trần hạng riêng):
 
-- Muốn từ C trở lên phải làm bản Doctorate, tức phải đánh trên bàn 9 feet.
-- Người làm bản Masters tối đa được 177 điểm.
+- Bản Bachelors (Đề I 0–49) tối đa 49 + 54 = 103 điểm, tức hạng F.
+- Bản Masters trên bàn 9 feet (Đề I 50–69) tối đa 69 + 77 = 146 điểm, tức hạng C.
+- Bản Masters trên bàn 7–8 feet (Đề I tới 100) tối đa 177 điểm, tức hạng A. BU chỉ giới hạn bằng cấp, không giới hạn điểm, nên app cũng không giới hạn hạng.
 
 ### 5.5 Sơ đồ xếp bi
 
@@ -216,7 +218,7 @@ Mỗi cú ghi xuống Drift ngay khi nhập, nên đóng app giữa chừng vẫ
 Ba collection mới cùng tên. Tạo collection là thao tác trên máy chủ thật, phải hỏi chủ sản phẩm trước khi làm.
 
 - `BuTestRows` và `BuDrillResultRows`: chỉ thêm. Một lần kiểm tra không sửa được nữa sau khi hoàn tất hoặc hủy. Không có xung đột.
-- `PlayerRankRows`: **bản mới nhất thắng** theo `updatedAt`, trừ một ngoại lệ: bản `verified` không bao giờ bị bản `estimated`/`selfDeclared` ghi đè. Giữa hai bản `verified` thì bản mới hơn thắng.
+- `PlayerRankRows`: **bản mới nhất thắng** theo `updatedAt`, trừ một ngoại lệ: bản `verified` không bao giờ bị bản `estimated`/`selfDeclared` ghi đè. Giữa hai bản `verified` thì **hạng cao hơn thắng**; cùng hạng thì bản mới hơn thắng. Nếu bản thua là kết quả kiểm tra thấp hơn thì nó trở thành cảnh báo (luật 4), không hạ hạng. Bản không có hạng không bao giờ thắng bản có hạng. Chủ sản phẩm chốt ngày 14/10/2026, vì luật "bản mới hơn thắng" có thể hạ hạng khi hai máy đồng bộ lệch nhau.
 
 ## 7. Màn hình và luồng
 
