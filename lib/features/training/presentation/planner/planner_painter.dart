@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
@@ -253,7 +251,7 @@ class PlannerPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = _railAimWidth
             ..color = AppColors.railHit);
-      _diamondNumbers(canvas, layout);
+      drawDiamondNumbers(canvas, layout);
     }
 
     // 4. Bi hợp lệ sau va chạm và chỗ nó dừng.
@@ -285,43 +283,13 @@ class PlannerPainter extends CustomPainter {
       if (ball != null) {
         drawDashedPolyline(
             canvas, [layout.toCanvas(trace.cueEnd), layout.toCanvas(ball.pos)], opp, s);
-        _label(canvas, layout.toCanvas(trace.cueEnd) + Offset(0, -2.4 * r),
+        drawCenteredLabel(canvas, layout.toCanvas(trace.cueEnd) + Offset(0, -2.4 * r),
             Vi.safetyOpponentSnookered, r, AppColors.danger);
       }
     }
 
     // 6. Thanh sai số lực.
     _jitterBar(canvas, layout, trace.cueEnd, shot.jitterEnds);
-  }
-
-  /// Số chấm trên khung bàn: băng dài 0–8 từ góc trái, băng ngắn 0–4 từ góc trên.
-  void _diamondNumbers(Canvas canvas, TableLayout layout) {
-    final t = layout.table;
-    const f = TableLayout.frame;
-    final size = math.max(8.0, f * 0.55 * layout.scale);
-    void put(int n, Vec2 at) =>
-        _label(canvas, layout.toCanvas(at), '$n', size / 0.8, AppColors.textPrimary);
-    for (var i = 0; i <= longRailDiamonds; i++) {
-      final x = t.length * i / longRailDiamonds;
-      put(i, Vec2(x, -f / 2));
-      put(i, Vec2(x, t.width + f / 2));
-    }
-    for (var j = 0; j <= shortRailDiamonds; j++) {
-      final y = t.width * j / shortRailDiamonds;
-      put(j, Vec2(-f / 2, y));
-      put(j, Vec2(t.length + f / 2, y));
-    }
-  }
-
-  /// Chữ căn giữa tại [center], cỡ theo bán kính [radius] px như số trên bi.
-  void _label(Canvas canvas, Offset center, String text, double radius, Color color) {
-    final tp = TextPainter(
-      text: TextSpan(
-          text: text,
-          style: TextStyle(color: color, fontSize: radius * 0.8, fontWeight: FontWeight.w600)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
   @override
