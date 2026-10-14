@@ -54,4 +54,37 @@ Future<void> signOutAndForget({
   await auth.signOut();
   await (db.delete(db.drillLogRows)..where((t) => t.userId.equals(userId)))
       .go();
+  // Hạng và bài kiểm tra cũng là dữ liệu riêng của người này.
+  await (db.delete(db.playerRankRows)..where((t) => t.userId.equals(userId)))
+      .go();
+  final tests = db.selectOnly(db.buTestRows)
+    ..addColumns([db.buTestRows.id])
+    ..where(db.buTestRows.userId.equals(userId));
+  await (db.delete(db.buDrillResultRows)..where((r) => r.testId.isInQuery(tests)))
+      .go();
+  await (db.delete(db.buTestRows)..where((t) => t.userId.equals(userId))).go();
+}
+
+/// Dòng hạng và lần kiểm tra đã xong của [userId] chưa lên server. Lần đang
+/// làm dở không tính: nó chỉ lên server khi xong (D10 của kế hoạch).
+Future<int> pendingAssessmentCount(AppDatabase db, String userId) async {
+  final rank = await (db.select(db.playerRankRows)
+        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+      .get();
+  final tests = await (db.select(db.buTestRows)
+        ..where((t) =>
+            t.userId.equals(userId) &
+            t.syncedAt.isNull() &
+            (t.completedAt.isNotNull() | t.cancelledAt.isNotNull())))
+      .get();
+  return rank.length + tests.length;
+}
+
+/// [userId] có lần kiểm tra đang làm dở trên máy này không.
+Future<bool> hasActiveTest(AppDatabase db, String userId) async {
+  final rows = await (db.select(db.buTestRows)
+        ..where((t) =>
+            t.userId.equals(userId) & t.completedAt.isNull() & t.cancelledAt.isNull()))
+      .get();
+  return rows.isNotEmpty;
 }

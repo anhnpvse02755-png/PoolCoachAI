@@ -138,4 +138,40 @@ void main() {
       expect(ids, {'ok', 'nguoi-khac'});
     });
   });
+
+  test('đăng xuất tay xoá cả hạng và bài kiểm tra của người đó, giữ của người khác',
+      () async {
+    final at = DateTime(2026, 10, 14);
+    for (final user in ['u1', 'u2']) {
+      await db.into(db.playerRankRows).insert(PlayerRankRowsCompanion.insert(
+          userId: user, onboardingState: 'skipped', updatedAt: at));
+      await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+          id: 't-$user', userId: user, startedAt: at, tableSize: 'nineFootPlus'));
+      await db.into(db.buDrillResultRows).insert(BuDrillResultRowsCompanion.insert(
+          id: 'r-$user', testId: 't-$user', drillId: 'F1',
+          attempts: '{"shots":[]}', recordedAt: at));
+    }
+
+    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1');
+
+    expect((await db.select(db.playerRankRows).get()).map((r) => r.userId), ['u2']);
+    expect((await db.select(db.buTestRows).get()).map((r) => r.id), ['t-u2']);
+    expect((await db.select(db.buDrillResultRows).get()).map((r) => r.id), ['r-u2']);
+  });
+
+  test('đếm thứ chưa đồng bộ được của phần đánh giá, và lần đang dở', () async {
+    final at = DateTime(2026, 10, 14);
+    expect(await pendingAssessmentCount(db, 'u1'), 0);
+    expect(await hasActiveTest(db, 'u1'), isFalse);
+    await db.into(db.playerRankRows).insert(PlayerRankRowsCompanion.insert(
+        userId: 'u1', onboardingState: 'skipped', updatedAt: at));
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 'xong', userId: 'u1', startedAt: at, tableSize: 'nineFootPlus',
+        completedAt: Value(at)));
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 'do', userId: 'u1', startedAt: at, tableSize: 'nineFootPlus'));
+    expect(await pendingAssessmentCount(db, 'u1'), 2,
+        reason: 'dòng hạng + lần đã hoàn tất; lần đang dở không đồng bộ được');
+    expect(await hasActiveTest(db, 'u1'), isTrue);
+  });
 }

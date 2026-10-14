@@ -5,11 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
+import 'package:poolcoachai/domain/assessment/bu_test.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
@@ -63,6 +66,9 @@ ProviderContainer testContainer({
   List<DrillLog>? logs,
   DateTime? now,
   AuthRepository? auth,
+  PlayerRank? rank,
+  List<BuTest>? tests,
+  TestSnapshot? activeTest,
 }) {
   return ProviderContainer(
     overrides: [
@@ -74,6 +80,9 @@ ProviderContainer testContainer({
           .overrideWith((ref) => Stream.value(logs ?? const <DrillLog>[])),
       authRepositoryProvider
           .overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
+      playerRankProvider.overrideWith((ref) => Stream.value(rank)),
+      buTestsProvider.overrideWith((ref) => Stream.value(tests ?? const <BuTest>[])),
+      activeTestProvider.overrideWith((ref) => Stream.value(activeTest)),
     ],
   );
 }
