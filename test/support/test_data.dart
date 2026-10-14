@@ -123,9 +123,22 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
 
 /// Như [testContainer] nhưng hạng và bài kiểm tra đọc từ [db] thật (SQLite
 /// trong bộ nhớ) — cho widget test cần ghi rồi đọc lại.
-ProviderContainer dbContainer(AppDatabase db, {AuthRepository? auth, DateTime? now}) {
+///
+/// [rankLag] làm stream hạng trễ như Drift trên web (chạy trong worker):
+/// dòng vừa ghi tới màn hình sau một nhịp.
+ProviderContainer dbContainer(AppDatabase db,
+    {AuthRepository? auth, DateTime? now, Duration? rankLag}) {
   return ProviderContainer(
     overrides: [
+      if (rankLag != null)
+        playerRankProvider.overrideWith((ref) {
+          final repo = ref.watch(assessmentRepositoryProvider);
+          if (repo == null) return Stream.value(null);
+          return repo.watchRank().asyncMap((r) async {
+            await Future<void>.delayed(rankLag);
+            return r;
+          });
+        }),
       appDatabaseProvider.overrideWithValue(db),
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(testDrills)),

@@ -26,9 +26,9 @@ void main() {
   tearDown(() => db.close());
 
   Future<(GoRouter, ProviderContainer)> pump(WidgetTester tester,
-      {bool withGate = false, String? location}) async {
+      {bool withGate = false, String? location, Duration? rankLag}) async {
     final auth = FakeAuthRepository.signedIn();
-    final container = dbContainer(db, auth: auth);
+    final container = dbContainer(db, auth: auth, rankLag: rankLag);
     addTearDown(container.dispose);
     final gate = AuthGate(auth);
     addTearDown(gate.dispose);
@@ -129,6 +129,29 @@ void main() {
       container.read(rankFetchProvider.notifier).report('u1', RankFetch.foundNone);
       await tester.pumpAndSettle();
       expect(find.byType(OnboardingScreen), findsOneWidget);
+    });
+
+    // Chrome 14/10/2026: bấm Xác nhận mà vẫn đứng ở màn gợi ý — điều hướng về
+    // Trang chủ chạy trước khi stream hạng kịp báo dòng mới, cổng còn đòi
+    // onboarding nên đẩy ngược về đây.
+    testWidgets('bị đưa vào bộ câu hỏi, xác nhận xong thì về Trang chủ', (tester) async {
+      final (_, container) = await pump(tester, withGate: true, rankLag: const Duration(milliseconds: 200));
+      container.read(rankFetchProvider.notifier).report('u1', RankFetch.foundNone);
+      await tester.pumpAndSettle();
+      await answer(tester, toH);
+      await tester.tap(find.text(Vi.onboardingConfirm));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(OnboardingScreen), findsNothing);
+    });
+
+    testWidgets('bị đưa vào bộ câu hỏi, Để sau thì về Trang chủ', (tester) async {
+      final (_, container) = await pump(tester, withGate: true, rankLag: const Duration(milliseconds: 200));
+      container.read(rankFetchProvider.notifier).report('u1', RankFetch.foundNone);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.onboardingLater));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
     });
 
     testWidgets('máy mới mất mạng: không ép onboarding', (tester) async {

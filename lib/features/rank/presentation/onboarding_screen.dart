@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_rank_badge.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/questionnaire.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -39,9 +42,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  /// Chờ stream hạng báo dòng vừa ghi rồi mới rời màn. Trên web Drift chạy
+  /// trong worker nên stream tới sau một nhịp; đi Trang chủ sớm hơn thì cổng
+  /// onboarding còn thấy "chưa có hạng" và đẩy ngược về đây (Chrome 14/10/2026).
+  Future<void> _waitForSavedRank() async {
+    bool saved(AsyncValue<PlayerRank?> v) =>
+        v.value != null && v.value!.onboardingState != OnboardingState.notStarted;
+    if (saved(ref.read(playerRankProvider))) return;
+    final done = Completer<void>();
+    final sub = ref.listenManual(playerRankProvider, (_, next) {
+      if (saved(next) && !done.isCompleted) done.complete();
+    });
+    try {
+      await done.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+    } finally {
+      sub.close();
+    }
+  }
+
   Future<void> _skip() async {
     setState(() => _saving = true);
     await ref.read(assessmentRepositoryProvider)?.skipOnboarding();
+    await _waitForSavedRank();
     if (mounted) _leave();
   }
 
@@ -51,6 +73,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await ref
         .read(assessmentRepositoryProvider)!
         .saveQuestionnaire(chosen: chosen, suggested: _suggested!, answers: _answers);
+    await _waitForSavedRank();
     if (mounted) _leave();
   }
 
