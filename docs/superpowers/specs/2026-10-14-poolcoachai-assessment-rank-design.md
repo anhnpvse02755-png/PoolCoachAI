@@ -231,7 +231,7 @@ Mở rộng `authRedirect`: sau khi đăng nhập, nếu `onboardingState = notS
 ### 7.2 Onboarding
 
 1. Màn giới thiệu.
-2. Khoảng 8 câu hỏi.
+2. 8 câu hỏi (mục 11.2).
 3. App gợi ý một hạng, kèm mô tả hạng đó.
 4. Người chơi bấm **Xác nhận** (thành `estimated`) hoặc **Chọn hạng khác** (danh sách K…PRO kèm mô tả, thành `selfDeclared`).
 
@@ -286,9 +286,9 @@ Có nút **Hủy lần kiểm tra này**. Lần bị hủy không tính vào gi�
 - Hệ số độ khó bàn (Table Difficulty Factor).
 - Xin phép BU (chủ sản phẩm đã quyết định không xin).
 
-## 11. Chủ sản phẩm cần cung cấp
+## 11. Đầu vào từ chủ sản phẩm
 
-Phần này chưa có thì code onboarding chưa hoàn thiện được. Phần bài kiểm tra BU không phụ thuộc vào đây.
+Mục 1 và 2 đã có (14/10/2026). Còn mục 3 chờ chủ sản phẩm; mục này không chặn việc triển khai, vì tên bài chỉ là chuỗi hiển thị.
 
 1. **Mô tả từng hạng.** Lấy nguyên văn từ PoolOS v2, `lib/core/constants/app_constants.dart` (`AppConstants.playerLevels`, chú thích "HỆ THỐNG XẾP HẠNG - THEO CHUẨN HÀ NỘI / Tham khảo từ cộng đồng Pool Hà Nội"). Chủ sản phẩm chỉ định nguồn này ngày 14/10/2026.
 
@@ -306,7 +306,35 @@ Phần này chưa có thì code onboarding chưa hoàn thiện được. Phần 
    | A | thi đấu | Top đầu trong nước |
    | PRO | chuyên nghiệp | Thi đấu chuyên nghiệp |
 
-2. **Duyệt bộ câu hỏi và bảng quy đổi.** Bản nháp dùng 8 câu hỏi của PoolOS v2 (`AppConstants.assessmentQuestions`). Bảng quy đổi câu trả lời ra hạng phải làm lại, vì công thức cũ (`pool_rating_calculator.dart`) so điểm thang 0–100 với các mốc thang 0–1000. Claude soạn bảng mới dựa trên mô tả hạng ở mục 11.1, neo vào các bài BU khi có thể; chủ sản phẩm duyệt từng dòng.
+2. **Bộ câu hỏi và bảng quy đổi.** Chủ sản phẩm đã duyệt ngày 14/10/2026.
+
+   **Câu hỏi:** lấy nguyên văn 8 câu từ PoolOS v2 (`AppConstants.assessmentQuestions`, `lib/core/constants/app_constants.dart`). Không dùng công thức cũ trong `pool_rating_calculator.dart`, vì nó so điểm thang 0–100 với các mốc thang 0–1000.
+
+   - **Q1** "Bạn đã chơi Pool được bao lâu?": Chưa từng chơi / Dưới 3 tháng / 3 – 6 tháng / 6 tháng – 1 năm / 1 – 2 năm / 2 – 5 năm / Trên 5 năm.
+   - **Q2** "Trung bình bạn chơi Pool bao nhiêu?": Dưới 2 giờ / tuần / 2 – 5 / 5 – 10 / 10 – 20 / Trên 20 giờ / tuần.
+   - **Q3** "Trong một lượt cơ, bạn đã từng đi được nhiều nhất bao nhiêu bi?": 1…8 / Dọn bàn (Run Out).
+   - **Q4** "Trong những thế bi bình thường, bạn thường đi được bao nhiêu bi?": 1…5 / 6+ / Thường xuyên Runout.
+   - **Q5** "Bạn đã từng Runout (đi chấm) chưa?": Chưa bao giờ / Đã từng 1–2 lần / Thỉnh thoảng / Khá thường xuyên / Rất thường xuyên.
+   - **Q6** "Trung bình bao nhiêu rack bạn có thể đi được một chấm?": Chưa từng / Hơn 100 rack / Khoảng 50 rack / Khoảng 20 rack / Khoảng 10 rack / Khoảng 5 rack / Khoảng 2–3 rack / Gần như rack nào cũng có thể.
+   - **Q7** "Sau cú phá bi, bạn thường còn thế bi như thế nào?": Thường không có bi đánh tiếp / Thường chỉ có 1 bi / Có thể đi tiếp 2–3 bi / Thường có layout thuận lợi / Thường có cơ hội đi chấm.
+   - **Q8** "Sau khi ăn một bi, bạn thường điều bi cái ở mức nào?": Thường xuyên bị khó / Có lúc dễ, có lúc khó / Phần lớn còn bi đánh tiếp / Thường chủ động điều được bi cái / Có thể điều bi chính xác theo ý muốn.
+
+   **Bảng quy đổi:** chỉ Q4, Q5 và Q6 dùng để tính hạng. Các mốc neo vào mô tả Fargo của Dr. Dave (https://drdavepoolinfo.com/faq/rating/fargorate/).
+
+   | Câu trả lời | Hạng gợi ý | Căn cứ |
+   |---|---|---|
+   | Q5 "Chưa bao giờ" + Q4 = 1 | K | Fargo < 200: "has probably never run a table" |
+   | Q5 "Chưa bao giờ" + Q4 = 2 | I | Mô tả I: "Đã biết luật chơi, kỹ thuật cơ bản" |
+   | Q5 "Chưa bao giờ" + Q4 ≥ 3, hoặc Q5 "Đã từng 1–2 lần" | H | Fargo 300: "running out is very unlikely" |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Chưa từng" / "Hơn 100 rack" / "Khoảng 50 rack" | G | Fargo 400: "runs out first time at the table infrequently" |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Khoảng 20 rack" | F | **Nội suy giữa 400 và 500, không có nguồn** (chủ sản phẩm chấp nhận) |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Khoảng 10 rack" | E | Fargo 500: "runs out first time at the table occasionally" |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Khoảng 5 rack" | D | **Nội suy giữa 500 và 600, không có nguồn** (chủ sản phẩm chấp nhận) |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Khoảng 2–3 rack" | C | Fargo 600: "has run three-in-a-row multiple times" |
+   | Q5 "Thỉnh thoảng" trở lên + Q6 "Gần như rack nào cũng có thể" | B | Fargo 700: "a threat to run six in a row" |
+   | (không câu trả lời nào dẫn tới) | A, PRO | Chỉ chọn được qua "Chọn hạng khác", thành `selfDeclared` |
+
+   Q1, Q2, Q3, Q7 và Q8 vẫn được hỏi và lưu trong `questionnaireAnswers` để Lộ trình dùng sau, nhưng **không tính hạng**. Có unit test cho từng dòng của bảng.
 
 3. **Sửa tên bài chưa có trong bộ thuật ngữ.** Các tên sau do Claude tạm đặt:
    - F5 "Đánh đứng bi trượt" (stun);
