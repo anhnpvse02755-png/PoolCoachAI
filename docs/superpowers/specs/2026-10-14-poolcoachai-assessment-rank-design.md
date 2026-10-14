@@ -311,7 +311,7 @@ Mục 1 và 2 đã có (14/10/2026). Còn mục 3 chờ chủ sản phẩm; mụ
    **Câu hỏi:** lấy nguyên văn 8 câu từ PoolOS v2 (`AppConstants.assessmentQuestions`, `lib/core/constants/app_constants.dart`). Không dùng công thức cũ trong `pool_rating_calculator.dart`, vì nó so điểm thang 0–100 với các mốc thang 0–1000.
 
    - **Q1** "Bạn đã chơi Pool được bao lâu?": Chưa từng chơi / Dưới 3 tháng / 3 – 6 tháng / 6 tháng – 1 năm / 1 – 2 năm / 2 – 5 năm / Trên 5 năm.
-   - **Q2** "Trung bình bạn chơi Pool bao nhiêu?": Dưới 2 giờ / tuần / 2 – 5 / 5 – 10 / 10 – 20 / Trên 20 giờ / tuần.
+   - **Q2** "Trung bình bạn chơi Pool bao nhiêu?": Dưới 2 giờ / tuần · 2 – 5 giờ / tuần · 5 – 10 giờ / tuần · 10 – 20 giờ / tuần · Trên 20 giờ / tuần.
    - **Q3** "Trong một lượt cơ, bạn đã từng đi được nhiều nhất bao nhiêu bi?": 1…8 / Dọn bàn (Run Out).
    - **Q4** "Trong những thế bi bình thường, bạn thường đi được bao nhiêu bi?": 1…5 / 6+ / Thường xuyên Runout.
    - **Q5** "Bạn đã từng Runout (đi chấm) chưa?": Chưa bao giờ / Đã từng 1–2 lần / Thỉnh thoảng / Khá thường xuyên / Rất thường xuyên.
