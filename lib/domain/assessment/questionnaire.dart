@@ -1,3 +1,5 @@
+import 'package:poolcoachai/domain/rank.dart';
+
 /// Số lựa chọn của từng câu Q1…Q8, đúng thứ tự trong spec mục 11.2.
 ///
 /// Q1 7 · Q2 5 · Q3 9 (1…8 và Dọn bàn) · Q4 7 (1…5, 6+, Thường xuyên
@@ -48,4 +50,40 @@ final class QuestionnaireAnswers {
 
   @override
   String toString() => 'QuestionnaireAnswers($choices)';
+}
+
+// Chỉ số lựa chọn có tên, để hàm dưới đọc được như bảng của spec mục 11.2.
+const _q4One = 0;
+const _q4Two = 1;
+const _q5Never = 0;
+const _q5OnceOrTwice = 1;
+const _q6TwentyRacks = 3;
+const _q6TenRacks = 4;
+const _q6FiveRacks = 5;
+const _q6TwoThreeRacks = 6;
+
+/// Hạng bộ câu hỏi gợi ý — đúng từng dòng bảng quy đổi spec mục 11.2.
+///
+/// Chỉ Q4, Q5, Q6 được dùng. A và PRO không bao giờ được gợi ý: chỉ chọn
+/// được qua *Chọn hạng khác* (thành tự khai).
+Rank suggestRank(QuestionnaireAnswers answers) {
+  final q4 = answers.of(4);
+  final q5 = answers.of(5);
+  final q6 = answers.of(6);
+  if (q5 == _q5Never) {
+    return switch (q4) {
+      _q4One => Rank.k,
+      _q4Two => Rank.i,
+      _ => Rank.h,
+    };
+  }
+  if (q5 == _q5OnceOrTwice) return Rank.h;
+  return switch (q6) {
+    _q6TwentyRacks => Rank.f,
+    _q6TenRacks => Rank.e,
+    _q6FiveRacks => Rank.d,
+    _q6TwoThreeRacks => Rank.c,
+    > _q6TwoThreeRacks => Rank.b,
+    _ => Rank.g,
+  };
 }

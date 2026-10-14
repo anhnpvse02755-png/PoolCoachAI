@@ -6,6 +6,7 @@ import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
@@ -742,5 +743,64 @@ abstract final class Vi {
         ExamIIVersion.bachelors => 'Bachelors',
         ExamIIVersion.masters => 'Masters',
         ExamIIVersion.doctorate => 'Doctorate',
+      };
+
+  // ─── Đánh giá + hạng — bộ câu hỏi và mô tả hạng ────────────────────────────
+  //
+  // Nguyên văn PoolOS v2 (AppConstants.assessmentQuestions và
+  // AppConstants.playerLevels), chủ sản phẩm duyệt ngày 14/10/2026 —
+  // spec mục 11.1, 11.2. Không sửa chữ ở đây mà không hỏi chủ sản phẩm.
+
+  static String rankQuestion(int question) => switch (question) {
+        1 => 'Bạn đã chơi Pool được bao lâu?',
+        2 => 'Trung bình bạn chơi Pool bao nhiêu?',
+        3 => 'Trong một lượt cơ, bạn đã từng đi được nhiều nhất bao nhiêu bi?',
+        4 => 'Trong những thế bi bình thường, bạn thường đi được bao nhiêu bi?',
+        5 => 'Bạn đã từng Runout (đi chấm) chưa?',
+        6 => 'Trung bình bao nhiêu rack bạn có thể đi được một chấm?',
+        7 => 'Sau cú phá bi, bạn thường còn thế bi như thế nào?',
+        8 => 'Sau khi ăn một bi, bạn thường điều bi cái ở mức nào?',
+        _ => throw RangeError.range(question, 1, 8, 'question'),
+      };
+
+  static List<String> rankQuestionOptions(int question) => switch (question) {
+        1 => const ['Chưa từng chơi', 'Dưới 3 tháng', '3 – 6 tháng', '6 tháng – 1 năm',
+            '1 – 2 năm', '2 – 5 năm', 'Trên 5 năm'],
+        2 => const ['Dưới 2 giờ / tuần', '2 – 5 giờ / tuần', '5 – 10 giờ / tuần',
+            '10 – 20 giờ / tuần', 'Trên 20 giờ / tuần'],
+        3 => const ['1', '2', '3', '4', '5', '6', '7', '8', 'Dọn bàn (Run Out)'],
+        4 => const ['1', '2', '3', '4', '5', '6+', 'Thường xuyên Runout'],
+        5 => const ['Chưa bao giờ', 'Đã từng 1–2 lần', 'Thỉnh thoảng',
+            'Khá thường xuyên', 'Rất thường xuyên'],
+        6 => const ['Chưa từng', 'Hơn 100 rack', 'Khoảng 50 rack', 'Khoảng 20 rack',
+            'Khoảng 10 rack', 'Khoảng 5 rack', 'Khoảng 2–3 rack',
+            'Gần như rack nào cũng có thể'],
+        7 => const ['Thường không có bi đánh tiếp', 'Thường chỉ có 1 bi',
+            'Có thể đi tiếp 2–3 bi', 'Thường có layout thuận lợi',
+            'Thường có cơ hội đi chấm'],
+        8 => const ['Thường xuyên bị khó', 'Có lúc dễ, có lúc khó',
+            'Phần lớn còn bi đánh tiếp', 'Thường chủ động điều được bi cái',
+            'Có thể điều bi chính xác theo ý muốn'],
+        _ => throw RangeError.range(question, 1, 8, 'question'),
+      };
+
+  static String rankDescription(Rank rank) => switch (rank) {
+        Rank.k => 'Người mới làm quen với Pool',
+        Rank.i => 'Đã biết luật chơi, kỹ thuật cơ bản',
+        Rank.h => 'Người chơi phong trào phổ biến, bắt đầu có khả năng điều bi',
+        Rank.g => 'Người chơi phong trào khá, có thể thi đấu ổn định với đa số CLB',
+        Rank.f => 'Bước đầu tham gia sân chơi thi đấu, trình độ cao trong nhóm phong trào',
+        Rank.e => 'Người chơi bán chuyên',
+        Rank.d => 'Người chơi mạnh, thường xuyên thi đấu',
+        Rank.c => 'Vận động viên trình độ cao',
+        Rank.b => 'Vận động viên rất mạnh',
+        Rank.a => 'Top đầu trong nước',
+        Rank.pro => 'Thi đấu chuyên nghiệp',
+      };
+
+  static String rankGroupName(RankGroup group) => switch (group) {
+        RankGroup.amateur => 'phong trào',
+        RankGroup.competitive => 'thi đấu',
+        RankGroup.pro => 'chuyên nghiệp',
       };
 }

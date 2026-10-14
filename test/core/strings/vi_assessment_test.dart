@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/assessment/questionnaire.dart';
+import 'package:poolcoachai/domain/rank.dart';
 
 void main() {
   test('tên bài đúng thuật ngữ chủ sản phẩm đã chốt (spec mục 5.1, 5.2, 11.3)', () {
@@ -26,6 +28,28 @@ void main() {
         expect(name, isNot(contains(banned)), reason: d.id);
       }
       expect(Vi.buDrillTitle(d.id), startsWith('${d.id} · '));
+    }
+  });
+
+  test('8 câu hỏi, số lựa chọn khớp questionOptionCounts', () {
+    for (var q = 1; q <= 8; q++) {
+      expect(Vi.rankQuestion(q), isNotEmpty);
+      expect(Vi.rankQuestionOptions(q).length, questionOptionCounts[q - 1], reason: 'Q$q');
+    }
+  });
+
+  test('câu hỏi nguyên văn PoolOS v2 (spec mục 11.2)', () {
+    expect(Vi.rankQuestion(5), 'Bạn đã từng Runout (đi chấm) chưa?');
+    expect(Vi.rankQuestionOptions(6).last, 'Gần như rack nào cũng có thể');
+    expect(Vi.rankQuestionOptions(3).last, 'Dọn bàn (Run Out)');
+  });
+
+  test('mỗi hạng có mô tả nguyên văn (spec mục 11.1)', () {
+    expect(Vi.rankDescription(Rank.k), 'Người mới làm quen với Pool');
+    expect(Vi.rankDescription(Rank.a), 'Top đầu trong nước');
+    expect(Vi.rankDescription(Rank.pro), 'Thi đấu chuyên nghiệp');
+    for (final r in Rank.values) {
+      expect(Vi.rankDescription(r), isNotEmpty);
     }
   });
 }
