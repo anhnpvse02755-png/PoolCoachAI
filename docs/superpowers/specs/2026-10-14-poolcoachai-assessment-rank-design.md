@@ -44,7 +44,7 @@ Thành công nghĩa là:
 | Q8 | App **tự vẽ sơ đồ xếp bi BU** trên mặt bàn trong app. Chủ sản phẩm chấp nhận rủi ro bản quyền và deploy luôn, không xin phép BU. Bài nào cũng ghi nguồn BU |
 | Q9 | Mỗi lần kiểm tra làm **đủ Đề I + Đề II** (thang 200) |
 | Q10 | Câu hỏi onboarding soạn từ **mô tả từng hạng do chủ sản phẩm viết**, chủ sản phẩm duyệt từng dòng |
-| Q11 | Quy đổi BU sang hạng: khớp 1–1 với bảng chính thức (mục 5.4) |
+| Q11 | Quy đổi BU sang hạng: gộp các mức của bảng chính thức cho khớp mô tả hạng (mục 5.4) |
 | Q12 | Bài kiểm tra luôn được làm, nhưng hai lần **hoàn tất** phải cách nhau tối thiểu **14 ngày** (quy định của app, không phải luật BU). Dữ liệu luyện tập chỉ dùng để gợi ý kiểm tra lại |
 | Q13 | Onboarding hiện sau lần đăng nhập đầu tiên, có nút "Để sau" |
 | Q14 | Kiến trúc: module đánh giá riêng, không nhét bài BU vào mô hình `Drill`/`DrillLog` |
@@ -100,11 +100,11 @@ Không file PDF nào có dòng giấy phép.
 | Mã | Bài | Cách chấm | Tối đa |
 |---|---|---|---|
 | F1 | Cắt góc (Cut Shot) | Thang vị trí | 10 |
-| F2 | Dừng bi (Stop Shot) | Thang vị trí. Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ma | 10 |
-| F3 | Theo (Follow Shot) | Thang vị trí. Bi cái dừng trong hoặc chồng lên khung giấy đích | 10 |
-| F4 | Kéo (Draw Shot) | Thang vị trí. Tâm bi cái dừng trong hình chữ nhật 2×1 kim cương cạnh lỗ giữa | 10 |
-| F5 | Stun (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
-| F6 | Đưa bi vào lỗ (Ball Pocketing) | 10 cú, mỗi cú 1 lượt, không được lọt bi cái. Mỗi bi vào 1 điểm | 10 |
+| F2 | Đánh đứng bi (Stop Shot) | Thang vị trí. Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo | 10 |
+| F3 | Đánh cu lê (Follow Shot) | Thang vị trí. Bi cái dừng trong hoặc chồng lên khung giấy đích | 10 |
+| F4 | Đánh trô bi (Draw Shot) | Thang vị trí. Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa | 10 |
+| F5 | Đánh đứng bi trượt (Stun Shot) | Thang vị trí, nhưng **đích di chuyển** thay cho bi cái. Vị trí 1–3 đi thẳng tới đích, 5–7 phải bật băng cuối | 10 |
+| F6 | Ăn bi (Ball Pocketing) | 10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm | 10 |
 | F7 | Bánh xe (Wagon Wheel) | 10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ **và** chạm đúng bi đích được 1 điểm | 20 |
 | F8 | Lưới đích (Grid Target) | 5 đích, mỗi đích 4 lượt. Vào lỗ **và** bi cái dừng trong hoặc chồng lên đích được 1 điểm | 20 |
 
@@ -113,31 +113,31 @@ Không file PDF nào có dòng giấy phép.
 | Mã | Bài | Cách chấm | Bachelors | Masters | Doctorate |
 |---|---|---|---|---|---|
 | S1 | Hàng bi (Line of Balls) | Đánh theo thứ tự số, 2 lượt, lấy lượt cao hơn | 4 (bi 1–4, cách 3 bi) | 7 (cách 2 bi) | 10 (cách 1 bi) |
-| S2 | Cắt sát băng (Rail Cuts) | 2 lượt, thứ tự tùy ý, lấy lượt cao hơn | 7 | 11 | 15 |
+| S2 | Ngắm bi sát băng (Rail Cuts) | 2 lượt, thứ tự tùy ý, lấy lượt cao hơn | 7 | 11 | 15 |
 | S3 | Thế 9 bi | 3 thế, mỗi bi hợp lệ theo thứ tự 1 điểm, cộng 2 thế thấp nhất | 10 (bi 5–9) | 12 (bi 4–9) | 14 (bi 3–9) |
 | S4 | Thế 8 bi | 3 thế, mỗi bi trước khi trượt 1 điểm, cộng 2 thế thấp nhất | 10 | 12 | 14 |
-| S5 | Giấu bi (an toàn) | Mỗi vị trí bi cái 2 lượt, mỗi lần giấu được 1 điểm | 6 (3 vị trí) | 10 (5) | 14 (7) |
-| S6 | Đánh băng (Kicks) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
-| S7 | Đánh bi băng (Banks) | Mỗi cú thành công 1 điểm | 3 (bi qua lỗ giữa) | 5 | 7 (bi qua lỗ góc) |
-| S8 | Cơ dốc (Elevated cue) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
-| S9 | Nhảy / massé | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
+| S5 | Phòng thủ làm đui (Safety) | Mỗi vị trí bi cái 2 lượt, mỗi lần làm đui được 1 điểm | 6 (3 vị trí) | 10 (5) | 14 (7) |
+| S6 | A băng (Kicks) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
+| S7 | Cân bi (Banks) | Mỗi cú thành công 1 điểm | 3 (bi qua lỗ giữa) | 5 | 7 (bi qua lỗ góc) |
+| S8 | Dựng cơ (Elevated cue) | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
+| S9 | Nhảy bi / massé | Mỗi cú thành công 1 điểm | 3 | 5 | 7 |
 | S10 | Phá (Break) | 3 lần phá, mỗi lần chấm 5 tiêu chí a–e (0/1 mỗi tiêu chí), lấy **trung vị** | 5 | 5 | 5 |
 | | **Tổng** | | **54** | **77** | **100** |
 
 Tiêu chí của S10:
 
-- a: không lọt bi cái.
+- a: không chết cái.
 - b: a, và bi cái không chạm băng.
-- c: a, và bi cái dừng trong vùng 4 kim cương ở giữa bàn.
+- c: a, và bi cái dừng trong vùng 4 chấm ở giữa bàn.
 - d: a, và có ít nhất 1 bi vào.
-- e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn.
+- e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn (head string).
 
 Các luật riêng cần mã hóa đúng:
 
 - S3: bi 9 vào sớm thì vẫn phải đánh nốt các bi còn lại theo thứ tự.
 - S3 bản Doctorate, thế 3: phải tới bi 7 và bi 9 bằng 3–4 băng.
 - S4: được chạm bi chướng ngại.
-- S9 bản Doctorate: không có dòng "được lọt bi cái".
+- S9 bản Doctorate: không có dòng "được chết cái".
 
 Bản kế hoạch triển khai phải đối chiếu lại từng luật với PDF.
 
@@ -155,24 +155,35 @@ Bản kế hoạch triển khai phải đối chiếu lại từng luật với 
 - Bản Doctorate phải đánh trên bàn **9 feet trở lên**. Bàn 7–8 feet mà Đề I đạt mức Doctorate thì làm bản Masters.
 - Đề II được làm vào buổi khác Đề I. Một lần kiểm tra chỉ **hoàn tất** khi đã có điểm cả hai đề.
 - **Điểm BU = Đề I + Đề II, cộng điểm thô.** Đây là **giả định**: PDF không nói có quy đổi bản Bachelors (tối đa 54) và Masters (tối đa 77) sang thang 100 hay không. Hệ quả: người làm bản thấp bị giới hạn tổng điểm, muốn lên tiếp thì phải đạt Đề I cao hơn. Kế hoạch triển khai nên kiểm tra phiếu điểm (score sheet) chính thức nếu tìm được.
-- Quy đổi sang hạng theo `BU_Rating_Comparisons.pdf` (không dùng bảng trên trang web, vì hai bảng lệch nhau ở các mức dưới 140):
+- Quy đổi sang hạng theo `BU_Rating_Comparisons.pdf` (không dùng bảng trên trang web, vì hai bảng lệch nhau ở các mức dưới 140). Bảng dưới **chỉ gộp các mức có sẵn của BU**, không thêm mốc tự đặt. Cách gộp bám theo mô tả hạng ở mục 11.1. Chủ sản phẩm chốt ngày 14/10/2026, thay cho bản khớp 1–1 trước đó vì bản đó đặt hạng A ("Top đầu trong nước") ở mức Fargo 600, quá thấp.
 
 | Hạng | Điểm BU | Mức BU | Fargo (tham chiếu) |
 |---|---|---|---|
 | K | 0–19 | novice | < 200 |
-| I | 20–29 | lower beginner | 200–249 |
-| H | 30–39 | mid beginner | 250–299 |
-| G | 40–54 | upper beginner | 300–349 |
-| F | 55–69 | lower intermediate | 350–399 |
-| E | 70–94 | mid intermediate | 400–449 |
-| D | 95–109 | upper intermediate | 450–499 |
-| C | 110–124 | lower advanced | 500–549 |
-| B | 125–139 | mid advanced | 550–599 |
-| A | 140–200 | upper advanced trở lên | ≥ 600 |
+| I | 20–39 | lower + mid beginner | 200–299 |
+| H | 40–69 | upper beginner + lower intermediate | 300–399 |
+| G | 70–94 | mid intermediate | 400–449 |
+| F | 95–109 | upper intermediate | 450–499 |
+| E | 110–124 | lower advanced | 500–549 |
+| D | 125–139 | mid advanced | 550–599 |
+| C | 140–154 | upper advanced | 600–649 |
+| B | 155–174 | lower + upper shortstop | 650–729 |
+| A | 175–200 | semipro/pro + world class pro | ≥ 730 |
+
+Căn cứ cho mốc A/B (tra ngày 14/10/2026). Dữ liệu còn mỏng; chủ sản phẩm chấp nhận giữ các mốc này:
+
+- Dr. Dave mô tả Fargo 700 là "top player to pro level" và 800 là "top world-class professional" (https://drdavepoolinfo.com/faq/rating/fargorate/).
+- Dương Quốc Hoàng có Fargo khoảng 805–839. Con số chỉ thấy qua trích đoạn kết quả tìm kiếm, **chưa kiểm chứng**.
+- Không tìm được Fargo của các cơ thủ Việt Nam khác, cũng không có bảng nào quy đổi hạng CLB Việt Nam sang Fargo. Các nguồn Việt Nam hiểu cùng một chữ cái hạng khác nhau, nên câu miễn trừ ở mục 4.3 là bắt buộc.
+
+Hệ quả theo luật BU:
+
+- Muốn từ C trở lên phải làm bản Doctorate, tức phải đánh trên bàn 9 feet.
+- Người làm bản Masters tối đa được 177 điểm.
 
 ### 5.5 Sơ đồ xếp bi
 
-- Ghi bằng **tọa độ kim cương trên lưới 8×4**. Gốc tọa độ ở góc trên trái, trục x dọc băng dài (0–8), trục y từ băng trên xuống (0–4).
+- Ghi bằng **tọa độ chấm trên lưới 8×4** (chấm 0–8 băng dài, 0–4 băng ngắn). Gốc tọa độ ở góc trên trái, trục x dọc băng dài (0–8), trục y từ băng trên xuống (0–4).
 - Vẽ lại chính xác được: S2, S3, S4, S6, S7, S10.
 - Phải dựng bằng **luật hình học**: F1–F8, S5, S8. Ví dụ: vị trí 1–7 của thang; khung giấy đích; "bi mục tiêu nằm giữa bi cái và lỗ".
 - Ví dụ đã đo: Bachelors S3 thế 1 (trang 3) là bi 5 (1,1), bi 8 (3,1), bi 9 (5,1), bi 7 (1,3), bi 6 (3,3); bi cái tự do; chấm đặt bi ở (6,2).
@@ -183,7 +194,7 @@ Bản kế hoạch triển khai phải đối chiếu lại từng luật với 
 
 Unit test cho:
 
-- năm kiểu chấm, mỗi kiểu có ví dụ tính tay theo PDF, cộng các trường hợp biên: dừng sớm F1–F5, phá lọt bi cái ở S10, chuỗi toàn trượt hoặc toàn vào;
+- năm kiểu chấm, mỗi kiểu có ví dụ tính tay theo PDF, cộng các trường hợp biên: dừng sớm F1–F5, phá chết cái ở S10, chuỗi toàn trượt hoặc toàn vào;
 - luật cấp đề ở các mốc 49/50 và 69/70, cùng trường hợp bàn nhỏ;
 - mọi mốc của bảng quy đổi (19/20, 54/55, 139/140…);
 - sáu luật đổi hạng ở mục 4.2.
@@ -279,20 +290,29 @@ Có nút **Hủy lần kiểm tra này**. Lần bị hủy không tính vào gi�
 
 Phần này chưa có thì code onboarding chưa hoàn thiện được. Phần bài kiểm tra BU không phụ thuộc vào đây.
 
-1. **Mô tả 1–2 dòng cho từng hạng** (người chơi ở hạng đó làm được gì, theo cảm nhận ở quán Hà Nội):
+1. **Mô tả từng hạng.** Lấy nguyên văn từ PoolOS v2, `lib/core/constants/app_constants.dart` (`AppConstants.playerLevels`, chú thích "HỆ THỐNG XẾP HẠNG - THEO CHUẨN HÀ NỘI / Tham khảo từ cộng đồng Pool Hà Nội"). Chủ sản phẩm chỉ định nguồn này ngày 14/10/2026.
 
-   | Hạng | Mô tả |
-   |---|---|
-   | K | _(chủ sản phẩm điền)_ |
-   | I | _(chủ sản phẩm điền)_ |
-   | H | _(chủ sản phẩm điền)_ |
-   | G | _(chủ sản phẩm điền)_ |
-   | F | _(chủ sản phẩm điền)_ |
-   | E | _(chủ sản phẩm điền)_ |
-   | D | _(chủ sản phẩm điền)_ |
-   | C | _(chủ sản phẩm điền)_ |
-   | B | _(chủ sản phẩm điền)_ |
-   | A | _(chủ sản phẩm điền)_ |
-   | PRO | _(chủ sản phẩm điền)_ |
+   | Hạng | Nhóm | Mô tả |
+   |---|---|---|
+   | K | phong trào | Người mới làm quen với Pool |
+   | I | phong trào | Đã biết luật chơi, kỹ thuật cơ bản |
+   | H | phong trào | Người chơi phong trào phổ biến, bắt đầu có khả năng điều bi |
+   | G | phong trào | Người chơi phong trào khá, có thể thi đấu ổn định với đa số CLB |
+   | F | thi đấu | Bước đầu tham gia sân chơi thi đấu, trình độ cao trong nhóm phong trào |
+   | E | thi đấu | Người chơi bán chuyên |
+   | D | thi đấu | Người chơi mạnh, thường xuyên thi đấu |
+   | C | thi đấu | Vận động viên trình độ cao |
+   | B | thi đấu | Vận động viên rất mạnh |
+   | A | thi đấu | Top đầu trong nước |
+   | PRO | chuyên nghiệp | Thi đấu chuyên nghiệp |
 
-2. **Duyệt bộ câu hỏi và bảng quy đổi.** Claude soạn từ các mô tả trên, neo vào các bài BU khi có thể (ví dụ: "đánh 10 cú cắt góc thì vào mấy bi" ứng với F1/F6). Chủ sản phẩm duyệt từng dòng.
+2. **Duyệt bộ câu hỏi và bảng quy đổi.** Bản nháp dùng 8 câu hỏi của PoolOS v2 (`AppConstants.assessmentQuestions`). Bảng quy đổi câu trả lời ra hạng phải làm lại, vì công thức cũ (`pool_rating_calculator.dart`) so điểm thang 0–100 với các mốc thang 0–1000. Claude soạn bảng mới dựa trên mô tả hạng ở mục 11.1, neo vào các bài BU khi có thể; chủ sản phẩm duyệt từng dòng.
+
+3. **Sửa tên bài chưa có trong bộ thuật ngữ.** Các tên sau do Claude tạm đặt:
+   - F5 "Đánh đứng bi trượt" (stun);
+   - F6 "Ăn bi";
+   - S5 "Phòng thủ làm đui";
+   - S8 "Dựng cơ";
+   - S9 "Nhảy bi / massé".
+
+   Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
