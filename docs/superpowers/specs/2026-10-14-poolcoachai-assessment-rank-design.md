@@ -340,7 +340,6 @@ Cả ba mục đã chốt ngày 14/10/2026.
    - F5 (stun) là **Đánh tâm tiến**: kỹ thuật cao hơn đánh đứng bi (F2), sau va chạm bi cái nhích lên một chút. Không gộp với đánh đứng bi.
    - S5 là **Phòng thủ / bắt đui**.
    - S9 là **Nhảy bi (Jump)** hoặc **Mát xê (Massé)**. Đây là hai kỹ thuật khác nhau; S9 của BU cho phép dùng một trong hai.
-
    - F6 là **Ăn bi** và S8 là **Dựng cơ** (chủ sản phẩm đồng ý tên Claude đề xuất).
 
    Các tên khác theo bộ thuật ngữ chủ sản phẩm đã chốt: đánh đứng bi, đánh tâm tiến, đánh cu lê, đánh trô bi, a băng, cân bi, chấm, bi ảo, chết cái, phá.
