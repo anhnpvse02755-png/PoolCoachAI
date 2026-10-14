@@ -26,6 +26,12 @@ abstract final class Routes {
 
   /// Kế hoạch dọn bàn — trong nhánh Luyện tập như màn mô phỏng.
   static const planner = '$training/planner';
+
+  /// Sơ đồ mọi bài kiểm tra BU — mở đè lên shell (D12 của kế hoạch).
+  static const rankLayouts = '/rank/layouts';
+
+  /// Một sơ đồ theo thứ tự của `allLayouts()` — để chụp từng sơ đồ trên Chrome.
+  static String rankLayoutAt(int i) => '$rankLayouts?i=$i';
   static const articlePattern = '/knowledge/:id';
 
   /// Đường dẫn chi tiết một bài tập.
@@ -68,6 +74,7 @@ abstract final class Routes {
     drillSessionPattern,
     simulator,
     planner,
+    rankLayouts,
     articlePattern,
     login,
     register,

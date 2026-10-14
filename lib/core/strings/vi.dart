@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
+import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
@@ -937,4 +938,14 @@ abstract final class Vi {
             'chấm ở giữa bàn. Phá 3 lần, chấm từng lần theo tiêu chí a–e.',
         _ => throw ArgumentError.value(drillId, 'drillId', 'chưa dịch cách xếp bài'),
       };
+
+  // Sơ đồ bài kiểm tra — D12 của kế hoạch.
+  static const buLayoutsTitle = 'Sơ đồ bài kiểm tra';
+  static const buLayoutsEnd = 'Hết sơ đồ.';
+
+  static String buLayoutCaption(BuLayout l, int k, int n) =>
+      'Sơ đồ $k / $n · ${buDrillTitle(l.drillId)}'
+      '${l.version == null ? '' : ' · ${buVersionName(l.version!)}'} · hình ${l.variant}';
+
+  static String buLayoutSource(String source) => 'Nguồn: Billiard University — $source';
 }
