@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/assessment/onboarding_check.dart';
 import 'package:poolcoachai/domain/assessment/questionnaire.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -38,5 +39,28 @@ void main() {
     await pumpEventQueue();
     expect(container.read(assessmentRepositoryProvider), isNull);
     expect(container.read(playerRankProvider).value, isNull);
+  });
+
+  group('RankFetchNotifier', () {
+    test('báo theo người; người khác thì coi như chưa lấy', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(rankFetchProvider.notifier).report('u1', RankFetch.foundNone);
+      final state = container.read(rankFetchProvider);
+      expect(rankFetchFor(state, 'u1'), RankFetch.foundNone);
+      expect(rankFetchFor(state, 'u2'), RankFetch.pending);
+    });
+
+    test('đã hỏng một lần thì giữ nguyên trong phiên (spec mục 8)', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final n = container.read(rankFetchProvider.notifier);
+      n.report('u1', RankFetch.failed);
+      n.report('u1', RankFetch.foundNone);
+      expect(rankFetchFor(container.read(rankFetchProvider), 'u1'), RankFetch.failed);
+      n.report('u2', RankFetch.foundNone);
+      expect(rankFetchFor(container.read(rankFetchProvider), 'u2'), RankFetch.foundNone,
+          reason: 'người khác đăng nhập thì bắt đầu lại');
+    });
   });
 }

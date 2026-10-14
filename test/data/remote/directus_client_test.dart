@@ -64,4 +64,17 @@ void main() {
       throwsA(isA<DirectusError>().having((e) => e.code, 'code', isNull)),
     );
   });
+
+  test('patch gửi PATCH kèm token và thân JSON, trả trường data', () async {
+    final server = FakeDirectus()
+      ..routes['PATCH /items/player_ranks/u1'] =
+          ((req) => FakeDirectus.ok({'id': 'u1', ...FakeDirectus.body(req)}));
+    final api = DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl);
+
+    final data = await api.patch('/items/player_ranks/u1', token: 'tk', body: {'rank': 'g'});
+
+    expect(data, {'id': 'u1', 'rank': 'g'});
+    final req = server.sent('PATCH', '/items/player_ranks/u1').single;
+    expect(req.headers['Authorization'], 'Bearer tk');
+  });
 }

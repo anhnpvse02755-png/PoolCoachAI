@@ -63,3 +63,96 @@ BuTest toBuTest(BuTestRow r) => BuTest(
 
 DrillAttempts attemptsOfRow(BuDrillResultRow r) =>
     DrillAttempts.fromJson(jsonDecode(r.attempts));
+
+// ─── Directus (spec mục 6.2; tên collection theo D9 của kế hoạch) ─────────
+//
+// Không gửi chủ: server tự điền `user_created` từ token, như drill_logs.
+
+const remoteRankFields = 'id,rank,source,bu_score,test_id,warning_rank,'
+    'warning_test_id,questionnaire_answers,onboarding_state,updated_at';
+const remoteTestFields = 'id,started_at,completed_at,cancelled_at,table_size,'
+    'exam_i_score,exam_ii_version,exam_ii_score,total_score,result_rank';
+const remoteResultFields = 'id,test_id,drill_id,attempts,score,recorded_at';
+
+String? _iso(DateTime? d) => d?.toUtc().toIso8601String();
+DateTime? _local(Object? s) => s == null ? null : DateTime.parse(s as String).toLocal();
+
+/// Dòng hạng cho `POST /items/player_ranks` (id là id người dùng).
+Map<String, Object?> toRemoteRank(PlayerRankRow r) => {
+      'id': r.userId,
+      'rank': r.rank,
+      'source': r.source,
+      'bu_score': r.buScore,
+      'test_id': r.testId,
+      'warning_rank': r.warningRank,
+      'warning_test_id': r.warningTestId,
+      'questionnaire_answers':
+          r.questionnaireAnswers == null ? null : jsonDecode(r.questionnaireAnswers!),
+      'onboarding_state': r.onboardingState,
+      'updated_at': _iso(r.updatedAt),
+    };
+
+PlayerRank rankFromRemote(Map<String, Object?> j) => PlayerRank(
+      rank: _rank(j['rank'] as String?),
+      source: j['source'] == null ? null : RankSource.values.byName(j['source']! as String),
+      buScore: j['bu_score'] as int?,
+      testId: j['test_id'] as String?,
+      warningRank: _rank(j['warning_rank'] as String?),
+      warningTestId: j['warning_test_id'] as String?,
+      answers: j['questionnaire_answers'] == null
+          ? null
+          : QuestionnaireAnswers.fromJson(j['questionnaire_answers']),
+      onboardingState: OnboardingState.values.byName(j['onboarding_state']! as String),
+      updatedAt: _local(j['updated_at'])!,
+    );
+
+Map<String, Object?> toRemoteTest(BuTestRow r) => {
+      'id': r.id,
+      'started_at': _iso(r.startedAt),
+      'completed_at': _iso(r.completedAt),
+      'cancelled_at': _iso(r.cancelledAt),
+      'table_size': r.tableSize,
+      'exam_i_score': r.examIScore,
+      'exam_ii_version': r.examIIVersion,
+      'exam_ii_score': r.examIIScore,
+      'total_score': r.totalScore,
+      'result_rank': r.resultRank,
+    };
+
+BuTestRowsCompanion fromRemoteTest(Map<String, Object?> j,
+        {required String userId, required DateTime syncedAt}) =>
+    BuTestRowsCompanion.insert(
+      id: j['id']! as String,
+      userId: userId,
+      startedAt: _local(j['started_at'])!,
+      tableSize: j['table_size']! as String,
+      completedAt: drift.Value(_local(j['completed_at'])),
+      cancelledAt: drift.Value(_local(j['cancelled_at'])),
+      examIScore: drift.Value(j['exam_i_score'] as int?),
+      examIIVersion: drift.Value(j['exam_ii_version'] as String?),
+      examIIScore: drift.Value(j['exam_ii_score'] as int?),
+      totalScore: drift.Value(j['total_score'] as int?),
+      resultRank: drift.Value(j['result_rank'] as String?),
+      syncedAt: drift.Value(syncedAt),
+    );
+
+Map<String, Object?> toRemoteResult(BuDrillResultRow r) => {
+      'id': r.id,
+      'test_id': r.testId,
+      'drill_id': r.drillId,
+      'attempts': jsonDecode(r.attempts),
+      'score': r.score,
+      'recorded_at': _iso(r.recordedAt),
+    };
+
+BuDrillResultRowsCompanion fromRemoteResult(Map<String, Object?> j,
+        {required DateTime syncedAt}) =>
+    BuDrillResultRowsCompanion.insert(
+      id: j['id']! as String,
+      testId: j['test_id']! as String,
+      drillId: j['drill_id']! as String,
+      attempts: jsonEncode(j['attempts']),
+      score: drift.Value(j['score'] as int?),
+      recordedAt: _local(j['recorded_at'])!,
+      syncedAt: drift.Value(syncedAt),
+    );

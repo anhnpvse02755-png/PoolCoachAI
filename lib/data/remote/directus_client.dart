@@ -50,6 +50,9 @@ class DirectusClient {
   Future<Object?> post(String path, {Object? body, String? token}) =>
       _send('POST', path, body: body, token: token);
 
+  Future<Object?> patch(String path, {Object? body, String? token}) =>
+      _send('PATCH', path, body: body, token: token);
+
   Future<Object?> _send(
     String method,
     String path, {
