@@ -117,6 +117,43 @@ try {
     fail('không lấy được id của B từ admin');
   }
 
+  // ─── Đánh giá + hạng: player_ranks, bu_tests, bu_drill_results ──────────
+  if (aId && bId) {
+    const rank = { id: aId, rank: 'h', source: 'estimated', bu_score: null, test_id: null,
+      warning_rank: null, warning_test_id: null, questionnaire_answers: [0, 0, 0, 2, 1, 0, 0, 0],
+      onboarding_state: 'done', updated_at: '2026-10-14T03:00:00.000Z' };
+    const made = await call('POST', '/items/player_ranks', rank, a.access_token);
+    made.status === 200 ? ok('A tạo được dòng hạng của mình') : fail(`A tạo dòng hạng → ${made.status} ${made.code}`);
+    const forgedRank = await call('POST', '/items/player_ranks', { ...rank, id: bId }, a.access_token);
+    forgedRank.status >= 400 ? ok(`A không tạo được dòng hạng mang id của B → ${forgedRank.status}`) : fail('A tạo được dòng hạng mang id của B');
+    const patched = await call('PATCH', `/items/player_ranks/${aId}`, { rank: 'g', updated_at: '2026-10-15T03:00:00.000Z' }, a.access_token);
+    patched.status === 200 ? ok('A sửa được dòng hạng của mình') : fail(`A sửa dòng hạng → ${patched.status} ${patched.code}`);
+    const bRanks = await call('GET', '/items/player_ranks', undefined, b.access_token);
+    (bRanks.data ?? []).length === 0 ? ok('B không thấy hạng của A') : fail(`B thấy ${bRanks.data.length} dòng hạng`);
+    const bPatch = await call('PATCH', `/items/player_ranks/${aId}`, { rank: 'a' }, b.access_token);
+    bPatch.status === 403 ? ok('B không sửa được hạng của A') : fail(`B sửa hạng của A → ${bPatch.status}`);
+
+    const testId = randomUUID();
+    const buTest = { id: testId, started_at: '2026-10-14T02:00:00.000Z', completed_at: '2026-10-14T04:00:00.000Z',
+      cancelled_at: null, table_size: 'nineFootPlus', exam_i_score: 60, exam_ii_version: 'masters',
+      exam_ii_score: 77, total_score: 137, result_rank: 'd' };
+    const tMade = await call('POST', '/items/bu_tests', buTest, a.access_token);
+    tMade.status === 200 ? ok('A tạo được lần kiểm tra') : fail(`A tạo lần kiểm tra → ${tMade.status} ${tMade.code}`);
+    const tAgain = await call('POST', '/items/bu_tests', buTest, a.access_token);
+    note(`gửi lại lần kiểm tra cùng id → status ${tAgain.status}, code ${tAgain.code}`);
+    const tPatch = await call('PATCH', `/items/bu_tests/${testId}`, { total_score: 200 }, a.access_token);
+    tPatch.status === 403 ? ok('A không sửa được lần kiểm tra đã gửi') : fail(`A sửa lần kiểm tra → ${tPatch.status}`);
+    const rMade = await call('POST', '/items/bu_drill_results', { id: randomUUID(), test_id: testId, drill_id: 'S10',
+      attempts: { breaks: [[true, true, false, true, false]] }, score: null, recorded_at: '2026-10-14T03:30:00.000Z' }, a.access_token);
+    rMade.status === 200 ? ok('A tạo được kết quả bài') : fail(`A tạo kết quả bài → ${rMade.status} ${rMade.code}`);
+    const rList = await call('GET', '/items/bu_drill_results?fields=attempts', undefined, a.access_token);
+    typeof rList.data?.[0]?.attempts === 'object' ? ok('attempts về dạng JSON, không phải chuỗi') : fail(`attempts về dạng ${typeof rList.data?.[0]?.attempts}`);
+    const bTests = await call('GET', '/items/bu_tests', undefined, b.access_token);
+    (bTests.data ?? []).length === 0 ? ok('B không thấy lần kiểm tra của A') : fail(`B thấy ${bTests.data.length} lần kiểm tra`);
+  } else {
+    fail('thiếu id của A hoặc B, bỏ qua phần hạng');
+  }
+
   const adminRole = (await call('GET', '/roles?filter[name][_eq]=Administrator', undefined, admin.access_token)).data?.[0]?.id;
   await call('PATCH', '/users/me', { role: adminRole }, a.access_token);
   const roleAfter = await roleOf(users[0].email);

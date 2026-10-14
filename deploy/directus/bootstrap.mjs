@@ -146,6 +146,81 @@ if (!hasRelation) {
   console.log('Tạo quan hệ drill_logs.user_created → directus_users');
 }
 
+// ─── 1b. Đánh giá + hạng (spec 2026-10-14 mục 6.2) ─────────────────────────
+// player_ranks: mỗi tài khoản một dòng, id = id người dùng (D9 của kế hoạch).
+// bu_tests, bu_drill_results: chỉ thêm — app chỉ đẩy lần đã xong.
+const ownerFields = [
+  { field: 'user_created', type: 'uuid', meta: { special: ['user-created'], readonly: true, hidden: true }, schema: {} },
+  { field: 'date_created', type: 'timestamp', meta: { special: ['date-created'], readonly: true, hidden: true }, schema: {} },
+];
+
+async function exists(path) {
+  // Directus trả 403 (không phải 404) cho thứ chưa có, để không lộ tên.
+  return api('GET', path, undefined, token).then(
+    () => true,
+    (e) => (e.status === 403 || e.status === 404 ? false : Promise.reject(e)),
+  );
+}
+
+async function ensureCollection(name, note, fields) {
+  if (!(await exists(`/collections/${name}`))) {
+    await api('POST', '/collections', {
+      collection: name,
+      meta: { icon: 'military_tech', note },
+      schema: {},
+      fields: [...fields, ...ownerFields],
+    }, token);
+    console.log(`Tạo collection ${name}`);
+  }
+  if (!(await exists(`/relations/${name}/user_created`))) {
+    // Xoá người dùng thì xoá luôn hạng và bài kiểm tra của họ.
+    await api('POST', '/relations', {
+      collection: name,
+      field: 'user_created',
+      related_collection: 'directus_users',
+      schema: { on_delete: 'CASCADE' },
+    }, token);
+    console.log(`Tạo quan hệ ${name}.user_created → directus_users`);
+  }
+}
+
+const nullable = (field, type) => ({ field, type, schema: { is_nullable: true } });
+const required = (field, type) => ({ field, type, schema: { is_nullable: false } });
+const pk = { field: 'id', type: 'uuid', schema: { is_primary_key: true, is_nullable: false } };
+
+await ensureCollection('player_ranks', 'Hạng người chơi PoolCoachAI — mỗi tài khoản một dòng, id = id người dùng', [
+  pk,
+  nullable('rank', 'string'),
+  nullable('source', 'string'),
+  nullable('bu_score', 'integer'),
+  nullable('test_id', 'uuid'),
+  nullable('warning_rank', 'string'),
+  nullable('warning_test_id', 'uuid'),
+  nullable('questionnaire_answers', 'json'),
+  required('onboarding_state', 'string'),
+  required('updated_at', 'timestamp'),
+]);
+await ensureCollection('bu_tests', 'Lần kiểm tra Billiard University đã xong (hoàn tất hoặc hủy)', [
+  pk,
+  required('started_at', 'timestamp'),
+  nullable('completed_at', 'timestamp'),
+  nullable('cancelled_at', 'timestamp'),
+  required('table_size', 'string'),
+  nullable('exam_i_score', 'integer'),
+  nullable('exam_ii_version', 'string'),
+  nullable('exam_ii_score', 'integer'),
+  nullable('total_score', 'integer'),
+  nullable('result_rank', 'string'),
+]);
+await ensureCollection('bu_drill_results', 'Kết quả thô từng bài của một lần kiểm tra BU', [
+  pk,
+  required('test_id', 'uuid'),
+  required('drill_id', 'string'),
+  required('attempts', 'json'),
+  nullable('score', 'integer'),
+  required('recorded_at', 'timestamp'),
+]);
+
 // ─── 2. Role Player và policy của nó ────────────────────────────────────────
 async function findOrCreate(path, name, payload) {
   const found = await api('GET', `${path}?filter[name][_eq]=${encodeURIComponent(name)}`, undefined, token);
@@ -206,6 +281,42 @@ const desiredPermissions = [
     fields: ['first_name', 'email', 'password'],
     permissions: self,
   },
+  // Hạng: tạo đúng một dòng của chính mình, đọc và sửa dòng của mình.
+  {
+    collection: 'player_ranks',
+    action: 'create',
+    fields: ['id', 'rank', 'source', 'bu_score', 'test_id', 'warning_rank', 'warning_test_id',
+      'questionnaire_answers', 'onboarding_state', 'updated_at'],
+    permissions: {},
+    validation: { id: { _eq: '$CURRENT_USER' } },
+  },
+  { collection: 'player_ranks', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'player_ranks',
+    action: 'update',
+    fields: ['rank', 'source', 'bu_score', 'test_id', 'warning_rank', 'warning_test_id',
+      'questionnaire_answers', 'onboarding_state', 'updated_at'],
+    permissions: { user_created: self },
+    validation: {},
+  },
+  // Bài kiểm tra và kết quả: chỉ thêm, không sửa, không xoá.
+  {
+    collection: 'bu_tests',
+    action: 'create',
+    fields: ['id', 'started_at', 'completed_at', 'cancelled_at', 'table_size', 'exam_i_score',
+      'exam_ii_version', 'exam_ii_score', 'total_score', 'result_rank'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'bu_tests', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'bu_drill_results',
+    action: 'create',
+    fields: ['id', 'test_id', 'drill_id', 'attempts', 'score', 'recorded_at'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'bu_drill_results', action: 'read', fields: ['*'], permissions: { user_created: self } },
 ];
 
 const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policy.id}&limit=-1`, undefined, token);
