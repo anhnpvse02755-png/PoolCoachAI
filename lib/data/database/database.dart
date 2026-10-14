@@ -91,6 +91,87 @@ class AuthSessionRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// ─── Đánh giá + hạng (spec 2026-10-14 mục 6.1) ─────────────────────────────
+
+/// Hạng của một tài khoản — mỗi tài khoản một dòng.
+class PlayerRankRows extends Table {
+  TextColumn get userId => text()();
+
+  /// `Rank.name`; null cùng [source] khi chưa có hạng (đã bấm Để sau).
+  TextColumn get rank => text().nullable()();
+
+  /// `RankSource.name`.
+  TextColumn get source => text().nullable()();
+  IntColumn get buScore => integer().nullable()();
+  TextColumn get testId => text().nullable()();
+  TextColumn get warningRank => text().nullable()();
+  TextColumn get warningTestId => text().nullable()();
+
+  /// JSON `List<int>` — chỉ số lựa chọn của Q1…Q8.
+  TextColumn get questionnaireAnswers => text().nullable()();
+
+  /// `OnboardingState.name`.
+  TextColumn get onboardingState => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  /// Null nghĩa là bản trên máy chưa lên server.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {userId};
+}
+
+/// Một lần kiểm tra BU (Đề I + Đề II).
+class BuTestRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+  DateTimeColumn get cancelledAt => dateTime().nullable()();
+
+  /// `TableSize.name`.
+  TextColumn get tableSize => text()();
+  IntColumn get examIScore => integer().nullable()();
+
+  /// `ExamIIVersion.name`.
+  TextColumn get examIIVersion => text().nullable()();
+  IntColumn get examIIScore => integer().nullable()();
+  IntColumn get totalScore => integer().nullable()();
+
+  /// `Rank.name` quy đổi từ tổng điểm.
+  TextColumn get resultRank => text().nullable()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Kết quả thô của một bài trong một lần kiểm tra. Ghi lại sau mỗi cú, nên
+/// đóng app giữa chừng vẫn làm tiếp được.
+class BuDrillResultRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get testId => text()();
+
+  /// 'F1'…'S10'.
+  TextColumn get drillId => text()();
+
+  /// JSON của `DrillAttempts` — kết quả thô từng cú.
+  TextColumn get attempts => text()();
+
+  /// Điểm bài; null tới khi bài đủ lượt.
+  IntColumn get score => integer().nullable()();
+  DateTimeColumn get recordedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {testId, drillId},
+      ];
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -100,6 +181,9 @@ class AuthSessionRows extends Table {
   ScheduleSlotRows,
   TimerSessionRows,
   AuthSessionRows,
+  PlayerRankRows,
+  BuTestRows,
+  BuDrillResultRows,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -108,7 +192,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -122,6 +206,12 @@ class AppDatabase extends _$AppDatabase {
             await m.deleteTable('drill_log_rows');
             await m.createTable(drillLogRows);
             await m.createTable(authSessionRows);
+          }
+          if (from < 3) {
+            // Chỉ thêm bảng: không đụng dữ liệu cũ (spec mục 6.1).
+            await m.createTable(playerRankRows);
+            await m.createTable(buTestRows);
+            await m.createTable(buDrillResultRows);
           }
         },
       );
