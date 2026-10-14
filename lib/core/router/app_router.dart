@@ -20,6 +20,7 @@ import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
+import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
@@ -144,6 +145,10 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
     GoRoute(
       path: Routes.onboardingRank,
       builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(
+      path: Routes.rankTest,
+      builder: (context, state) => const TestScreen(),
     ),
     // Bài đọc mở đè lên shell: vào được từ AI Home và từ bài tập, nên
     // không thuộc riêng nhánh tab nào.

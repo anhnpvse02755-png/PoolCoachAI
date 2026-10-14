@@ -32,6 +32,9 @@ abstract final class Routes {
 
   /// Một sơ đồ theo thứ tự của `allLayouts()` — để chụp từng sơ đồ trên Chrome.
   static String rankLayoutAt(int i) => '$rankLayouts?i=$i';
+
+  /// Làm bài kiểm tra BU — mở đè lên shell (spec mục 7.1).
+  static const rankTest = '/rank/test';
   static const articlePattern = '/knowledge/:id';
 
   /// Đường dẫn chi tiết một bài tập.
@@ -79,6 +82,7 @@ abstract final class Routes {
     planner,
     rankLayouts,
     onboardingRank,
+    rankTest,
     articlePattern,
     login,
     register,

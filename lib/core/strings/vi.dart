@@ -970,4 +970,66 @@ abstract final class Vi {
   /// Câu miễn trừ bắt buộc ở mọi màn hiện hạng (spec mục 4.3).
   static const rankDisclaimer =
       'Đây là bảng hạng riêng của PoolCoachAI, tham khảo cách hiểu ở Hà Nội.';
+
+  // Làm bài kiểm tra — spec mục 7.3.
+  static const buTestTitle = 'Bài kiểm tra BU';
+  static const buPrepTitle = 'Chuẩn bị';
+  static const buPrepIntro = 'Bài kiểm tra gồm Đề I (Cơ bản) và Đề II (Kỹ năng) của '
+      'Billiard University. Mỗi đề mất khoảng 40–60 phút. Điểm Đề I quyết định bản '
+      'Đề II (Bachelors, Masters hoặc Doctorate). Đề II làm ngay hoặc để buổi khác đều được.';
+  static const buSourceLine = 'Đề bài: Billiard University (billiarduniversity.org) — '
+      'Dr. Dave Alciatore và Bob Jewett.';
+  static const buTableSizeLabel = 'Kích thước bàn';
+  static String buTableSize(TableSize s) => switch (s) {
+        TableSize.sevenFoot => '7 feet',
+        TableSize.eightFoot => '8 feet',
+        TableSize.nineFootPlus => '9 feet trở lên',
+      };
+  static const buDoctorateNeedsNine = 'Bản Doctorate chỉ làm trên bàn 9 feet trở lên.';
+  static const buStart = 'Bắt đầu Đề I';
+  static String buRetestFrom(DateTime d) => 'Lần kiểm tra trước đã hoàn tất. '
+      'Lần kế tiếp làm được từ ngày ${shortDate(d)}.';
+  static const buLoadFailed = 'Không đọc được bài kiểm tra trên máy.';
+
+  static String buRunnerHeader(BuExam exam, ExamIIVersion? v, int k, int n) =>
+      '${buExamName(exam)}${v == null ? '' : ' · ${buVersionName(v)}'} · bài $k / $n';
+  static String buRunningScore(BuExam exam, int score) =>
+      'Điểm ${exam == BuExam.fundamentals ? 'Đề I' : 'Đề II'} hiện tại: $score';
+  static String buLadderPosition(int p) => 'Vị trí hiện tại: $p';
+
+  /// Lượt đang nhập, theo cách phiếu điểm BU chia ô.
+  static String buAttemptLabel(BuDrill d, int index) {
+    final i = index.clamp(0, d.attemptCount - 1);
+    final group = i ~/ d.attemptsPerGroup + 1;
+    final within = i % d.attemptsPerGroup + 1;
+    return switch (d.kind) {
+      ScoringKind.bestOfTwo => 'Lượt ${i + 1} / 2',
+      ScoringKind.sumOfLowestTwo => 'Thế ${i + 1} / 3',
+      ScoringKind.medianBreak => 'Lần phá ${i + 1} / 3',
+      _ when d.id == 'F7' => 'Bi đích $group · lượt $within',
+      _ when d.id == 'F8' => 'Đích $group · lượt $within',
+      _ when d.id == 'S5' => 'Vị trí bi cái $group · lượt $within',
+      _ => 'Cú ${i + 1} / ${d.attemptCount}',
+    };
+  }
+
+  static String buShotYes(String drillId) => switch (drillId) {
+        'S5' => 'Bắt đui được',
+        'S6' => 'Chạm bi',
+        'F7' || 'F8' || 'S8' || 'S9' => 'Đạt',
+        _ => 'Vào',
+      };
+
+  static String buShotNo(String drillId) => switch (drillId) {
+        'S5' => 'Không bắt đui',
+        'F7' || 'F8' || 'S8' || 'S9' => 'Không đạt',
+        _ => 'Trượt',
+      };
+
+  static const buCountLess = 'Bớt một bi';
+  static const buCountMore = 'Thêm một bi';
+  static String buCountOf(int n, int max) => '$n / $max bi';
+  static const buCountSubmit = 'Ghi lượt';
+  static const buBreakSubmit = 'Ghi lần phá';
+  static const buUndo = 'Hoàn tác cú vừa nhập';
 }
