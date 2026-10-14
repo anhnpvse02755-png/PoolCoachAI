@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/data/repositories/assessment_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
@@ -13,6 +16,7 @@ import 'package:poolcoachai/domain/assessment/drill_attempts.dart';
 import 'package:poolcoachai/domain/assessment/retest_gate.dart';
 import 'package:poolcoachai/features/rank/presentation/bu_layout_painter.dart';
 import 'package:poolcoachai/features/rank/presentation/drill_inputs.dart';
+import 'package:poolcoachai/features/rank/presentation/test_result_view.dart';
 
 /// Làm bài kiểm tra BU (spec mục 7.3). Màn chỉ đọc Drift: mỗi cú ghi xuống
 /// máy ngay, stream bắn lại, màn tự sang cú / bài kế.
@@ -24,14 +28,85 @@ class TestScreen extends ConsumerStatefulWidget {
 }
 
 class _TestScreenState extends ConsumerState<TestScreen> {
+  /// Lần vừa hoàn tất trong phiên này: nó không còn "đang làm", nên giữ id
+  /// để tiếp tục hiện kết quả.
+  ({String testId, TestCompleted outcome})? _finished;
+
+  /// Đã bấm *Làm Đề II ngay* cho lần này.
+  String? _examIINow;
+  DateTime? _tooSoon;
+  bool _busy = false;
+
+  AssessmentRepository get _repo => ref.read(assessmentRepositoryProvider)!;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _complete(String testId) => _run(() async {
+        final out = await _repo.completeTest(testId);
+        if (!mounted) return;
+        setState(() {
+          switch (out) {
+            case TestCompleted():
+              _finished = (testId: testId, outcome: out);
+            case CompletionTooSoon(:final from):
+              _tooSoon = from;
+          }
+        });
+      });
+
+  Future<void> _cancel(String testId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: const Text(Vi.buCancelConfirmBody),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text(Vi.cancel)),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(Vi.buCancelConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _repo.cancelTest(testId);
+    if (mounted) context.go(Routes.profile);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final finished = _finished;
+    if (finished != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text(Vi.buResultTitle)),
+        body: SafeArea(child: TestResultView(testId: finished.testId, outcome: finished.outcome)),
+      );
+    }
     final active = ref.watch(activeTestProvider);
+    final snap = active.value;
     return Scaffold(
-      appBar: AppBar(title: const Text(Vi.buTestTitle)),
+      appBar: AppBar(
+        title: const Text(Vi.buTestTitle),
+        actions: [
+          if (snap != null)
+            IconButton(
+              tooltip: Vi.buCancelTest,
+              icon: const Icon(Icons.close),
+              onPressed: () => _cancel(snap.test.id),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: switch (active) {
-          AsyncData(value: final snap?) => _activeBody(snap),
+          AsyncData(value: final s?) => _activeBody(s),
           AsyncData() => const _PrepView(),
           AsyncError() => const Center(child: Text(Vi.buLoadFailed)),
           _ => const Center(child: CircularProgressIndicator()),
@@ -40,7 +115,70 @@ class _TestScreenState extends ConsumerState<TestScreen> {
     );
   }
 
-  Widget _activeBody(TestSnapshot snap) => DrillRunner(snap: snap);
+  Widget _activeBody(TestSnapshot snap) {
+    final t = snap.test;
+    final text = Theme.of(context).textTheme;
+    final button = FilledButton.styleFrom(minimumSize: const Size.fromHeight(48));
+
+    if (snap.examIReady) {
+      return ListView(padding: const EdgeInsets.all(AppSpacing.lg), children: [
+        Text(Vi.buExamIReadyTitle, style: text.titleLarge),
+        const SizedBox(height: AppSpacing.md),
+        Text(Vi.buExamIScore(snap.scoreOf(examIDrills))),
+        const SizedBox(height: AppSpacing.xxl),
+        FilledButton(
+          style: button,
+          onPressed: _busy ? null : () => _run(() => _repo.finishExamI(t.id)),
+          child: const Text(Vi.buExamIReadyAction),
+        ),
+      ]);
+    }
+
+    // Đề I đã chốt mà Đề II chưa có cú nào: hỏi làm ngay hay để buổi khác.
+    if (t.examIScore != null && !snap.examIIStarted && _examIINow != t.id) {
+      final small = t.tableSize != TableSize.nineFootPlus && t.examIScore! >= 70;
+      return ListView(padding: const EdgeInsets.all(AppSpacing.lg), children: [
+        Text(Vi.buExamIScore(t.examIScore!), style: text.titleLarge),
+        const SizedBox(height: AppSpacing.md),
+        Text(Vi.buPlacement(t.examIIVersion!)),
+        if (small) const Text(Vi.buPlacementSmallTable),
+        const SizedBox(height: AppSpacing.xxl),
+        FilledButton(
+          style: button,
+          onPressed: () => setState(() => _examIINow = t.id),
+          child: const Text(Vi.buExamIINow),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          onPressed: () => context.go(Routes.profile),
+          child: const Text(Vi.buExamIILater),
+        ),
+      ]);
+    }
+
+    if (snap.examIIReady) {
+      final from = _tooSoon;
+      return ListView(padding: const EdgeInsets.all(AppSpacing.lg), children: [
+        Text(Vi.buFinishTitle, style: text.titleLarge),
+        const SizedBox(height: AppSpacing.md),
+        Text(Vi.buExamScoreLine(
+            BuExam.skills, snap.scoreOf(examIIDrills(t.examIIVersion!)), examIIMax(t.examIIVersion!))),
+        if (from != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(Vi.buCompletionTooSoon(from)),
+        ],
+        const SizedBox(height: AppSpacing.xxl),
+        FilledButton(
+          style: button,
+          onPressed: _busy ? null : () => _complete(t.id),
+          child: const Text(Vi.buFinishAction),
+        ),
+      ]);
+    }
+
+    return DrillRunner(snap: snap);
+  }
 }
 
 /// Bước chuẩn bị: kích thước bàn, giới thiệu đề và nguồn, giãn cách 14 ngày.

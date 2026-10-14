@@ -1,6 +1,7 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
@@ -1032,4 +1033,40 @@ abstract final class Vi {
   static const buCountSubmit = 'Ghi lượt';
   static const buBreakSubmit = 'Ghi lần phá';
   static const buUndo = 'Hoàn tác cú vừa nhập';
+
+  static const buExamIReadyTitle = 'Xong Đề I';
+  static const buExamIReadyAction = 'Chấm Đề I';
+  static String buExamIScore(int s) => 'Điểm Đề I: $s / $examIMax';
+  static String buPlacement(ExamIIVersion v) => 'Bạn làm Đề II bản ${buVersionName(v)}.';
+  static const buPlacementSmallTable =
+      'Đề I đạt mức Doctorate nhưng bàn nhỏ hơn 9 feet, nên làm bản Masters.';
+  static const buExamIINow = 'Làm Đề II ngay';
+  static const buExamIILater = 'Để buổi khác';
+  static const buFinishTitle = 'Xong Đề II';
+  static const buFinishAction = 'Hoàn tất và xem kết quả';
+  static String buCompletionTooSoon(DateTime d) => 'Lần kiểm tra trước hoàn tất chưa đủ 14 '
+      'ngày. Lần này hoàn tất được từ ngày ${shortDate(d)}; các cú đã nhập vẫn còn nguyên.';
+  static const buResultTitle = 'Kết quả kiểm tra';
+  static String buDrillScoreLine(String id, int score, int max) =>
+      '${buDrillTitle(id)}: $score / $max';
+  static String buExamScoreLine(BuExam e, int s, int max) => '${buExamName(e)}: $s / $max';
+  static String buTotal(int total) => 'Điểm BU: $total / $buTotalMax';
+  static String buBand(BuRankBand b) => 'Mức BU: ${b.buLevels}';
+  static String buFargo(BuRankBand b) => 'Fargo tham chiếu: ${b.fargo}';
+  static const buResultDone = 'Xong';
+
+  /// Câu kết quả hạng — đúng một câu cho mỗi luật của spec mục 4.2.
+  static String rankOutcome(RankOutcome o, Rank? before, Rank result) => switch (o) {
+        RankOutcome.firstRank => 'Bạn nhận hạng ${result.label}, đã kiểm chứng.',
+        RankOutcome.promoted => 'Lên hạng: ${before!.label} → ${result.label}, đã kiểm chứng.',
+        RankOutcome.confirmed => 'Giữ hạng ${result.label}, nay đã kiểm chứng.',
+        RankOutcome.warned => 'Kết quả tương đương hạng ${result.label}, thấp hơn hạng hiện '
+            'tại ${before!.label}. Hạng giữ nguyên và có cảnh báo cho tới khi một lần sau '
+            'đạt ${before.label} trở lên.',
+      };
+
+  static const buCancelTest = 'Hủy lần kiểm tra này';
+  static const buCancelConfirmBody =
+      'Hủy lần này? Các cú đã nhập không được tính và hạng không đổi.';
+  static const buCancelConfirm = 'Hủy lần này';
 }
