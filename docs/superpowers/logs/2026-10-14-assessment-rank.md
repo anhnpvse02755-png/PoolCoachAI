@@ -70,3 +70,9 @@ None to layouts or texts. Spec §5.2 S9 Doctorate line rewritten to match the PD
 ## Owner decisions
 
 - D4: between two verified rows the higher rank wins, equal ranks take the newer, the losing lower newer test becomes a warning. D5: the test table defaults to the 9-foot standard American pool table; BU placement rule kept for smaller tables, no rank cap. S9 Doctorate: follow the PDF.
+
+## Final verification (Task 18, 15/10/2026)
+
+- `flutter test`: `03:57 +1004 ~5: All tests passed!` (Task 0 baseline: 794 passed, 5 skipped → +210 tests).
+- `flutter analyze`: `No issues found!`
+- Whole-branch review: self-review (owner declined subagent review). Checked: the six rank rules and that no path lowers a rank (`applyTestResult` keeps rank + warning; questionnaire locked once verified); `mergeRank` (D4) and that `_syncRank` only PATCHes when the local row won the merge, so an unverified row never overwrites a verified one; no BU PDF in git history (`git log --all -- '*.pdf'` empty); `lib/domain/assessment` has no Flutter import; no "kim cương" / "bi ma" / "lọt bi cái" in `lib`; disclaimer on the questionnaire and the result, ⓘ sheet with the disclaimer on every rank badge (Hồ sơ, Trang chủ, rank screen). Scoring vs score sheets and every layout were checked in Tasks 3 and 11 and by the owner at Task 17. No findings.

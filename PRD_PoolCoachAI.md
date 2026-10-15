@@ -56,7 +56,12 @@ PoolCoachAI phục vụ cơ thủ phong trào và người muốn nâng trình, 
 
 ## 4. Onboarding & Skill Assessment
 
-8 câu hỏi ngắn để ước lượng trình độ ban đầu (thời gian chơi, tần suất, số bi/lượt cơ tốt nhất và thông thường, kinh nghiệm runout, khả năng kiểm soát cơ bi, một câu phân biệt bổ sung). Kết quả chỉ là **baseline** — trình độ thực tế được điều chỉnh liên tục từ dữ liệu Training và Play.
+*(Đã xây — spec `docs/superpowers/specs/2026-10-14-poolcoachai-assessment-rank-design.md`.)*
+
+- Sau lần đăng nhập đầu tiên, tài khoản chưa có hạng được đưa tới **8 câu hỏi** (nguyên văn PoolOS v2). Chỉ Q4, Q5, Q6 tính hạng gợi ý, theo bảng quy đổi neo vào mô tả Fargo của Dr. Dave. Người chơi **Xác nhận** (hạng *ước lượng*) hoặc **Chọn hạng khác** (hạng *tự khai*, kể cả PRO). Màn nào cũng có **Để sau**. Máy mới chưa lấy được hạng từ máy chủ thì không bị ép vào bộ câu hỏi.
+- **Bài kiểm tra Billiard University** (Đề I + Đề II, thang 200, cộng điểm thô theo phiếu điểm BU) cho hạng *đã kiểm chứng*. Điểm BU quy đổi sang K…A bằng cách gộp các mức của `BU_Rating_Comparisons.pdf`; BU không bao giờ cho PRO. Hai lần hoàn tất cách nhau tối thiểu 14 ngày; lần bị hủy không tính.
+- App **không bao giờ tự hạ hạng**: kết quả thấp hơn chỉ đặt cảnh báo. Dữ liệu luyện tập không đổi hạng.
+- Mỗi cú ghi xuống máy ngay khi nhập; hạng, câu trả lời và các lần kiểm tra đã xong đồng bộ theo tài khoản. Mọi màn hiện hạng kèm nhãn nguồn, câu miễn trừ và bảng quy đổi.
 
 ## 5. AI Home — Dashboard
 
