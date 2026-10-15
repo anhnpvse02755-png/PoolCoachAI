@@ -3,6 +3,8 @@
 Ngày: 2026-10-06
 Trạng thái: đã duyệt hướng, chờ duyệt bản viết (chưa thành kế hoạch triển khai). **Phải viết lại sau khi có dự án con Đánh giá + hạng** (xem mục "Đối chiếu với mã" ngay dưới).
 
+> **Đã thay bằng `2026-10-15-poolcoachai-roadmap-design.md` (15/10/2026).** Giữ file này làm lịch sử.
+
 ## Đối chiếu với mã (07/10/2026)
 
 Bản này viết ngoài repo (PM qua Claude chat). Đối chiếu với `main` (`d03a55e`), phần Tiền đề và bảng Bối cảnh có mấy chỗ coi là đã có nhưng thật ra chưa có:
