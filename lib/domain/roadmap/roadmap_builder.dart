@@ -24,8 +24,8 @@ Roadmap buildRoadmap({
   final facts = PracticeFacts(drills: drills, logs: logs, today: today);
   return switch (goal.kind) {
     GoalKind.lenHang => _lenHang(goal, rank, facts, tests, latestResult),
-    GoalKind.thuanThucKyNang => throw UnimplementedError('Task 5'),
-    GoalKind.chuanBiGiai => throw UnimplementedError('Task 5'),
+    GoalKind.thuanThucKyNang => _skill(goal, facts),
+    GoalKind.chuanBiGiai => _tournament(goal, facts, latestResult),
   };
 }
 
@@ -113,6 +113,48 @@ List<RoadmapStep> _untilEnough(PracticeFacts facts, BuResult result, int needed)
     sum += e.points;
   }
   return picked;
+}
+
+/// Mỗi bài của nhóm một bước, theo cấp; bước cuối là cả nhóm (R6).
+Roadmap _skill(PlayerGoal goal, PracticeFacts facts) {
+  final c = goal.category!;
+  final inGroup = facts.drills.where((d) => d.cat == c).toList()
+    ..sort((a, b) {
+      final byLevel = a.level.compareTo(b.level);
+      return byLevel != 0 ? byLevel : a.id.compareTo(b.id);
+    });
+  final steps = <RoadmapStep>[
+    for (final d in inGroup)
+      RoadmapStep(
+        kind: StepKind.baiTap,
+        status: facts.drillReady(d) ? StepStatus.xong : StepStatus.chuaToi,
+        reason: DrillLevel(d.level),
+        category: c,
+        drillId: d.id,
+        passStreak: facts.passStreak(d),
+      ),
+    facts.groupStep(c, facts.groupReason(c)),
+  ];
+  return Roadmap(goal: goal, steps: placeSteps(facts, steps));
+}
+
+/// Mọi nhóm dưới 75; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
+/// có bước làm BU; bước không kịp trước ngày giải xếp riêng (mục 4.3).
+Roadmap _tournament(PlayerGoal goal, PracticeFacts facts, BuResult? result) {
+  final below = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList();
+  final List<RoadmapStep> steps;
+  if (result == null) {
+    below.sort(facts.compareWeakness);
+    steps = [for (final c in below) facts.groupStep(c, facts.groupReason(c))];
+  } else {
+    final lost = lostByCategory(result);
+    final entries = <_Lost>[
+      for (final c in below) (cat: c, points: lost.byCategory[c] ?? 0),
+      if (lost.unmapped > 0) (cat: null, points: lost.unmapped),
+    ]..sort((a, b) => _byPointsThenWeakness(facts, a, b));
+    steps = [for (final e in entries) _lostStep(facts, result, e)];
+  }
+  return Roadmap(goal: goal, steps: placeSteps(facts, steps, eventDate: goal.eventDate));
 }
 
 /// Đặt ngày dự kiến rồi trạng thái cho cả danh sách (mục 4.4, 4.5).
