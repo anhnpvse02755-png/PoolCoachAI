@@ -53,3 +53,20 @@ Xong.
 ```
 
 `verify.mjs` (exit 0): all 10 new rank/test checks OK, `NOTE gửi lại lần kiểm tra cùng id → status 400, code RECORD_NOT_UNIQUE`, ended with `Tất cả kiểm tra đều qua`. The app treats RECORD_NOT_UNIQUE on a re-push as already synced (test `máy chủ đã có lần kiểm tra và kết quả (RECORD_NOT_UNIQUE): coi như đã đồng bộ`).
+
+## Chrome (14–15/10/2026)
+
+- rank.mjs (build/web 17:28 after 5cbdb31, run 17:52 14/10): Bước 1–11 all passed — đăng ký → bộ câu hỏi → gợi ý H (ước lượng) → bàn 9 feet, Đề I → F1 tải lại vẫn ở Cú 4 / 10, vị trí 7 → Đề I 60, bản Masters → để buổi khác, Làm tiếp → Masters 77 → 137 điểm, H → D, đã kiểm chứng → Hồ sơ HẠNG D → máy thứ hai thấy HẠNG D, không vào bộ câu hỏi. 85 layouts photographed, ended `Xong.`
+- accounts.mjs (15/10): Bước 1–6 passed. simulator.mjs (15/10): `Xong.` planner.mjs (15/10): `Xong.`; safety-search frame time median 16.7 ms, p95 33.2 ms, max 83.3 ms.
+
+## Owner's eye check
+
+15/10/2026: "Duyệt hết, giữ S9 theo PDF" — all 85 layouts, texts and result lines approved; S9 Doctorate stays as the BU PDF (cue ball into the corner pocket without touching the obstacle, no object ball).
+
+## Corrections
+
+None to layouts or texts. Spec §5.2 S9 Doctorate line rewritten to match the PDF (the old "không có dòng 'được chết cái'" read the PDF backwards; the app already followed the PDF since Task 11).
+
+## Owner decisions
+
+- D4: between two verified rows the higher rank wins, equal ranks take the newer, the losing lower newer test becomes a warning. D5: the test table defaults to the 9-foot standard American pool table; BU placement rule kept for smaller tables, no rank cap. S9 Doctorate: follow the PDF.

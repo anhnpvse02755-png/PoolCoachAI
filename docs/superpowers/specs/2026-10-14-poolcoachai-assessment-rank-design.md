@@ -137,7 +137,7 @@ Các luật riêng cần mã hóa đúng:
 - S3: bi 9 vào sớm thì vẫn phải đánh nốt các bi còn lại theo thứ tự.
 - S3 bản Doctorate, thế 3: phải tới bi 7 và bi 9 bằng 3–4 băng.
 - S4: được chạm bi chướng ngại.
-- S9 bản Doctorate: không có dòng "được chết cái".
+- S9 bản Doctorate: không có bi mục tiêu; cú thành công là đưa bi cái vào lỗ góc mà không chạm bi chướng ngại (PDF: "scratch in the corner", chấm "CB pocketed"). Chủ dự án chốt theo PDF ngày 15/10/2026.
 
 Bản kế hoạch triển khai phải đối chiếu lại từng luật với PDF.
 
