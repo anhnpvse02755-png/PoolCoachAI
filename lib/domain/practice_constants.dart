@@ -24,4 +24,9 @@ abstract final class PracticeConstants {
 
   /// Chênh lệch tối thiểu giữa hai nửa để gọi là có xu hướng.
   static const trendThreshold = 0.1;
+
+  /// Số ngày gần nhất dùng để đo tốc độ tiến bộ cho ngày dự kiến của Lộ
+  /// trình. Không có trong spec prototype: chủ sản phẩm duyệt 15/10/2026
+  /// (spec 2026-10-15 mục 4.5).
+  static const paceWindowDays = 28;
 }
