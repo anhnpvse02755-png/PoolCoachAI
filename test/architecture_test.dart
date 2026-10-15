@@ -255,4 +255,18 @@ void main() {
           'được trên Dart VM thuần (spec 2026-10-15 mục 4)',
     );
   });
+
+  test('thành tích chỉ sinh ra từ newAchievements', () {
+    // Thành tích tạo tay là thành tích "ảo" (spec 2026-10-15 mục 2.7). Ngoài
+    // lõi và tầng dữ liệu, không nơi nào được dựng Achievement(.
+    final offenders = <String>[];
+    for (final file in dartFilesIn('lib')) {
+      final path = file.path.replaceAll(r'\', '/');
+      if (path.endsWith('lib/domain/roadmap/achievements.dart')) continue;
+      if (path.endsWith('lib/data/database/roadmap_converters.dart')) continue;
+      if (codeOnly(file.readAsStringSync()).contains('Achievement(')) offenders.add(path);
+    }
+    expect(offenders, isEmpty,
+        reason: 'thành tích phải đi từ một sự kiện dữ liệu thật qua newAchievements');
+  });
 }
