@@ -57,6 +57,9 @@ try {
   step(4, 'F1 ba cú vào, tải lại trang: vẫn ở cú 4/10, vị trí 7');
   await times(one, 'Vào', 3);
   await one.reload();
+  // Màn làm bài mở bằng push nên URL vẫn là /profile: tải lại thì về Hồ sơ,
+  // thẻ hạng có Làm tiếp (như bước 6).
+  await one.click('Làm tiếp');
   await one.waitForText('Cú 4 / 10');
   await one.waitForText('Vị trí hiện tại: 7');
   await one.shot(path.join(shots, '03-tai-lai-giua-F1.png'));
