@@ -172,6 +172,51 @@ class BuDrillResultRows extends Table {
       ];
 }
 
+// ─── Lộ trình (spec 2026-10-15 mục 6) ──────────────────────────────────────
+
+/// Mục tiêu của một tài khoản — mỗi tài khoản một dòng. Bỏ mục tiêu thì dòng
+/// còn đó với [kind] rỗng, để máy khác biết "đã bỏ" là bản mới hơn (R2).
+class PlayerGoalRows extends Table {
+  TextColumn get userId => text()();
+
+  /// Đổi mục tiêu là ra id mới.
+  TextColumn get goalId => text().nullable()();
+
+  /// `GoalKind.name`; null là đã bỏ mục tiêu.
+  TextColumn get kind => text().nullable()();
+
+  /// `SkillCategory.name` cho Thuần thục kỹ năng.
+  TextColumn get category => text().nullable()();
+  DateTimeColumn get eventDate => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {userId};
+}
+
+/// Thành tích — chỉ thêm. Id tính từ (người, loại, refId), nên hai máy ghi
+/// cùng một thành tích ra cùng một id (R8).
+class AchievementRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+
+  /// `AchievementKind.name`.
+  TextColumn get kind => text()();
+  TextColumn get refId => text()();
+  DateTimeColumn get achievedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {userId, kind, refId},
+      ];
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -184,6 +229,8 @@ class BuDrillResultRows extends Table {
   PlayerRankRows,
   BuTestRows,
   BuDrillResultRows,
+  PlayerGoalRows,
+  AchievementRows,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -192,7 +239,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -212,6 +259,11 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(playerRankRows);
             await m.createTable(buTestRows);
             await m.createTable(buDrillResultRows);
+          }
+          if (from < 4) {
+            // Chỉ thêm bảng (spec 2026-10-15 mục 6).
+            await m.createTable(playerGoalRows);
+            await m.createTable(achievementRows);
           }
         },
       );
