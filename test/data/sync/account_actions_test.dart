@@ -174,4 +174,18 @@ void main() {
         reason: 'dòng hạng + lần đã hoàn tất; lần đang dở không đồng bộ được');
     expect(await hasActiveTest(db, 'u1'), isTrue);
   });
+
+  test('đăng xuất xoá mục tiêu và thành tích của người đó; đếm được dòng chưa đồng bộ', () async {
+    final at = DateTime(2026, 10, 15, 9);
+    await db.into(db.playerGoalRows).insert(PlayerGoalRowsCompanion.insert(userId: 'u1', updatedAt: at));
+    await db.into(db.achievementRows).insert(AchievementRowsCompanion.insert(
+        id: 'x', userId: 'u1', kind: 'chuoiNgay', refId: '7', achievedAt: at));
+    await db.into(db.playerGoalRows).insert(PlayerGoalRowsCompanion.insert(userId: 'u2', updatedAt: at));
+
+    expect(await pendingRoadmapCount(db, 'u1'), 2);
+    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1');
+
+    expect((await db.select(db.playerGoalRows).get()).map((r) => r.userId), ['u2']);
+    expect(await db.select(db.achievementRows).get(), isEmpty);
+  });
 }

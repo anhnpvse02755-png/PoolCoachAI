@@ -63,6 +63,9 @@ Future<void> signOutAndForget({
   await (db.delete(db.buDrillResultRows)..where((r) => r.testId.isInQuery(tests)))
       .go();
   await (db.delete(db.buTestRows)..where((t) => t.userId.equals(userId))).go();
+  // Mục tiêu và thành tích cũng là dữ liệu riêng của người này.
+  await (db.delete(db.playerGoalRows)..where((t) => t.userId.equals(userId))).go();
+  await (db.delete(db.achievementRows)..where((t) => t.userId.equals(userId))).go();
 }
 
 /// Dòng hạng và lần kiểm tra đã xong của [userId] chưa lên server. Lần đang
@@ -78,6 +81,17 @@ Future<int> pendingAssessmentCount(AppDatabase db, String userId) async {
             (t.completedAt.isNotNull() | t.cancelledAt.isNotNull())))
       .get();
   return rank.length + tests.length;
+}
+
+/// Dòng mục tiêu và thành tích của [userId] chưa lên server.
+Future<int> pendingRoadmapCount(AppDatabase db, String userId) async {
+  final goals = await (db.select(db.playerGoalRows)
+        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+      .get();
+  final achievements = await (db.select(db.achievementRows)
+        ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+      .get();
+  return goals.length + achievements.length;
 }
 
 /// [userId] có lần kiểm tra đang làm dở trên máy này không.
