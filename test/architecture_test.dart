@@ -238,4 +238,21 @@ void main() {
           'thuần (spec 2026-10-14 mục 5)',
     );
   });
+
+  test('lõi Lộ trình không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/roadmap');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'cách suy bước, ước lượng ngày và thành tích phải chạy và test '
+          'được trên Dart VM thuần (spec 2026-10-15 mục 4)',
+    );
+  });
 }
