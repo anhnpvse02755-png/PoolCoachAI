@@ -8,6 +8,8 @@ merge are not listed, except where noted.
 
 - Task 9: the portrait table box ignored the 32 px horizontal padding, so
   the bottom rail was about 17 px thicker — 947f93c, tested at two sizes
+- `Vec2.isZero` had no direct test; `vec2_table_test.dart` now checks exact zero
+  and tiny nonzero values on either axis.
 
 ## Next steps
 
