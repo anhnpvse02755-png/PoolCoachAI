@@ -114,7 +114,9 @@ class SyncService {
   Future<({SyncOutcome outcome, bool reachedEnd})> _once() async {
     if (_disposed) return (outcome: SyncOutcome.stopped, reachedEnd: false);
     final who = _auth.current;
-    if (who is! SignedIn) return (outcome: SyncOutcome.signedOut, reachedEnd: true);
+    if (who is! SignedIn) {
+      return (outcome: SyncOutcome.signedOut, reachedEnd: true);
+    }
     try {
       final anyRejected = await _push(who.userId);
       // Buổi bị từ chối không phải lý do bỏ kéo về: dữ liệu từ máy khác
@@ -132,7 +134,15 @@ class SyncService {
     } on DirectusError {
       return (outcome: SyncOutcome.failed, reachedEnd: false);
     } on _UserChanged {
-      return (outcome: SyncOutcome.signedOut, reachedEnd: false);
+      final current = _auth.current;
+      final switchedToAnotherUser =
+          current is SignedIn && current.userId != who.userId;
+      final shouldSyncNewUser = _started && switchedToAnotherUser;
+      if (shouldSyncNewUser) _again = true;
+      return (
+        outcome: SyncOutcome.signedOut,
+        reachedEnd: shouldSyncNewUser,
+      );
     } on _Stopped {
       return (outcome: SyncOutcome.stopped, reachedEnd: false);
     } on Object {
