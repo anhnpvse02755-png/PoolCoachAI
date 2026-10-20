@@ -91,6 +91,10 @@ low-risk at the time. Items fixed before the merge are not listed.
   A started sync service now immediately queues one pass for the new signed-in
   account; `sync_service_test.dart` covers a blocked old-account upload and
   verifies the new account's pending row is pushed without waiting for the timer.
+- Overlapping sign-ins shared one boolean commit guard, so the first write to
+  finish could let the old session request a token while another sign-in was
+  still committing. The guard is now a counter; `directus_auth_repository_test.dart`
+  verifies the token remains unavailable until both writes finish.
 
 ## Still open
 
