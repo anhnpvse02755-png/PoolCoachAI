@@ -80,6 +80,18 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             child: PcCard(
               child: ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: const Text(Vi.roadmapTitle),
+                subtitle: const Text(Vi.roadmapCardBody),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go(Routes.roadmap),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: PcCard(
+              child: ListTile(
                 leading: const Icon(Icons.adjust),
                 title: const Text(Vi.simTitle),
                 subtitle: const Text(Vi.simCardBody),
@@ -103,10 +115,12 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
           Expanded(
             child: drillsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => const PcEmptyState(
-                icon: Icons.cloud_off,
-                title: Vi.dataErrorTitle,
-                body: Vi.dataErrorBody,
+              error: (error, stack) => const SingleChildScrollView(
+                child: PcEmptyState(
+                  icon: Icons.cloud_off,
+                  title: Vi.dataErrorTitle,
+                  body: Vi.dataErrorBody,
+                ),
               ),
               data: (drills) {
                 final logs = logsAsync.hasValue

@@ -18,6 +18,7 @@ import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dar
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
+import 'package:poolcoachai/features/roadmap/presentation/roadmap_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_screen.dart';
@@ -84,6 +85,10 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
                 GoRoute(
                   path: 'planner',
                   builder: (context, state) => const PlannerScreen(),
+                ),
+                GoRoute(
+                  path: 'roadmap',
+                  builder: (context, state) => const RoadmapScreen(),
                 ),
                 GoRoute(
                   path: 'drills/:id',

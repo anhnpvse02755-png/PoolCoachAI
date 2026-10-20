@@ -19,6 +19,7 @@ import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dar
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
+import 'package:poolcoachai/features/roadmap/presentation/roadmap_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
@@ -62,6 +63,7 @@ const _routeCases = <String, _RouteCase>{
   ),
   Routes.simulator: (path: Routes.simulator, screen: SimulatorScreen),
   Routes.planner: (path: Routes.planner, screen: PlannerScreen),
+  Routes.roadmap: (path: Routes.roadmap, screen: RoadmapScreen),
   Routes.rankLayouts: (path: Routes.rankLayouts, screen: LayoutGalleryScreen),
   Routes.onboardingRank: (path: Routes.onboardingRank, screen: OnboardingScreen),
   Routes.rankTest: (path: Routes.rankTest, screen: TestScreen),

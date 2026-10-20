@@ -27,6 +27,9 @@ abstract final class Routes {
   /// Kế hoạch dọn bàn — trong nhánh Luyện tập như màn mô phỏng.
   static const planner = '$training/planner';
 
+  /// Lộ trình — trong nhánh Luyện tập, không thêm tab.
+  static const roadmap = '$training/roadmap';
+
   /// Chi tiết hạng — mở đè lên shell (spec mục 7.1).
   static const rank = '/rank';
 
@@ -83,6 +86,7 @@ abstract final class Routes {
     drillSessionPattern,
     simulator,
     planner,
+    roadmap,
     rank,
     rankLayouts,
     onboardingRank,

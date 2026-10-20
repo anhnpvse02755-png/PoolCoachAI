@@ -112,6 +112,13 @@ void main() {
     expect(find.byType(PlannerScreen), findsOneWidget);
   });
 
+  testWidgets('thẻ Lộ trình mở màn chọn mục tiêu', (tester) async {
+    await openTraining(tester, const []);
+    await tester.tap(find.text(Vi.roadmapTitle));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.goalPickTitle), findsOneWidget);
+  });
+
   // Mô phỏng không cần dữ liệu bài tập, nên thẻ không được biến mất khi
   // danh sách bài đang tải hay tải lỗi.
   for (final (name, drills) in <(String, Stream<List<Drill>>)>[
