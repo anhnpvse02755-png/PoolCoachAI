@@ -9,6 +9,11 @@ import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
+import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -254,7 +259,7 @@ abstract final class Vi {
   // Đăng xuất — spec mục 5.4.
   static String profileSignedInAs(String name) => 'Đang đăng nhập: $name';
   static const profileSignOut = 'Đăng xuất';
-  static const signOutPendingTitle = 'Còn buổi tập chưa đồng bộ';
+  static const signOutPendingTitle = 'Còn dữ liệu chưa đồng bộ';
   static String signOutPendingBody(int count) =>
       'Còn $count buổi chưa đồng bộ, đăng xuất sẽ mất.';
   static const signOutSyncFirst = 'Đồng bộ trước';
@@ -1106,4 +1111,136 @@ abstract final class Vi {
   static String signOutPendingAssessment(int n) =>
       'Còn $n mục hạng hoặc bài kiểm tra chưa đồng bộ, đăng xuất sẽ mất.';
   static const signOutActiveTest = 'Lần kiểm tra đang làm dở sẽ mất khi đăng xuất.';
+
+  static String signOutPendingRoadmap(int count) =>
+      'Còn $count mục tiêu hoặc thành tích chưa lên máy chủ — đăng xuất bây giờ sẽ mất.';
+
+  // ─── Lộ trình (spec 2026-10-15) ─────────────────────────────────────────────
+  //
+  // Mọi câu là khuôn; con số do các hàm trong lib/domain/roadmap tính ra.
+  static const roadmapTitle = 'Lộ trình';
+  static const roadmapCardBody = 'Chọn mục tiêu, xem các bước tập dẫn tới đó.';
+
+  static String goalKind(GoalKind kind) => switch (kind) {
+    GoalKind.lenHang => 'Lên hạng',
+    GoalKind.thuanThucKyNang => 'Thuần thục kỹ năng',
+    GoalKind.chuanBiGiai => 'Chuẩn bị giải',
+  };
+
+  static String goalKindBody(GoalKind kind) => switch (kind) {
+    GoalKind.lenHang =>
+      'Nhắm hạng ngay trên hạng hiện tại, theo điểm BU còn thiếu.',
+    GoalKind.thuanThucKyNang =>
+      'Chọn một nhóm kỹ năng, tập tới khi đạt ${PracticeConstants.strongCutoff} '
+          'và ${PracticeConstants.readyStreak} buổi đạt liên tiếp.',
+    GoalKind.chuanBiGiai =>
+      'Chọn ngày giải; bước nào không kịp sẽ được xếp riêng.',
+  };
+
+  static const goalPickTitle = 'Chọn mục tiêu';
+  static const goalPickDate = 'Chọn ngày giải';
+
+  static String goalBlocked(LenHangBlock block) => switch (block) {
+    LenHangBlock.noRank => 'Cần có hạng trước khi đặt mục tiêu lên hạng.',
+    LenHangBlock.topRank =>
+      'Hạng A là hạng cao nhất bài BU xác nhận được; PRO chỉ tự khai.',
+  };
+
+  static const goalNeedRank = 'Xác định hạng';
+  static const goalChange = 'Đổi mục tiêu';
+  static const goalClear = 'Bỏ mục tiêu';
+  static const goalCancelChange = 'Giữ mục tiêu cũ';
+
+  static String roadmapHeadline(Roadmap roadmap) => switch (roadmap.goal.kind) {
+    GoalKind.lenHang =>
+      roadmap.from == null || roadmap.target == null
+          ? goalKind(GoalKind.lenHang)
+          : 'Lên hạng: ${roadmap.from!.label} → ${roadmap.target!.label}',
+    GoalKind.thuanThucKyNang => 'Thuần thục: ${skill(roadmap.goal.category!)}',
+    GoalKind.chuanBiGiai =>
+      'Chuẩn bị giải ngày ${shortDate(roadmap.goal.eventDate!)}',
+  };
+
+  /// Dòng phụ của mục tiêu Lên hạng; null với hai mục tiêu kia.
+  static String? roadmapNeed(Roadmap roadmap) {
+    if (roadmap.goal.kind != GoalKind.lenHang || roadmap.target == null) {
+      return null;
+    }
+    final needed = roadmap.pointsNeeded;
+    if (needed == null) {
+      return 'Chưa có bài BU hoàn chỉnh: xếp bước theo nhóm yếu nhất.';
+    }
+    if (needed <= 0) return 'Điểm BU gần nhất đã đủ, chỉ còn làm bài BU.';
+    return 'Cần thêm $needed điểm BU (hạng ${roadmap.target!.label} từ '
+        '${buFloor(roadmap.target!)} điểm).';
+  }
+
+  static String finishLine(Estimate estimate) => estimate.date == null
+      ? 'Dự kiến xong: chưa đủ dữ liệu'
+      : 'Dự kiến xong: ${shortDate(estimate.date!)}';
+
+  static const roadmapAchieved = 'Đã đạt mục tiêu.';
+
+  static String stepStatus(StepStatus status) => switch (status) {
+    StepStatus.dangLam => 'Đang làm',
+    StepStatus.xong => 'Xong',
+    StepStatus.chuaToi => 'Chưa tới',
+    StepStatus.khongKip => 'Không kịp trước giải',
+  };
+
+  static String stepTitle(RoadmapStep step, {String? drillName}) =>
+      switch (step.kind) {
+        StepKind.xacDinhHang => 'Xác định hạng',
+        StepKind.nhom =>
+          drillName == null
+              ? skill(step.category!)
+              : '${skill(step.category!)} · $drillName',
+        StepKind.buLe => 'Tập lại ${step.buDrillIds.join('/')} trên bàn BU',
+        StepKind.baiTap => drillName ?? step.drillId!,
+        StepKind.lamBaiBu => 'Làm bài BU',
+      };
+
+  static String stepProgress(int? mastery, int streak) =>
+      '${mastery == null ? 'Độ thuần thục: chưa đo' : 'Độ thuần thục: $mastery / ${PracticeConstants.strongCutoff}'}'
+      ' · ${stepStreak(streak)}';
+
+  static String stepStreak(int streak) =>
+      'Buổi đạt liên tiếp: $streak / ${PracticeConstants.readyStreak}';
+
+  static String stepReason(StepReason reason) => switch (reason) {
+    LostBuPoints(:final points, :final drillIds) =>
+      'Mất $points điểm BU ở ${drillIds.join(', ')}.',
+    Unmeasured(:final sessions) =>
+      'Tập đủ ${PracticeConstants.minSessions} buổi để đo (đã có $sessions).',
+    BelowStrong(:final mastery) =>
+      'Còn thiếu ${PracticeConstants.strongCutoff - mastery} điểm để đạt '
+          '${PracticeConstants.strongCutoff}.',
+    NeedStreak() =>
+      'Đã đạt ${PracticeConstants.strongCutoff}, cần '
+          '${PracticeConstants.readyStreak} buổi đạt liên tiếp.',
+    DrillLevel(:final level) => 'Bài cấp $level của nhóm.',
+    RetestFrom(:final from) =>
+      from == null ? 'Làm được ngay.' : 'Mở từ ngày ${shortDate(from)}.',
+    NeedRank() => 'Làm bộ câu hỏi hoặc bài BU để có hạng.',
+  };
+
+  static String estimateLine(Estimate estimate) => estimate.date == null
+      ? 'Dự kiến: chưa đủ dữ liệu'
+      : 'Dự kiến: ${shortDate(estimate.date!)}';
+
+  static const stepTrain = 'Tập ngay';
+  static const stepOpenTest = 'Làm bài kiểm tra';
+  static const roadmapMissedTitle = 'Không kịp trước giải';
+  static const achievementsTitle = 'Thành tích';
+  static const achievementsEmpty =
+      'Chưa có thành tích. Thành tích chỉ đến từ buổi tập thật.';
+
+  static String achievement(AchievementKind kind, String subject) =>
+      switch (kind) {
+        AchievementKind.xongBuoc => 'Xong bước: $subject',
+        AchievementKind.duDieuKienLenCap => 'Đủ điều kiện lên cấp: $subject',
+        AchievementKind.chuoiNgay => 'Chuỗi $subject ngày tập liên tiếp',
+      };
+
+  static String homeCurrentStep(String step) => 'Bước hiện tại: $step';
 }
