@@ -396,6 +396,35 @@ void main() {
       expect(store.session?.refreshToken, 'r1');
     });
 
+    test('đăng nhập thất bại không làm mất refresh đang xoay của phiên hiện tại',
+        () async {
+      await signedIn();
+      now = now.add(const Duration(minutes: 20));
+      final refreshGate = Completer<void>();
+      server.routes['POST /auth/refresh'] = (_) async {
+        await refreshGate.future;
+        return FakeDirectus.ok({
+          'access_token': 'access-r2',
+          'expires': 900000,
+          'refresh_token': 'r2',
+        });
+      };
+      server.routes['POST /auth/login'] =
+          (_) => FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+
+      final refresh = auth.accessToken();
+      await pumpEventQueue();
+      await expectLater(
+        auth.signIn(email: 'wrong@example.com', password: 'matkhau123'),
+        throwsA(AuthFailure.wrongCredentials),
+      );
+      refreshGate.complete();
+
+      expect(await refresh, 'access-r2');
+      expect(auth.current, const SignedIn(userId: 'u1', displayName: 'An'));
+      expect(store.session?.refreshToken, 'r2');
+    });
+
     test('401 nhưng máy đã có token mới hơn thì thử lại bằng token đó', () async {
       await signedIn();
       now = now.add(const Duration(minutes: 20));
@@ -580,13 +609,20 @@ void main() {
       expect(auth.current, isA<SignedIn>());
     });
 
-    // Lượt A bắt đầu làm mới, giữ token mới (chưa bump gen). Người chơi
-    // đăng nhập lại trong lúc A đang chờ /users/me. A về muộn không đè
-    // token mới vì bump gen đã xảy ra giữa lúc A nhận kết quả refresh và
-    // lúc nó ghi phiên.
+    // Lượt refresh cũ vẫn được phép hoàn tất trong lúc signIn kiểm tra
+    // /users/me. Khi signIn bắt đầu ghi phiên mới, thế hệ đổi và refresh
+    // cũ về muộn không được ghi đè phiên đó.
     test('đăng nhập lại khi đang đăng nhập: lượt làm mới cũ không đè token mới',
         () async {
-      await signedIn(); // u1, r1
+      final deferred = DeferredInMemorySessionStore()
+        ..session = const StoredSession(
+          userId: 'u1',
+          displayName: 'An',
+          refreshToken: 'r1',
+        );
+      store = deferred;
+      auth = build();
+      await auth.restore();
       now = now.add(const Duration(minutes: 20));
       final gate = Completer<void>();
       server.routes['POST /auth/refresh'] = (_) async {
@@ -598,8 +634,6 @@ void main() {
       final oldDone = expectLater(old, throwsA(AuthFailure.sessionExpired));
       await pumpEventQueue();
 
-      // Lượt cũ phải về đúng lúc signIn đang chờ /users/me — chỗ mã cũ đã
-      // giữ token mới nhưng chưa đổi thế hệ.
       server.acceptLogin(userId: 'u2', name: 'Bình', refresh: 'rB');
       final meGate = Completer<void>();
       server.routes['GET /users/me'] = (_) async {
@@ -608,14 +642,16 @@ void main() {
       };
       final b = auth.signIn(email: 'binh@example.com', password: 'matkhau123');
       await pumpEventQueue(); // /auth/login xong, đang chờ /users/me
-      gate.complete();
-      await pumpEventQueue(); // lượt cũ về
       meGate.complete();
+      await pumpEventQueue(); // signIn đang chờ ghi phiên mới
+      gate.complete();
+      await pumpEventQueue(); // lượt cũ về sau khi thế hệ đã đổi
+      deferred.releaseWrite();
       await b;
       await oldDone;
 
       expect(await auth.accessToken(), 'access-rB');
-      expect(store.session?.refreshToken, 'rB');
+      expect(deferred.session?.refreshToken, 'rB');
     });
 
     // Lượt cũ bị 401 rồi đứng ở lần đọc phiên sau 401 — lần đọc cuối cùng

@@ -95,16 +95,17 @@ low-risk at the time. Items fixed before the merge are not listed.
   finish could let the old session request a token while another sign-in was
   still committing. The guard is now a counter; `directus_auth_repository_test.dart`
   verifies the token remains unavailable until both writes finish.
+- The old refresh future could otherwise remain in the single-flight slot
+  after sign-in starts. The existing test “lượt làm mới cũ về muộn không phá
+  ‘chỉ làm mới một lần’ của phiên mới” verifies a new refresh starts and later
+  callers share it, even when the old refresh completes late.
+- A failed sign-in could invalidate an in-flight refresh for the current
+  account. The session generation now changes only after the new account has
+  been verified; the auth test confirms a failed sign-in preserves the old
+  account's rotated refresh token.
 
 ## Still open
 
-- A failed signIn while signed in can drop an in-flight refresh rotation,
-  which forces a later expiry. Unreachable through the UI, because
-  authRedirect keeps signed-in users off /login and /register.
-- No test pins `_refreshing = null` in signIn on its own.
-- Two overlapping `signIn` calls share one `_committingSignIn` flag: the
-  first one's `finally` reopens the commit window for the second. The login
-  screen makes an overlap practically unreachable; a counter would close it.
 - `_dropForeign`'s generation guard has no test; both call sites run
   synchronously after `stillCurrent()`, so it cannot fire today.
 - A refresh that succeeds in one tab can overwrite a newer session another

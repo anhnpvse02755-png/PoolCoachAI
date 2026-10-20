@@ -92,15 +92,6 @@ class DirectusAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
-    // Phiên cũ (nếu có) hết hiệu lực ngay từ đây: một lượt làm mới của nó
-    // về muộn thấy thế hệ đã đổi và bỏ kết quả, không đè token mới.
-    _bumpGen();
-    _refreshing = null;
-    // Token của phiên cũ cũng hết hiệu lực luôn: không để ai còn cầm nó
-    // trong lúc phiên đang đổi chủ.
-    _accessToken = null;
-    _accessExpiresAt = null;
-
     final Map<String, Object?> tokens;
     try {
       tokens = await _api.post('/auth/login', body: {
@@ -134,10 +125,12 @@ class DirectusAuthRepository implements AuthRepository {
       displayName: (me['first_name'] as String?) ?? '',
       refreshToken: tokens['refresh_token']! as String,
     );
-    // Lần nữa, ngay trước khi giữ token và chưa chờ gì: lượt làm mới bắt
-    // đầu giữa chừng (lúc chờ /users/me, còn đọc phiên cũ) mà về trong lúc
-    // ta chờ ghi phiên sẽ thấy thế hệ đã đổi, không đè token hay phiên mới.
+    // Chỉ đổi thế hệ khi đã xác thực được người mới. Một lần đăng nhập thất
+    // bại không được làm mất lượt refresh hợp lệ của phiên hiện tại.
     _bumpGen();
+    _refreshing = null;
+    _accessToken = null;
+    _accessExpiresAt = null;
     // Token người mới chỉ vào tay cùng lúc với SignedIn(người mới), không
     // chờ gì giữa hai việc: trong lúc chờ ghi, trạng thái vẫn là người cũ,
     // và ai xin token lúc đó sẽ đẩy dữ liệu người cũ bằng token người mới.
