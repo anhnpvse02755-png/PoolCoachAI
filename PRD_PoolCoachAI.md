@@ -83,7 +83,7 @@ Người dùng bấm trực tiếp vào goal hoặc quick action để đi thẳ
 Trung tâm của PoolCoachAI, gồm các nhánh sau:
 
 ### 6.1 AI Learning Path
-AI xây lộ trình tập dựa trên trình độ, kỹ năng, điểm yếu, lịch sử tập, kết quả Skill Test, dữ liệu chơi trận và Knowledge liên quan. **AI đề xuất, không khóa người dùng** — người chơi có thể đi theo lộ trình, hoặc bỏ qua để vào **All Drills** tự tìm/filter và chọn bài (kể cả người hạng thấp muốn học một bài nhảy bi hay masse).
+Lộ trình (đã làm, spec 2026-10-15): mỗi tài khoản một mục tiêu — Lên hạng (luôn là hạng ngay trên), Thuần thục một nhóm kỹ năng, hoặc Chuẩn bị giải (có ngày giải). App suy các bước từ dữ liệu thật: điểm mất ở bài BU hoàn chỉnh gần nhất (qua bảng nối 18 bài BU vào 6 nhóm), Player Intelligence và nhật ký tập; tính lại mỗi khi dữ liệu đổi. Một bước xong khi nhóm đạt 75 và bài của bước có 3 buổi đạt liên tiếp. Ngày dự kiến ước lượng từ tốc độ tiến bộ 28 ngày gần nhất; không đủ dữ liệu thì nói thẳng. Thành tích chỉ đến từ sự kiện thật: xong bước, đủ điều kiện lên cấp, chuỗi 7/14/30/60/100 ngày. AI đề xuất, không khóa người dùng; không dùng LLM. Mục tiêu và thành tích đồng bộ theo tài khoản.
 
 ### 6.2 Drill Library
 Đơn vị thực hành chính. Danh sách bài tập chia theo **5 nhóm kỹ năng**: Ngắm bi, Đi bi/Vị trí, Giao bóng, Phòng thủ, Bi băng *(danh mục cụ thể từ Luyện Cơ, dùng làm taxonomy chính thức thay cho nhóm chung chung)*. Có thể tìm kiếm, filter theo trình độ hoặc theo kỹ năng, chọn trực tiếp hoặc nhận từ AI Coach.
