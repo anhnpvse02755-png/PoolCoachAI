@@ -1,0 +1,112 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
+import 'package:poolcoachai/data/sync/roadmap_sync.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
+import 'package:uuid/uuid.dart';
+
+/// Mục tiêu và thành tích của người đang đăng nhập; null khi chưa đăng nhập.
+final roadmapRepositoryProvider = Provider<RoadmapRepository?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+  return RoadmapRepository(
+    ref.watch(appDatabaseProvider),
+    userId: userId,
+    now: ref.watch(nowProvider),
+    newId: const Uuid().v4,
+  );
+});
+
+final goalProvider = StreamProvider<GoalRecord?>((ref) {
+  final repo = ref.watch(roadmapRepositoryProvider);
+  return repo == null ? Stream.value(null) : repo.watchGoal();
+});
+
+final achievementsProvider = StreamProvider<List<Achievement>>((ref) {
+  final repo = ref.watch(roadmapRepositoryProvider);
+  return repo == null ? Stream.value(const []) : repo.watchAchievements();
+});
+
+bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
+
+/// Đã tải xong và không phải giá trị cũ của người trước (đang tải lại).
+final latestBuResultProvider = Provider<AsyncValue<BuResult?>>((ref) {
+  final tests = ref.watch(buTestsProvider);
+  if (!_ready(tests)) return const AsyncLoading();
+  final id = latestCompletedTestId(tests.value!);
+  if (id == null) return const AsyncData(null);
+  final snapshot = ref.watch(testSnapshotProvider(id));
+  if (!_ready(snapshot)) return const AsyncLoading();
+  final value = snapshot.value;
+  return AsyncData(
+    value == null || !value.test.isCompleted ? null : buResultFrom(value),
+  );
+});
+
+/// Tính lại khi mục tiêu, hạng, bài BU hoặc dữ liệu tập thay đổi.
+final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
+  final goal = ref.watch(goalProvider);
+  final rank = ref.watch(playerRankProvider);
+  final drills = ref.watch(drillsProvider);
+  final logs = ref.watch(drillLogsProvider);
+  final tests = ref.watch(buTestsProvider);
+  final result = ref.watch(latestBuResultProvider);
+  if (![goal, rank, drills, logs, tests, result].every(_ready)) {
+    return const AsyncLoading();
+  }
+
+  final currentGoal = goal.value?.goal;
+  if (currentGoal == null) return const AsyncData(null);
+  return AsyncData(
+    buildRoadmap(
+      goal: currentGoal,
+      rank: rank.value,
+      drills: drills.value!,
+      logs: logs.value!,
+      tests: tests.value!,
+      latestResult: result.value,
+      today: ref.watch(nowProvider)(),
+    ),
+  );
+});
+
+/// Ghi thành tích từ sự kiện thật. App phải nghe provider để Riverpod 3 chạy.
+final achievementRecorderProvider = Provider<void>((ref) {
+  final repo = ref.watch(roadmapRepositoryProvider);
+  final goal = ref.watch(goalProvider);
+  final drills = ref.watch(drillsProvider);
+  final logs = ref.watch(drillLogsProvider);
+  final existing = ref.watch(achievementsProvider);
+  if (repo == null || ![goal, drills, logs, existing].every(_ready)) return;
+
+  final fresh = newAchievements(
+    goal: goal.value?.goal,
+    drills: drills.value!,
+    logs: logs.value!,
+    existing: {for (final achievement in existing.value!) achievement.key},
+    today: ref.watch(nowProvider)(),
+  );
+  if (fresh.isNotEmpty) unawaited(repo.recordAchievements(fresh));
+});
+
+/// Service đã chạy sẵn, như [assessmentSyncProvider].
+final roadmapSyncProvider = Provider<RoadmapSyncService>((ref) {
+  final service = RoadmapSyncService(
+    db: ref.watch(appDatabaseProvider),
+    auth: ref.watch(authRepositoryProvider),
+    api: ref.watch(directusClientProvider),
+    now: ref.watch(nowProvider),
+  )..start();
+  ref.onDispose(service.dispose);
+  return service;
+});

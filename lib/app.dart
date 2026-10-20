@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_theme.dart';
@@ -49,7 +50,10 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
     // Riverpod 3 tạm dừng provider không ai nghe: cổng onboarding chỉ được
     // router giữ (ngoài Riverpod), nên app phải nghe nó thì nó mới theo kịp
     // hạng và kết quả lấy hạng từ máy chủ.
-    if (_ownsRouter) ref.watch(onboardingGateProvider);
+    if (_ownsRouter) {
+      ref.watch(onboardingGateProvider);
+      ref.watch(achievementRecorderProvider);
+    }
     return MaterialApp.router(
       title: Vi.appName,
       theme: AppTheme.dark(),
