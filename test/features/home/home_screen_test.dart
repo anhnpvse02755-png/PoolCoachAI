@@ -9,6 +9,7 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
@@ -21,6 +22,7 @@ void main() {
     List<Drill>? drills,
     List<KnowledgeArticle>? knowledge,
     List<DrillLog>? logs,
+    GoalRecord? goal,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -28,6 +30,7 @@ void main() {
       drills: drills,
       knowledge: knowledge,
       logs: logs,
+      goal: goal,
     );
     addTearDown(container.dispose);
 
@@ -45,23 +48,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('chưa tập buổi nào thì chuỗi ngày tập là 0, hiện bình thường',
-      (tester) async {
+  testWidgets('chưa tập buổi nào thì chuỗi ngày tập là 0, hiện bình thường', (
+    tester,
+  ) async {
     await openHome(tester);
 
     expect(find.text('0'), findsOneWidget);
     expect(find.text(Vi.homeStreakUnit), findsOneWidget);
   });
 
-  testWidgets('hiện câu lý do của nhóm được chọn, không nuốt lý do',
-      (tester) async {
+  testWidgets('hiện câu lý do của nhóm được chọn, không nuốt lý do', (
+    tester,
+  ) async {
     await openHome(tester);
 
     expect(
-      find.text(Vi.pickReason(
-        PickReason.newcomer,
-        Vi.skill(SkillCategory.aiming),
-      )),
+      find.text(
+        Vi.pickReason(PickReason.newcomer, Vi.skill(SkillCategory.aiming)),
+      ),
       findsOneWidget,
     );
   });
@@ -74,8 +78,9 @@ void main() {
     expect(find.text(Vi.homeDrillOpen), findsOneWidget);
   });
 
-  testWidgets('hết bài trong nhóm thì nói hết bài, không mượn bài nhóm khác',
-      (tester) async {
+  testWidgets('hết bài trong nhóm thì nói hết bài, không mượn bài nhóm khác', (
+    tester,
+  ) async {
     await openHome(tester, drills: const []);
 
     expect(find.text(Vi.homeDrillAllDone), findsOneWidget);
@@ -96,5 +101,39 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(KnowledgeScreen), findsOneWidget);
+  });
+
+  testWidgets(
+    'có mục tiêu: Trang chủ hiện bước hiện tại, chạm thì mở Lộ trình',
+    (tester) async {
+      final at = DateTime(2026, 9, 20, 9);
+      await openHome(
+        tester,
+        goal: GoalRecord(
+          updatedAt: at,
+          goal: PlayerGoal(
+            goalId: 'g',
+            kind: GoalKind.thuanThucKyNang,
+            category: SkillCategory.aiming,
+            createdAt: at,
+          ),
+        ),
+      );
+      final line = find.text(Vi.homeCurrentStep('Đường thẳng cơ bản'));
+      expect(line, findsOneWidget);
+      await tester.tap(line);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Thuần thục: ${Vi.skill(SkillCategory.aiming)}'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('chưa có mục tiêu: Trang chủ không hiện dòng bước hiện tại', (
+    tester,
+  ) async {
+    await openHome(tester);
+    expect(find.textContaining('Bước hiện tại'), findsNothing);
   });
 }

@@ -11,14 +11,19 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/assessment_sync.dart';
+import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
 
 import '../../support/fake_auth.dart';
@@ -31,26 +36,66 @@ void main() {
     WidgetTester tester, {
     int pending = 0,
     int unsyncable = 0,
+    bool pendingRoadmap = false,
   }) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await upsertSeed(db);
     for (var i = 0; i < pending; i++) {
-      await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
-            id: 'p$i', userId: 'u1', drillId: 'd1', date: today, score: 7));
+      await db
+          .into(db.drillLogRows)
+          .insert(
+            DrillLogRowsCompanion.insert(
+              id: 'p$i',
+              userId: 'u1',
+              drillId: 'd1',
+              date: today,
+              score: 7,
+            ),
+          );
     }
     for (var i = 0; i < unsyncable; i++) {
-      await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
-            id: 'u$i', userId: 'u1', drillId: 'd1', date: today,
-            score: double.infinity));
+      await db
+          .into(db.drillLogRows)
+          .insert(
+            DrillLogRowsCompanion.insert(
+              id: 'u$i',
+              userId: 'u1',
+              drillId: 'd1',
+              date: today,
+              score: double.infinity,
+            ),
+          );
     }
-    await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
-          id: 'da-len', userId: 'u1', drillId: 'd1', date: today, score: 7,
-          syncedAt: Value(today)));
+    if (pendingRoadmap) {
+      final goal = GoalRecord(
+        updatedAt: today,
+        goal: PlayerGoal(
+          goalId: 'goal-1',
+          kind: GoalKind.thuanThucKyNang,
+          category: SkillCategory.aiming,
+          createdAt: today,
+        ),
+      );
+      await db.into(db.playerGoalRows).insert(toGoalRow(goal, userId: 'u1'));
+    }
+    await db
+        .into(db.drillLogRows)
+        .insert(
+          DrillLogRowsCompanion.insert(
+            id: 'da-len',
+            userId: 'u1',
+            drillId: 'd1',
+            date: today,
+            score: 7,
+            syncedAt: Value(today),
+          ),
+        );
 
     final auth = FakeAuthRepository.signedIn(userId: 'u1', displayName: 'An');
     final server = FakeDirectus()
-      ..routes['POST /items/drill_logs'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['POST /items/drill_logs'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/drill_logs'] = ((_) => FakeDirectus.ok([]));
     final sync = SyncService(
       db: db,
@@ -61,11 +106,22 @@ void main() {
     addTearDown(sync.dispose);
     server
       ..routes['GET /items/player_ranks'] = ((_) => FakeDirectus.ok([]))
-      ..routes['POST /items/player_ranks'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['POST /items/player_ranks'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/bu_tests'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/bu_drill_results'] = ((_) => FakeDirectus.ok([]))
-      ..routes['POST /items/bu_tests'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)))
-      ..routes['POST /items/bu_drill_results'] = ((req) => FakeDirectus.ok(jsonDecode(req.body)));
+      ..routes['POST /items/bu_tests'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['POST /items/bu_drill_results'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/player_goals'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/player_goals'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['PATCH /items/player_goals/u1'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/achievements'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/achievements'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)));
     final assessmentSync = AssessmentSyncService(
       db: db,
       auth: auth,
@@ -74,24 +130,36 @@ void main() {
       onRankFetch: (_, _) {},
     );
     addTearDown(assessmentSync.dispose);
+    final roadmapSync = RoadmapSyncService(
+      db: db,
+      auth: auth,
+      api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+      now: () => today,
+    );
+    addTearDown(roadmapSync.dispose);
 
-    final container = ProviderContainer(overrides: [
-      appDatabaseProvider.overrideWithValue(db),
-      nowProvider.overrideWithValue(() => today),
-      authRepositoryProvider.overrideWithValue(auth),
-      syncServiceProvider.overrideWithValue(sync),
-      assessmentSyncProvider.overrideWithValue(assessmentSync),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        nowProvider.overrideWithValue(() => today),
+        authRepositoryProvider.overrideWithValue(auth),
+        syncServiceProvider.overrideWithValue(sync),
+        assessmentSyncProvider.overrideWithValue(assessmentSync),
+        roadmapSyncProvider.overrideWithValue(roadmapSync),
+      ],
+    );
     addTearDown(container.dispose);
     final gate = AuthGate(auth);
     addTearDown(gate.dispose);
     final router = createAppRouter(auth: gate);
     addTearDown(router.dispose);
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: PoolCoachApp(router: router),
-    ));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: PoolCoachApp(router: router),
+      ),
+    );
     await tester.pumpAndSettle();
     router.go(Routes.profile);
     await tester.pumpAndSettle();
@@ -104,8 +172,9 @@ void main() {
     expect(find.text(Vi.profileSignedInAs('An')), findsOneWidget);
   });
 
-  testWidgets('không còn buổi chờ thì đăng xuất ngay, xoá dữ liệu trên máy',
-      (tester) async {
+  testWidgets('không còn buổi chờ thì đăng xuất ngay, xoá dữ liệu trên máy', (
+    tester,
+  ) async {
     final (db, auth, _) = await openProfile(tester);
 
     await tester.tap(find.text(Vi.profileSignOut));
@@ -116,8 +185,9 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('còn buổi chờ thì cảnh báo trước, bấm Vẫn đăng xuất thì mất',
-      (tester) async {
+  testWidgets('còn buổi chờ thì cảnh báo trước, bấm Vẫn đăng xuất thì mất', (
+    tester,
+  ) async {
     final (db, auth, _) = await openProfile(tester, pending: 2);
 
     await tester.tap(find.text(Vi.profileSignOut));
@@ -132,7 +202,40 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
   });
 
-  testWidgets('chọn Đồng bộ trước thì đẩy lên rồi mới đăng xuất', (tester) async {
+  testWidgets('còn mục tiêu Lộ trình chờ thì cảnh báo và Vẫn đăng xuất xoá', (
+    tester,
+  ) async {
+    final (db, auth, _) = await openProfile(tester, pendingRoadmap: true);
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.signOutPendingRoadmap(1)), findsOneWidget);
+    expect(auth.calls, isEmpty);
+
+    await tester.tap(find.text(Vi.signOutAnyway));
+    await tester.pumpAndSettle();
+
+    expect(auth.calls, ['signOut']);
+    expect(await db.select(db.playerGoalRows).get(), isEmpty);
+  });
+
+  testWidgets('Đồng bộ trước đẩy mục tiêu Lộ trình rồi mới đăng xuất', (
+    tester,
+  ) async {
+    final (_, auth, server) = await openProfile(tester, pendingRoadmap: true);
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.signOutSyncFirst));
+    await tester.pumpAndSettle();
+
+    expect(server.sent('POST', '/items/player_goals'), hasLength(1));
+    expect(auth.calls, ['signOut']);
+  });
+
+  testWidgets('chọn Đồng bộ trước thì đẩy lên rồi mới đăng xuất', (
+    tester,
+  ) async {
     final (_, auth, server) = await openProfile(tester, pending: 1);
 
     await tester.tap(find.text(Vi.profileSignOut));
@@ -144,8 +247,9 @@ void main() {
     expect(auth.calls, ['signOut']);
   });
 
-  testWidgets('Đồng bộ trước mà mất mạng thì không đăng xuất, báo lỗi',
-      (tester) async {
+  testWidgets('Đồng bộ trước mà mất mạng thì không đăng xuất, báo lỗi', (
+    tester,
+  ) async {
     final (db, auth, server) = await openProfile(tester, pending: 1);
     server.offline = true;
 
@@ -161,37 +265,56 @@ void main() {
 
   // Buổi điểm vô hạn không bao giờ lên được: báo "kiểm tra mạng" là sai
   // nguyên nhân, người chơi thử mãi không xong. Chỉ đường tới chỗ bỏ chúng.
-  testWidgets('Đồng bộ trước mà chỉ còn buổi không đồng bộ được thì chỉ tới cảnh báo',
-      (tester) async {
-    final (db, auth, server) = await openProfile(tester, pending: 1, unsyncable: 1);
+  testWidgets(
+    'Đồng bộ trước mà chỉ còn buổi không đồng bộ được thì chỉ tới cảnh báo',
+    (tester) async {
+      final (db, auth, server) = await openProfile(
+        tester,
+        pending: 1,
+        unsyncable: 1,
+      );
 
-    await tester.tap(find.text(Vi.profileSignOut));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(Vi.signOutSyncFirst));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.profileSignOut));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.signOutSyncFirst));
+      await tester.pumpAndSettle();
 
-    expect(server.sent('POST', '/items/drill_logs'), hasLength(1)); // buổi thường đã lên
-    expect(find.text(Vi.syncBlockedByUnsyncable), findsOneWidget);
-    expect(find.text(Vi.syncFailed), findsNothing);
-    expect(auth.calls, isEmpty);
-    expect((await db.select(db.drillLogRows).get()).where((r) => !r.score.isFinite),
-        hasLength(1));
-  });
+      expect(
+        server.sent('POST', '/items/drill_logs'),
+        hasLength(1),
+      ); // buổi thường đã lên
+      expect(find.text(Vi.syncBlockedByUnsyncable), findsOneWidget);
+      expect(find.text(Vi.syncFailed), findsNothing);
+      expect(auth.calls, isEmpty);
+      expect(
+        (await db.select(db.drillLogRows).get()).where(
+          (r) => !r.score.isFinite,
+        ),
+        hasLength(1),
+      );
+    },
+  );
 
-  testWidgets('Đồng bộ trước mất mạng, còn cả buổi thường lẫn buổi lỗi thì vẫn báo mạng',
-      (tester) async {
-    final (_, auth, server) = await openProfile(tester, pending: 1, unsyncable: 1);
-    server.offline = true;
+  testWidgets(
+    'Đồng bộ trước mất mạng, còn cả buổi thường lẫn buổi lỗi thì vẫn báo mạng',
+    (tester) async {
+      final (_, auth, server) = await openProfile(
+        tester,
+        pending: 1,
+        unsyncable: 1,
+      );
+      server.offline = true;
 
-    await tester.tap(find.text(Vi.profileSignOut));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(Vi.signOutSyncFirst));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.profileSignOut));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.signOutSyncFirst));
+      await tester.pumpAndSettle();
 
-    expect(find.text(Vi.syncFailed), findsOneWidget);
-    expect(find.text(Vi.syncBlockedByUnsyncable), findsNothing);
-    expect(auth.calls, isEmpty);
-  });
+      expect(find.text(Vi.syncFailed), findsOneWidget);
+      expect(find.text(Vi.syncBlockedByUnsyncable), findsNothing);
+      expect(auth.calls, isEmpty);
+    },
+  );
 
   testWidgets('bỏ qua hộp thoại thì không làm gì', (tester) async {
     final (_, auth, _) = await openProfile(tester, pending: 1);
@@ -204,24 +327,26 @@ void main() {
     expect(auth.calls, isEmpty);
   });
 
-  testWidgets('có buổi không đồng bộ được thì Hồ sơ báo, bấm Bỏ thì xoá sau khi xác nhận',
-      (tester) async {
-    final (db, auth, _) = await openProfile(tester, unsyncable: 2);
+  testWidgets(
+    'có buổi không đồng bộ được thì Hồ sơ báo, bấm Bỏ thì xoá sau khi xác nhận',
+    (tester) async {
+      final (db, auth, _) = await openProfile(tester, unsyncable: 2);
 
-    expect(find.text(Vi.unsyncableTitle(2)), findsOneWidget);
-    await tester.tap(find.text(Vi.unsyncableDiscard));
-    await tester.pumpAndSettle();
-    expect(find.text(Vi.unsyncableConfirmBody(2)), findsOneWidget);
+      expect(find.text(Vi.unsyncableTitle(2)), findsOneWidget);
+      await tester.tap(find.text(Vi.unsyncableDiscard));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.unsyncableConfirmBody(2)), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, Vi.unsyncableConfirm));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, Vi.unsyncableConfirm));
+      await tester.pumpAndSettle();
 
-    final left = await db.select(db.drillLogRows).get();
-    expect(left.where((r) => !r.score.isFinite), isEmpty);
-    expect(left.map((r) => r.id), contains('da-len'));
-    expect(find.text(Vi.unsyncableTitle(2)), findsNothing);
-    expect(auth.calls, isEmpty);
-  });
+      final left = await db.select(db.drillLogRows).get();
+      expect(left.where((r) => !r.score.isFinite), isEmpty);
+      expect(left.map((r) => r.id), contains('da-len'));
+      expect(find.text(Vi.unsyncableTitle(2)), findsNothing);
+      expect(auth.calls, isEmpty);
+    },
+  );
 
   testWidgets('Huỷ ở hộp xác nhận thì không xoá gì', (tester) async {
     final (db, _, _) = await openProfile(tester, unsyncable: 1);
@@ -231,8 +356,10 @@ void main() {
     await tester.tap(find.text(Vi.cancel));
     await tester.pumpAndSettle();
 
-    expect((await db.select(db.drillLogRows).get()).where((r) => !r.score.isFinite),
-        hasLength(1));
+    expect(
+      (await db.select(db.drillLogRows).get()).where((r) => !r.score.isFinite),
+      hasLength(1),
+    );
   });
 
   testWidgets('không có buổi lỗi thì không hiện gì', (tester) async {
@@ -240,30 +367,46 @@ void main() {
     expect(find.text(Vi.unsyncableDiscard), findsNothing);
   });
 
-  testWidgets('hộp thoại đăng xuất: Đồng bộ trước là nút chính', (tester) async {
+  testWidgets('hộp thoại đăng xuất: Đồng bộ trước là nút chính', (
+    tester,
+  ) async {
     await openProfile(tester, pending: 1);
     await tester.tap(find.text(Vi.profileSignOut));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, Vi.signOutSyncFirst), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, Vi.signOutSyncFirst),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(TextButton, Vi.signOutAnyway), findsOneWidget);
   });
 
-  testWidgets('đăng xuất khi có lần kiểm tra dở: cảnh báo sẽ mất, Vẫn đăng xuất thì xoá', (tester) async {
-    final (db, auth, _) = await openProfile(tester);
-    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-        id: 'do', userId: 'u1', startedAt: today, tableSize: 'nineFootPlus'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'đăng xuất khi có lần kiểm tra dở: cảnh báo sẽ mất, Vẫn đăng xuất thì xoá',
+    (tester) async {
+      final (db, auth, _) = await openProfile(tester);
+      await db
+          .into(db.buTestRows)
+          .insert(
+            BuTestRowsCompanion.insert(
+              id: 'do',
+              userId: 'u1',
+              startedAt: today,
+              tableSize: 'nineFootPlus',
+            ),
+          );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text(Vi.profileSignOut));
-    await tester.pumpAndSettle();
-    expect(find.text(Vi.signOutActiveTest), findsOneWidget);
-    await tester.tap(find.text(Vi.signOutAnyway));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.profileSignOut));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.signOutActiveTest), findsOneWidget);
+      await tester.tap(find.text(Vi.signOutAnyway));
+      await tester.pumpAndSettle();
 
-    expect(auth.calls, ['signOut']);
-    expect(await db.select(db.buTestRows).get(), isEmpty);
-  });
+      expect(auth.calls, ['signOut']);
+      expect(await db.select(db.buTestRows).get(), isEmpty);
+    },
+  );
 
   testWidgets('Hồ sơ hiện thẻ hạng thay cho chỗ trống cũ', (tester) async {
     await openProfile(tester);

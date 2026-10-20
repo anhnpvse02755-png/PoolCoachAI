@@ -8,6 +8,7 @@ import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
+import 'package:poolcoachai/features/roadmap/presentation/roadmap_home_line.dart';
 
 /// AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
 ///
@@ -79,6 +80,7 @@ class HomeScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const RoadmapHomeLine(),
 
                 // Bài tập gợi ý. Hết bài thì nói hết bài, không mượn
                 // bài của nhóm khác cho khối đỡ trống.
