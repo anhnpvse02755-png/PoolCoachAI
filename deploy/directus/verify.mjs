@@ -154,6 +154,90 @@ try {
     fail('thiếu id của A hoặc B, bỏ qua phần hạng');
   }
 
+  // ─── Lộ trình: player_goals, achievements ───────────────────────────────
+  if (aId && bId) {
+    const goal = {
+      id: aId,
+      goal_id: randomUUID(),
+      kind: 'thuanThucKyNang',
+      category: 'safety',
+      event_date: null,
+      created_at: '2026-10-15T03:00:00.000Z',
+      updated_at: '2026-10-15T03:00:00.000Z',
+    };
+    const gMade = await call('POST', '/items/player_goals', goal, a.access_token);
+    gMade.status === 200
+      ? ok('A tạo được mục tiêu của mình')
+      : fail(`A tạo mục tiêu → ${gMade.status} ${gMade.code}`);
+    const gForged = await call(
+      'POST',
+      '/items/player_goals',
+      { ...goal, id: bId },
+      a.access_token,
+    );
+    gForged.status >= 400
+      ? ok(`A không tạo được mục tiêu mang id của B → ${gForged.status}`)
+      : fail('A tạo được mục tiêu mang id của B');
+    const gDropped = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      {
+        goal_id: null,
+        kind: null,
+        category: null,
+        created_at: null,
+        updated_at: '2026-10-16T03:00:00.000Z',
+      },
+      a.access_token,
+    );
+    gDropped.status === 200
+      ? ok('A bỏ được mục tiêu (dòng rỗng)')
+      : fail(`A bỏ mục tiêu → ${gDropped.status} ${gDropped.code}`);
+    const bGoals = await call('GET', '/items/player_goals', undefined, b.access_token);
+    (bGoals.data ?? []).length === 0
+      ? ok('B không thấy mục tiêu của A')
+      : fail(`B thấy ${bGoals.data.length} mục tiêu`);
+    const bGoalPatch = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      { kind: 'lenHang' },
+      b.access_token,
+    );
+    bGoalPatch.status === 403
+      ? ok('B không sửa được mục tiêu của A')
+      : fail(`B sửa mục tiêu của A → ${bGoalPatch.status}`);
+
+    const ach = {
+      id: randomUUID(),
+      kind: 'chuoiNgay',
+      ref_id: '7',
+      achieved_at: '2026-10-15T03:00:00.000Z',
+    };
+    const aMade = await call('POST', '/items/achievements', ach, a.access_token);
+    aMade.status === 200
+      ? ok('A tạo được thành tích')
+      : fail(`A tạo thành tích → ${aMade.status} ${aMade.code}`);
+    const aAgain = await call('POST', '/items/achievements', ach, a.access_token);
+    aAgain.code === 'RECORD_NOT_UNIQUE'
+      ? ok('gửi lại thành tích cùng id → RECORD_NOT_UNIQUE (app coi là đã đồng bộ)')
+      : fail(`gửi lại thành tích cùng id → ${aAgain.status} ${aAgain.code}`);
+    const aPatch = await call(
+      'PATCH',
+      `/items/achievements/${ach.id}`,
+      { ref_id: '100' },
+      a.access_token,
+    );
+    aPatch.status === 403
+      ? ok('A không sửa được thành tích')
+      : fail(`A sửa thành tích → ${aPatch.status}`);
+    const bAch = await call('GET', '/items/achievements', undefined, b.access_token);
+    (bAch.data ?? []).length === 0
+      ? ok('B không thấy thành tích của A')
+      : fail(`B thấy ${bAch.data.length} thành tích`);
+  } else {
+    fail('thiếu id của A hoặc B, bỏ qua phần Lộ trình');
+  }
+
   const adminRole = (await call('GET', '/roles?filter[name][_eq]=Administrator', undefined, admin.access_token)).data?.[0]?.id;
   await call('PATCH', '/users/me', { role: adminRole }, a.access_token);
   const roleAfter = await roleOf(users[0].email);
