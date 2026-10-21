@@ -1,0 +1,107 @@
+name: iOS / build
+
+# Build iOS trên macOS. Chưa có tài khoản Apple Developer nên chỉ build
+# --no-codesign (không cài lên máy thật được). Test chạy ở android.yml
+# (ubuntu) để đỡ tốn phút macOS.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Zip Runner.app
+        run: |
+          cd build/ios/iphoneos
+          zip -r --symlinks "$GITHUB_WORKSPACE/Runner.app.zip" Runner.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poolcoachai-ios-runner-app-unsigned
+          path: Runner.app.zip
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------
+  # TẮT SẴN — bật khi đã có tài khoản Apple Developer (xem docs/mobile.md,
+  # mục "iOS: cần gì từ Apple"). Đổi `if: false` thành `if: true` rồi thêm
+  # các secret bên dưới vào GitHub > Settings > Secrets and variables > Actions:
+  #   IOS_CERTIFICATE_P12_BASE64   chứng chỉ Apple Distribution (.p12) mã hoá base64
+  #   IOS_CERTIFICATE_PASSWORD     mật khẩu file .p12
+  #   IOS_PROVISIONING_PROFILE_BASE64  provisioning profile App Store (.mobileprovision), base64
+  #   APPSTORE_API_KEY_ID          App Store Connect API key: Key ID
+  #   APPSTORE_API_ISSUER_ID       App Store Connect API key: Issuer ID
+  #   APPSTORE_API_PRIVATE_KEY     nội dung file AuthKey_XXXX.p8
+  # Cần thêm ios/ExportOptions.plist (method app-store, teamID, profile) khi bật.
+  # ---------------------------------------------------------------------
+  testflight:
+    if: false
+    needs: build-ios
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Import signing certificate and provisioning profile
+        env:
+          CERT_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/poolcoachai.mobileprovision"
+
+      - name: Build signed IPA
+        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$API_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
+          xcrun altool --upload-app --type ios \
+            --file build/ios/ipa/*.ipa \
+            --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID"
