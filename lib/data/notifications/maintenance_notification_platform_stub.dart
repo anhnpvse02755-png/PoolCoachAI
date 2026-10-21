@@ -7,7 +7,7 @@ class MaintenanceNotificationPlatform {
   /// Chỉ Android/iOS đặt lịch qua hệ điều hành.
   MaintenanceScheduler? get scheduler => null;
 
-  Future<void> refresh() async {}
+  Future<void> loadPermission() async {}
 
   bool get isSupported => false;
 

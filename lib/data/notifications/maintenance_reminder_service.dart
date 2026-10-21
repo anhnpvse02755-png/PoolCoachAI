@@ -58,7 +58,7 @@ class MaintenanceReminderService {
 
   MaintenanceScheduler? get _scheduler => _platform.scheduler;
 
-  late final Future<void> _permissionLoaded = _platform.refresh();
+  late final Future<void> _permissionLoaded = _platform.loadPermission();
   Future<void> _syncChain = Future.value();
 
   /// Android/iOS: đặt lại toàn bộ lịch theo danh sách cơ hiện tại. Xếp

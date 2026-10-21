@@ -13,7 +13,7 @@ class MaintenanceNotificationPlatform {
   /// Trình duyệt không đặt lịch được: dịch vụ tự kiểm tra bằng timer.
   MaintenanceScheduler? get scheduler => null;
 
-  Future<void> refresh() async {}
+  Future<void> loadPermission() async {}
 
   bool get isSupported => _browserNotification != null;
 
