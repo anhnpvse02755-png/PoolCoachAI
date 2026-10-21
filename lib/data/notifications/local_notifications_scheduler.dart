@@ -4,7 +4,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
-import 'package:poolcoachai/domain/maintenance_schedule.dart';
+import 'package:poolcoachai/domain/notifications/notification_plan.dart';
+import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -16,7 +17,12 @@ class LocalNotificationsScheduler implements NotificationScheduler {
   LocalNotificationsScheduler({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
-  static const _channelId = 'cue_maintenance';
+  /// 'cue_maintenance' giữ nguyên để kênh cũ của người đã cài vẫn dùng được.
+  static String _channelId(NotificationKind kind) => switch (kind) {
+    NotificationKind.maintenance => 'cue_maintenance',
+    NotificationKind.schedule => 'schedule_reminder',
+    NotificationKind.streak => 'streak_reminder',
+  };
 
   final FlutterLocalNotificationsPlugin _plugin;
   Future<void>? _init;
@@ -77,34 +83,45 @@ class LocalNotificationsScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<void> replaceAll(List<MaintenanceReminder> reminders) async {
+  Future<Set<int>> pendingIds() async {
     await _ensureInit();
-    await _plugin.cancelAll();
-    for (final r in reminders) {
-      await _plugin.zonedSchedule(
-        id: r.id,
-        title: Vi.equipmentNotificationTitle,
-        body: Vi.equipmentNotificationBody(r.cueName, r.daysBefore),
-        scheduledDate: tz.TZDateTime(
-          tz.local,
-          r.at.year,
-          r.at.month,
-          r.at.day,
-          r.at.hour,
-          r.at.minute,
+    final pending = await _plugin.pendingNotificationRequests();
+    return {for (final request in pending) request.id};
+  }
+
+  @override
+  Future<void> schedule(PlannedNotification notification) async {
+    await _ensureInit();
+    final at = notification.at;
+    await _plugin.zonedSchedule(
+      id: notification.id,
+      title: notification.title,
+      body: notification.body,
+      scheduledDate: tz.TZDateTime(
+        tz.local,
+        at.year,
+        at.month,
+        at.day,
+        at.hour,
+        at.minute,
+      ),
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId(notification.kind),
+          Vi.notificationKind(notification.kind),
+          importance: Importance.high,
+          priority: Priority.high,
         ),
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            Vi.equipmentNotificationTitle,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
-    }
+        iOS: const DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  @override
+  Future<void> cancel(int id) async {
+    await _ensureInit();
+    await _plugin.cancel(id: id);
   }
 
   @override
