@@ -3,7 +3,6 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:poolcoachai/domain/coach/coach_job.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/difficulty.dart';
 import 'package:poolcoachai/domain/coach/generator.dart';
