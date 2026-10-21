@@ -186,6 +186,17 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            PcCard(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text(Vi.knowledgeLibraryTitle),
+                subtitle: const Text(Vi.knowledgeLibraryCardBody),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go(Routes.knowledge),
+              ),
+            ),
           ],
         ),
       ),

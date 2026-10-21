@@ -11,6 +11,7 @@ import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
+import 'package:poolcoachai/domain/knowledge_lookup.dart';
 
 /// Chi tiết một bài tập — mục 6.3 của thiết kế.
 class DrillDetailScreen extends ConsumerWidget {
@@ -25,6 +26,8 @@ class DrillDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final drillsAsync = ref.watch(drillsProvider);
     final logsAsync = ref.watch(drillLogsProvider);
+    final articles = ref.watch(knowledgeProvider).value ?? const [];
+    final related = articlesForDrill(drillId, articles);
 
     return drillsAsync.when(
       loading: () => const PcRootScaffold(
@@ -113,6 +116,25 @@ class DrillDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (related.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  Vi.drillReadArticles,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                ...related.map(
+                  (article) => PcCard(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.article_outlined),
+                      title: Text(article.title),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.go(Routes.article(article.id)),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               // Lịch sử hiện tỉ lệ đạt mục tiêu, không phải điểm thô:
               // "9" một mình không nói lên bài đó cần trúng mấy trên

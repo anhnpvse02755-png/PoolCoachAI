@@ -106,19 +106,10 @@ abstract final class Vi {
   // sinh ra — viết sẵn ở đây là đúng. Mỗi màn nói thẳng sẽ có gì ở bản
   // sau thay vì để trắng hoặc bịa nội dung cho có.
   static const homeTitle = 'Xin chào';
-  static const homeComing =
-      'Gợi ý của huấn luyện viên, mục tiêu hôm nay '
-      'và tiến độ sẽ hiện ở đây.';
 
   static const trainingTitle = 'Trung tâm luyện tập';
-  static const trainingComing =
-      'Thư viện bài tập, lộ trình AI, mô phỏng '
-      'góc cắt và đồng hồ luyện tập sẽ nằm ở đây.';
 
   static const playTitle = 'Thi đấu';
-  static const playComing =
-      'Ghi trận đấu, lịch sử trận và giải đấu sẽ '
-      'nằm ở đây.';
   static const matchStart = 'Ghi trận mới';
   static const matchEmpty = 'Chưa có trận đấu nào được ghi.';
   static const matchGameType = 'Thể loại';
@@ -199,9 +190,6 @@ abstract final class Vi {
       '${matchShotOutcomeName(shot.outcome)}';
 
   static const statsTitle = 'Thống kê';
-  static const statsComing =
-      'Biểu đồ tiến bộ theo từng nhóm kỹ năng, '
-      'kết hợp dữ liệu luyện tập và thi đấu.';
   static const statsOverview = 'Tổng quan luyện tập';
   static const statsTotalSessions = 'Tổng buổi tập';
   static const statsDrillSessions = 'Buổi theo bài';
@@ -318,9 +306,6 @@ abstract final class Vi {
   static String equipmentWeightValue(int grams) => '$grams g';
   static String equipmentDiameterValue(double millimeters) =>
       '${millimeters.toStringAsFixed(1)} mm';
-  static const profileComing =
-      'Hạng, chứng nhận, cơ bi-a và cài đặt sẽ '
-      'nằm ở đây.';
 
   static const coachComing =
       'Hỏi huấn luyện viên hôm nay nên tập gì, '
@@ -359,6 +344,15 @@ abstract final class Vi {
   // Màn đọc kiến thức — mục 6.5 của thiết kế.
   static const knowledgeTitle = 'Bài đọc';
   static const knowledgeRelatedTitle = 'Bài tập liên quan';
+
+  // Thư viện kiến thức: danh sách mọi bài đọc.
+  static const knowledgeLibraryTitle = 'Kiến thức';
+  static const knowledgeLibraryCardBody =
+      'Các bài đọc về kỹ thuật, theo từng nhóm kỹ năng.';
+  static const knowledgeLibraryEmpty = 'Chưa có bài kiến thức nào.';
+
+  /// Tiêu đề khối trên chi tiết bài tập: các bài đọc nhắc tới bài này.
+  static const drillReadArticles = 'Đọc bài liên quan';
 
   // Khi không đọc được dữ liệu.
   //

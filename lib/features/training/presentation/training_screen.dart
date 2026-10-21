@@ -92,6 +92,18 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             child: PcCard(
               child: ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text(Vi.knowledgeLibraryTitle),
+                subtitle: const Text(Vi.knowledgeLibraryCardBody),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go(Routes.knowledge),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: PcCard(
+              child: ListTile(
                 leading: const Icon(Icons.adjust),
                 title: const Text(Vi.simTitle),
                 subtitle: const Text(Vi.simCardBody),
