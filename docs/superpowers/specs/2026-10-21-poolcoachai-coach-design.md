@@ -497,6 +497,8 @@ const coachLibrary = <CoachLibraryEntry>[ … ];
 | safety | `noPotTable`, `blockedEverywhereTable`; một thế do người soạn dựng | |
 | kick | `snookerOneRailTable`, bàn hai băng cùng tệp; S5 (bi 1 bị cụm 9 bi che), bản Bachelors vị trí 1 | S5 có bi 1–10, nên là bàn **10 bi** |
 
+**Kết quả lúc làm T5 (21/10/2026): 10 mục, không phải 12.** Test thư viện (mục 9.5) bỏ hai mục: `blockedEverywhereTable` (từ bi cái (40, 100), bi 1 bị đui, nên là thế A băng chứ không phải Phòng thủ) và S5 Bachelors thế 1 (bi 1 nhìn thấy và có lỗ đánh được theo hình học; Planner ra phòng thủ vì mọi cú hỏng, không phải vì đui). Hai mục "người soạn dựng từ bộ sinh" là `gen-v1-aiming-medium-6054` và `gen-v1-safety-medium-1009`. Mục 9.5 chỉ xét các điều kiện của mục 8.5 dựa vào tham chiếu (`acceptsForTopic`); các điều kiện riêng của bộ sinh (số bi theo độ khó, dải góc, "≥ 2 bi sau bi phải chạm") không áp cho thư viện, nên `railTable` và `cornerFollowTable` (2 bi) vẫn ở nhóm Vị trí.
+
 Các thế BU có bi cái tự do (S1–S4) không đưa vào bộ đầu: người soạn sẽ phải tự đặt bi cái, tức là thêm một lựa chọn chưa có nguồn. Để sau, khi chủ sản phẩm chỉ chỗ đặt bi cái.
 
 ### 9.3 Cách soạn thêm
