@@ -1,11 +1,11 @@
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 
-class MaintenanceNotificationPlatform {
+class NotificationPlatform {
   // ignore: avoid_unused_constructor_parameters
-  MaintenanceNotificationPlatform({MaintenanceScheduler? scheduler});
+  NotificationPlatform({NotificationScheduler? scheduler});
 
   /// Chỉ Android/iOS đặt lịch qua hệ điều hành.
-  MaintenanceScheduler? get scheduler => null;
+  NotificationScheduler? get scheduler => null;
 
   Future<void> loadPermission() async {}
 
@@ -30,5 +30,5 @@ class MaintenanceNotificationPlatform {
   }
 }
 
-MaintenanceNotificationPlatform createMaintenanceNotificationPlatform() =>
-    MaintenanceNotificationPlatform();
+NotificationPlatform createNotificationPlatform() =>
+    NotificationPlatform();

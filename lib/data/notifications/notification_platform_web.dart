@@ -1,17 +1,17 @@
 import 'dart:js_interop';
 
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:web/web.dart' as web;
 
 @JS('globalThis.Notification')
 external JSFunction? get _browserNotification;
 
-class MaintenanceNotificationPlatform {
+class NotificationPlatform {
   // ignore: avoid_unused_constructor_parameters
-  MaintenanceNotificationPlatform({MaintenanceScheduler? scheduler});
+  NotificationPlatform({NotificationScheduler? scheduler});
 
   /// Trình duyệt không đặt lịch được: dịch vụ tự kiểm tra bằng timer.
-  MaintenanceScheduler? get scheduler => null;
+  NotificationScheduler? get scheduler => null;
 
   Future<void> loadPermission() async {}
 
@@ -39,5 +39,5 @@ class MaintenanceNotificationPlatform {
   }
 }
 
-MaintenanceNotificationPlatform createMaintenanceNotificationPlatform() =>
-    MaintenanceNotificationPlatform();
+NotificationPlatform createNotificationPlatform() =>
+    NotificationPlatform();
