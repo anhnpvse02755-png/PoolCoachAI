@@ -307,6 +307,22 @@ abstract final class Vi {
   static const equipmentLastUsed = 'Lần dùng gần nhất';
   static const equipmentNoRecordedPractice = 'Chưa có buổi tập ghi với cơ này.';
   static const equipmentUnknownCue = 'Cơ đã xóa';
+  static const matchCue = 'Cơ dùng trong trận';
+  static String matchCueLine(String cueName) => 'Cơ: $cueName';
+  static const cueWinRateTitle = 'Tỉ lệ thắng theo cơ';
+  static const cueWinRateNoMatches = 'Chưa có trận hoàn tất nào ghi cơ.';
+  static const cueBestBadge = 'Cơ hợp bạn nhất';
+  static String cueWinRateLine({
+    required int wins,
+    required int completed,
+    required int percent,
+  }) => '$wins thắng / $completed trận hoàn tất · $percent%';
+  static const cueWinRateNone = 'Chưa có trận hoàn tất với cơ này.';
+  static String cueMatchesNeeded(int count) =>
+      'Cần thêm $count trận hoàn tất để so sánh.';
+  static String cueVerdictRule(int minMatches) =>
+      'Cơ hợp bạn nhất chỉ được nêu khi có ít nhất hai cơ, mỗi cơ từ '
+      '$minMatches trận hoàn tất, và một cơ có tỉ lệ thắng cao hơn hẳn các cơ còn lại.';
   static const timerChooseCue = 'Cơ đang dùng (không bắt buộc)';
   static const timerNoCue = 'Không chọn cơ';
   static String equipmentTypeName(CueType type) => switch (type) {

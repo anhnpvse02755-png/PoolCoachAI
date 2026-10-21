@@ -8,7 +8,10 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/features/stats/presentation/cue_win_rate_block.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:uuid/uuid.dart';
 
@@ -343,7 +346,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     return !due.isBefore(today) && due.difference(today).inDays <= 7;
   }
 
-  Widget _cueCard(CueEquipment cue, DateTime now, List<TimerSession> sessions) {
+  Widget _cueCard(
+    CueEquipment cue,
+    DateTime now,
+    List<TimerSession> sessions,
+    CueWinRateReport winRates,
+  ) {
     final dueDate = cue.tipMaintenanceDueDate;
     final overdue =
         dueDate != null &&
@@ -405,6 +413,10 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
               ),
               Text('${Vi.equipmentLastUsed}: ${_formatDate(lastUsed.date)}'),
             ],
+            CueWinRateBlock(
+              stats: winRates.statsFor(cue.id),
+              isBest: winRates.bestCueId == cue.id,
+            ),
             if (dueDate != null)
               Text(
                 '${overdue
@@ -446,6 +458,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   Widget build(BuildContext context) {
     final equipmentAsync = ref.watch(cueEquipmentProvider);
     final sessionsAsync = ref.watch(timerSessionsProvider);
+    final matches = ref.watch(matchesProvider).value ?? const <PoolMatch>[];
     final now = ref.watch(nowProvider)();
 
     return PcRootScaffold(
@@ -464,6 +477,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                 : _equipmentList(
                     equipmentAsync.requireValue,
                     sessionsAsync.requireValue,
+                    matches,
                     now,
                   ),
           ),
@@ -485,8 +499,13 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   Widget _equipmentList(
     List<CueEquipment> cues,
     List<TimerSession> sessions,
+    List<PoolMatch> matches,
     DateTime now,
   ) {
+    final winRates = computeCueWinRates(
+      matches: matches,
+      knownCueIds: {for (final cue in cues) cue.id},
+    );
     final sortedCues = [...cues]
       ..sort((a, b) {
         final priorityA = _maintenancePriority(a.tipMaintenanceDueDate, now);
@@ -517,7 +536,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
                   children: sortedCues
-                      .map((cue) => _cueCard(cue, now, sessions))
+                      .map((cue) => _cueCard(cue, now, sessions, winRates))
                       .toList(growable: false),
                 ),
         ),

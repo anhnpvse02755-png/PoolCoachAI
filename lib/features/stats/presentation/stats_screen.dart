@@ -6,7 +6,10 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/training_statistics.dart';
+import 'package:poolcoachai/features/stats/presentation/cue_win_rate_block.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -17,6 +20,7 @@ class StatsScreen extends ConsumerWidget {
     final logsAsync = ref.watch(drillLogsProvider);
     final timerSessionsAsync = ref.watch(timerSessionsProvider);
     final matchesAsync = ref.watch(matchesProvider);
+    final cues = ref.watch(cueEquipmentProvider).value;
 
     if (drillsAsync.hasError ||
         logsAsync.hasError ||
@@ -149,6 +153,14 @@ class StatsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          if (cues != null)
+            _CueWinRateCard(
+              cues: cues,
+              report: computeCueWinRates(
+                matches: matchesAsync.requireValue,
+                knownCueIds: {for (final cue in cues) cue.id},
+              ),
+            ),
           const SizedBox(height: 16),
           Text(Vi.statsSkills, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -218,6 +230,73 @@ class StatsScreen extends ConsumerWidget {
             const PcCard(child: Text(Vi.statsNoTraining)),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _CueWinRateCard extends StatelessWidget {
+  const _CueWinRateCard({required this.cues, required this.report});
+
+  final List<CueEquipment> cues;
+  final CueWinRateReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    if (cues.isEmpty && report.unknownCues.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final sorted = [...cues]..sort((a, b) => a.name.compareTo(b.name));
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: PcCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              Vi.cueWinRateTitle,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            for (final cue in sorted)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cue.name,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    CueWinRateBlock(
+                      stats: report.statsFor(cue.id),
+                      isBest: report.bestCueId == cue.id,
+                    ),
+                  ],
+                ),
+              ),
+            for (final stats in report.unknownCues)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Vi.equipmentUnknownCue,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    CueWinRateBlock(stats: stats, isBest: false),
+                  ],
+                ),
+              ),
+            if (report.bestCueId == null && cues.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                Vi.cueVerdictRule(minMatchesForCueVerdict),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

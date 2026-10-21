@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
@@ -150,6 +151,11 @@ void main() {
     for (final cue in cues) {
       await repository.save(cue);
     }
+    // Mỗi thẻ cơ giờ cao hơn (có dòng tỉ lệ thắng): cần màn đủ cao để cả năm
+    // thẻ cùng được dựng.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final container = dbContainer(db, now: testToday);
     addTearDown(container.dispose);
 
@@ -251,5 +257,66 @@ void main() {
 
     expect(find.text(Vi.equipmentShaftDiameterInvalid), findsOneWidget);
     expect(await db.select(db.cueEquipmentRows).get(), isEmpty);
+  });
+
+  testWidgets('shows win rate and the best-cue verdict on each cue', (
+    tester,
+  ) async {
+    var n = 0;
+    PoolMatch match(String cueId, {required bool win}) {
+      n++;
+      return PoolMatch(
+        id: 'm$n',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 1,
+        rackWinners: [win ? RackWinner.player : RackWinner.opponent],
+        startedAt: DateTime(2026, 9, 1).add(Duration(hours: n)),
+        cueId: cueId,
+      );
+    }
+
+    final container = testContainer(
+      equipment: const [
+        CueEquipment(
+          id: 'a',
+          name: 'Cơ A',
+          type: CueType.playing,
+          skillCategories: [],
+        ),
+        CueEquipment(
+          id: 'b',
+          name: 'Cơ B',
+          type: CueType.breakJump,
+          skillCategories: [],
+        ),
+      ],
+      matches: [
+        for (var i = 0; i < 8; i++) match('a', win: true),
+        for (var i = 0; i < 2; i++) match('a', win: false),
+        for (var i = 0; i < 4; i++) match('b', win: true),
+        for (var i = 0; i < 6; i++) match('b', win: false),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: EquipmentScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(Vi.cueBestBadge), findsOneWidget);
+    expect(
+      find.text(Vi.cueWinRateLine(wins: 8, completed: 10, percent: 80)),
+      findsOneWidget,
+    );
+    expect(
+      find.text(Vi.cueWinRateLine(wins: 4, completed: 10, percent: 40)),
+      findsOneWidget,
+    );
   });
 }
