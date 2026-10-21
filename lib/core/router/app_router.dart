@@ -14,6 +14,7 @@ import 'package:poolcoachai/features/auth/presentation/register_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/reset_password_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
+import 'package:poolcoachai/features/knowledge/presentation/knowledge_library_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
@@ -183,6 +184,10 @@ GoRouter createAppRouter({
     ),
     // Bài đọc mở đè lên shell: vào được từ AI Home và từ bài tập, nên
     // không thuộc riêng nhánh tab nào.
+    GoRoute(
+      path: Routes.knowledge,
+      builder: (context, state) => const KnowledgeLibraryScreen(),
+    ),
     GoRoute(
       path: Routes.articlePattern,
       builder: (context, state) =>

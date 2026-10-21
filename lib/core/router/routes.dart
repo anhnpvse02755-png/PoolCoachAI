@@ -44,6 +44,9 @@ abstract final class Routes {
 
   /// Làm bài kiểm tra BU — mở đè lên shell (spec mục 7.1).
   static const rankTest = '/rank/test';
+
+  /// Thư viện kiến thức — mở đè lên shell như màn đọc bài.
+  static const knowledge = '/knowledge';
   static const articlePattern = '/knowledge/:id';
 
   /// Đường dẫn chi tiết một bài tập.
@@ -97,6 +100,7 @@ abstract final class Routes {
     rankLayouts,
     onboardingRank,
     rankTest,
+    knowledge,
     articlePattern,
     login,
     register,

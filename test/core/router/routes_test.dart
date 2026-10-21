@@ -30,6 +30,7 @@ void main() {
         Routes.rankLayouts,
         Routes.onboardingRank,
         Routes.rankTest,
+        Routes.knowledge,
         Routes.articlePattern,
         Routes.login,
         Routes.register,

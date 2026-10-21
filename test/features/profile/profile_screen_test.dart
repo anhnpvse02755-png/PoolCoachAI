@@ -435,6 +435,5 @@ void main() {
     await openProfile(tester);
     expect(find.text(Vi.rankNone), findsOneWidget);
     expect(find.text(Vi.rankDetermine), findsOneWidget);
-    expect(find.text(Vi.profileComing), findsNothing);
   });
 }

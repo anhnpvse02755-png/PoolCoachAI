@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -29,6 +31,11 @@ void main() {
     addTearDown(router.dispose);
     final container = testContainer(logs: logs);
     addTearDown(container.dispose);
+
+    // Thẻ đầu trang đã nhiều: cao hơn để danh sách bài vẫn nằm trong khung.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
