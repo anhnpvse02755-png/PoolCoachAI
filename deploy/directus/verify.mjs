@@ -212,10 +212,13 @@ try {
     const cue = {
       id: cueId,
       name: 'Cơ kiểm thử',
-      type: 'playing',
+      type: 'breakJump',
       weight_grams: 540,
+      shaft_brand: 'Predator',
       tip_diameter_mm: 12.5,
+      tip_brand: 'Kamui',
       tip_hardness: 'medium',
+      butt_brand: 'Cuetec',
       skill_categories: ['aiming'],
       last_tip_maintenance: '2026-10-01',
       tip_maintenance_due_date: '2026-12-01',
@@ -235,6 +238,18 @@ try {
     cueOwner.data?.user_created === aId
       ? ok('server gán chủ hồ sơ cơ là A')
       : fail(`chủ hồ sơ cơ không phải A: ${cueOwner.data?.user_created ?? '(null)'}`);
+    const cueFields = await call(
+      'GET',
+      `/items/cue_equipment/${cueId}?fields=type,shaft_brand,tip_brand,butt_brand,tip_diameter_mm`,
+      undefined,
+      a.access_token,
+    );
+    cueFields.data?.type === 'breakJump' &&
+    cueFields.data?.shaft_brand === 'Predator' &&
+    cueFields.data?.tip_brand === 'Kamui' &&
+    cueFields.data?.butt_brand === 'Cuetec'
+      ? ok('hồ sơ cơ lưu đủ loại breakJump và hãng ngọn/đầu tẩy/chuôi')
+      : fail(`trường cơ mới không đủ: ${JSON.stringify(cueFields.data)}`);
     const aCues = await call(
       'GET',
       '/items/cue_equipment?fields=id,user_created',

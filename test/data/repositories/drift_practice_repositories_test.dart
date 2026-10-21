@@ -137,6 +137,32 @@ void main() {
     },
   );
 
+  test('stores the break-jump type and brand fields round-trip', () async {
+    final repository = DriftCueEquipmentRepository(db, userId: 'u1');
+    await repository.save(
+      const CueEquipment(
+        id: 'cue-bj',
+        name: 'Cơ phá nhảy',
+        type: CueType.breakJump,
+        shaftBrand: 'Predator',
+        shaftDiameterMm: 12.4,
+        tipBrand: 'Kamui',
+        tipHardness: TipHardness.hard,
+        buttBrand: 'Cuetec',
+        skillCategories: [],
+      ),
+    );
+
+    final cue = (await repository.watchAll().first).single;
+    expect(cue.type, CueType.breakJump);
+    expect(cue.shaftBrand, 'Predator');
+    expect(cue.shaftDiameterMm, 12.4);
+    expect(cue.tipBrand, 'Kamui');
+    expect(cue.tipHardness, TipHardness.hard);
+    expect(cue.buttBrand, 'Cuetec');
+    expect(cue.weightGrams, isNull);
+  });
+
   test(
     'equipment is account-scoped and deleting a cue unlinks its sessions',
     () async {
@@ -146,7 +172,7 @@ void main() {
         name: 'Cơ thi đấu',
         type: CueType.playing,
         weightGrams: 540,
-        tipDiameterMm: 12.5,
+        shaftDiameterMm: 12.5,
         tipHardness: TipHardness.medium,
         skillCategories: const [SkillCategory.aiming],
         lastTipMaintenance: DateTime(2026, 9, 1),
@@ -197,7 +223,7 @@ void main() {
       expect(ownCues.single.name, cue.name);
       expect(ownCues.single.type, CueType.playing);
       expect(ownCues.single.weightGrams, 540);
-      expect(ownCues.single.tipDiameterMm, 12.5);
+      expect(ownCues.single.shaftDiameterMm, 12.5);
       expect(ownCues.single.tipHardness, TipHardness.medium);
       expect(ownCues.single.skillCategories, [SkillCategory.aiming]);
       expect(ownCues.single.lastTipMaintenance, DateTime(2026, 9, 1));
@@ -238,7 +264,7 @@ void main() {
               id: 'invalid-diameter',
               name: 'Cơ không hợp lệ',
               type: CueType.playing,
-              tipDiameterMm: diameter,
+              shaftDiameterMm: diameter,
               skillCategories: const [],
             ),
           ),

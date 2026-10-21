@@ -12,8 +12,8 @@ import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 const cueEquipmentRemoteFields =
-    'id,user_created,name,type,weight_grams,tip_diameter_mm,tip_hardness,'
-    'skill_categories,last_tip_maintenance,tip_maintenance_due_date,'
+    'id,user_created,name,type,weight_grams,shaft_brand,tip_diameter_mm,'
+    'tip_brand,tip_hardness,butt_brand,skill_categories,last_tip_maintenance,tip_maintenance_due_date,'
     'updated_at,is_deleted';
 
 Stream<List<CueEquipmentRow>> watchPendingCueEquipment(AppDatabase db) =>
@@ -292,8 +292,12 @@ class CueEquipmentSyncService {
     'name': row.name,
     'type': row.type,
     'weight_grams': row.weightGrams,
-    'tip_diameter_mm': row.tipDiameterMm,
+    'shaft_brand': row.shaftBrand,
+    // Tên trường giữ nguyên `tip_diameter_mm`; nghĩa là size ngọn.
+    'tip_diameter_mm': row.shaftDiameterMm,
+    'tip_brand': row.tipBrand,
     'tip_hardness': row.tipHardness,
+    'butt_brand': row.buttBrand,
     'skill_categories': jsonDecode(row.skillCategories),
     'last_tip_maintenance': _formatDateOnly(row.lastTipMaintenance),
     'tip_maintenance_due_date': _formatDateOnly(row.tipMaintenanceDueDate),
@@ -342,7 +346,7 @@ class CueEquipmentSyncService {
     }
     if (diameter != null &&
         (diameter is! num || !diameter.isFinite || diameter <= 0)) {
-      throw const FormatException('Đường kính đầu cơ từ server không hợp lệ');
+      throw const FormatException('Size ngọn từ server không hợp lệ');
     }
     final name = _requiredString(item, 'name');
     if (name.trim().isEmpty) {
@@ -353,8 +357,11 @@ class CueEquipmentSyncService {
       name: name,
       type: type,
       weightGrams: (weight as num?)?.toInt(),
-      tipDiameterMm: (diameter as num?)?.toDouble(),
+      shaftBrand: _nullableText(item, 'shaft_brand'),
+      shaftDiameterMm: (diameter as num?)?.toDouble(),
+      tipBrand: _nullableText(item, 'tip_brand'),
       tipHardness: hardness,
+      buttBrand: _nullableText(item, 'butt_brand'),
       skillCategories: skills,
       lastTipMaintenance: _nullableDate(item, 'last_tip_maintenance'),
       tipMaintenanceDueDate: _nullableDate(item, 'tip_maintenance_due_date'),
@@ -387,6 +394,13 @@ class CueEquipmentSyncService {
   String _requiredString(Map<String, Object?> item, String key) {
     final value = item[key];
     if (value is String && value.isNotEmpty) return value;
+    throw FormatException('Trường $key từ server không hợp lệ');
+  }
+
+  String? _nullableText(Map<String, Object?> item, String key) {
+    final value = item[key];
+    if (value == null) return null;
+    if (value is String) return value;
     throw FormatException('Trường $key từ server không hợp lệ');
   }
 

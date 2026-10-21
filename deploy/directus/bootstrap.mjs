@@ -271,8 +271,12 @@ await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng 
   required('name', 'string'),
   required('type', 'string'),
   nullable('weight_grams', 'integer'),
+  nullable('shaft_brand', 'string'),
+  // Size ngọn (đường kính ngọn, mm). Giữ tên trường cũ để không phải đổi tên trên server.
   nullable('tip_diameter_mm', 'decimal'),
+  nullable('tip_brand', 'string'),
   nullable('tip_hardness', 'string'),
+  nullable('butt_brand', 'string'),
   required('skill_categories', 'json'),
   nullable('last_tip_maintenance', 'date'),
   nullable('tip_maintenance_due_date', 'date'),
@@ -406,7 +410,8 @@ const desiredPermissions = [
     collection: 'cue_equipment',
     action: 'create',
     fields: [
-      'id', 'name', 'type', 'weight_grams', 'tip_diameter_mm', 'tip_hardness',
+      'id', 'name', 'type', 'weight_grams', 'shaft_brand', 'tip_diameter_mm',
+      'tip_brand', 'tip_hardness', 'butt_brand',
       'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
       'updated_at', 'is_deleted',
     ],
@@ -423,7 +428,8 @@ const desiredPermissions = [
     collection: 'cue_equipment',
     action: 'update',
     fields: [
-      'name', 'type', 'weight_grams', 'tip_diameter_mm', 'tip_hardness',
+      'name', 'type', 'weight_grams', 'shaft_brand', 'tip_diameter_mm',
+      'tip_brand', 'tip_hardness', 'butt_brand',
       'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
       'updated_at', 'is_deleted',
     ],

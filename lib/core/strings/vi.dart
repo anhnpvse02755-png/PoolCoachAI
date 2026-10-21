@@ -258,9 +258,14 @@ abstract final class Vi {
   static const equipmentPlayingCue = 'Cơ chính';
   static const equipmentBreakCue = 'Cơ phá';
   static const equipmentJumpCue = 'Cơ nhảy';
+  static const equipmentBreakJumpCue = 'Cơ phá nhảy kết hợp';
   static const equipmentWeight = 'Trọng lượng (gram)';
-  static const equipmentTipDiameter = 'Đường kính đầu cơ (mm)';
-  static const equipmentTipHardness = 'Độ cứng đầu cơ';
+  static const equipmentShaftBrand = 'Hãng ngọn';
+  static const equipmentShaftDiameter = 'Size ngọn (đường kính)';
+  static const unitMm = 'mm';
+  static const equipmentTipBrand = 'Hãng đầu tẩy';
+  static const equipmentButtBrand = 'Hãng chuôi';
+  static const equipmentTipHardness = 'Độ cứng đầu tẩy';
   static const equipmentNoHardness = 'Không chọn';
   static const equipmentSoft = 'Mềm';
   static const equipmentMedium = 'Trung bình';
@@ -283,8 +288,8 @@ abstract final class Vi {
   static const equipmentSaveFailed =
       'Không lưu được hồ sơ cơ. Vui lòng thử lại.';
   static const equipmentWeightInvalid = 'Nhập trọng lượng tính bằng gram.';
-  static const equipmentTipDiameterInvalid =
-      'Nhập đường kính đầu cơ tính bằng mm.';
+  static const equipmentShaftDiameterInvalid =
+      'Nhập size ngọn (đường kính) tính bằng mm.';
   static const equipmentDue = 'Đã đến ngày bảo dưỡng đầu cơ.';
   static const equipmentDueSoon = 'Sắp đến ngày bảo dưỡng đầu cơ.';
   static const equipmentReminderTitle = 'Nhắc bảo dưỡng đầu cơ';
@@ -308,6 +313,7 @@ abstract final class Vi {
     CueType.playing => equipmentPlayingCue,
     CueType.breakCue => equipmentBreakCue,
     CueType.jump => equipmentJumpCue,
+    CueType.breakJump => equipmentBreakJumpCue,
   };
   static String equipmentHardnessName(TipHardness hardness) =>
       switch (hardness) {
@@ -315,6 +321,9 @@ abstract final class Vi {
         TipHardness.medium => equipmentMedium,
         TipHardness.hard => equipmentHard,
       };
+  static String equipmentShaftBrandValue(String brand) => 'Ngọn $brand';
+  static String equipmentTipBrandValue(String brand) => 'Đầu tẩy $brand';
+  static String equipmentButtBrandValue(String brand) => 'Chuôi $brand';
   static String equipmentWeightValue(int grams) => '$grams g';
   static String equipmentDiameterValue(double millimeters) =>
       '${millimeters.toStringAsFixed(1)} mm';

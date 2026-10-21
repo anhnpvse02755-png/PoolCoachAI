@@ -51,6 +51,11 @@ void main() {
       expect(uploaded!.containsKey('user_created'), isFalse);
       expect(uploaded, containsPair('is_deleted', false));
       expect(uploaded?['skill_categories'], ['aiming']);
+      expect(uploaded?['type'], 'breakJump');
+      expect(uploaded?['shaft_brand'], 'Predator');
+      expect(uploaded?['tip_diameter_mm'], 12.4);
+      expect(uploaded?['tip_brand'], 'Kamui');
+      expect(uploaded?['butt_brand'], 'Cuetec');
       expect(uploaded?['last_tip_maintenance'], '2026-10-01');
       expect(uploaded?['tip_maintenance_due_date'], '2026-11-01');
       expect((uploaded?['updated_at'] as String).endsWith('Z'), isTrue);
@@ -70,6 +75,9 @@ void main() {
     expect(cue.id, 'from-server');
     expect(cue.name, 'Cơ từ server');
     expect(cue.type, CueType.playing);
+    expect(cue.shaftBrand, 'Predator');
+    expect(cue.shaftDiameterMm, 12.4);
+    expect(cue.tipBrand, isNull);
     expect(cue.lastTipMaintenance, DateTime(2026, 10, 1));
     expect(cue.tipMaintenanceDueDate, DateTime(2026, 11, 1));
     final row = (await db.select(db.cueEquipmentRows).get()).single;
@@ -195,7 +203,11 @@ void main() {
 CueEquipment _cue(String id) => CueEquipment(
   id: id,
   name: 'Cơ test',
-  type: CueType.playing,
+  type: CueType.breakJump,
+  shaftBrand: 'Predator',
+  shaftDiameterMm: 12.4,
+  tipBrand: 'Kamui',
+  buttBrand: 'Cuetec',
   skillCategories: const [SkillCategory.aiming],
   lastTipMaintenance: DateTime(2026, 10, 1),
   tipMaintenanceDueDate: DateTime(2026, 11, 1),
@@ -213,7 +225,10 @@ Map<String, Object?> _remoteCue({
   'name': name,
   'type': 'playing',
   'weight_grams': null,
-  'tip_diameter_mm': null,
+  'shaft_brand': 'Predator',
+  'tip_diameter_mm': 12.4,
+  'tip_brand': null,
+  'butt_brand': null,
   'tip_hardness': null,
   'skill_categories': ['aiming'],
   'last_tip_maintenance': '2026-10-01',

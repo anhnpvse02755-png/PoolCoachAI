@@ -63,6 +63,15 @@ class ScheduleSlotRows extends Table {
   TextColumn get label => text()();
   TextColumn get cat => text().nullable()();
 
+  /// Lúc sửa gần nhất; bản mới hơn thắng khi đồng bộ. Null = dòng cũ.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  /// Null nghĩa là **chưa đồng bộ**.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  /// Xóa mềm: dòng vẫn ở lại để đồng bộ lệnh xóa sang máy khác.
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -76,6 +85,9 @@ class TimerSessionRows extends Table {
   TextColumn get cat => text().nullable()();
   TextColumn get cueId => text().nullable()();
 
+  /// Null nghĩa là **chưa đồng bộ**. Buổi tập tự do chỉ thêm, không sửa.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -87,8 +99,15 @@ class CueEquipmentRows extends Table {
   TextColumn get name => text()();
   TextColumn get type => text()();
   IntColumn get weightGrams => integer().nullable()();
-  RealColumn get tipDiameterMm => real().nullable()();
+
+  /// Size ngọn (đường kính ngọn, mm). Cột SQL giữ tên cũ `tip_diameter_mm`
+  /// để không phải đổi tên cột trên máy người dùng và trên Directus.
+  RealColumn get shaftDiameterMm =>
+      real().named('tip_diameter_mm').nullable()();
+  TextColumn get shaftBrand => text().nullable()();
+  TextColumn get tipBrand => text().nullable()();
   TextColumn get tipHardness => text().nullable()();
+  TextColumn get buttBrand => text().nullable()();
   TextColumn get skillCategories => text()();
   DateTimeColumn get lastTipMaintenance => dateTime().nullable()();
   DateTimeColumn get tipMaintenanceDueDate => dateTime().nullable()();
@@ -112,6 +131,15 @@ class PoolMatchRows extends Table {
   TextColumn get shots => text().withDefault(const Constant('[]'))();
   DateTimeColumn get startedAt => dateTime()();
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// Cây cơ dùng trong trận. Giữ nguyên cả khi cơ bị xóa mềm.
+  TextColumn get cueId => text().nullable()();
+
+  /// Lúc sửa gần nhất (ghi rack, cú đánh...); bản mới hơn thắng khi đồng bộ.
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  /// Null nghĩa là **chưa đồng bộ**.
+  DateTimeColumn get syncedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -282,7 +310,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -328,6 +356,24 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(cueEquipmentRows, cueEquipmentRows.syncedAt);
           await m.addColumn(cueEquipmentRows, cueEquipmentRows.isDeleted);
         }
+      }
+      if (from < 10) {
+        // Bảng tạo mới ở bước trên đã có sẵn các cột này, nên chỉ thêm vào
+        // bảng đã tồn tại từ trước.
+        if (from >= 6) {
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.shaftBrand);
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.tipBrand);
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.buttBrand);
+        }
+        if (from >= 7) {
+          await m.addColumn(poolMatchRows, poolMatchRows.cueId);
+          await m.addColumn(poolMatchRows, poolMatchRows.updatedAt);
+          await m.addColumn(poolMatchRows, poolMatchRows.syncedAt);
+        }
+        await m.addColumn(timerSessionRows, timerSessionRows.syncedAt);
+        await m.addColumn(scheduleSlotRows, scheduleSlotRows.updatedAt);
+        await m.addColumn(scheduleSlotRows, scheduleSlotRows.syncedAt);
+        await m.addColumn(scheduleSlotRows, scheduleSlotRows.isDeleted);
       }
     },
   );

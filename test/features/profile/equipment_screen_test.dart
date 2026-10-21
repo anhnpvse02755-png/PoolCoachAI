@@ -30,8 +30,12 @@ void main() {
     await tester.tap(find.text(Vi.equipmentAdd));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Cơ thi đấu');
-    await tester.enterText(find.byType(TextFormField).at(1), '540');
-    await tester.enterText(find.byType(TextFormField).at(2), '12.5');
+    await tester.enterText(find.byKey(const Key('cue-weight')), '540');
+    await tester.enterText(find.byKey(const Key('cue-shaft-diameter')), '12.5');
+    await tester.enterText(find.byKey(const Key('cue-shaft-brand')), 'Predator');
+    await tester.enterText(find.byKey(const Key('cue-tip-brand')), 'Kamui');
+    await tester.enterText(find.byKey(const Key('cue-butt-brand')), 'Cuetec');
+    await tester.ensureVisible(find.text(Vi.skill(SkillCategory.aiming)));
     await tester.tap(find.text(Vi.skill(SkillCategory.aiming)));
     await tester.tap(find.text(Vi.equipmentSave));
     await tester.pumpAndSettle();
@@ -40,7 +44,10 @@ void main() {
     expect(cues, hasLength(1));
     expect(cues.single.userId, 'u1');
     expect(cues.single.weightGrams, 540);
-    expect(cues.single.tipDiameterMm, 12.5);
+    expect(cues.single.shaftDiameterMm, 12.5);
+    expect(cues.single.shaftBrand, 'Predator');
+    expect(cues.single.tipBrand, 'Kamui');
+    expect(cues.single.buttBrand, 'Cuetec');
     expect(cues.single.skillCategories, '["aiming"]');
     expect(find.text('Cơ thi đấu'), findsOneWidget);
 
@@ -238,11 +245,11 @@ void main() {
     await tester.tap(find.text(Vi.equipmentAdd));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Cơ thử nghiệm');
-    await tester.enterText(find.byType(TextFormField).at(2), 'NaN');
+    await tester.enterText(find.byKey(const Key('cue-shaft-diameter')), 'NaN');
     await tester.tap(find.text(Vi.equipmentSave));
     await tester.pumpAndSettle();
 
-    expect(find.text(Vi.equipmentTipDiameterInvalid), findsOneWidget);
+    expect(find.text(Vi.equipmentShaftDiameterInvalid), findsOneWidget);
     expect(await db.select(db.cueEquipmentRows).get(), isEmpty);
   });
 }

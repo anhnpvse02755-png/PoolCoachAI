@@ -75,9 +75,9 @@ class DriftCueEquipmentRepository implements CueEquipmentRepository {
     if (cue.weightGrams != null && cue.weightGrams! <= 0) {
       throw ArgumentError.value(cue.weightGrams, 'weightGrams');
     }
-    if (cue.tipDiameterMm != null &&
-        (!cue.tipDiameterMm!.isFinite || cue.tipDiameterMm! <= 0)) {
-      throw ArgumentError.value(cue.tipDiameterMm, 'tipDiameterMm');
+    if (cue.shaftDiameterMm != null &&
+        (!cue.shaftDiameterMm!.isFinite || cue.shaftDiameterMm! <= 0)) {
+      throw ArgumentError.value(cue.shaftDiameterMm, 'shaftDiameterMm');
     }
     final lastMaintenance = cue.lastTipMaintenance;
     final dueDate = cue.tipMaintenanceDueDate;

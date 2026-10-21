@@ -44,10 +44,23 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         (number is double && !number.isFinite)) {
       return integer
           ? Vi.equipmentWeightInvalid
-          : Vi.equipmentTipDiameterInvalid;
+          : Vi.equipmentShaftDiameterInvalid;
     }
     return null;
   }
+
+  Widget _brandField({
+    required Key key,
+    required String label,
+    required String initial,
+    required ValueChanged<String> onSaved,
+  }) => TextFormField(
+    key: key,
+    initialValue: initial,
+    decoration: InputDecoration(labelText: label),
+    textCapitalization: TextCapitalization.words,
+    onSaved: (value) => onSaved(value?.trim() ?? ''),
+  );
 
   Future<void> _editCue({CueEquipment? existing}) async {
     final formKey = GlobalKey<FormState>();
@@ -58,7 +71,10 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     var dueDate = existing?.tipMaintenanceDueDate;
     var name = existing?.name ?? '';
     var weight = existing?.weightGrams?.toString() ?? '';
-    var diameter = existing?.tipDiameterMm?.toString() ?? '';
+    var diameter = existing?.shaftDiameterMm?.toString() ?? '';
+    var shaftBrand = existing?.shaftBrand ?? '';
+    var tipBrand = existing?.tipBrand ?? '';
+    var buttBrand = existing?.buttBrand ?? '';
     var dialogSaving = false;
     final currentDate = ref.read(nowProvider)();
 
@@ -111,20 +127,18 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                             },
                     ),
                     const SizedBox(height: 8),
-                    TextFormField(
-                      initialValue: weight,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentWeight,
-                      ),
-                      keyboardType: TextInputType.number,
-                      onSaved: (value) => weight = value?.trim() ?? '',
-                      validator: (value) =>
-                          _positiveNumberValidator(value, integer: true),
+                    _brandField(
+                      key: const Key('cue-shaft-brand'),
+                      label: Vi.equipmentShaftBrand,
+                      initial: shaftBrand,
+                      onSaved: (value) => shaftBrand = value,
                     ),
                     TextFormField(
+                      key: const Key('cue-shaft-diameter'),
                       initialValue: diameter,
                       decoration: const InputDecoration(
-                        labelText: Vi.equipmentTipDiameter,
+                        labelText: Vi.equipmentShaftDiameter,
+                        suffixText: Vi.unitMm,
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -132,6 +146,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                       onSaved: (value) => diameter = value?.trim() ?? '',
                       validator: (value) =>
                           _positiveNumberValidator(value, integer: false),
+                    ),
+                    _brandField(
+                      key: const Key('cue-tip-brand'),
+                      label: Vi.equipmentTipBrand,
+                      initial: tipBrand,
+                      onSaved: (value) => tipBrand = value,
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<TipHardness?>(
@@ -154,6 +174,23 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                       onChanged: dialogSaving
                           ? null
                           : (value) => setDialogState(() => hardness = value),
+                    ),
+                    _brandField(
+                      key: const Key('cue-butt-brand'),
+                      label: Vi.equipmentButtBrand,
+                      initial: buttBrand,
+                      onSaved: (value) => buttBrand = value,
+                    ),
+                    TextFormField(
+                      key: const Key('cue-weight'),
+                      initialValue: weight,
+                      decoration: const InputDecoration(
+                        labelText: Vi.equipmentWeight,
+                      ),
+                      keyboardType: TextInputType.number,
+                      onSaved: (value) => weight = value?.trim() ?? '',
+                      validator: (value) =>
+                          _positiveNumberValidator(value, integer: true),
                     ),
                     const SizedBox(height: 12),
                     const Text(Vi.equipmentSkills),
@@ -232,10 +269,13 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                         name: name,
                         type: type,
                         weightGrams: weight.isEmpty ? null : int.parse(weight),
-                        tipDiameterMm: diameter.isEmpty
+                        shaftBrand: shaftBrand.isEmpty ? null : shaftBrand,
+                        shaftDiameterMm: diameter.isEmpty
                             ? null
                             : double.parse(diameter),
+                        tipBrand: tipBrand.isEmpty ? null : tipBrand,
                         tipHardness: hardness,
+                        buttBrand: buttBrand.isEmpty ? null : buttBrand,
                         skillCategories: skills.toList(growable: false),
                         lastTipMaintenance: lastMaintenance,
                         tipMaintenanceDueDate: dueDate,
@@ -316,9 +356,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     final details = <String>[
       Vi.equipmentTypeName(cue.type),
       if (cue.weightGrams != null) Vi.equipmentWeightValue(cue.weightGrams!),
-      if (cue.tipDiameterMm != null)
-        Vi.equipmentDiameterValue(cue.tipDiameterMm!),
+      if (cue.shaftBrand != null) Vi.equipmentShaftBrandValue(cue.shaftBrand!),
+      if (cue.shaftDiameterMm != null)
+        Vi.equipmentDiameterValue(cue.shaftDiameterMm!),
+      if (cue.tipBrand != null) Vi.equipmentTipBrandValue(cue.tipBrand!),
       if (cue.tipHardness != null) Vi.equipmentHardnessName(cue.tipHardness!),
+      if (cue.buttBrand != null) Vi.equipmentButtBrandValue(cue.buttBrand!),
     ];
     final skills = cue.skillCategories.map(Vi.skill).join(', ');
     final cueSessions = sessions.where((session) => session.cueId == cue.id);

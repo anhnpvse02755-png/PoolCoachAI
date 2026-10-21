@@ -1,6 +1,6 @@
 import 'package:poolcoachai/domain/skill_category.dart';
 
-enum CueType { playing, breakCue, jump }
+enum CueType { playing, breakCue, jump, breakJump }
 
 enum TipHardness { soft, medium, hard }
 
@@ -11,8 +11,11 @@ class CueEquipment {
     required this.type,
     required this.skillCategories,
     this.weightGrams,
-    this.tipDiameterMm,
+    this.shaftBrand,
+    this.shaftDiameterMm,
+    this.tipBrand,
     this.tipHardness,
+    this.buttBrand,
     this.lastTipMaintenance,
     this.tipMaintenanceDueDate,
     this.updatedAt,
@@ -22,8 +25,19 @@ class CueEquipment {
   final String name;
   final CueType type;
   final int? weightGrams;
-  final double? tipDiameterMm;
+
+  /// Hãng ngọn (nhập tự do).
+  final String? shaftBrand;
+
+  /// Size ngọn: đường kính ngọn, tính bằng mm.
+  final double? shaftDiameterMm;
+
+  /// Hãng đầu tẩy (nhập tự do).
+  final String? tipBrand;
   final TipHardness? tipHardness;
+
+  /// Hãng chuôi (nhập tự do).
+  final String? buttBrand;
   final List<SkillCategory> skillCategories;
   final DateTime? lastTipMaintenance;
   final DateTime? tipMaintenanceDueDate;
