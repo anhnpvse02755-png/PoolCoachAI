@@ -134,84 +134,26 @@ void main() {
         isEmpty);
   });
 
-  test('có áp phê thì nói góc bi cái bị lệch do áp phê', () {
+  test('có áp phê thì nói góc bi cái bị lệch do áp phê, kèm câu mẫu SAWS', () {
     final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
-    expect(lines(a: fake(), spin: right1), contains(Vi.simSquirt(deg)));
-    expect(lines(a: fake()).where((l) => l.startsWith('Bi cái bị lệch')),
-        isEmpty);
+    final bhe = sawsBhePercent(distance: g.cue.distanceTo(g.ghost), power: 45, stroke: Stroke.stun);
+    final expected = Vi.simSquirt(deg, right1, bhe, sawsSpeed(45));
+    expect(lines(a: fake(), spin: right1), contains(expected));
+    expect(lines(a: fake()).where((l) => l.startsWith('Bi cái bị lệch')), isEmpty);
   });
 
-  group('độ lệch điểm ngắm đổi ra đầu cơ và con bi', () {
-    test('đúng một đầu cơ thì phần con bi là đường kính chia đầu cơ', () {
-      final u = aimShiftUnits(tipWidth, table.ballDiameter)!;
-      expect(u.tips, 1);
-      expect(u.ballDenominator, 4.5);
-      expect(u.ballCount, isNull);
-    });
-
-    test('lệch bằng không, hay dưới nửa nấc 0.25 đầu cơ, thì không có số', () {
-      expect(aimShiftUnits(0, table.ballDiameter), isNull);
-      expect(aimShiftUnits(0.12 * tipWidth, table.ballDiameter), isNull);
-    });
-
-    test('làm tròn đầu cơ tới 0.25 và mẫu số con bi tới 0.5', () {
-      final u = aimShiftUnits(1.4 * tipWidth, table.ballDiameter)!;
-      expect(u.tips, 1.5);
-      // Mẫu số tính từ 1.5 đầu cơ đã làm tròn, không từ 1.4 thô.
-      final k = table.ballDiameter / (1.5 * tipWidth);
-      expect(u.ballDenominator, (k * 2).round() / 2);
-    });
-
-    test('mỗi nấc đầu cơ: mẫu số khớp số đầu cơ hiện ra', () {
-      for (final tips in [0.25, 0.5, 1.0, 2.0, 3.0]) {
-        // Cộng lệch nhỏ để chắc chắn số thô chưa phải nấc tròn.
-        final u = aimShiftUnits((tips + 0.05) * tipWidth, table.ballDiameter)!;
-        expect(u.tips, tips);
-        final k = table.ballDiameter / (tips * tipWidth);
-        if (k <= 1) {
-          expect(u.ballDenominator, isNull);
-        } else {
-          expect(u.ballDenominator, (k * 2).round() / 2);
-        }
-      }
-    });
-
-    test('lệch từ một con bi trở lên thì nói "N con bi", không phải 1/k', () {
-      final u = aimShiftUnits(table.ballDiameter, table.ballDiameter)!;
-      expect(u.ballDenominator, isNull);
-      expect(u.ballCount, 1);
-      final u2 = aimShiftUnits(1.5 * table.ballDiameter, table.ballDiameter)!;
-      expect(u2.ballDenominator, isNull);
-      expect(u2.ballCount, 1.5);
-      expect(Vi.simSquirt(1.5, u2.tips, null, null, u2.ballCount),
-          contains('≈ 1.5 con bi)'));
-    });
-  });
-
-  test('áp phê thật: dòng kèm độ lệch điểm ngắm tính từ hướng cơ đã bù', () {
-    final a = aimed(Stroke.stun, spin: right1);
-    // Bi ảo thật gần như trùng bi ảo hình học (cú đã bù để vào lỗ), nên
-    // lượng phải dịch là độ xoay hướng cơ nhân quãng tới bi ảo.
-    final shift = g.cue.distanceTo(g.ghost) *
-        math.tan(a.aimOffsetDeg.abs() * math.pi / 180);
-    final u = aimShiftUnits(shift, table.ballDiameter)!;
-    final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
-    final line = lines(a: a, spin: right1)
-        .singleWhere((l) => l.startsWith('Bi cái bị lệch'));
-    final bhe = sawsBhePercent(
-        distance: g.cue.distanceTo(g.ghost), power: 45, stroke: Stroke.stun);
-    expect(line, Vi.simSquirt(
-        deg, u.tips, u.ballDenominator, bhe, u.ballCount));
-    expect(line, contains('SAWS ($bhe% BHE / ${100 - bhe}% FHE)'));
-    expect(line, endsWith('để bù trừ áp phê.'));
-    expect(line, contains('đầu cơ'));
-    expect(line, contains('con bi'));
-  });
-
-  test('lệch dưới nấc nhỏ nhất hoặc không có vết: dòng không có ngoặc', () {
-    final deg = squirtAngle(tipWidth, table.radius) * 180 / math.pi;
-    expect(lines(a: fake(), spin: right1), contains(Vi.simSquirt(deg)));
-    expect(lines(a: null, spin: right1), contains(Vi.simSquirt(deg)));
+  test('áp phê (Q5, 21/10/2026): ngắm như đánh tâm bi rồi bù BHE/FHE, không còn "ngắm lệch"', () {
+    final bhe = sawsBhePercent(distance: g.cue.distanceTo(g.ghost), power: 45, stroke: Stroke.stun);
+    // Có vết hay không (lõi quá giờ), câu vẫn như nhau: SAWS không dựa vào vết.
+    for (final a in [aimed(Stroke.stun, spin: right1), null]) {
+      final line = lines(a: a, spin: right1).singleWhere((l) => l.startsWith('Bi cái bị lệch'));
+      expect(line, contains(Vi.sawsSpinAdvice(SpinSide.right, 1, bhe, sawsSpeed(45))));
+      expect(line, contains('ngắm như đánh tâm bi'));
+      expect(line, contains('$bhe% BHE, ${100 - bhe}% FHE'));
+      expect(line, isNot(contains('ngắm lệch')));
+      expect(line, isNot(contains('điểm ngắm cần lệch')));
+      expect(line, isNot(contains('con bi')));
+    }
   });
 
   test('số lần chạm băng, chết cái, bi mục tiêu không vào lỗ', () {

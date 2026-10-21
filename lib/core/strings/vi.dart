@@ -20,6 +20,7 @@ import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
+import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -695,33 +696,33 @@ abstract final class Vi {
       'Đánh đứng bi: đặt cơ dưới tâm khoảng '
       '${_rounded(offset.abs() / tipWidth, 0.25)} đầu cơ';
 
-  /// Góc lệch do áp phê, độ, làm tròn 0.5°. Có [shiftTips] thì nói thêm
-  /// điểm ngắm phải dịch bao xa, bằng đầu cơ và phần con bi (đã làm tròn ở
-  /// `aimShiftUnits`): "1/[ballDenominator] con bi", hoặc "[ballCount] con
-  /// bi" khi lệch từ một con bi trở lên. Có thêm [bhePercent] thì câu kết
-  /// bằng lựa chọn SAWS (FHE = phần còn lại của 100). Dòng nào cũng kết
-  /// bằng dấu chấm.
-  static String simSquirt(
-    double deg, [
-    double? shiftTips,
-    double? ballDenominator,
-    int? bhePercent,
-    double? ballCount,
-  ]) {
-    final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
-    if (shiftTips == null || (ballDenominator == null && ballCount == null)) {
-      return '$base.';
-    }
-    final ball = ballCount != null
-        ? '${simTips(ballCount)} con bi'
-        : '1/${simTips(ballDenominator!)} con bi';
-    final shift =
-        '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} '
-        'đầu cơ ≈ $ball)';
-    if (bhePercent == null) return '$shift.';
-    return '$shift → bạn có thể dùng SAWS ($bhePercent% BHE / '
-        '${100 - bhePercent}% FHE) hoặc ngắm lệch đi để bù trừ áp phê.';
+  /// Góc lệch do áp phê, độ, làm tròn 0.5° — thông tin chủ sản phẩm đã
+  /// duyệt, không phải lời khuyên ngắm. Có [spin], [bhePercent] và [speed]
+  /// thì nối thêm đúng câu áp phê mẫu SAWS mà Coach dùng ([sawsSpinAdvice]);
+  /// không còn vế "điểm ngắm cần lệch" hay "ngắm lệch đi" (chủ sản phẩm chốt
+  /// Q5, 21/10/2026). Dòng nào cũng kết bằng dấu chấm.
+  static String simSquirt(double deg, [SideSpin? spin, int? bhePercent, SawsSpeed? speed]) {
+    final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°.';
+    final side = spin?.side;
+    if (side == null || bhePercent == null || speed == null) return base;
+    return '$base ${sawsSpinAdvice(side, spin!.tips, bhePercent, speed)}';
   }
+
+  /// Chữ chỉ lực của cột SAWS: Chậm / Vừa / Nhanh là lực nhẹ / trung bình /
+  /// mạnh (chủ sản phẩm chốt 05/10/2026).
+  static String sawsSpeedWord(SawsSpeed speed) => switch (speed) {
+    SawsSpeed.slow => 'nhẹ',
+    SawsSpeed.medium => 'trung bình',
+    SawsSpeed.fast => 'mạnh',
+  };
+
+  /// Câu áp phê mẫu SAWS của chủ sản phẩm (05/10/2026): số đầu cơ, "ngắm
+  /// như đánh tâm bi", % BHE / FHE và chữ chỉ lực. Một hàm cho cả màn Mô
+  /// phỏng, Kế hoạch dọn bàn và Coach. Không có số độ, không có "ngắm lệch".
+  static String sawsSpinAdvice(SpinSide side, double tips, int bhePercent, SawsSpeed speed) =>
+      'Cú này cần áp phê ${_side(side)} ${simTips(tips)} đầu cơ. '
+      'Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng $bhePercent% BHE, '
+      '${100 - bhePercent}% FHE với lực ${sawsSpeedWord(speed)}.';
 
   static String simRailCount(int count) => 'Bi cái chạm băng $count lần.';
 

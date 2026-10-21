@@ -38,8 +38,7 @@ List<String> planStepLines(PlanStep step,
       Vi.simPowerLine(s.power),
       if (!s.spin.isNone) ...[
         Vi.simSpinLine(s.spin),
-        squirtLineFor(s.spin, s.aimed.aimOffsetDeg, s.contactDistance, table,
-            bhePercent: s.sawsBhePercent),
+        squirtLineFor(s.spin, table, bhePercent: s.sawsBhePercent, power: s.power),
       ],
       Vi.safetyOpponent(s.opponent),
       Vi.safetyTolerance(s.tolerance, toleranceSamples),
@@ -57,7 +56,7 @@ List<String> planStepLines(PlanStep step,
     Vi.simPowerLine(step.power),
     if (!step.spin.isNone) ...[
       Vi.simSpinLine(step.spin),
-      squirtLine(step.spin, step.aimed, g, table, step.stroke, step.power),
+      squirtLine(step.spin, g, table, step.stroke, step.power),
     ],
     if (step.tolerance case final t?) Vi.planTolerance(t.good, toleranceSamples),
     // Bước cuối không có bi kế tiếp: chỉ nói số băng, không nói vùng điều.
