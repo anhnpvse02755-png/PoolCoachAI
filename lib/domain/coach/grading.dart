@@ -117,6 +117,7 @@ CoachVerdict _gradePot(CoachReference ref, PotAnswer a, CoachEvaluation e, int? 
       outcome: CoachOutcome.wrong,
       fault: plannerPots ? fault : CoachFault.shouldSafety,
       breakage: fault,
+      answer: a,
       pocket: a.pocket,
       unmakeable: unmakeable,
       scratchPocket: rejected?.scratchPocket,
@@ -132,7 +133,8 @@ CoachVerdict _gradePot(CoachReference ref, PotAnswer a, CoachEvaluation e, int? 
       return CoachVerdict(
           outcome: CoachOutcome.undecided,
           undecided: CoachUndecidedReason.timeout,
-          pocket: a.pocket,
+          answer: a,
+      pocket: a.pocket,
           nextBall: next);
     case EvalUnmakeable():
       return broken(CoachFault.pocketUnmakeable, unmakeable: e.reason);
@@ -147,7 +149,8 @@ CoachVerdict _gradePot(CoachReference ref, PotAnswer a, CoachEvaluation e, int? 
     case EvalNoNext():
       if (ref.kind == PlanStepKind.fallback && _isFallbackShot(a, ref.step)) {
         return CoachVerdict(
-            outcome: CoachOutcome.best, pocket: a.pocket, nextBall: next, playerAimed: e.aimed);
+            outcome: CoachOutcome.best, answer: a,
+      pocket: a.pocket, nextBall: next, playerAimed: e.aimed);
       }
       return broken(CoachFault.noNextShot, noNext: e);
     case EvalScored(:final option):
@@ -156,7 +159,8 @@ CoachVerdict _gradePot(CoachReference ref, PotAnswer a, CoachEvaluation e, int? 
           CoachVerdict(
             outcome: outcome,
             fault: fault,
-            pocket: a.pocket,
+            answer: a,
+      pocket: a.pocket,
             nextBall: next,
             playerAimed: option.aimed,
             playerScore: option.score,

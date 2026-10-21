@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/coach/answer.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
@@ -67,6 +68,7 @@ final class CoachVerdict {
     this.fault,
     this.breakage,
     this.undecided,
+    this.answer,
     this.pocket,
     this.unmakeable,
     this.scratchPocket,
@@ -85,6 +87,9 @@ final class CoachVerdict {
   /// nói đúng hậu quả. Các lỗi khác: bằng [fault] nếu là lỗi hỏng.
   final CoachFault? breakage;
   final CoachUndecidedReason? undecided;
+
+  /// Câu trả lời Ăn bi đã chấm; null khi chọn Phòng thủ.
+  final PotAnswer? answer;
 
   /// Lỗ người chơi chọn; null khi chọn Phòng thủ.
   final Pocket? pocket;
