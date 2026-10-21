@@ -18,6 +18,8 @@ void main() {
         ...Routes.tabs,
         Routes.equipment,
         Routes.coach,
+        Routes.coachSituation,
+        Routes.coachLibrary,
         Routes.notifications,
         Routes.drillPattern,
         Routes.drillSessionPattern,

@@ -7,6 +7,10 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/coach_providers.dart';
+import 'package:poolcoachai/core/providers/repository_providers.dart';
+import 'package:poolcoachai/data/repositories/coach_attempt_repository.dart';
+import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
@@ -29,6 +33,8 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 
+import 'coach_fixtures.dart';
+import 'planner_tables.dart';
 import 'fake_auth.dart';
 
 /// Dữ liệu và bộ chứa provider dùng chung cho mọi widget test.
@@ -87,9 +93,17 @@ ProviderContainer testContainer({
   GoalRecord? goal,
   List<Achievement>? achievements,
   BuResult? buResult,
+  List<CoachAttempt>? coachAttempts,
+  CoachAttemptRepository? coachRepo,
+  CoachEngine? coachEngine,
 }) {
   return ProviderContainer(
     overrides: [
+      coachAttemptsProvider.overrideWith(
+        (ref) => Stream.value(coachAttempts ?? const <CoachAttempt>[]),
+      ),
+      coachAttemptRepositoryProvider.overrideWithValue(coachRepo),
+      coachEngineProvider.overrideWithValue(coachEngine ?? fastCoachEngine),
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith(
@@ -199,3 +213,10 @@ ProviderContainer dbContainer(
     ],
   );
 }
+
+/// Lõi Coach của widget test: lõi giả tức thì, tính một mạch mỗi khung hình.
+final fastCoachEngine = CoachEngine(
+  aim: fakeAim,
+  safety: noSafetyPhysics,
+  budget: const Duration(days: 1),
+);

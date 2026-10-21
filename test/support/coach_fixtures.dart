@@ -115,3 +115,52 @@ CoachAttempt attempt(
   );
 }
 
+
+/// Lõi giả, tức thì, cho widget test (spec mục 14.4): không chạy vật lý thật.
+/// Bi mục tiêu luôn vào đúng lỗ; bi cái từ bi ảo đi theo hướng tiếp tuyến
+/// (Đánh đứng bi), về phía lỗ (Đánh cu lê) hay lùi lại (Đánh trô bi), quãng
+/// tỉ lệ với lực, kẹp trong mặt bàn. Đủ để mỗi câu trả lời có một điểm
+/// dừng khác nhau, nên cách chấm thật của Planner cho kết luận khác nhau.
+AimedShot fakeAim({
+  required Vec2 cue,
+  required Vec2 object,
+  required Pocket pocket,
+  required Stroke stroke,
+  SideSpin spin = const SideSpin.none(),
+  required double power,
+  CueElevation elevation = CueElevation.normal,
+  TableSpec table = TableSpec.nineFoot,
+  bool compensate = true,
+  bool withUncompensated = true,
+  double maxTime = maxSimTime,
+}) {
+  final pocketPos = table.pocketPosition(pocket);
+  final u = (pocketPos - object).normalized;
+  final ghost = object - u * table.ballDiameter;
+  final aim = (ghost - cue).normalized;
+  final tangent = (aim - u * aim.dot(u));
+  final dir = switch (stroke) {
+    Stroke.stun => tangent.length < 1e-9 ? Vec2.zero : tangent.normalized,
+    Stroke.follow => aim,
+    Stroke.draw => -aim,
+  };
+  final side = spin.isNone ? 0.0 : (spin.side == SpinSide.left ? -1.0 : 1.0) * spin.tips * 8;
+  final end = table.clamp(ghost + dir * (power * 1.2) + dir.rightNormal * side);
+  return AimedShot(
+    trace: ShotTrace(
+      cueBefore: [cue, ghost],
+      cueAfter: [ghost, end],
+      objectPath: [object, pocketPos],
+      contactCue: ghost,
+      rails: const [],
+      cuePocket: null,
+      objectPocket: pocket,
+      cueEnd: end,
+    ),
+    uncompensated: null,
+    aimOffsetDeg: 0,
+    verticalOffset: 0,
+    stunReached: true,
+    converged: true,
+  );
+}

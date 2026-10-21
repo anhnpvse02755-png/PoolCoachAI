@@ -1736,6 +1736,9 @@ abstract final class Vi {
   static const coachStart = 'Bắt đầu';
   static const coachLibraryLink = 'Thư viện tình huống ›';
   static const coachLibraryTitle = 'Thư viện tình huống';
+  static String coachLibraryCaption(String id, int k, int n) => 'Tình huống $k/$n · $id';
+  static String coachLibrarySource(String source) => 'Nguồn: $source';
+  static const coachLibraryEnd = 'Hết thư viện.';
   static const coachChatSoonTitle = 'Trò chuyện với huấn luyện viên (sắp có)';
   static const coachRecTitle = 'Nên luyện gì';
 
