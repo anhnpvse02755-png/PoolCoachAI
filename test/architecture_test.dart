@@ -238,4 +238,37 @@ void main() {
           'thuần (spec 2026-10-14 mục 5)',
     );
   });
+
+  test('lõi Lộ trình không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/roadmap');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'cách suy bước, ước lượng ngày và thành tích phải chạy và test '
+          'được trên Dart VM thuần (spec 2026-10-15 mục 4)',
+    );
+  });
+
+  test('thành tích chỉ sinh ra từ newAchievements', () {
+    // Thành tích tạo tay là thành tích "ảo" (spec 2026-10-15 mục 2.7). Ngoài
+    // lõi và tầng dữ liệu, không nơi nào được dựng Achievement(.
+    // Khớp đúng lời gọi hàm dựng: toRemoteAchievement(...) không phải dựng mới.
+    final constructor = RegExp(r'(?<![A-Za-z0-9_$])Achievement\(');
+    final offenders = <String>[];
+    for (final file in dartFilesIn('lib')) {
+      final path = file.path.replaceAll(r'\', '/');
+      if (path.endsWith('lib/domain/roadmap/achievements.dart')) continue;
+      if (path.endsWith('lib/data/database/roadmap_converters.dart')) continue;
+      if (constructor.hasMatch(codeOnly(file.readAsStringSync()))) offenders.add(path);
+    }
+    expect(offenders, isEmpty,
+        reason: 'thành tích phải đi từ một sự kiện dữ liệu thật qua newAchievements');
+  });
 }

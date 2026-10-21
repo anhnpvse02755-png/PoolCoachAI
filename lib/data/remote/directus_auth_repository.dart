@@ -29,7 +29,7 @@ class DirectusAuthRepository implements AuthRepository {
   int _gen = 0; // session generation: incremented on every sign-in/sign-out/_expire
   // signIn đã đổi thế hệ và đang chờ ghi phiên người mới, trạng thái vẫn
   // là người cũ. Ai xin token lúc này đang làm việc cho người cũ.
-  bool _committingSignIn = false;
+  int _committingSignIns = 0;
 
   @override
   AuthState get current => _state;
@@ -145,11 +145,11 @@ class DirectusAuthRepository implements AuthRepository {
     // đè phiên người mới vừa ghi.
     final accessToken = tokens['access_token']! as String;
     final accessExpiresAt = _expiresAt(tokens);
-    _committingSignIn = true;
+    _committingSignIns++;
     try {
       await _sessions.write(session);
     } finally {
-      _committingSignIn = false;
+      _committingSignIns--;
     }
     _accessToken = accessToken;
     _accessExpiresAt = accessExpiresAt;
@@ -167,7 +167,7 @@ class DirectusAuthRepository implements AuthRepository {
 
   @override
   Future<String> accessToken() {
-    if (_state is! SignedIn || _committingSignIn) {
+    if (_state is! SignedIn || _committingSignIns > 0) {
       return Future.error(AuthFailure.sessionExpired);
     }
     final token = _accessToken;

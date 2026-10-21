@@ -18,6 +18,8 @@ import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dar
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
+import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
+import 'package:poolcoachai/features/roadmap/presentation/roadmap_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_screen.dart';
@@ -27,6 +29,8 @@ import 'package:poolcoachai/features/training/presentation/drill_detail_screen.d
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
+import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
+import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 
 /// Dựng router của app.
@@ -39,11 +43,19 @@ import 'package:poolcoachai/features/training/presentation/training_screen.dart'
 /// trạng thái**: nó nhớ đang đứng ở đâu. Một router dùng chung toàn
 /// chương trình khiến hai màn hình không thể tồn tại độc lập, và trong
 /// kiểm thử thì test trước để lại vị trí điều hướng cho test sau.
-GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) => GoRouter(
+GoRouter createAppRouter({
+  required AuthGate auth,
+  OnboardingGate? onboarding,
+}) => GoRouter(
   initialLocation: Routes.home,
-  refreshListenable: onboarding == null ? auth : Listenable.merge([auth, onboarding]),
-  redirect: (context, state) => authRedirect(auth.state, state.uri,
-      onboarding: onboarding?.check ?? OnboardingCheck.notRequired),
+  refreshListenable: onboarding == null
+      ? auth
+      : Listenable.merge([auth, onboarding]),
+  redirect: (context, state) => authRedirect(
+    auth.state,
+    state.uri,
+    onboarding: onboarding?.check ?? OnboardingCheck.notRequired,
+  ),
   // Đường dẫn lạ thì dựng màn tiếng Việt của mình, không để go_router
   // đổ trang lỗi mặc định — trang đó là tiếng Anh và in thẳng nội dung
   // ngoại lệ ra trước mặt người chơi.
@@ -86,10 +98,21 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
                   builder: (context, state) => const PlannerScreen(),
                 ),
                 GoRoute(
+                  path: 'roadmap',
+                  builder: (context, state) => const RoadmapScreen(),
+                ),
+                GoRoute(
+                  path: 'timer',
+                  builder: (context, state) => const TimerScreen(),
+                ),
+                GoRoute(
+                  path: 'schedule',
+                  builder: (context, state) => const ScheduleScreen(),
+                ),
+                GoRoute(
                   path: 'drills/:id',
-                  builder: (context, state) => DrillDetailScreen(
-                    drillId: state.pathParameters['id']!,
-                  ),
+                  builder: (context, state) =>
+                      DrillDetailScreen(drillId: state.pathParameters['id']!),
                   routes: [
                     GoRoute(
                       path: 'session',
@@ -124,6 +147,12 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
             GoRoute(
               path: Routes.profile,
               builder: (context, state) => const ProfileScreen(),
+              routes: [
+                GoRoute(
+                  path: 'equipment',
+                  builder: (context, state) => const EquipmentScreen(),
+                ),
+              ],
             ),
           ],
         ),
@@ -137,10 +166,7 @@ GoRouter createAppRouter({required AuthGate auth, OnboardingGate? onboarding}) =
       path: Routes.notifications,
       builder: (context, state) => const NotificationsScreen(),
     ),
-    GoRoute(
-      path: Routes.rank,
-      builder: (context, state) => const RankScreen(),
-    ),
+    GoRoute(path: Routes.rank, builder: (context, state) => const RankScreen()),
     GoRoute(
       path: Routes.rankLayouts,
       builder: (context, state) => LayoutGalleryScreen(
@@ -200,7 +226,9 @@ String? authRedirect(
   return switch (auth) {
     SignedOut() when !onAuthPage => Routes.login,
     SignedIn() when onAuthPage => Routes.home,
-    SignedIn() when onboarding == OnboardingCheck.required && path != Routes.onboardingRank =>
+    SignedIn()
+        when onboarding == OnboardingCheck.required &&
+            path != Routes.onboardingRank =>
       Routes.onboardingRank,
     _ => null,
   };

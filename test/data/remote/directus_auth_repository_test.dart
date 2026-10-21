@@ -38,6 +38,19 @@ class DeferredInMemorySessionStore extends InMemorySessionStore {
   }
 }
 
+class TwoDeferredWritesSessionStore extends InMemorySessionStore {
+  final firstWriteGate = Completer<void>();
+  final secondWriteGate = Completer<void>();
+  var writeCount = 0;
+
+  @override
+  Future<void> write(StoredSession s) async {
+    writeCount++;
+    await (writeCount == 1 ? firstWriteGate.future : secondWriteGate.future);
+    await super.write(s);
+  }
+}
+
 /// Lần đọc bị chặn chụp phiên **lúc bắt đầu đọc** rồi mới chờ — như một
 /// lần đọc DB trả về giá trị đã cũ khi code phía sau chạy. [skip] lần đọc
 /// đầu tiên đi thẳng; lần kế tiếp chờ [gate], rồi cổng tự gỡ.
@@ -140,6 +153,60 @@ void main() {
       expect(changes, [const SignedIn(userId: 'u1', displayName: 'An')]);
       expect(store.session?.refreshToken, 'r1');
       expect(FakeDirectus.body(server.sent('POST', '/auth/login').single)['mode'], 'json');
+    });
+
+    test('một lần ghi xong không mở token khi lần đăng nhập khác vẫn đang ghi',
+        () async {
+      final deferred = TwoDeferredWritesSessionStore()
+        ..session = const StoredSession(
+          userId: 'u0',
+          displayName: 'Cũ',
+          refreshToken: 'r0',
+        );
+      store = deferred;
+      auth = build();
+      await auth.restore();
+
+      server.routes['POST /auth/login'] = (request) {
+        final email = FakeDirectus.body(request)['email'];
+        final suffix = email == 'first@example.com' ? '1' : '2';
+        return FakeDirectus.ok({
+          'access_token': 'access-$suffix',
+          'expires': 900000,
+          'refresh_token': 'r$suffix',
+        });
+      };
+      server.routes['GET /users/me'] = (request) {
+        final isFirst = request.headers['authorization'] == 'Bearer access-1';
+        return FakeDirectus.ok({
+          'id': isFirst ? 'u1' : 'u2',
+          'first_name': isFirst ? 'Một' : 'Hai',
+        });
+      };
+
+      final first = auth.signIn(
+        email: 'first@example.com',
+        password: 'matkhau123',
+      );
+      await pumpEventQueue();
+      final second = auth.signIn(
+        email: 'second@example.com',
+        password: 'matkhau123',
+      );
+      await pumpEventQueue();
+      expect(deferred.writeCount, 2);
+
+      deferred.firstWriteGate.complete();
+      await first;
+      await expectLater(
+        auth.accessToken(),
+        throwsA(AuthFailure.sessionExpired),
+      );
+
+      deferred.secondWriteGate.complete();
+      await second;
+      expect(auth.current, const SignedIn(userId: 'u2', displayName: 'Hai'));
+      expect(await auth.accessToken(), 'access-2');
     });
 
     test('email được cắt khoảng trắng và viết thường', () async {

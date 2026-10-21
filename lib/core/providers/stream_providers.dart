@@ -1,8 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
+import 'package:poolcoachai/domain/timer_session.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 
 /// Stream of all drills from the database.
 final drillsProvider = StreamProvider<List<Drill>>((ref) {
@@ -19,5 +23,25 @@ final knowledgeProvider = StreamProvider<List<KnowledgeArticle>>((ref) {
 /// Stream of all drill logs from the database.
 final drillLogsProvider = StreamProvider<List<DrillLog>>((ref) {
   final repo = ref.watch(drillLogRepositoryProvider);
+  return repo.watchAll();
+});
+
+final timerSessionsProvider = StreamProvider<List<TimerSession>>((ref) {
+  final repo = ref.watch(timerSessionRepositoryProvider);
+  return repo.watchAll();
+});
+
+final scheduleProvider = StreamProvider<List<ScheduleSlot>>((ref) {
+  final repo = ref.watch(scheduleRepositoryProvider);
+  return repo.watchAll();
+});
+
+final cueEquipmentProvider = StreamProvider<List<CueEquipment>>((ref) {
+  final repo = ref.watch(cueEquipmentRepositoryProvider);
+  return repo.watchAll();
+});
+
+final matchesProvider = StreamProvider<List<PoolMatch>>((ref) {
+  final repo = ref.watch(matchRepositoryProvider);
   return repo.watchAll();
 });

@@ -8,6 +8,10 @@ merge are not listed, except where noted.
 
 - Task 9: the portrait table box ignored the 32 px horizontal padding, so
   the bottom rail was about 17 px thicker — 947f93c, tested at two sizes
+- `Vec2.isZero` now has direct exact-zero and tiny-nonzero coverage in
+  `vec2_table_test.dart`.
+- `shot_geometry_test.dart` now reads the ball diameter from
+  `TableSpec.nineFoot.ballDiameter` instead of duplicating `5.715`.
 
 ## Next steps
 
@@ -30,10 +34,7 @@ merge are not listed, except where noted.
 
 ### Core (lib/domain/table_geometry)
 
-- `Vec2.isZero` has no direct test (Task 1)
 - `UnmakeableReason` enum line is over 80 columns (Task 2)
-- `shot_geometry_test` hard-codes `d = 5.715` instead of
-  `TableSpec.nineFoot.ballDiameter` (Task 2)
 - No end-to-end `bestPocket` test under a genuine full tie; only
   `compareShots == 0` is asserted (Task 3)
 - Clamping `p1` can change a curve's starting tangent, an edge case where

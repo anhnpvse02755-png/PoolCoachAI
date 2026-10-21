@@ -9,7 +9,7 @@ import '../../support/table_layouts.dart';
 
 void main() {
   const table = TableSpec.nineFoot;
-  const d = 5.715;
+  final d = table.ballDiameter;
   final topRight = table.pocketPosition(Pocket.topRight);
 
   test('khoảng cách từ điểm tới đoạn thẳng', () {
@@ -18,8 +18,8 @@ void main() {
     expect(distanceToSegment(const Vec2(5, 3), a, b), 3);
     expect(distanceToSegment(const Vec2(-4, 3), a, b), 5); // quá đầu đoạn
     expect(distanceToSegment(const Vec2(1, 1), a, a), closeTo(1.41421356, 1e-8));
-    expect(isPathClear(a, b, [const Vec2(5, d)]), isTrue); // đúng D: không chắn
-    expect(isPathClear(a, b, [const Vec2(5, d - 0.01)]), isFalse);
+    expect(isPathClear(a, b, [Vec2(5, d)]), isTrue); // đúng D: không chắn
+    expect(isPathClear(a, b, [Vec2(5, d - 0.01)]), isFalse);
   });
 
   test('bi ảo lùi đúng một đường kính sau bi mục tiêu, trên đường lỗ', () {
@@ -60,7 +60,7 @@ void main() {
 
     test('hai bi chồng lên nhau', () {
       final r = evaluateShot(
-        cue: tableCenter + const Vec2(d * 0.9, 0),
+        cue: tableCenter + Vec2(d * 0.9, 0),
         object: tableCenter,
         pocket: Pocket.topRight,
       );

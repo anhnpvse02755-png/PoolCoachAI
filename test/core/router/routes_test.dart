@@ -13,15 +13,19 @@ void main() {
       ]);
     });
 
-    test('all gom đủ năm tab, sáu màn mở đè, ba đường dẫn có tham số và bốn màn tài khoản', () {
+    test('all gom đủ tab, màn con, đường dẫn có tham số và màn tài khoản', () {
       expect(Routes.all, [
         ...Routes.tabs,
+        Routes.equipment,
         Routes.coach,
         Routes.notifications,
         Routes.drillPattern,
         Routes.drillSessionPattern,
         Routes.simulator,
         Routes.planner,
+        Routes.roadmap,
+        Routes.timer,
+        Routes.schedule,
         Routes.rank,
         Routes.rankLayouts,
         Routes.onboardingRank,
@@ -36,6 +40,10 @@ void main() {
 
     test('Kế hoạch dọn bàn nằm trong nhánh Luyện tập', () {
       expect(Routes.planner, '${Routes.training}/planner');
+    });
+
+    test('Lộ trình nằm trong nhánh Luyện tập', () {
+      expect(Routes.roadmap, '${Routes.training}/roadmap');
     });
 
     test('mọi đường dẫn đều bắt đầu bằng dấu gạch chéo', () {

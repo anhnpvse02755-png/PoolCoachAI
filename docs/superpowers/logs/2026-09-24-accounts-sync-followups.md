@@ -84,6 +84,18 @@ low-risk at the time. Items fixed before the merge are not listed.
   removed. It now waits for the event queue to go idle and checks that one
   sign-in runs exactly one pass, which fails without the guard — 8519307
 
+## Closed 2026-10-20
+
+- When a sync pass for the old user ended early because the account changed,
+  the new user's first sync could wait for the next trigger or the 30 s timer.
+  A started sync service now immediately queues one pass for the new signed-in
+  account; `sync_service_test.dart` covers a blocked old-account upload and
+  verifies the new account's pending row is pushed without waiting for the timer.
+- Overlapping sign-ins shared one boolean commit guard, so the first write to
+  finish could let the old session request a token while another sign-in was
+  still committing. The guard is now a counter; `directus_auth_repository_test.dart`
+  verifies the token remains unavailable until both writes finish.
+
 ## Still open
 
 - A failed signIn while signed in can drop an in-flight refresh rotation,
@@ -98,8 +110,6 @@ low-risk at the time. Items fixed before the merge are not listed.
 - A refresh that succeeds in one tab can overwrite a newer session another
   tab just stored for a different user; that tab is then signed out by the
   foreign-session check. No token leaks and no logs are lost.
-- When a sync pass for the old user ends early because the account changed,
-  the new user's first sync waits for the next trigger or the 30 s timer.
 - `signIn` does not re-check the generation after its write, so a sign-out
   during the commit could leave `SignedIn` with a cleared store.
   Unreachable through the UI.

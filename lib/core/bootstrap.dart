@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 
 /// Nạp dữ liệu seed vào DB trước khi màn hình đầu tiên đọc nó.
@@ -24,9 +25,12 @@ Future<void> restoreSession(ProviderContainer container) async {
   await container.read(authRepositoryProvider).restore();
 }
 
-/// Bật đồng bộ nền suốt đời app — buổi tập và phần đánh giá. Gọi **sau**
-/// [restoreSession]: lượt đầu cần biết ai đang đăng nhập. Màn hình chỉ đọc Drift.
+/// Bật đồng bộ nền và nhắc bảo dưỡng suốt đời app. Gọi **sau** [restoreSession]:
+/// lượt đầu cần biết ai đang đăng nhập. Màn hình chỉ đọc Drift.
 void startSync(ProviderContainer container) {
   container.read(syncServiceProvider);
+  container.read(cueEquipmentSyncProvider);
+  container.read(maintenanceReminderServiceProvider).start();
   container.read(assessmentSyncProvider);
+  container.read(roadmapSyncProvider);
 }

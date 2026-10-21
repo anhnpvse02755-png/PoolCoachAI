@@ -15,15 +15,19 @@ import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dar
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
+import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
+import 'package:poolcoachai/features/roadmap/presentation/roadmap_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
+import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
+import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
@@ -47,23 +51,27 @@ const _routeCases = <String, _RouteCase>{
   Routes.play: (path: Routes.play, screen: PlayScreen),
   Routes.stats: (path: Routes.stats, screen: StatsScreen),
   Routes.profile: (path: Routes.profile, screen: ProfileScreen),
+  Routes.equipment: (path: Routes.equipment, screen: EquipmentScreen),
   Routes.coach: (path: Routes.coach, screen: CoachScreen),
   Routes.notifications: (
     path: Routes.notifications,
     screen: NotificationsScreen,
   ),
-  Routes.drillPattern: (
-    path: '/training/drills/d1',
-    screen: DrillDetailScreen,
-  ),
+  Routes.drillPattern: (path: '/training/drills/d1', screen: DrillDetailScreen),
   Routes.drillSessionPattern: (
     path: '/training/drills/d1/session',
     screen: DrillSessionScreen,
   ),
   Routes.simulator: (path: Routes.simulator, screen: SimulatorScreen),
   Routes.planner: (path: Routes.planner, screen: PlannerScreen),
+  Routes.roadmap: (path: Routes.roadmap, screen: RoadmapScreen),
+  Routes.timer: (path: Routes.timer, screen: TimerScreen),
+  Routes.schedule: (path: Routes.schedule, screen: ScheduleScreen),
   Routes.rankLayouts: (path: Routes.rankLayouts, screen: LayoutGalleryScreen),
-  Routes.onboardingRank: (path: Routes.onboardingRank, screen: OnboardingScreen),
+  Routes.onboardingRank: (
+    path: Routes.onboardingRank,
+    screen: OnboardingScreen,
+  ),
   Routes.rankTest: (path: Routes.rankTest, screen: TestScreen),
   Routes.rank: (path: Routes.rank, screen: RankScreen),
   Routes.articlePattern: (path: '/knowledge/k1', screen: KnowledgeScreen),
@@ -87,9 +95,7 @@ void main() {
   /// Dựng app với dữ liệu test rồi trả router để test tự lái.
   Future<GoRouter> pumpApp(WidgetTester tester, {bool signedIn = true}) async {
     final router = createAppRouter(
-      auth: signedIn
-          ? signedInGate()
-          : AuthGate.fixed(const SignedOut()),
+      auth: signedIn ? signedInGate() : AuthGate.fixed(const SignedOut()),
     );
     addTearDown(router.dispose);
     final container = testContainer();
@@ -136,8 +142,9 @@ void main() {
       }
     });
 
-    testWidgets('mở được mọi đường dẫn mà không crash — khi chưa đăng nhập',
-        (tester) async {
+    testWidgets('mở được mọi đường dẫn mà không crash — khi chưa đăng nhập', (
+      tester,
+    ) async {
       final router = await pumpApp(tester, signedIn: false);
 
       for (final route in _signedOutRouteCases.values) {
@@ -152,21 +159,23 @@ void main() {
       }
     });
 
-    testWidgets('mỗi đường dẫn dựng đúng màn hình của nó — khi chưa đăng nhập',
-        (tester) async {
-      final router = await pumpApp(tester, signedIn: false);
+    testWidgets(
+      'mỗi đường dẫn dựng đúng màn hình của nó — khi chưa đăng nhập',
+      (tester) async {
+        final router = await pumpApp(tester, signedIn: false);
 
-      for (final route in _signedOutRouteCases.values) {
-        router.go(route.path);
-        await tester.pumpAndSettle();
+        for (final route in _signedOutRouteCases.values) {
+          router.go(route.path);
+          await tester.pumpAndSettle();
 
-        expect(
-          find.byType(route.screen),
-          findsOneWidget,
-          reason: 'đường dẫn ${route.path} phải dựng ${route.screen}',
-        );
-      }
-    });
+          expect(
+            find.byType(route.screen),
+            findsOneWidget,
+            reason: 'đường dẫn ${route.path} phải dựng ${route.screen}',
+          );
+        }
+      },
+    );
 
     test('bảng smoke test phủ hết mọi đường dẫn đã khai báo', () {
       expect(

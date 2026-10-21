@@ -1,0 +1,136 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
+
+void main() {
+  final at = DateTime(2026, 10, 15);
+
+  RoadmapStep step(
+    StepKind kind,
+    StepReason reason, {
+    SkillCategory? category,
+    List<String> bu = const [],
+  }) =>
+      RoadmapStep(
+        kind: kind,
+        status: StepStatus.dangLam,
+        reason: reason,
+        category: category,
+        buDrillIds: bu,
+      );
+
+  test('lý do mang đúng con số của hàm tính', () {
+    expect(
+      Vi.stepReason(const LostBuPoints(18, ['F3', 'F5'])),
+      'Mất 18 điểm BU ở F3, F5.',
+    );
+    expect(Vi.stepReason(const Unmeasured(1)), 'Tập đủ 3 buổi để đo (đã có 1).');
+    expect(Vi.stepReason(const BelowStrong(62)), 'Còn thiếu 13 điểm để đạt 75.');
+    expect(
+      Vi.stepReason(const NeedStreak()),
+      'Đã đạt 75, cần 3 buổi đạt liên tiếp.',
+    );
+    expect(Vi.stepReason(const DrillLevel(2)), 'Bài cấp 2 của nhóm.');
+    expect(Vi.stepReason(const RetestFrom(null)), 'Làm được ngay.');
+    expect(
+      Vi.stepReason(RetestFrom(DateTime(2026, 10, 28))),
+      'Mở từ ngày 28/10/2026.',
+    );
+  });
+
+  test('tên bước', () {
+    expect(
+      Vi.stepTitle(
+        step(
+          StepKind.buLe,
+          const LostBuPoints(3, ['S8', 'S9']),
+          bu: ['S8', 'S9'],
+        ),
+      ),
+      'Tập lại S8/S9 trên bàn BU',
+    );
+    expect(
+      Vi.stepTitle(
+        step(
+          StepKind.nhom,
+          const Unmeasured(0),
+          category: SkillCategory.kick,
+        ),
+        drillName: 'Bài A',
+      ),
+      'A băng · Bài A',
+    );
+    expect(
+      Vi.stepTitle(step(StepKind.lamBaiBu, const RetestFrom(null))),
+      'Làm bài BU',
+    );
+  });
+
+  test('ngày dự kiến: có ngày hoặc nói thẳng chưa đủ dữ liệu', () {
+    expect(
+      Vi.estimateLine(Estimate.on(DateTime(2026, 11, 2))),
+      'Dự kiến: 02/11/2026',
+    );
+    expect(
+      Vi.estimateLine(const Estimate.notEnoughData()),
+      'Dự kiến: chưa đủ dữ liệu',
+    );
+    expect(
+      Vi.finishLine(const Estimate.notEnoughData()),
+      'Dự kiến xong: chưa đủ dữ liệu',
+    );
+  });
+
+  test('đầu trang Lên hạng nói điểm còn thiếu và sàn của hạng đích', () {
+    final roadmap = Roadmap(
+      goal: PlayerGoal(
+        goalId: 'g',
+        kind: GoalKind.lenHang,
+        createdAt: at,
+      ),
+      steps: const [],
+      from: Rank.d,
+      target: Rank.c,
+      pointsNeeded: 3,
+    );
+    expect(Vi.roadmapHeadline(roadmap), 'Lên hạng: D → C');
+    expect(
+      Vi.roadmapNeed(roadmap),
+      'Cần thêm 3 điểm BU (hạng C từ 140 điểm).',
+    );
+  });
+
+  test('thành tích', () {
+    expect(
+      Vi.achievement(AchievementKind.chuoiNgay, '7'),
+      'Chuỗi 7 ngày tập liên tiếp',
+    );
+    expect(
+      Vi.achievement(AchievementKind.duDieuKienLenCap, 'Bài A'),
+      'Đủ điều kiện lên cấp: Bài A',
+    );
+  });
+
+  test('không dùng từ đã bị chủ sản phẩm sửa', () {
+    final texts = [
+      for (final kind in GoalKind.values) ...[
+        Vi.goalKind(kind),
+        Vi.goalKindBody(kind),
+      ],
+      for (final block in LenHangBlock.values) Vi.goalBlocked(block),
+      for (final status in StepStatus.values) Vi.stepStatus(status),
+      Vi.roadmapCardBody,
+      Vi.achievementsEmpty,
+      Vi.roadmapMissedTitle,
+    ];
+    for (final text in texts) {
+      for (final banned in ['kim cương', 'bi ma', 'lọt bi cái']) {
+        expect(text.toLowerCase(), isNot(contains(banned)), reason: text);
+      }
+    }
+  });
+}

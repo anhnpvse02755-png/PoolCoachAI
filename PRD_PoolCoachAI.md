@@ -83,7 +83,7 @@ Người dùng bấm trực tiếp vào goal hoặc quick action để đi thẳ
 Trung tâm của PoolCoachAI, gồm các nhánh sau:
 
 ### 6.1 AI Learning Path
-AI xây lộ trình tập dựa trên trình độ, kỹ năng, điểm yếu, lịch sử tập, kết quả Skill Test, dữ liệu chơi trận và Knowledge liên quan. **AI đề xuất, không khóa người dùng** — người chơi có thể đi theo lộ trình, hoặc bỏ qua để vào **All Drills** tự tìm/filter và chọn bài (kể cả người hạng thấp muốn học một bài nhảy bi hay masse).
+Lộ trình (đã làm, spec 2026-10-15): mỗi tài khoản một mục tiêu — Lên hạng (luôn là hạng ngay trên), Thuần thục một nhóm kỹ năng, hoặc Chuẩn bị giải (có ngày giải). App suy các bước từ dữ liệu thật: điểm mất ở bài BU hoàn chỉnh gần nhất (qua bảng nối 18 bài BU vào 6 nhóm), Player Intelligence và nhật ký tập; tính lại mỗi khi dữ liệu đổi. Một bước xong khi nhóm đạt 75 và bài của bước có 3 buổi đạt liên tiếp. Ngày dự kiến ước lượng từ tốc độ tiến bộ 28 ngày gần nhất; không đủ dữ liệu thì nói thẳng. Thành tích chỉ đến từ sự kiện thật: xong bước, đủ điều kiện lên cấp, chuỗi 7/14/30/60/100 ngày. AI đề xuất, không khóa người dùng; không dùng LLM. Mục tiêu và thành tích đồng bộ theo tài khoản.
 
 ### 6.2 Drill Library
 Đơn vị thực hành chính. Danh sách bài tập chia theo **5 nhóm kỹ năng**: Ngắm bi, Đi bi/Vị trí, Giao bóng, Phòng thủ, Bi băng *(danh mục cụ thể từ Luyện Cơ, dùng làm taxonomy chính thức thay cho nhóm chung chung)*. Có thể tìm kiếm, filter theo trình độ hoặc theo kỹ năng, chọn trực tiếp hoặc nhận từ AI Coach.
@@ -116,6 +116,12 @@ Công cụ độc lập trong Training Center, không gắn với một Drill ha
 - **Đồng hồ luyện tập**: đếm lên hoặc đếm ngược cho một buổi tập tự do (không gắn Drill cụ thể), gắn nhãn kỹ năng đang tập và cơ đang dùng; buổi tập được lưu và tính vào tổng giờ tập + streak trên AI Home.
 - **Lịch tập hằng tuần**: người chơi tự đặt các khung giờ luyện tập định kỳ; AI Home hiển thị đúng phần lịch của ngày hôm nay, và AI Coach có thể dùng lịch này để nhắc nhở hoặc điều chỉnh Today's Goals cho phù hợp thời lượng đã đặt.
 
+**Trạng thái triển khai hiện tại**
+- Đã có đồng hồ đếm lên/đếm ngược (15, 30, 45 hoặc 60 phút), gắn nhóm kỹ năng tùy chọn, lưu/xem buổi tập gần đây; dữ liệu được tính vào streak, tổng thời gian tập tự do trong tuần và ưu tiên gợi ý trên Home.
+- Đã có tạo/sửa/xóa lịch lặp theo thứ, giờ, tên buổi và nhóm kỹ năng tùy chọn; dữ liệu ngày/giờ được kiểm tra ở tầng lưu trữ. Home hiển thị các khung giờ hôm nay, lịch có nhóm kỹ năng sẽ ưu tiên nhóm đó trong gợi ý.
+- Dữ liệu được lưu cục bộ và cô lập theo tài khoản trên cùng thiết bị. Dữ liệu lịch/buổi tập cũ không có chủ được giữ ở trạng thái chưa gán, không tự động tiết lộ cho tài khoản mới.
+- **Còn thiếu:** đồng bộ lịch/buổi tập qua thiết bị, thông báo nhắc lịch và điều chỉnh mục tiêu theo thời lượng dự kiến.
+
 ### 6.6 Knowledge
 Phần học lý thuyết, không khóa chặt vào Drill: kỹ thuật, cách thực hiện, lỗi thường gặp, nguyên lý, tình huống áp dụng. Một Drill có thể liên kết tới Knowledge và ngược lại (Knowledge ↔ Drill là quan hệ hỗ trợ, không phải dependency cứng). Người dùng có quyền khám phá Knowledge độc lập, tương tự thư viện bài viết ngắn theo từng kỹ năng.
 
@@ -128,6 +134,12 @@ Nơi dành cho chơi thực tế, tách biệt hoàn toàn với Drill Session:
 - **Match Recording** — ghi nhận rack, shot, kết quả, lỗi, safety, scratch, break, position và các thống kê liên quan. Mục tiêu không chỉ là thắng/thua mà là dữ liệu đủ chi tiết để hiểu cách người chơi đã chơi.
 - **Match History**
 - **Competition / Tournament**
+
+**Trạng thái triển khai hiện tại**
+- Đã có MVP ghi trận 8/9/10 bi theo thể thức race-to-3/5/7/9: lưu tên người chơi/đối thủ, kết quả từng ván, tỷ số, trạng thái trận và lịch sử cục bộ theo tài khoản.
+- Có thể hoàn tác ván vừa ghi, kể cả sau khi trận kết thúc, để sửa nhầm kết quả. Đăng xuất chủ động xóa trận của tài khoản khỏi thiết bị.
+- Đã có ghi cú theo từng ván: người đánh, phá/cú thường/phòng thủ, có bi/trượt/phạm lỗi/scratch, kết quả vị trí bi cái và ghi chú tùy chọn. Có thể hoàn tác cú cuối của ván đang diễn ra.
+- **Còn thiếu:** phân tích sâu chuỗi break, lỗi vị trí và mẫu chiến thuật; chỉnh sửa/xóa trận, giải đấu và đồng bộ đa thiết bị. Kết quả từng cú là ghi nhận thủ công, chưa tự suy luận luật hay đánh giá AI.
 
 ## 8. Intelligence & Coach
 
@@ -147,12 +159,28 @@ AI có thể phát hiện: easy miss, lỗi vị trí (position error), lỗi gi
 
 Nơi xem dữ liệu chi tiết — Dashboard chỉ đưa insight quan trọng, Statistics hiển thị đầy đủ: lịch sử, performance, thống kê trận đấu, thống kê luyện tập (bao gồm biểu đồ theo từng kỹ năng và xu hướng điểm số theo từng Drill theo thời gian), tổng giờ tập, streak, và các xu hướng kết hợp cả Training lẫn Play.
 
+**Trạng thái triển khai hiện tại**
+- Đã có tổng số buổi theo Drill và Timer, tổng thời gian tập tự do, thời gian tập tự do tuần này và streak.
+- Đã có trung bình kết quả chuẩn hóa theo mục tiêu cho từng nhóm kỹ năng; các buổi thiếu dữ liệu chấm không bị tính thành 0.
+- Đã có xu hướng 5 kết quả chấm gần nhất theo Drill. Giá trị được chuẩn hóa theo mục tiêu riêng của bài để so sánh cùng một Drill qua thời gian, không dùng để so điểm thô giữa các Drill.
+- Đã có số trận đã ghi/hoàn tất và tổng trận thắng/thua từ các rack đã nhập; đây là thống kê tỷ số cơ bản, không phải phân tích chất lượng từng cú.
+- Đã có tổng hợp số cú đã ghi, break, safety, trượt, phạm lỗi, scratch và tỷ lệ vị trí thành công từ dữ liệu người dùng nhập.
+- **Còn thiếu:** xu hướng kết hợp Training + Play và phân tích chuỗi/chiến thuật trận. Thời lượng hiện tại chỉ gồm các buổi Timer tự do vì Drill log chưa ghi thời lượng.
+
 ## 10. Profile
 
 Trả lời câu hỏi "tôi là ai và tôi đã tiến bộ thế nào" (khác với Dashboard trả lời "hôm nay làm gì"):
 - Rank, progress, training history, match history
 - Achievements / Certifications
-- **Equipment (Cơ bi-a)** — hồ sơ từng cây cơ: loại (cơ chính/break/jump), trọng lượng, kích thước & độ cứng tip, kỹ năng phù hợp, ngày bảo dưỡng tip gần nhất kèm nhắc nhở khi quá hạn *(chi tiết hóa mục Equipment từ bản PoolCoachAI gốc bằng toàn bộ chức năng quản lý cơ của Luyện Cơ)*
+- **Equipment (Cơ bi-a)** — hồ sơ từng cây cơ: loại (cơ chính/break/jump), trọng lượng, kích thước & độ cứng tip, kỹ năng phù hợp, ngày bảo dưỡng tip gần nhất và ngày dự kiến bảo dưỡng tiếp *(chi tiết hóa mục Equipment từ bản PoolCoachAI gốc bằng toàn bộ chức năng quản lý cơ của Luyện Cơ)*.
+
+**Trạng thái triển khai hiện tại**
+- Đã có thêm/sửa/xóa hồ sơ cơ với loại, trọng lượng, đường kính/độ cứng tip, kỹ năng phù hợp và ngày bảo dưỡng do người chơi nhập.
+- Đã có cảnh báo trực quan khi đến hạn hoặc còn tối đa 7 ngày tới hạn; danh sách ưu tiên cơ quá hạn và sắp đến hạn gần nhất.
+- Người chơi có thể bật thông báo trình duyệt: nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó, chỉ khi ứng dụng đang mở; không gửi khi ứng dụng đã đóng và không thay thế thông báo đẩy.
+- Có thể chọn cơ cho buổi tập tự do trong Đồng hồ. Nếu xóa cơ, buổi tập cũ vẫn được giữ nhưng bỏ liên kết tới cơ đã xóa.
+- Trang Equipment hiển thị tổng thời gian tập tự do và ngày sử dụng gần nhất theo từng cây cơ, lấy từ các Timer session đã ghi.
+- Hồ sơ cơ đồng bộ đa thiết bị qua Directus theo `user_created`; xóa mềm dùng tombstone để không tải hồ sơ đã xóa về lại. Dữ liệu cục bộ cô lập theo tài khoản (schema Drift v9) và được xóa khi người chơi chủ động đăng xuất. Cần chạy bootstrap Directus trên môi trường triển khai để tạo collection và quyền.
 - Settings
 
 ## 11. Notifications

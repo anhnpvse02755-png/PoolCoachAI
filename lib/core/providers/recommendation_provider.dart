@@ -5,28 +5,53 @@ import 'package:poolcoachai/domain/recommendation.dart';
 
 /// Today's recommendation computed from all data streams.
 ///
-/// Waits for all three streams to have loaded — returns null during loading.
-final todayRecommendationProvider = Provider<TodayRecommendation?>((ref) {
+/// Waits for all recommendation inputs and surfaces source errors to Home.
+final todayRecommendationProvider = Provider<AsyncValue<TodayRecommendation>>((
+  ref,
+) {
   final drillsAsync = ref.watch(drillsProvider);
   final knowledgeAsync = ref.watch(knowledgeProvider);
   final logsAsync = ref.watch(drillLogsProvider);
+  final timerSessionsAsync = ref.watch(timerSessionsProvider);
+  final scheduleAsync = ref.watch(scheduleProvider);
 
-  final drills = drillsAsync.hasValue ? drillsAsync.value : null;
-  final knowledge = knowledgeAsync.hasValue ? knowledgeAsync.value : null;
-  final logs = logsAsync.hasValue ? logsAsync.value : null;
-
-  // Not ready until all three streams have loaded at least once
-  if (drills == null || knowledge == null || logs == null) return null;
+  if (drillsAsync.hasError) {
+    return AsyncError(drillsAsync.error!, drillsAsync.stackTrace!);
+  }
+  if (knowledgeAsync.hasError) {
+    return AsyncError(knowledgeAsync.error!, knowledgeAsync.stackTrace!);
+  }
+  if (logsAsync.hasError) {
+    return AsyncError(logsAsync.error!, logsAsync.stackTrace!);
+  }
+  if (timerSessionsAsync.hasError) {
+    return AsyncError(
+      timerSessionsAsync.error!,
+      timerSessionsAsync.stackTrace!,
+    );
+  }
+  if (scheduleAsync.hasError) {
+    return AsyncError(scheduleAsync.error!, scheduleAsync.stackTrace!);
+  }
+  if (!drillsAsync.hasValue ||
+      !knowledgeAsync.hasValue ||
+      !logsAsync.hasValue ||
+      !timerSessionsAsync.hasValue ||
+      !scheduleAsync.hasValue) {
+    return const AsyncLoading();
+  }
 
   final nowFn = ref.watch(nowProvider);
   final today = nowFn();
 
-  return computeRecommendation(
-    drills: drills,
-    logs: logs,
-    knowledge: knowledge,
-    timerSessions: const [], // Timer sessions not persisted yet
-    schedule: const [], // Schedule not persisted yet
-    today: today,
+  return AsyncData(
+    computeRecommendation(
+      drills: drillsAsync.requireValue,
+      logs: logsAsync.requireValue,
+      knowledge: knowledgeAsync.requireValue,
+      timerSessions: timerSessionsAsync.requireValue,
+      schedule: scheduleAsync.requireValue,
+      today: today,
+    ),
   );
 });

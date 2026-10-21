@@ -20,6 +20,12 @@ void main() {
       expect(Vec2.zero.normalized, Vec2.zero);
     });
 
+    test('isZero chỉ đúng khi cả hai tọa độ bằng không', () {
+      expect(Vec2.zero.isZero, isTrue);
+      expect(const Vec2(0, 1e-12).isZero, isFalse);
+      expect(const Vec2(-1e-12, 0).isZero, isFalse);
+    });
+
     test('bên phải khi nhìn từ trên xuống, với y hướng xuống', () {
       // Đi lên màn hình thì bên phải là hướng đông.
       expect(const Vec2(0, -1).rightNormal, const Vec2(1, 0));

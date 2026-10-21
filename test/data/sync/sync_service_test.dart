@@ -396,5 +396,29 @@ void main() {
 
       expect(server.sent('GET', '/items/drill_logs'), isNotEmpty);
     });
+
+    test('đổi tài khoản giữa lượt thì đồng bộ ngay cho người mới', () async {
+      await addLog('cua-an', userId: 'u1');
+      await addLog('cua-binh', userId: 'u2');
+      final gate = Completer<void>();
+      server.routes['POST /items/drill_logs'] = (req) async {
+        final body = FakeDirectus.body(req);
+        if (body['id'] == 'cua-an') await gate.future;
+        return FakeDirectus.ok(body);
+      };
+
+      sync.start();
+      await pumpEventQueue();
+      expect(pushedIds(), ['cua-an']);
+
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      gate.complete();
+      await pumpEventQueue();
+
+      expect(pushedIds(), ['cua-an', 'cua-binh']);
+      expect((await row('cua-binh')).syncedAt, now);
+      expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
+    });
   });
 }

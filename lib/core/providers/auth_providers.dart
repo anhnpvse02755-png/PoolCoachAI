@@ -6,9 +6,11 @@ import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
+import 'package:poolcoachai/data/notifications/maintenance_reminder_service.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_session_store.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
+import 'package:poolcoachai/data/sync/cue_equipment_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
@@ -36,8 +38,9 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 /// Trạng thái đăng nhập, đọc đồng bộ — không có pha "đang tải".
-final authStateProvider =
-    NotifierProvider<AuthStateNotifier, AuthState>(AuthStateNotifier.new);
+final authStateProvider = NotifierProvider<AuthStateNotifier, AuthState>(
+  AuthStateNotifier.new,
+);
 
 class AuthStateNotifier extends Notifier<AuthState> {
   @override
@@ -82,3 +85,26 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
+
+final cueEquipmentSyncProvider = Provider<CueEquipmentSyncService>((ref) {
+  final service = CueEquipmentSyncService(
+    db: ref.watch(appDatabaseProvider),
+    auth: ref.watch(authRepositoryProvider),
+    api: ref.watch(directusClientProvider),
+    now: ref.watch(nowProvider),
+  )..start();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final maintenanceReminderServiceProvider = Provider<MaintenanceReminderService>(
+  (ref) {
+    final service = MaintenanceReminderService(
+      db: ref.watch(appDatabaseProvider),
+      auth: ref.watch(authRepositoryProvider),
+      now: ref.watch(nowProvider),
+    );
+    ref.onDispose(service.dispose);
+    return service;
+  },
+);

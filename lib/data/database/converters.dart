@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -172,6 +173,63 @@ TimerSessionRowsCompanion toTimerSessionRow(TimerSession session) {
         : const drift.Value.absent(),
   );
 }
+
+// ─── Cue equipment ─────────────────────────────────────────────────────────
+
+CueEquipment toCueEquipment(CueEquipmentRow row) {
+  final type = CueType.values.firstWhere(
+    (value) => value.name == row.type,
+    orElse: () => throw FormatException('Unknown CueType: ${row.type}'),
+  );
+  final hardnessName = row.tipHardness;
+  final hardness = hardnessName == null
+      ? null
+      : TipHardness.values.firstWhere(
+          (value) => value.name == hardnessName,
+          orElse: () =>
+              throw FormatException('Unknown TipHardness: $hardnessName'),
+        );
+  final skills = _parseStringList(row.skillCategories)
+      .map(_parseCategory)
+      .toList(growable: false);
+
+  return CueEquipment(
+    id: row.id,
+    name: row.name,
+    type: type,
+    weightGrams: row.weightGrams,
+    tipDiameterMm: row.tipDiameterMm,
+    tipHardness: hardness,
+    skillCategories: skills,
+    lastTipMaintenance: row.lastTipMaintenance,
+    tipMaintenanceDueDate: row.tipMaintenanceDueDate,
+    updatedAt: row.updatedAt,
+  );
+}
+
+CueEquipmentRowsCompanion toCueEquipmentRow(
+  CueEquipment cue, {
+  required String userId,
+  DateTime? syncedAt,
+  bool isDeleted = false,
+}) =>
+    CueEquipmentRowsCompanion(
+      id: drift.Value(cue.id),
+      userId: drift.Value(userId),
+      name: drift.Value(cue.name),
+      type: drift.Value(cue.type.name),
+      weightGrams: drift.Value(cue.weightGrams),
+      tipDiameterMm: drift.Value(cue.tipDiameterMm),
+      tipHardness: drift.Value(cue.tipHardness?.name),
+      skillCategories: drift.Value(
+        _stringListToJson(cue.skillCategories.map((category) => category.name).toList()),
+      ),
+      lastTipMaintenance: drift.Value(cue.lastTipMaintenance),
+      tipMaintenanceDueDate: drift.Value(cue.tipMaintenanceDueDate),
+      updatedAt: drift.Value(cue.updatedAt),
+      syncedAt: drift.Value(syncedAt),
+      isDeleted: drift.Value(isDeleted),
+    );
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
