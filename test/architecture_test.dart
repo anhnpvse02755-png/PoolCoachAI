@@ -256,6 +256,24 @@ void main() {
     );
   });
 
+  test('lõi Coach không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/coach');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'\', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'chấm cú, gợi ý, bộ sinh và thẻ gợi ý phải chạy và test được '
+          'trên Dart VM thuần, và chạy giống hệt trên web, Android, iOS '
+          '(spec 2026-10-21 mục 5)',
+    );
+  });
+
   test('lõi tỉ lệ thắng theo cơ không phụ thuộc Flutter', () {
     final files = dartFilesIn('lib/domain/cue_performance');
     final offenders = [

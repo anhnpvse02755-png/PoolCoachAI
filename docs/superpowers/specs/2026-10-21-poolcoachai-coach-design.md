@@ -420,11 +420,11 @@ Bàn vẽ cú tốt nhất bằng `PlannerPainter` (`PlannerScene.step = referen
 
 `coachDifficultyFor(insight)` trả về:
 
-- mức thuần thục null hoặc < 50 → `easy`;
-- từ 50 tới 74 → `medium`;
+- mức thuần thục null hoặc < 55 → `easy`;
+- từ 55 tới 74 → `medium`;
 - từ 75 trở lên → `hard`.
 
-Hai ngưỡng 50 và 75 là `PracticeConstants.weakCutoff` và `strongCutoff`. Spec chỉ đặt tên, không đặt số: dùng đúng hằng số đang có. Người chơi đổi mức bằng chip.
+Hai ngưỡng 55 và 75 là `PracticeConstants.weakCutoff` và `strongCutoff` (bản đầu của spec ghi nhầm 50; mã đang có là 55, sửa lúc làm T0). Spec chỉ đặt tên, không đặt số: dùng đúng hằng số đang có. Người chơi đổi mức bằng chip.
 
 | Mức | Số bi | Góc cắt của bi phải chạm, theo `bandFor` của `difficulty.dart` |
 |---|---|---|

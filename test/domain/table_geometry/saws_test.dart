@@ -89,4 +89,20 @@ void main() {
     expect(at(30, 30, Stroke.follow), 50);
     expect(at(30, 90, Stroke.draw), 100);
   });
+
+  test('sawsSpeed: cùng cách chia cột với bảng — 30 Chậm; 45, 60 Vừa; 75, 90 Nhanh', () {
+    expect(sawsSpeed(powerPresets[0]), SawsSpeed.slow);
+    expect(sawsSpeed(powerPresets[1]), SawsSpeed.medium);
+    expect(sawsSpeed(powerPresets[2]), SawsSpeed.medium);
+    expect(sawsSpeed(powerPresets[3]), SawsSpeed.fast);
+    expect(sawsSpeed(powerPresets[4]), SawsSpeed.fast);
+    // Lực lạ lấy mức gần nhất, như cột của bảng.
+    expect(sawsSpeed(50), SawsSpeed.medium);
+    expect(sawsSpeed(100), SawsSpeed.fast);
+    // Một nguồn: cột của bảng chính là tốc độ này.
+    for (final p in powerPresets) {
+      expect(sawsBhePercent(distance: 90, power: p, stroke: Stroke.stun),
+          sawsBheTable[1][sawsSpeed(p).index]);
+    }
+  });
 }

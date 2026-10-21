@@ -9,6 +9,7 @@ import 'package:poolcoachai/domain/planner/safety_options.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/scoring.dart';
 import 'package:poolcoachai/domain/planner/shot_options.dart';
+import 'package:poolcoachai/domain/planner/sim_cache.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_geometry/stroke.dart';
@@ -134,8 +135,14 @@ final class PlanDone extends PlannerEvent {
 /// lát cho đúng y kết quả như chạy một mạch: Stopwatch chỉ quyết định *khi
 /// nào* trả quyền cho giao diện, không bao giờ quyết định *tính gì*.
 class PlannerJob {
-  PlannerJob(this.setup, {this.aim = aimShot, this.safety = const SafetyPhysics()})
-      : _cue = setup.cue,
+  ///
+  /// [cache] dùng chung bộ nhớ mô phỏng với người gọi (Coach chấm cú người
+  /// chơi bằng đúng các lần mô phỏng này, spec Coach mục 5.2); không truyền
+  /// thì dùng bộ riêng. Kết quả không phụ thuộc bộ nhớ có sẵn gì.
+  PlannerJob(this.setup,
+      {this.aim = aimShot, this.safety = const SafetyPhysics(), SimCache? cache})
+      : _sims = cache ?? SimCache(),
+        _cue = setup.cue,
         _remaining = [...setup.balls]..sort((a, b) => a.number.compareTo(b.number)),
         _finder = CandidateFinder(game: setup.game, table: setup.table);
 
@@ -156,7 +163,7 @@ class PlannerJob {
   /// chạy tiếp (chủ sản phẩm chốt 08/10/2026 sau Task 25).
   bool _provisional = false;
   final CandidateFinder _finder;
-  final _sims = <ShotKey, AimedShot?>{};
+  final SimCache _sims;
   final _steps = <PlanStep>[];
   Vec2 _cue;
   List<PlacedBall> _remaining;
@@ -166,6 +173,11 @@ class PlannerJob {
   List<PlanStep> get steps => List.unmodifiable(_steps);
   bool get isDone => _done;
   bool get isCancelled => _cancelled;
+
+  /// Bước phòng thủ đang tìm cú thủ, chưa báo ra (spec Coach mục 5.3): Coach
+  /// chấm lựa chọn Phòng thủ không phải chờ cú thủ. null khi chưa tới bước
+  /// phòng thủ nào.
+  PlanStep? get pendingSafety => _reportedRough ? null : _bareSafety;
 
   /// Đang tìm cú thủ: màn hình nói "Đang tìm cú thủ…" thay "Đang tính bước".
   bool get searchingSafety => _search != null && !_done && !safetyCheckpoint;
@@ -252,8 +264,8 @@ class PlannerJob {
             ),
             events,
           );
-        } on _Missing catch (m) {
-          _sims[m.key] = simulateKey(m.key, aim: aim, table: setup.table);
+        } on MissingSimulation catch (m) {
+          _sims.fill(m.key, aim: aim, table: setup.table);
           simulated++;
         }
       }
@@ -279,10 +291,7 @@ class PlannerJob {
     events.add(StepReady(_steps.length - 1, step));
   }
 
-  AimedShot? _lookup(ShotKey key) {
-    if (_sims.containsKey(key)) return _sims[key];
-    throw _Missing(key);
-  }
+  AimedShot? _lookup(ShotKey key) => _sims.lookup(key);
 
   void _commit(PlanStep step, List<PlannerEvent> events) {
     if (step.kind == PlanStepKind.safety) {
@@ -308,11 +317,6 @@ class PlannerJob {
     _done = true;
     events.add(PlanDone(List.unmodifiable(_steps)));
   }
-}
-
-class _Missing implements Exception {
-  const _Missing(this.key);
-  final ShotKey key;
 }
 
 /// Chạy một mạch tới hết — cho test, công cụ dò bàn và đo tốc độ. Ở điểm
