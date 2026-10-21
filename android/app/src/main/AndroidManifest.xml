@@ -1,6 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Bản release không tự có INTERNET (chỉ debug/profile có): thiếu là
+         không gọi được Directus. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+: phải xin quyền lúc chạy mới hiện được thông báo. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Máy khởi động lại thì lịch thông báo đã đặt phải được đặt lại. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Cố ý KHÔNG xin SCHEDULE_EXACT_ALARM: nhắc bảo dưỡng dùng lịch
+         không chính xác (lệch vài phút là chấp nhận được). -->
     <application
-        android:label="poolcoachai"
+        android:label="PoolCoach AI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -25,6 +34,23 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- flutter_local_notifications: hiện thông báo đã đặt lịch, và đặt
+             lại lịch sau khi máy khởi động lại / ứng dụng được cập nhật. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
