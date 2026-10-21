@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
-import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -26,7 +26,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   bool _saving = false;
 
   Future<void> _requestMaintenanceNotifications() async {
-    final service = ref.read(maintenanceReminderServiceProvider);
+    final service = ref.read(notificationServiceProvider);
     await service.requestPermission();
     if (mounted) setState(() {});
   }
@@ -545,7 +545,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   }
 
   Widget _maintenanceReminderCard() {
-    final reminders = ref.watch(maintenanceReminderServiceProvider);
+    final reminders = ref.watch(notificationServiceProvider);
     if (!reminders.isSupported) return const SizedBox.shrink();
     final permission = reminders.permission;
     final message = permission == 'granted'

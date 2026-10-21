@@ -1,20 +1,20 @@
 import 'dart:io' show Platform;
 
 import 'package:poolcoachai/data/notifications/local_notifications_scheduler.dart';
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 
 /// Android/iOS: hệ điều hành tự giữ lịch thông báo, nên không cần
 /// show/readValue — dịch vụ đặt lịch qua [scheduler]. Trên desktop/test
 /// (không phải Android/iOS) không có scheduler nên coi như không hỗ trợ.
-class MaintenanceNotificationPlatform {
-  MaintenanceNotificationPlatform({MaintenanceScheduler? scheduler})
+class NotificationPlatform {
+  NotificationPlatform({NotificationScheduler? scheduler})
     : scheduler =
           scheduler ??
           (Platform.isAndroid || Platform.isIOS
               ? LocalNotificationsScheduler()
               : null);
 
-  final MaintenanceScheduler? scheduler;
+  final NotificationScheduler? scheduler;
   String _permission = 'default';
 
   bool get isSupported => scheduler != null;
@@ -44,5 +44,5 @@ class MaintenanceNotificationPlatform {
   void writeValue(String key, String value) {}
 }
 
-MaintenanceNotificationPlatform createMaintenanceNotificationPlatform() =>
-    MaintenanceNotificationPlatform();
+NotificationPlatform createNotificationPlatform() =>
+    NotificationPlatform();
