@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/coach_providers.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
@@ -35,4 +36,5 @@ void startSync(ProviderContainer container) {
   container.read(notificationServiceProvider).start();
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);
+  container.read(coachSyncProvider);
 }

@@ -1,7 +1,7 @@
 # PoolCoachAI — Thiết kế Coach tình huống (Giai đoạn A)
 
 **Ngày:** 21/10/2026
-**Trạng thái:** bản viết chờ chủ sản phẩm duyệt. Các quyết định chủ sản phẩm chốt ngày 21/10 ghi ở mục 3.1. Những chỗ người viết tự điền đánh dấu **(đề xuất)** ở mục 3.2, và các câu hỏi còn mở ở mục 16. Mọi câu tiếng Việt mới ở mục 15 đều **chờ duyệt**.
+**Trạng thái:** đang làm Giai đoạn A. Các quyết định chủ sản phẩm chốt ngày 21/10 ghi ở mục 3.1. Những chỗ người viết tự điền đánh dấu **(đề xuất)** ở mục 3.2. Năm câu hỏi ở mục 16 đã được chủ sản phẩm trả lời ngày 21/10/2026, ghi ở cột cuối của bảng mục 16. Mọi câu tiếng Việt mới ở mục 15 đều **chờ duyệt**.
 **Tiền đề:** `main` 1c59f3e. Đã có lõi vật lý, Kế hoạch dọn bàn kèm cú phòng thủ, Đánh giá + hạng, Lộ trình, quản lý cơ, đồng bộ trận đấu và bản Android/iOS. Tài liệu nguồn: `tong_hop_y_tuong_app_huan_luyen_bi_a_9ball.md` §3.4, §9.6, §15.4 và `PRD_PoolCoachAI.md` §8, §13.
 
 ---
@@ -86,7 +86,7 @@ Có năm phần, cùng một kế hoạch:
 | D4 | Mức chênh điểm cho phép `coachScoreTolerance = 3.0` (mục 6.5) | Bằng phạt Đánh cu lê: một cú cu lê có cùng vị trí với cú đánh đứng bi vẫn được tính đạt. Nhỏ hơn hẳn phạt trô (10) và phạt áp phê (15, 20) |
 | D5 | Coach Recommendation lấy **nhóm** từ `TodayRecommendation.cat` khi nhóm đó có tình huống; nếu không thì lấy nhóm yếu có tình huống | Trang chủ và Coach nói cùng một nhóm, không có hai luật chọn nhóm |
 | D6 | **Lưu và đồng bộ** từng lần làm tình huống, nhưng **không** đưa vào điểm thuần thục (mục 11) | Thẻ gợi ý cần tỉ lệ giải và lỗi lặp lại; Giai đoạn B cần dữ liệu thật. Chọn cú là năng lực *đọc bàn*, khác năng lực *thực hiện* mà điểm thuần thục đo (tong_hop §15.3). Xem Q2 |
-| D7 | Câu áp phê của Coach theo mẫu SAWS của chủ sản phẩm, **không** dùng lại `Vi.simSquirt` | `simSquirt` còn vế "ngắm lệch", trái với C7 |
+| D7 | Câu áp phê của Coach theo mẫu SAWS của chủ sản phẩm, **không** dùng lại `Vi.simSquirt` | `simSquirt` còn vế "ngắm lệch", trái với C7. **Q5 (21/10/2026) thay đề xuất này:** màn Mô phỏng cũng dùng đúng câu mẫu SAWS đó |
 | D8 | Không có số độ nào trong chữ của Coach, kể cả góc cắt để tham khảo. Độ khó vị trí nói bằng **vùng tốt / tạm được / khó** | Quy tắc đơn giản hơn, và test bắt được bằng cách tìm ký tự "°" |
 
 ---
@@ -420,11 +420,11 @@ Bàn vẽ cú tốt nhất bằng `PlannerPainter` (`PlannerScene.step = referen
 
 `coachDifficultyFor(insight)` trả về:
 
-- mức thuần thục null hoặc < 50 → `easy`;
-- từ 50 tới 74 → `medium`;
+- mức thuần thục null hoặc < 55 → `easy`;
+- từ 55 tới 74 → `medium`;
 - từ 75 trở lên → `hard`.
 
-Hai ngưỡng 50 và 75 là `PracticeConstants.weakCutoff` và `strongCutoff`. Spec chỉ đặt tên, không đặt số: dùng đúng hằng số đang có. Người chơi đổi mức bằng chip.
+Hai ngưỡng 55 và 75 là `PracticeConstants.weakCutoff` và `strongCutoff` (bản đầu của spec ghi nhầm 50; mã đang có là 55, sửa lúc làm T0). Spec chỉ đặt tên, không đặt số: dùng đúng hằng số đang có. Người chơi đổi mức bằng chip.
 
 | Mức | Số bi | Góc cắt của bi phải chạm, theo `bandFor` của `difficulty.dart` |
 |---|---|---|
@@ -496,6 +496,8 @@ const coachLibrary = <CoachLibraryEntry>[ … ];
 | aiming | `typicalNineBallTable` (bi 5 chắn lỗ giữa, phải đi lỗ góc); F1 (bi cái cố định, một bi, lỗ góc dưới phải); một thế do người soạn dựng từ bộ sinh (mục 9.3) | F1 chỉ có một bi, nên không chấm vị trí: chấm lỗ, vòng loại và các khoản phạt |
 | safety | `noPotTable`, `blockedEverywhereTable`; một thế do người soạn dựng | |
 | kick | `snookerOneRailTable`, bàn hai băng cùng tệp; S5 (bi 1 bị cụm 9 bi che), bản Bachelors vị trí 1 | S5 có bi 1–10, nên là bàn **10 bi** |
+
+**Kết quả lúc làm T5 (21/10/2026): 10 mục, không phải 12.** Test thư viện (mục 9.5) bỏ hai mục: `blockedEverywhereTable` (từ bi cái (40, 100), bi 1 bị đui, nên là thế A băng chứ không phải Phòng thủ) và S5 Bachelors thế 1 (bi 1 nhìn thấy và có lỗ đánh được theo hình học; Planner ra phòng thủ vì mọi cú hỏng, không phải vì đui). Hai mục "người soạn dựng từ bộ sinh" là `gen-v1-aiming-medium-6054` và `gen-v1-safety-medium-1009`. Mục 9.5 chỉ xét các điều kiện của mục 8.5 dựa vào tham chiếu (`acceptsForTopic`); các điều kiện riêng của bộ sinh (số bi theo độ khó, dải góc, "≥ 2 bi sau bi phải chạm") không áp cho thư viện, nên `railTable` và `cornerFollowTable` (2 bi) vẫn ở nhóm Vị trí.
 
 Các thế BU có bi cái tự do (S1–S4) không đưa vào bộ đầu: người soạn sẽ phải tự đặt bi cái, tức là thêm một lựa chọn chưa có nguồn. Để sau, khi chủ sản phẩm chỉ chỗ đặt bi cái.
 
@@ -875,13 +877,15 @@ Sau khi có màn tình huống trên Chrome, **dừng lại**. Chủ sản phẩ
 
 ## 16. Câu hỏi cho chủ sản phẩm
 
-| # | Câu hỏi | Đề xuất của người viết |
-|---|---|---|
-| Q1 | Câu "đáp án sau 2 lần sai" nghĩa là người chơi trả lời tối đa **3 lần** (sai → gợi ý 1 → sai → gợi ý 2 → sai → đáp án), hay đáp án hiện ngay ở **lần sai thứ 2**, tức là bỏ gợi ý 2? | **3 lần**, đủ hai gợi ý (D3). Đổi lại chỉ cần sửa một hằng số `coachMaxAnswers` |
-| Q2 | Lưu và đồng bộ từng lần làm tình huống (bảng `coach_attempts`, mục 11), nhưng không đưa vào điểm thuần thục? | **Có, lưu và đồng bộ, không đưa vào điểm thuần thục.** Thẻ gợi ý và Giai đoạn B cần dữ liệu này; trộn vào điểm thuần thục là suy năng lực đọc bàn ra năng lực thực hiện |
-| Q3 | Mức chênh điểm còn tính là đạt: `coachScoreTolerance = 3` điểm (bằng phạt Đánh cu lê)? | **3 điểm**, rồi chỉnh sau buổi chủ sản phẩm thử 10 tình huống (mục 14.6) |
-| Q4 | Người chơi chọn Phòng thủ khi Planner có cú ăn nhưng vị trí sau đó không tốt: nói *chưa đủ dữ liệu* (không tính đúng sai)? | **Đúng như vậy.** Planner không so cú ăn với cú thủ, nên chấm là sai thì thành bịa |
-| Q5 | Câu áp phê của Coach theo đúng mẫu 05/10 (*"Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng …% BHE…"*). Có sửa luôn dòng áp phê ở màn Mô phỏng (vẫn còn vế "ngắm lệch đi") cho khớp không? | **Coach dùng mẫu mới ngay.** Sửa màn Mô phỏng là một việc nhỏ, làm riêng sau khi chủ sản phẩm duyệt câu, để dự án này không đụng màn đã chạy thật |
+Chủ sản phẩm trả lời cả năm câu ngày **21/10/2026**. Cột cuối là quyết định; nơi nào trong spec còn ghi khác thì cột này thắng.
+
+| # | Câu hỏi | Đề xuất của người viết | Quyết định (21/10/2026) |
+|---|---|---|---|
+| Q1 | Câu "đáp án sau 2 lần sai" nghĩa là người chơi trả lời tối đa **3 lần** (sai → gợi ý 1 → sai → gợi ý 2 → sai → đáp án), hay đáp án hiện ngay ở **lần sai thứ 2**, tức là bỏ gợi ý 2? | **3 lần**, đủ hai gợi ý (D3). Đổi lại chỉ cần sửa một hằng số `coachMaxAnswers` | **Đã chốt: 3 lần** (sai → gợi ý 1 → sai → gợi ý 2 → sai → đáp án). `coachMaxAnswers = 3`. Nút *Xem đáp án* luôn bấm được |
+| Q2 | Lưu và đồng bộ từng lần làm tình huống (bảng `coach_attempts`, mục 11), nhưng không đưa vào điểm thuần thục? | **Có, lưu và đồng bộ, không đưa vào điểm thuần thục.** Thẻ gợi ý và Giai đoạn B cần dữ liệu này; trộn vào điểm thuần thục là suy năng lực đọc bàn ra năng lực thực hiện | **Đã chốt: lưu và đồng bộ**, **không** đưa vào điểm thuần thục |
+| Q3 | Mức chênh điểm còn tính là đạt: `coachScoreTolerance = 3` điểm (bằng phạt Đánh cu lê)? | **3 điểm**, rồi chỉnh sau buổi chủ sản phẩm thử 10 tình huống (mục 14.6) | **Đã chốt: `coachScoreTolerance = 3`**, chỉnh sau |
+| Q4 | Người chơi chọn Phòng thủ khi Planner có cú ăn nhưng vị trí sau đó không tốt: nói *chưa đủ dữ liệu* (không tính đúng sai)? | **Đúng như vậy.** Planner không so cú ăn với cú thủ, nên chấm là sai thì thành bịa | **Đã chốt: nói *chưa đủ dữ liệu***, không tính là một lần thử, và hiện **cả hai cú**: cú ăn của Planner và cú thủ |
+| Q5 | Câu áp phê của Coach theo đúng mẫu 05/10 (*"Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng …% BHE…"*). Có sửa luôn dòng áp phê ở màn Mô phỏng (vẫn còn vế "ngắm lệch đi") cho khớp không? | **Coach dùng mẫu mới ngay.** Sửa màn Mô phỏng là một việc nhỏ, làm riêng sau khi chủ sản phẩm duyệt câu, để dự án này không đụng màn đã chạy thật | **Đã chốt: sửa luôn trong dự án này.** Bỏ vế *"điểm ngắm cần lệch…"* và *"ngắm lệch đi…"* của `Vi.simSquirt`, thay bằng đúng câu áp phê mẫu SAWS mà Coach dùng (một hàm chung), và sửa test của nó. Quyết định này thay D7 và dòng `Vi.simSquirt` ở mục 2 |
 
 ---
 
@@ -905,3 +909,23 @@ Mỗi việc có tệp riêng. Hai việc không cùng sửa một tệp, trừ 
 Có thể chạy song song: sau T0, các việc **T1, T4, T5, T6, T7** độc lập về tệp. **T2 và T3** chạy song song với nhau, nhưng chốt kiểu dữ liệu gợi ý trong buổi đầu của T2. **T8, T9** làm sau cùng.
 
 Sau T9: dừng cho chủ sản phẩm xem (mục 14.6) → merge → deploy bằng `deploy/publish.sh` → hỏi chủ sản phẩm trước khi tạo collection `coach_attempts` trên production → chạy `coach.mjs` trên trang thật.
+
+---
+
+## 18. Ghi chú lúc làm Giai đoạn A (21/10/2026, nhánh `feat/coach`)
+
+Hai sự thật người viết đánh dấu là chưa kiểm đã được kiểm bằng test: số thứ 10 000 của Park–Miller từ seed 1 đúng là 399 268 537 (`generator_test`); trên `railTable` cú Đánh đứng bi 60 % (26,37) nằm trong dung sai của cú tốt nhất Đánh đứng bi 45 % (25,74), còn Đánh trô bi 30 % (37,82) thì không (`grading_test`).
+
+Chỗ làm khác spec, kèm lý do:
+
+| Chỗ | Spec ghi | Đã làm | Lý do |
+|---|---|---|---|
+| 8.4 | Ngưỡng 50 / 75 | `weakCutoff` 55 / `strongCutoff` 75 | Spec bảo dùng đúng hằng số có sẵn; hằng số là 55 |
+| 6.7 | 11 lỗi | Thêm `spinWorse` | Người chơi có áp phê nhưng khác kiểu áp phê của cú gần nhất (chỉ gặp ở tầng 2): không lỗi nào trong bảng mô tả đúng. Gợi ý 2 là câu mới `Hint2Spin` |
+| 10.2 | Nhóm lỗi không liệt kê `objectMissed` | `objectMissed` thuộc *chọn lỗ*; `spinWorse` thuộc *vị trí bi cái* | Mỗi lỗi phải thuộc đúng một nhóm |
+| 4.2, 13 | Bàn hiện ≤ 100 ms sau Bắt đầu | Ngắm bi / Vị trí sinh ngẫu nhiên: bàn hiện khi thế bàn đã qua lượt vật lý (đo trên VM: trung vị 146 / 244 ms); Phòng thủ / A băng và thư viện hiện ngay | Hiện thế bàn của lượt hình học rồi đổi khi lượt vật lý bác thì người chơi đang chọn cú trên một bàn sẽ biến mất. Tình huống kế tiếp được sinh sẵn (8.7) nên "Tình huống mới" vẫn hiện ngay |
+| 4.3 | Web ≥ 900 px: bàn trái, bảng phải ("TablePanelLayout đã hỗ trợ") | Bàn trên, bảng dưới ở mọi cỡ | `TablePanelLayout` hiện chỉ có bố cục dọc; thêm bố cục ngang là đổi cả màn Mô phỏng và Kế hoạch, để việc riêng |
+| 7.3, D8 | Bước phòng thủ dùng `planStepLines` | `planStepLines` bỏ dòng "Bước 1 / 1" và mọi dòng có "°" | Dòng đối thủ và dòng góc bi cái bị lệch của Planner có số độ; D8 cấm số độ trong chữ của Coach |
+| 9.5 | Kiểm "vị trí hợp lệ theo 8.3" cho mọi mục | Sơ đồ BU được phép bi chạm nhau | Cụm bi xếp sát của BU chạm nhau thật |
+| 15 | Danh sách câu | Thêm `coachHint2Spin`, `coachLibraryCaption`, `coachLibrarySource`, `coachLibraryEnd`, `signOutPendingCoach`, `sawsSpeedWord`, `sawsSpinAdvice` | Các chỗ trên, màn thư viện, cảnh báo đăng xuất khi còn lần làm chưa đồng bộ, và câu SAWS dùng chung với màn Mô phỏng (Q5) |
+| 14.5 | `coach.mjs` chạy trên bản cục bộ và trang thật | Chỉ chạy trên bản cục bộ dựng từ `tool/e2e/coach_main.dart` (đăng nhập sẵn trên máy, API trỏ về chỗ không có server) | Không tạo người dùng nào trên Directus thật; chạy trên trang thật sau khi deploy và có collection `coach_attempts` |

@@ -88,6 +88,10 @@ Future<void> signOutAndForget({
   await (db.delete(
     db.achievementRows,
   )..where((t) => t.userId.equals(userId))).go();
+  // Lần làm tình huống Coach cũng là dữ liệu riêng của người này.
+  await (db.delete(
+    db.coachAttemptRows,
+  )..where((t) => t.userId.equals(userId))).go();
 }
 
 /// Dòng hạng và lần kiểm tra đã xong của [userId] chưa lên server. Lần đang
@@ -116,6 +120,14 @@ Future<int> pendingRoadmapCount(AppDatabase db, String userId) async {
     db.achievementRows,
   )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
   return goals.length + achievements.length;
+}
+
+/// Lần làm tình huống Coach của [userId] chưa lên server.
+Future<int> pendingCoachCount(AppDatabase db, String userId) async {
+  final rows = await (db.select(
+    db.coachAttemptRows,
+  )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
+  return rows.length;
 }
 
 Future<int> pendingCueEquipmentCount(AppDatabase db, String userId) async {

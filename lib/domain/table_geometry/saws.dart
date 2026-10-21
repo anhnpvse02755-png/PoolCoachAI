@@ -16,17 +16,25 @@ const sawsBheTable = <List<int>>[
 /// Đánh trô bi cộng, đánh cu lê trừ ngần này điểm phần trăm BHE.
 const sawsStrokeShift = 10;
 
+/// Ba cột tốc độ của bảng SAWS: Chậm / Vừa / Nhanh — trên màn là lực nhẹ /
+/// trung bình / mạnh (chủ sản phẩm chốt 05/10/2026). Thứ tự enum là thứ tự
+/// cột của [sawsBheTable].
+enum SawsSpeed { slow, medium, fast }
+
 /// Cột của bảng cho một mức lực: mức lực gần nhất trong [powerPresets]
 /// (30 = Chậm; 45, 60 = Vừa; 75, 90 = Nhanh). Lực lạ lấy mức gần nhất.
-int _sawsColumn(double power) {
+/// Một nguồn cho cả bảng lẫn chữ chỉ lực của câu áp phê.
+SawsSpeed sawsSpeed(double power) {
   var best = 0;
   for (var i = 1; i < powerPresets.length; i++) {
     if ((powerPresets[i] - power).abs() < (powerPresets[best] - power).abs()) {
       best = i;
     }
   }
-  return switch (best) { 0 => 0, 1 || 2 => 1, _ => 2 };
+  return switch (best) { 0 => SawsSpeed.slow, 1 || 2 => SawsSpeed.medium, _ => SawsSpeed.fast };
 }
+
+int _sawsColumn(double power) => sawsSpeed(power).index;
 
 /// BHE (%) nên dùng để bù áp phê: nội suy tuyến tính theo [distance] giữa
 /// các hàng (ngoài hai đầu thì giữ hàng đầu / hàng cuối), chỉnh theo kiểu

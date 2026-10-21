@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_physics/scratch.dart';
 import 'package:poolcoachai/domain/table_geometry/shot_geometry.dart';
@@ -231,14 +232,26 @@ void main() {
     test('lệch do áp phê và số lần chạm băng', () {
       expect(Vi.simSquirt(1.55), 'Bi cái bị lệch do áp phê khoảng 1.5°.');
       expect(Vi.simSquirt(0.83), 'Bi cái bị lệch do áp phê khoảng 1°.');
-      expect(Vi.simSquirt(1.55, 1, 4.5),
-          'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1 đầu cơ ≈ 1/4.5 con bi).');
-      expect(Vi.simSquirt(1.55, 1.25, 9),
-          'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1.25 đầu cơ ≈ 1/9 con bi).');
-      expect(Vi.simSquirt(1.55, 1.5, 3, 70),
-          'Bi cái bị lệch do áp phê khoảng 1.5° (điểm ngắm cần lệch khoảng 1.5 đầu cơ ≈ 1/3 con bi) → bạn có thể dùng SAWS (70% BHE / 30% FHE) hoặc ngắm lệch đi để bù trừ áp phê.');
-      expect(Vi.simSquirt(9, 6, null, null, 1.5),
-          'Bi cái bị lệch do áp phê khoảng 9° (điểm ngắm cần lệch khoảng 6 đầu cơ ≈ 1.5 con bi).');
+      // Q5 (21/10/2026): vế "điểm ngắm cần lệch" / "ngắm lệch đi" được thay
+      // bằng đúng câu mẫu SAWS mà Coach dùng.
+      expect(Vi.simSquirt(1.55, const SideSpin(SpinSide.right, 1), 70, SawsSpeed.medium),
+          'Bi cái bị lệch do áp phê khoảng 1.5°. Cú này cần áp phê phải 1 đầu cơ. '
+          'Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng 70% BHE, 30% FHE với lực trung bình.');
+      expect(Vi.simSquirt(1.55, const SideSpin(SpinSide.left, 0.5), 60, SawsSpeed.slow),
+          'Bi cái bị lệch do áp phê khoảng 1.5°. Cú này cần áp phê trái 0.5 đầu cơ. '
+          'Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng 60% BHE, 40% FHE với lực nhẹ.');
+      // Thiếu số SAWS thì chỉ nói góc.
+      expect(Vi.simSquirt(1.55, const SideSpin(SpinSide.left, 0.5)),
+          'Bi cái bị lệch do áp phê khoảng 1.5°.');
+      for (final line in [
+        Vi.simSquirt(1.55, const SideSpin(SpinSide.right, 1), 90, SawsSpeed.fast),
+        Vi.sawsSpinAdvice(SpinSide.left, 1, 40, SawsSpeed.fast),
+      ]) {
+        expect(line, isNot(contains('ngắm lệch')));
+        expect(line, isNot(contains('điểm ngắm cần lệch')));
+        expect(line, contains('ngắm như đánh tâm bi'));
+      }
+      expect(SawsSpeed.values.map(Vi.sawsSpeedWord), ['nhẹ', 'trung bình', 'mạnh']);
       expect(Vi.simRailCount(3), 'Bi cái chạm băng 3 lần.');
     });
   });

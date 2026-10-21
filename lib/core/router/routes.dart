@@ -14,6 +14,22 @@ abstract final class Routes {
   static const coach = '/coach';
   static const notifications = '/notifications';
 
+  /// Màn tình huống của Coach — mở trên màn Coach (spec Coach mục 4.2).
+  static const coachSituation = '$coach/situation';
+
+  /// Thư viện tình huống mẫu (spec Coach mục 9.4).
+  static const coachLibrary = '$coach/library';
+
+  /// Tình huống sinh ngẫu nhiên: cùng tham số thì ra cùng thế bàn.
+  static String coachGenerated(String topic, String difficulty, int seed) =>
+      '$coachSituation?topic=$topic&d=$difficulty&seed=$seed';
+
+  /// Tình huống thư viện theo id.
+  static String coachLibraryEntry(String id) => '$coachSituation?lib=$id';
+
+  /// Một mục thư viện theo thứ tự — để chụp từng mục trên Chrome.
+  static String coachLibraryAt(int i) => '$coachLibrary?i=$i';
+
   // Ba đường dẫn có tham số của lát dọc Phase 1.
   //
   // Hai đường đầu nằm **trong** nhánh Luyện tập của StatefulShellRoute,
@@ -88,6 +104,8 @@ abstract final class Routes {
     ...tabs,
     equipment,
     coach,
+    coachSituation,
+    coachLibrary,
     notifications,
     drillPattern,
     drillSessionPattern,

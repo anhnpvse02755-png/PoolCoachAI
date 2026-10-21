@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/data/repositories/coach_attempt_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_repositories.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/data/repositories/drill_log_repository.dart';
@@ -69,4 +70,12 @@ final matchRepositoryProvider = Provider<MatchRepository>((ref) {
     userId: userId,
     now: ref.watch(nowProvider),
   );
+});
+
+/// Lần làm tình huống Coach của người đang đăng nhập; null khi chưa đăng
+/// nhập (Coach vẫn chạy, chỉ không lưu).
+final coachAttemptRepositoryProvider = Provider<CoachAttemptRepository?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+  return CoachAttemptRepository(ref.watch(appDatabaseProvider), userId: userId);
 });

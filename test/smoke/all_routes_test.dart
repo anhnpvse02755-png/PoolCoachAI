@@ -9,7 +9,9 @@ import 'package:poolcoachai/features/auth/presentation/forgot_password_screen.da
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/register_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/reset_password_screen.dart';
+import 'package:poolcoachai/features/coach/presentation/coach_library_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
+import 'package:poolcoachai/features/coach/presentation/situation_screen.dart';
 import 'package:poolcoachai/features/home/presentation/home_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_library_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
@@ -54,6 +56,8 @@ const _routeCases = <String, _RouteCase>{
   Routes.profile: (path: Routes.profile, screen: ProfileScreen),
   Routes.equipment: (path: Routes.equipment, screen: EquipmentScreen),
   Routes.coach: (path: Routes.coach, screen: CoachScreen),
+  Routes.coachSituation: (path: '/coach/situation?lib=pos-rail-1', screen: SituationScreen),
+  Routes.coachLibrary: (path: Routes.coachLibrary, screen: CoachLibraryScreen),
   Routes.notifications: (
     path: Routes.notifications,
     screen: NotificationsScreen,

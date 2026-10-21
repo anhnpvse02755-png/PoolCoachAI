@@ -100,12 +100,13 @@ void main() {
         isNot(contains(Vi.planRiskWarning)));
   });
 
-  test('áp phê: đúng dòng của màn mô phỏng (đầu cơ, phần con bi, SAWS)', () {
+  test('áp phê: đúng dòng của màn mô phỏng (câu mẫu SAWS)', () {
     final s = spin.first;
     expect(s.spin.isNone, isFalse);
     final lines = linesOf(spin, 0);
     expect(lines, contains(Vi.simSpinLine(s.spin)));
-    expect(lines, contains(squirtLine(s.spin, s.aimed, s.geometry!, table, s.stroke, s.power)));
+    expect(lines, contains(squirtLine(s.spin, s.geometry!, table, s.stroke, s.power)));
+    expect(lines.any((l) => l.contains('${s.sawsBhePercent}% BHE')), isTrue);
   });
 
   test('bước dự phòng và bước phòng thủ', () {
@@ -243,7 +244,7 @@ void main() {
       final s = shot(spin: spin, stroke: Stroke.follow, bhe: 77);
       final lines = safetyLines(s);
       expect(lines, contains(Vi.simSpinLine(s.spin)));
-      expect(lines, contains(squirtLineFor(s.spin, 1.5, 100, table, bhePercent: 77)));
+      expect(lines, contains(squirtLineFor(s.spin, table, bhePercent: 77, power: s.power)));
       expect(lines.any((l) => l.contains('77')), isTrue);
     });
 
