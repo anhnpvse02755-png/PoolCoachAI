@@ -31,7 +31,7 @@ void startSync(ProviderContainer container) {
   container.read(syncServiceProvider);
   container.read(cueEquipmentSyncProvider);
   container.read(practiceSyncProvider);
-  container.read(maintenanceReminderServiceProvider).start();
+  container.read(notificationServiceProvider).start();
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);
 }

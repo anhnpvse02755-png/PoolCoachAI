@@ -1,9 +1,9 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
-import 'package:poolcoachai/data/notifications/maintenance_notification_platform.dart';
-import 'package:poolcoachai/data/notifications/maintenance_reminder_service.dart';
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_platform.dart';
+import 'package:poolcoachai/data/notifications/notification_service.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/domain/maintenance_schedule.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -26,7 +26,7 @@ void main() {
 
   tearDown(() => db.close());
 
-  MaintenanceReminderService service() => MaintenanceReminderService(
+  NotificationService service() => NotificationService(
     db: db,
     auth: auth,
     now: () => now,
@@ -105,7 +105,7 @@ void main() {
   group('native scheduling', () {
     late _FakeScheduler scheduler;
 
-    MaintenanceReminderService scheduling() => MaintenanceReminderService(
+    NotificationService scheduling() => NotificationService(
       db: db,
       auth: auth,
       now: () => now,
@@ -161,7 +161,7 @@ void main() {
   });
 }
 
-class _FakeScheduler implements MaintenanceScheduler {
+class _FakeScheduler implements NotificationScheduler {
   bool granted = false;
   int permissionRequests = 0;
   List<MaintenanceReminder> scheduled = const [];
@@ -188,14 +188,14 @@ class _FakeScheduler implements MaintenanceScheduler {
   }
 }
 
-class _SchedulingPlatform extends MaintenanceNotificationPlatform {
-  _SchedulingPlatform(MaintenanceScheduler scheduler)
+class _SchedulingPlatform extends NotificationPlatform {
+  _SchedulingPlatform(NotificationScheduler scheduler)
     : super(scheduler: scheduler);
 }
 
-class _FakeNotificationPlatform extends MaintenanceNotificationPlatform {
+class _FakeNotificationPlatform extends NotificationPlatform {
   @override
-  MaintenanceScheduler? get scheduler => null;
+  NotificationScheduler? get scheduler => null;
 
   String permissionValue = 'default';
   int permissionRequests = 0;

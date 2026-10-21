@@ -3,16 +3,16 @@ import 'dart:io' show Platform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/domain/maintenance_schedule.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Bản thật của [MaintenanceScheduler] trên Android/iOS.
+/// Bản thật của [NotificationScheduler] trên Android/iOS.
 ///
 /// Dùng lịch "không chính xác" (inexactAllowWhileIdle): Android có thể
 /// lệch vài phút nhưng không cần quyền báo thức chính xác.
-class LocalNotificationsScheduler implements MaintenanceScheduler {
+class LocalNotificationsScheduler implements NotificationScheduler {
   LocalNotificationsScheduler({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 

@@ -2,7 +2,7 @@ import 'package:poolcoachai/domain/maintenance_schedule.dart';
 
 /// Đặt lịch thông báo của hệ điều hành (Android/iOS). Tách khỏi plugin để
 /// test bằng bản giả; bản thật nằm ở local_notifications_scheduler.dart.
-abstract class MaintenanceScheduler {
+abstract class NotificationScheduler {
   /// Đã được cấp quyền gửi thông báo chưa. Không hiện hộp thoại.
   Future<bool> hasPermission();
 

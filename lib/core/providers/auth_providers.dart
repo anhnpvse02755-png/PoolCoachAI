@@ -6,7 +6,7 @@ import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
-import 'package:poolcoachai/data/notifications/maintenance_reminder_service.dart';
+import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_session_store.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
@@ -110,9 +110,9 @@ final practiceSyncProvider = Provider<PracticeSyncService>((ref) {
   return service;
 });
 
-final maintenanceReminderServiceProvider = Provider<MaintenanceReminderService>(
+final notificationServiceProvider = Provider<NotificationService>(
   (ref) {
-    final service = MaintenanceReminderService(
+    final service = NotificationService(
       db: ref.watch(appDatabaseProvider),
       auth: ref.watch(authRepositoryProvider),
       now: ref.watch(nowProvider),

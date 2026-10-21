@@ -4,26 +4,26 @@ import 'package:drift/drift.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
-import 'package:poolcoachai/data/notifications/maintenance_notification_platform.dart';
-import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_platform.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/maintenance_schedule.dart';
 
-class MaintenanceReminderService {
-  MaintenanceReminderService({
+class NotificationService {
+  NotificationService({
     required this._db,
     required this._auth,
     required this._now,
-    MaintenanceNotificationPlatform? platform,
+    NotificationPlatform? platform,
     this._checkEvery = const Duration(minutes: 1),
-  }) : _platform = platform ?? createMaintenanceNotificationPlatform();
+  }) : _platform = platform ?? createNotificationPlatform();
 
   final AppDatabase _db;
   final AuthRepository _auth;
   final DateTime Function() _now;
-  final MaintenanceNotificationPlatform _platform;
+  final NotificationPlatform _platform;
   final Duration _checkEvery;
 
   bool _started = false;
@@ -56,14 +56,14 @@ class MaintenanceReminderService {
     checkNow();
   }
 
-  MaintenanceScheduler? get _scheduler => _platform.scheduler;
+  NotificationScheduler? get _scheduler => _platform.scheduler;
 
   late final Future<void> _permissionLoaded = _platform.loadPermission();
   Future<void> _syncChain = Future.value();
 
   /// Android/iOS: đặt lại toàn bộ lịch theo danh sách cơ hiện tại. Xếp
   /// hàng để hai lần đặt không chạy chồng lên nhau.
-  void _syncSchedule(MaintenanceScheduler scheduler) {
+  void _syncSchedule(NotificationScheduler scheduler) {
     _syncChain = _syncChain.then((_) async {
       await _permissionLoaded;
       if (_disposed) return;

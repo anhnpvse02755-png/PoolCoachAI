@@ -26,7 +26,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   bool _saving = false;
 
   Future<void> _requestMaintenanceNotifications() async {
-    final service = ref.read(maintenanceReminderServiceProvider);
+    final service = ref.read(notificationServiceProvider);
     await service.requestPermission();
     if (mounted) setState(() {});
   }
@@ -545,7 +545,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   }
 
   Widget _maintenanceReminderCard() {
-    final reminders = ref.watch(maintenanceReminderServiceProvider);
+    final reminders = ref.watch(notificationServiceProvider);
     if (!reminders.isSupported) return const SizedBox.shrink();
     final permission = reminders.permission;
     final message = permission == 'granted'
