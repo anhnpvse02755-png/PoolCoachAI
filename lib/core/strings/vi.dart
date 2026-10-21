@@ -246,9 +246,14 @@ abstract final class Vi {
   static const equipmentPlayingCue = 'Cơ chính';
   static const equipmentBreakCue = 'Cơ phá';
   static const equipmentJumpCue = 'Cơ nhảy';
+  static const equipmentBreakJumpCue = 'Cơ phá nhảy kết hợp';
   static const equipmentWeight = 'Trọng lượng (gram)';
-  static const equipmentTipDiameter = 'Đường kính đầu cơ (mm)';
-  static const equipmentTipHardness = 'Độ cứng đầu cơ';
+  static const equipmentShaftBrand = 'Hãng ngọn';
+  static const equipmentShaftDiameter = 'Size ngọn (đường kính)';
+  static const unitMm = 'mm';
+  static const equipmentTipBrand = 'Hãng đầu tẩy';
+  static const equipmentButtBrand = 'Hãng chuôi';
+  static const equipmentTipHardness = 'Độ cứng đầu tẩy';
   static const equipmentNoHardness = 'Không chọn';
   static const equipmentSoft = 'Mềm';
   static const equipmentMedium = 'Trung bình';
@@ -271,8 +276,8 @@ abstract final class Vi {
   static const equipmentSaveFailed =
       'Không lưu được hồ sơ cơ. Vui lòng thử lại.';
   static const equipmentWeightInvalid = 'Nhập trọng lượng tính bằng gram.';
-  static const equipmentTipDiameterInvalid =
-      'Nhập đường kính đầu cơ tính bằng mm.';
+  static const equipmentShaftDiameterInvalid =
+      'Nhập size ngọn (đường kính) tính bằng mm.';
   static const equipmentDue = 'Đã đến ngày bảo dưỡng đầu cơ.';
   static const equipmentDueSoon = 'Sắp đến ngày bảo dưỡng đầu cơ.';
   static const equipmentReminderTitle = 'Nhắc bảo dưỡng đầu cơ';
@@ -290,12 +295,29 @@ abstract final class Vi {
   static const equipmentLastUsed = 'Lần dùng gần nhất';
   static const equipmentNoRecordedPractice = 'Chưa có buổi tập ghi với cơ này.';
   static const equipmentUnknownCue = 'Cơ đã xóa';
+  static const matchCue = 'Cơ dùng trong trận';
+  static String matchCueLine(String cueName) => 'Cơ: $cueName';
+  static const cueWinRateTitle = 'Tỉ lệ thắng theo cơ';
+  static const cueWinRateNoMatches = 'Chưa có trận hoàn tất nào ghi cơ.';
+  static const cueBestBadge = 'Cơ hợp bạn nhất';
+  static String cueWinRateLine({
+    required int wins,
+    required int completed,
+    required int percent,
+  }) => '$wins thắng / $completed trận hoàn tất · $percent%';
+  static const cueWinRateNone = 'Chưa có trận hoàn tất với cơ này.';
+  static String cueMatchesNeeded(int count) =>
+      'Cần thêm $count trận hoàn tất để so sánh.';
+  static String cueVerdictRule(int minMatches) =>
+      'Cơ hợp bạn nhất chỉ được nêu khi có ít nhất hai cơ, mỗi cơ từ '
+      '$minMatches trận hoàn tất, và một cơ có tỉ lệ thắng cao hơn hẳn các cơ còn lại.';
   static const timerChooseCue = 'Cơ đang dùng (không bắt buộc)';
   static const timerNoCue = 'Không chọn cơ';
   static String equipmentTypeName(CueType type) => switch (type) {
     CueType.playing => equipmentPlayingCue,
     CueType.breakCue => equipmentBreakCue,
     CueType.jump => equipmentJumpCue,
+    CueType.breakJump => equipmentBreakJumpCue,
   };
   static String equipmentHardnessName(TipHardness hardness) =>
       switch (hardness) {
@@ -303,6 +325,9 @@ abstract final class Vi {
         TipHardness.medium => equipmentMedium,
         TipHardness.hard => equipmentHard,
       };
+  static String equipmentShaftBrandValue(String brand) => 'Ngọn $brand';
+  static String equipmentTipBrandValue(String brand) => 'Đầu tẩy $brand';
+  static String equipmentButtBrandValue(String brand) => 'Chuôi $brand';
   static String equipmentWeightValue(int grams) => '$grams g';
   static String equipmentDiameterValue(double millimeters) =>
       '${millimeters.toStringAsFixed(1)} mm';
@@ -1494,6 +1519,8 @@ abstract final class Vi {
 
   static String signOutPendingRoadmap(int count) =>
       'Còn $count mục tiêu hoặc thành tích chưa lên máy chủ — đăng xuất bây giờ sẽ mất.';
+  static String signOutPendingPractice(int count) =>
+      'Còn $count trận, buổi tập tự do hoặc lịch tập chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
   static String signOutPendingEquipment(int count) =>
       'Còn $count hồ sơ cơ chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
 

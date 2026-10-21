@@ -43,6 +43,7 @@ class PoolMatch {
     required this.startedAt,
     this.shots = const [],
     this.completedAt,
+    this.cueId,
   });
 
   final String id;
@@ -54,6 +55,10 @@ class PoolMatch {
   final DateTime startedAt;
   final List<MatchShot> shots;
   final DateTime? completedAt;
+
+  /// Cây cơ người chơi dùng trong trận; null là không ghi cơ. Giữ nguyên cả
+  /// khi cơ bị xóa sau đó.
+  final String? cueId;
 
   int get playerScore =>
       rackWinners.where((winner) => winner == RackWinner.player).length;

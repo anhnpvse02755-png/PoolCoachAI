@@ -8,7 +8,10 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/features/stats/presentation/cue_win_rate_block.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:uuid/uuid.dart';
 
@@ -44,10 +47,23 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         (number is double && !number.isFinite)) {
       return integer
           ? Vi.equipmentWeightInvalid
-          : Vi.equipmentTipDiameterInvalid;
+          : Vi.equipmentShaftDiameterInvalid;
     }
     return null;
   }
+
+  Widget _brandField({
+    required Key key,
+    required String label,
+    required String initial,
+    required ValueChanged<String> onSaved,
+  }) => TextFormField(
+    key: key,
+    initialValue: initial,
+    decoration: InputDecoration(labelText: label),
+    textCapitalization: TextCapitalization.words,
+    onSaved: (value) => onSaved(value?.trim() ?? ''),
+  );
 
   Future<void> _editCue({CueEquipment? existing}) async {
     final formKey = GlobalKey<FormState>();
@@ -58,7 +74,10 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     var dueDate = existing?.tipMaintenanceDueDate;
     var name = existing?.name ?? '';
     var weight = existing?.weightGrams?.toString() ?? '';
-    var diameter = existing?.tipDiameterMm?.toString() ?? '';
+    var diameter = existing?.shaftDiameterMm?.toString() ?? '';
+    var shaftBrand = existing?.shaftBrand ?? '';
+    var tipBrand = existing?.tipBrand ?? '';
+    var buttBrand = existing?.buttBrand ?? '';
     var dialogSaving = false;
     final currentDate = ref.read(nowProvider)();
 
@@ -111,20 +130,18 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                             },
                     ),
                     const SizedBox(height: 8),
-                    TextFormField(
-                      initialValue: weight,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentWeight,
-                      ),
-                      keyboardType: TextInputType.number,
-                      onSaved: (value) => weight = value?.trim() ?? '',
-                      validator: (value) =>
-                          _positiveNumberValidator(value, integer: true),
+                    _brandField(
+                      key: const Key('cue-shaft-brand'),
+                      label: Vi.equipmentShaftBrand,
+                      initial: shaftBrand,
+                      onSaved: (value) => shaftBrand = value,
                     ),
                     TextFormField(
+                      key: const Key('cue-shaft-diameter'),
                       initialValue: diameter,
                       decoration: const InputDecoration(
-                        labelText: Vi.equipmentTipDiameter,
+                        labelText: Vi.equipmentShaftDiameter,
+                        suffixText: Vi.unitMm,
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -132,6 +149,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                       onSaved: (value) => diameter = value?.trim() ?? '',
                       validator: (value) =>
                           _positiveNumberValidator(value, integer: false),
+                    ),
+                    _brandField(
+                      key: const Key('cue-tip-brand'),
+                      label: Vi.equipmentTipBrand,
+                      initial: tipBrand,
+                      onSaved: (value) => tipBrand = value,
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<TipHardness?>(
@@ -154,6 +177,23 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                       onChanged: dialogSaving
                           ? null
                           : (value) => setDialogState(() => hardness = value),
+                    ),
+                    _brandField(
+                      key: const Key('cue-butt-brand'),
+                      label: Vi.equipmentButtBrand,
+                      initial: buttBrand,
+                      onSaved: (value) => buttBrand = value,
+                    ),
+                    TextFormField(
+                      key: const Key('cue-weight'),
+                      initialValue: weight,
+                      decoration: const InputDecoration(
+                        labelText: Vi.equipmentWeight,
+                      ),
+                      keyboardType: TextInputType.number,
+                      onSaved: (value) => weight = value?.trim() ?? '',
+                      validator: (value) =>
+                          _positiveNumberValidator(value, integer: true),
                     ),
                     const SizedBox(height: 12),
                     const Text(Vi.equipmentSkills),
@@ -232,10 +272,13 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                         name: name,
                         type: type,
                         weightGrams: weight.isEmpty ? null : int.parse(weight),
-                        tipDiameterMm: diameter.isEmpty
+                        shaftBrand: shaftBrand.isEmpty ? null : shaftBrand,
+                        shaftDiameterMm: diameter.isEmpty
                             ? null
                             : double.parse(diameter),
+                        tipBrand: tipBrand.isEmpty ? null : tipBrand,
                         tipHardness: hardness,
+                        buttBrand: buttBrand.isEmpty ? null : buttBrand,
                         skillCategories: skills.toList(growable: false),
                         lastTipMaintenance: lastMaintenance,
                         tipMaintenanceDueDate: dueDate,
@@ -303,7 +346,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     return !due.isBefore(today) && due.difference(today).inDays <= 7;
   }
 
-  Widget _cueCard(CueEquipment cue, DateTime now, List<TimerSession> sessions) {
+  Widget _cueCard(
+    CueEquipment cue,
+    DateTime now,
+    List<TimerSession> sessions,
+    CueWinRateReport winRates,
+  ) {
     final dueDate = cue.tipMaintenanceDueDate;
     final overdue =
         dueDate != null &&
@@ -316,9 +364,12 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     final details = <String>[
       Vi.equipmentTypeName(cue.type),
       if (cue.weightGrams != null) Vi.equipmentWeightValue(cue.weightGrams!),
-      if (cue.tipDiameterMm != null)
-        Vi.equipmentDiameterValue(cue.tipDiameterMm!),
+      if (cue.shaftBrand != null) Vi.equipmentShaftBrandValue(cue.shaftBrand!),
+      if (cue.shaftDiameterMm != null)
+        Vi.equipmentDiameterValue(cue.shaftDiameterMm!),
+      if (cue.tipBrand != null) Vi.equipmentTipBrandValue(cue.tipBrand!),
       if (cue.tipHardness != null) Vi.equipmentHardnessName(cue.tipHardness!),
+      if (cue.buttBrand != null) Vi.equipmentButtBrandValue(cue.buttBrand!),
     ];
     final skills = cue.skillCategories.map(Vi.skill).join(', ');
     final cueSessions = sessions.where((session) => session.cueId == cue.id);
@@ -362,6 +413,10 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
               ),
               Text('${Vi.equipmentLastUsed}: ${_formatDate(lastUsed.date)}'),
             ],
+            CueWinRateBlock(
+              stats: winRates.statsFor(cue.id),
+              isBest: winRates.bestCueId == cue.id,
+            ),
             if (dueDate != null)
               Text(
                 '${overdue
@@ -403,6 +458,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   Widget build(BuildContext context) {
     final equipmentAsync = ref.watch(cueEquipmentProvider);
     final sessionsAsync = ref.watch(timerSessionsProvider);
+    final matches = ref.watch(matchesProvider).value ?? const <PoolMatch>[];
     final now = ref.watch(nowProvider)();
 
     return PcRootScaffold(
@@ -421,6 +477,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                 : _equipmentList(
                     equipmentAsync.requireValue,
                     sessionsAsync.requireValue,
+                    matches,
                     now,
                   ),
           ),
@@ -442,8 +499,13 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   Widget _equipmentList(
     List<CueEquipment> cues,
     List<TimerSession> sessions,
+    List<PoolMatch> matches,
     DateTime now,
   ) {
+    final winRates = computeCueWinRates(
+      matches: matches,
+      knownCueIds: {for (final cue in cues) cue.id},
+    );
     final sortedCues = [...cues]
       ..sort((a, b) {
         final priorityA = _maintenancePriority(a.tipMaintenanceDueDate, now);
@@ -474,7 +536,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
                   children: sortedCues
-                      .map((cue) => _cueCard(cue, now, sessions))
+                      .map((cue) => _cueCard(cue, now, sessions, winRates))
                       .toList(growable: false),
                 ),
         ),

@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/match_codec.dart';
 import 'package:poolcoachai/data/repositories/match_repository.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 
@@ -41,6 +40,21 @@ class DriftMatchRepository implements MatchRepository {
       throw ArgumentError('Trận mới không được có kết quả rack');
     }
 
+    final cueId = match.cueId;
+    if (cueId != null) {
+      final cue =
+          await (_db.select(_db.cueEquipmentRows)..where(
+                (row) =>
+                    row.id.equals(cueId) &
+                    row.userId.equals(_userId) &
+                    row.isDeleted.equals(false),
+              ))
+              .getSingleOrNull();
+      if (cue == null) {
+        throw StateError('Cơ không tồn tại hoặc không thuộc tài khoản này');
+      }
+    }
+
     final existing = await (_db.select(
       _db.poolMatchRows,
     )..where((row) => row.id.equals(match.id))).getSingleOrNull();
@@ -49,14 +63,14 @@ class DriftMatchRepository implements MatchRepository {
     }
     await _db
         .into(_db.poolMatchRows)
-        .insert(_toCompanion(match, userId: _userId));
+        .insert(_toCompanion(match, userId: _userId, updatedAt: _now()));
   }
 
   @override
   Future<void> recordRack(String matchId, RackWinner winner) async {
     await _db.transaction(() async {
       final match = await _ownedMatch(matchId);
-      final updatedWinners = [..._decodeWinners(match.rackWinners), winner];
+      final updatedWinners = [...decodeMatchWinners(match.rackWinners), winner];
       final complete =
           updatedWinners.where((value) => value == winner).length >=
           match.targetRacks;
@@ -65,8 +79,10 @@ class DriftMatchRepository implements MatchRepository {
           ))
           .write(
             PoolMatchRowsCompanion(
-              rackWinners: Value(_encodeWinners(updatedWinners)),
+              rackWinners: Value(encodeMatchWinners(updatedWinners)),
               completedAt: Value(complete ? _now() : null),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
             ),
           );
     });
@@ -76,13 +92,13 @@ class DriftMatchRepository implements MatchRepository {
   Future<void> undoLastRack(String matchId) async {
     await _db.transaction(() async {
       final match = await _ownedMatch(matchId, allowCompleted: true);
-      final winners = _decodeWinners(match.rackWinners);
+      final winners = decodeMatchWinners(match.rackWinners);
       if (winners.isEmpty) {
         throw StateError('Trận đấu chưa có rack để hoàn tác');
       }
       final removedRack = winners.length;
       winners.removeLast();
-      final shots = _decodeShots(match.shots)
+      final shots = decodeMatchShots(match.shots)
           .where((shot) => shot.rackNumber != removedRack)
           .map(
             (shot) => shot.rackNumber > removedRack
@@ -105,9 +121,11 @@ class DriftMatchRepository implements MatchRepository {
           ))
           .write(
             PoolMatchRowsCompanion(
-              rackWinners: Value(_encodeWinners(winners)),
-              shots: Value(_encodeShots(shots)),
+              rackWinners: Value(encodeMatchWinners(winners)),
+              shots: Value(encodeMatchShots(shots)),
               completedAt: const Value(null),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
             ),
           );
     });
@@ -122,9 +140,9 @@ class DriftMatchRepository implements MatchRepository {
     }
     await _db.transaction(() async {
       final match = await _ownedMatch(matchId);
-      final winners = _decodeWinners(match.rackWinners);
+      final winners = decodeMatchWinners(match.rackWinners);
       final rackNumber = winners.length + 1;
-      final shots = _decodeShots(match.shots);
+      final shots = decodeMatchShots(match.shots);
       final rackShots = shots.where((value) => value.rackNumber == rackNumber);
       final nextShotNumber = rackShots.length + 1;
       if (shot.rackNumber != rackNumber || shot.shotNumber != nextShotNumber) {
@@ -137,7 +155,13 @@ class DriftMatchRepository implements MatchRepository {
       await (_db.update(_db.poolMatchRows)..where(
             (row) => row.id.equals(matchId) & row.userId.equals(_userId),
           ))
-          .write(PoolMatchRowsCompanion(shots: Value(_encodeShots(shots))));
+          .write(
+            PoolMatchRowsCompanion(
+              shots: Value(encodeMatchShots(shots)),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
+            ),
+          );
     });
   }
 
@@ -145,8 +169,8 @@ class DriftMatchRepository implements MatchRepository {
   Future<void> undoLastShot(String matchId) async {
     await _db.transaction(() async {
       final match = await _ownedMatch(matchId);
-      final rackNumber = _decodeWinners(match.rackWinners).length + 1;
-      final shots = _decodeShots(match.shots);
+      final rackNumber = decodeMatchWinners(match.rackWinners).length + 1;
+      final shots = decodeMatchShots(match.shots);
       final rackShots = shots
           .where((shot) => shot.rackNumber == rackNumber)
           .toList(growable: false);
@@ -160,7 +184,13 @@ class DriftMatchRepository implements MatchRepository {
       await (_db.update(_db.poolMatchRows)..where(
             (row) => row.id.equals(matchId) & row.userId.equals(_userId),
           ))
-          .write(PoolMatchRowsCompanion(shots: Value(_encodeShots(shots))));
+          .write(
+            PoolMatchRowsCompanion(
+              shots: Value(encodeMatchShots(shots)),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
+            ),
+          );
     });
   }
 
@@ -191,15 +221,17 @@ class DriftMatchRepository implements MatchRepository {
     playerName: row.playerName,
     opponentName: row.opponentName,
     targetRacks: row.targetRacks,
-    rackWinners: _decodeWinners(row.rackWinners),
+    rackWinners: decodeMatchWinners(row.rackWinners),
     startedAt: row.startedAt,
-    shots: _decodeShots(row.shots),
+    shots: decodeMatchShots(row.shots),
     completedAt: row.completedAt,
+    cueId: row.cueId,
   );
 
   PoolMatchRowsCompanion _toCompanion(
     PoolMatch match, {
     required String userId,
+    required DateTime updatedAt,
   }) => PoolMatchRowsCompanion.insert(
     id: match.id,
     userId: userId,
@@ -207,110 +239,10 @@ class DriftMatchRepository implements MatchRepository {
     playerName: match.playerName.trim(),
     opponentName: match.opponentName.trim(),
     targetRacks: match.targetRacks,
-    rackWinners: _encodeWinners(match.rackWinners),
+    rackWinners: encodeMatchWinners(match.rackWinners),
     startedAt: match.startedAt,
     completedAt: Value(match.completedAt),
+    cueId: Value(match.cueId),
+    updatedAt: Value(updatedAt),
   );
-
-  String _encodeWinners(List<RackWinner> winners) =>
-      jsonEncode(winners.map((winner) => winner.name).toList());
-
-  String _encodeShots(List<MatchShot> shots) => jsonEncode([
-    for (final shot in shots)
-      {
-        'id': shot.id,
-        'rackNumber': shot.rackNumber,
-        'shotNumber': shot.shotNumber,
-        'shooter': shot.shooter.name,
-        'type': shot.type.name,
-        'outcome': shot.outcome.name,
-        'positionOutcome': shot.positionOutcome?.name,
-        'notes': shot.notes,
-        'recordedAt': shot.recordedAt.toIso8601String(),
-      },
-  ]);
-
-  List<MatchShot> _decodeShots(String json) {
-    final decoded = jsonDecode(json);
-    if (decoded is! List) {
-      throw FormatException('Danh sách cú đánh không hợp lệ', json);
-    }
-    return decoded
-        .map((value) {
-          if (value is! Map<String, dynamic>) {
-            throw FormatException('Thông tin cú đánh không hợp lệ', json);
-          }
-          final shooterName = value['shooter'];
-          final typeName = value['type'];
-          final outcomeName = value['outcome'];
-          final positionName = value['positionOutcome'];
-          final id = value['id'];
-          final notes = value['notes'];
-          final rackNumber = value['rackNumber'];
-          final shotNumber = value['shotNumber'];
-          final recordedAt = value['recordedAt'];
-          if (id is! String ||
-              rackNumber is! int ||
-              shotNumber is! int ||
-              shooterName is! String ||
-              typeName is! String ||
-              outcomeName is! String ||
-              (positionName != null && positionName is! String) ||
-              (notes != null && notes is! String) ||
-              recordedAt is! String) {
-            throw FormatException(
-              'Thông tin cú đánh thiếu trường bắt buộc',
-              json,
-            );
-          }
-          return MatchShot(
-            id: id,
-            rackNumber: rackNumber,
-            shotNumber: shotNumber,
-            shooter: RackWinner.values.firstWhere(
-              (winner) => winner.name == shooterName,
-              orElse: () =>
-                  throw FormatException('Unknown RackWinner: $shooterName'),
-            ),
-            type: MatchShotType.values.firstWhere(
-              (type) => type.name == typeName,
-              orElse: () =>
-                  throw FormatException('Unknown MatchShotType: $typeName'),
-            ),
-            outcome: MatchShotOutcome.values.firstWhere(
-              (outcome) => outcome.name == outcomeName,
-              orElse: () => throw FormatException(
-                'Unknown MatchShotOutcome: $outcomeName',
-              ),
-            ),
-            positionOutcome: positionName == null
-                ? null
-                : PositionOutcome.values.firstWhere(
-                    (position) => position.name == positionName,
-                    orElse: () => throw FormatException(
-                      'Unknown PositionOutcome: $positionName',
-                    ),
-                  ),
-            notes: notes as String?,
-            recordedAt: DateTime.parse(recordedAt),
-          );
-        })
-        .toList(growable: true);
-  }
-
-  List<RackWinner> _decodeWinners(String json) {
-    final decoded = jsonDecode(json);
-    if (decoded is! List || decoded.any((winner) => winner is! String)) {
-      throw FormatException('Danh sách người thắng rack không hợp lệ', json);
-    }
-    return decoded
-        .cast<String>()
-        .map(
-          (name) => RackWinner.values.firstWhere(
-            (winner) => winner.name == name,
-            orElse: () => throw FormatException('Unknown RackWinner: $name'),
-          ),
-        )
-        .toList(growable: true);
-  }
 }

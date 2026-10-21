@@ -54,7 +54,11 @@ void main() {
   test(
     'weekly schedules are sorted and changes stay within the account',
     () async {
-      final repository = DriftScheduleRepository(db, userId: 'u1');
+      final repository = DriftScheduleRepository(
+        db,
+        userId: 'u1',
+        now: () => DateTime(2026, 10, 20, 9),
+      );
       await repository.save(
         const ScheduleSlot(
           id: 'late',
@@ -122,7 +126,13 @@ void main() {
       expect((await repository.watchAll().first).map((slot) => slot.id), [
         'early',
       ]);
-      expect((await db.select(db.scheduleSlotRows).get()).length, 2);
+      // Xóa là xóa mềm: dòng ở lại làm tombstone chờ đồng bộ.
+      final rows = await db.select(db.scheduleSlotRows).get();
+      expect(rows.length, 3);
+      final tombstone = rows.singleWhere((slot) => slot.id == 'late');
+      expect(tombstone.isDeleted, isTrue);
+      expect(tombstone.syncedAt, isNull);
+      expect(tombstone.updatedAt, isNotNull);
 
       for (final invalidSlot in [
         const ScheduleSlot(
@@ -137,6 +147,51 @@ void main() {
     },
   );
 
+  test('saving a removed slot again revives it as pending', () async {
+    final repository = DriftScheduleRepository(
+      db,
+      userId: 'u1',
+      now: () => DateTime(2026, 10, 20, 9),
+    );
+    const slot = ScheduleSlot(id: 's', day: 0, time: '08:00', label: 'Sáng');
+    await repository.save(slot);
+    await repository.remove('s');
+    expect(await repository.watchAll().first, isEmpty);
+
+    await repository.save(slot);
+
+    expect((await repository.watchAll().first).single.id, 's');
+    final row = (await db.select(db.scheduleSlotRows).get()).single;
+    expect(row.isDeleted, isFalse);
+    expect(row.syncedAt, isNull);
+  });
+
+  test('stores the break-jump type and brand fields round-trip', () async {
+    final repository = DriftCueEquipmentRepository(db, userId: 'u1');
+    await repository.save(
+      const CueEquipment(
+        id: 'cue-bj',
+        name: 'Cơ phá nhảy',
+        type: CueType.breakJump,
+        shaftBrand: 'Predator',
+        shaftDiameterMm: 12.4,
+        tipBrand: 'Kamui',
+        tipHardness: TipHardness.hard,
+        buttBrand: 'Cuetec',
+        skillCategories: [],
+      ),
+    );
+
+    final cue = (await repository.watchAll().first).single;
+    expect(cue.type, CueType.breakJump);
+    expect(cue.shaftBrand, 'Predator');
+    expect(cue.shaftDiameterMm, 12.4);
+    expect(cue.tipBrand, 'Kamui');
+    expect(cue.tipHardness, TipHardness.hard);
+    expect(cue.buttBrand, 'Cuetec');
+    expect(cue.weightGrams, isNull);
+  });
+
   test(
     'equipment is account-scoped and deleting a cue unlinks its sessions',
     () async {
@@ -146,7 +201,7 @@ void main() {
         name: 'Cơ thi đấu',
         type: CueType.playing,
         weightGrams: 540,
-        tipDiameterMm: 12.5,
+        shaftDiameterMm: 12.5,
         tipHardness: TipHardness.medium,
         skillCategories: const [SkillCategory.aiming],
         lastTipMaintenance: DateTime(2026, 9, 1),
@@ -197,7 +252,7 @@ void main() {
       expect(ownCues.single.name, cue.name);
       expect(ownCues.single.type, CueType.playing);
       expect(ownCues.single.weightGrams, 540);
-      expect(ownCues.single.tipDiameterMm, 12.5);
+      expect(ownCues.single.shaftDiameterMm, 12.5);
       expect(ownCues.single.tipHardness, TipHardness.medium);
       expect(ownCues.single.skillCategories, [SkillCategory.aiming]);
       expect(ownCues.single.lastTipMaintenance, DateTime(2026, 9, 1));
@@ -238,7 +293,7 @@ void main() {
               id: 'invalid-diameter',
               name: 'Cơ không hợp lệ',
               type: CueType.playing,
-              tipDiameterMm: diameter,
+              shaftDiameterMm: diameter,
               skillCategories: const [],
             ),
           ),

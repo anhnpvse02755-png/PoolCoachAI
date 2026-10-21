@@ -1,7 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/drift_match_repository.dart';
+import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 
 void main() {
@@ -119,4 +122,87 @@ void main() {
       await expectLater(repository.undoLastShot('new'), throwsStateError);
     },
   );
+
+  group('cue on a match', () {
+    final now = DateTime(2026, 10, 20, 12);
+
+    Future<void> addCue(String id, {String userId = 'u1'}) =>
+        DriftCueEquipmentRepository(db, userId: userId, now: () => now).save(
+          CueEquipment(
+            id: id,
+            name: 'Cơ $id',
+            type: CueType.playing,
+            skillCategories: const [],
+          ),
+        );
+
+    PoolMatch withCue(String id, String? cueId) => PoolMatch(
+      id: id,
+      gameType: PoolGameType.nineBall,
+      playerName: 'An',
+      opponentName: 'Bình',
+      targetRacks: 2,
+      rackWinners: const [],
+      startedAt: DateTime(2026, 10, 20, 10),
+      cueId: cueId,
+    );
+
+    test('is stored and read back', () async {
+      await addCue('c1');
+      final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+      await repository.start(withCue('m1', 'c1'));
+      await repository.start(withCue('m2', null));
+
+      final matches = {
+        for (final m in await repository.watchAll().first) m.id: m,
+      };
+      expect(matches['m1']!.cueId, 'c1');
+      expect(matches['m2']!.cueId, isNull);
+    });
+
+    test('must be an existing cue of this account', () async {
+      await addCue('theirs', userId: 'u2');
+      final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+
+      await expectLater(
+        repository.start(withCue('m1', 'theirs')),
+        throwsStateError,
+      );
+      await expectLater(
+        repository.start(withCue('m2', 'nope')),
+        throwsStateError,
+      );
+      expect(await db.select(db.poolMatchRows).get(), isEmpty);
+    });
+
+    test('is kept when the cue is deleted afterwards', () async {
+      await addCue('c1');
+      final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+      await repository.start(withCue('m1', 'c1'));
+
+      await DriftCueEquipmentRepository(db, userId: 'u1', now: () => now)
+          .remove('c1');
+
+      expect((await repository.watchAll().first).single.cueId, 'c1');
+    });
+  });
+
+  test('every change marks the match as unsynced with a fresh updatedAt', () async {
+    var now = DateTime(2026, 10, 20, 11);
+    final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+    await repository.start(newMatch('m1'));
+    var row = (await db.select(db.poolMatchRows).get()).single;
+    expect(row.updatedAt, now);
+    expect(row.syncedAt, isNull);
+
+    await (db.update(db.poolMatchRows)).write(
+      PoolMatchRowsCompanion(syncedAt: Value(now)),
+    );
+    now = DateTime(2026, 10, 20, 11, 5);
+    await repository.recordRack('m1', RackWinner.player);
+
+    row = (await db.select(db.poolMatchRows).get()).single;
+    expect(row.updatedAt, now);
+    expect(row.syncedAt, isNull);
+  });
 }

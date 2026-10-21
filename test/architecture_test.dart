@@ -256,6 +256,23 @@ void main() {
     );
   });
 
+  test('lõi tỉ lệ thắng theo cơ không phụ thuộc Flutter', () {
+    final files = dartFilesIn('lib/domain/cue_performance');
+    final offenders = [
+      for (final file in files)
+        if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
+          file.path.replaceAll(r'', '/'),
+    ];
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'cách tính tỉ lệ thắng và kết luận cơ hợp nhất phải chạy và '
+          'test được trên Dart VM thuần',
+    );
+  });
+
   test('thành tích chỉ sinh ra từ newAchievements', () {
     // Thành tích tạo tay là thành tích "ảo" (spec 2026-10-15 mục 2.7). Ngoài
     // lõi và tầng dữ liệu, không nơi nào được dựng Achievement(.

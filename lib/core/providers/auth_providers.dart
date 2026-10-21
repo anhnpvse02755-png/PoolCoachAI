@@ -11,6 +11,7 @@ import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_session_store.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/data/sync/cue_equipment_sync.dart';
+import 'package:poolcoachai/data/sync/practice_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
@@ -88,6 +89,18 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 
 final cueEquipmentSyncProvider = Provider<CueEquipmentSyncService>((ref) {
   final service = CueEquipmentSyncService(
+    db: ref.watch(appDatabaseProvider),
+    auth: ref.watch(authRepositoryProvider),
+    api: ref.watch(directusClientProvider),
+    now: ref.watch(nowProvider),
+  )..start();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Đồng bộ trận đấu, buổi tập tự do và lịch tập tuần.
+final practiceSyncProvider = Provider<PracticeSyncService>((ref) {
+  final service = PracticeSyncService(
     db: ref.watch(appDatabaseProvider),
     auth: ref.watch(authRepositoryProvider),
     api: ref.watch(directusClientProvider),

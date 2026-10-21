@@ -7,6 +7,8 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,6 +28,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     var opponentName = '';
     var gameType = PoolGameType.nineBall;
     var targetRacks = 5;
+    final cues = ref.read(cueEquipmentProvider).value ?? const <CueEquipment>[];
+    String? cueId = defaultMatchCueId(
+      matches: ref.read(matchesProvider).value ?? const <PoolMatch>[],
+      knownCueIds: {for (final cue in cues) cue.id},
+    );
     final create = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -100,6 +107,31 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       }
                     },
                   ),
+                  if (cues.isNotEmpty)
+                    DropdownButtonFormField<String?>(
+                      key: const Key('match-cue'),
+                      initialValue: cueId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: Vi.matchCue,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(Vi.timerNoCue),
+                        ),
+                        ...cues.map(
+                          (cue) => DropdownMenuItem<String?>(
+                            value: cue.id,
+                            child: Text(
+                              '${cue.name} · ${Vi.equipmentTypeName(cue.type)}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setDialogState(() => cueId = value),
+                    ),
                 ],
               ),
             ),
@@ -139,6 +171,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               targetRacks: targetRacks,
               rackWinners: const [],
               startedAt: ref.read(nowProvider)(),
+              cueId: cueId,
             ),
           );
     } catch (error) {
@@ -353,7 +386,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _matchCard(PoolMatch match) {
+  Widget _matchCard(PoolMatch match, Map<String, String> cueNames) {
     final score = Vi.matchScore(
       match.playerName,
       match.playerScore,
@@ -382,6 +415,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             ),
             const SizedBox(height: 8),
             Text(score, style: Theme.of(context).textTheme.titleLarge),
+            if (match.cueId != null)
+              Text(
+                Vi.matchCueLine(cueNames[match.cueId] ?? Vi.equipmentUnknownCue),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             Text(
               '${Vi.matchRaceTo(match.targetRacks)} · '
               '${Vi.matchRackProgress(match.rackWinners.length)}',
@@ -473,6 +511,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   @override
   Widget build(BuildContext context) {
     final matchesAsync = ref.watch(matchesProvider);
+    final cueNames = {
+      for (final cue in ref.watch(cueEquipmentProvider).value ?? const <CueEquipment>[])
+        cue.id: cue.name,
+    };
 
     return PcRootScaffold(
       title: Vi.playTitle,
@@ -499,7 +541,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 body: Vi.matchEmpty,
               )
             else
-              ...matches.map(_matchCard),
+              ...matches.map((match) => _matchCard(match, cueNames)),
           ],
         ),
       ),

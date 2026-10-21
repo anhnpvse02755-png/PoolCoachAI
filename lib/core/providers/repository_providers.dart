@@ -47,6 +47,7 @@ final scheduleRepositoryProvider = Provider<ScheduleRepository>((ref) {
   return DriftScheduleRepository(
     ref.watch(appDatabaseProvider),
     userId: userId,
+    now: ref.watch(nowProvider),
   );
 });
 
@@ -63,5 +64,9 @@ final cueEquipmentRepositoryProvider = Provider<CueEquipmentRepository>((ref) {
 final matchRepositoryProvider = Provider<MatchRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return const SignedOutMatchRepository();
-  return DriftMatchRepository(ref.watch(appDatabaseProvider), userId: userId);
+  return DriftMatchRepository(
+    ref.watch(appDatabaseProvider),
+    userId: userId,
+    now: ref.watch(nowProvider),
+  );
 });

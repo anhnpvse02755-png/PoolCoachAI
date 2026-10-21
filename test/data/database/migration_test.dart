@@ -62,7 +62,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 9);
+    expect(db.schemaVersion, 10);
     expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
 
     final at = DateTime(2026, 10, 14, 9);
@@ -139,7 +139,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 9);
+    expect(db.schemaVersion, 10);
     expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
 
     final at = DateTime(2026, 10, 15, 9);
@@ -162,7 +162,7 @@ void main() {
   });
 
   test(
-    'nâng từ v4 lên v9 giữ dữ liệu cũ và thêm bảng Timer, Equipment, Play',
+    'nâng từ v4 lên v10 giữ dữ liệu cũ và thêm bảng Timer, Equipment, Play',
     () async {
       final executor = NativeDatabase.memory(
         setup: (raw) {
@@ -179,7 +179,7 @@ void main() {
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 9);
+      expect(db.schemaVersion, 10);
       expect((await db.select(db.scheduleSlotRows).get()).single.userId, '');
       expect((await db.select(db.timerSessionRows).get()).single.userId, '');
 
@@ -202,7 +202,7 @@ void main() {
     },
   );
 
-  test('nâng từ v7 lên v9 thêm nhật ký cú và sync Equipment', () async {
+  test('nâng từ v7 lên v10 thêm nhật ký cú và sync Equipment', () async {
     final startedAt = DateTime.utc(2026, 10, 20);
     final timestamp = startedAt.millisecondsSinceEpoch ~/ 1000;
     final executor = NativeDatabase.memory(
@@ -242,13 +242,14 @@ void main() {
           "('cue-v7', 'u1', 'Cơ cũ', 'playing', 540, NULL, NULL, "
           "'[]', NULL, NULL);",
         );
+        _createOwnedPracticeTables(raw);
         raw.execute('PRAGMA user_version = 7;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 9);
+    expect(db.schemaVersion, 10);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
     expect(match.userId, 'u1');
@@ -268,7 +269,7 @@ void main() {
     );
   });
 
-  test('nâng từ v8 lên v9 thêm metadata sync cho Equipment', () async {
+  test('nâng từ v8 lên v10 thêm metadata sync cho Equipment', () async {
     final executor = NativeDatabase.memory(
       setup: (raw) {
         raw.execute(
@@ -289,21 +290,99 @@ void main() {
           "('cue-v8', 'u1', 'Cơ cũ', 'playing', 540, NULL, NULL, "
           "'[\"aiming\"]', NULL, NULL);",
         );
+        _createOwnedPracticeTables(raw);
+        raw.execute(
+          'CREATE TABLE pool_match_rows ('
+          'id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, '
+          'game_type TEXT NOT NULL, player_name TEXT NOT NULL, '
+          'opponent_name TEXT NOT NULL, target_racks INTEGER NOT NULL, '
+          'rack_winners TEXT NOT NULL, '
+          "shots TEXT NOT NULL DEFAULT '[]', "
+          'started_at INTEGER NOT NULL, completed_at INTEGER NULL);',
+        );
         raw.execute('PRAGMA user_version = 8;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 9);
+    expect(db.schemaVersion, 10);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.id, 'cue-v8');
     expect(cue.updatedAt, isNull);
     expect(cue.syncedAt, isNull);
     expect(cue.isDeleted, isFalse);
   });
-}
 
+  test('nâng từ v9 lên v10 thêm trường cơ, cueId và metadata sync', () async {
+    final executor = NativeDatabase.memory(
+      setup: (raw) {
+        raw.execute(
+          'CREATE TABLE schedule_slot_rows (id TEXT NOT NULL PRIMARY KEY, '
+          "user_id TEXT NOT NULL DEFAULT '', day INTEGER NOT NULL, "
+          'time TEXT NOT NULL, label TEXT NOT NULL, cat TEXT NULL);',
+        );
+        raw.execute(
+          "INSERT INTO schedule_slot_rows VALUES ('s9', 'u1', 2, '19:00', 'Tập', NULL);",
+        );
+        raw.execute(
+          'CREATE TABLE timer_session_rows (id TEXT NOT NULL PRIMARY KEY, '
+          "user_id TEXT NOT NULL DEFAULT '', date INTEGER NOT NULL, "
+          'duration_sec INTEGER NOT NULL, cat TEXT NULL, cue_id TEXT NULL);',
+        );
+        raw.execute(
+          "INSERT INTO timer_session_rows VALUES ('t9', 'u1', 1760400000, 900, NULL, NULL);",
+        );
+        raw.execute(
+          'CREATE TABLE cue_equipment_rows ('
+          'id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, '
+          'name TEXT NOT NULL, type TEXT NOT NULL, weight_grams INTEGER NULL, '
+          'tip_diameter_mm REAL NULL, tip_hardness TEXT NULL, '
+          'skill_categories TEXT NOT NULL, last_tip_maintenance INTEGER NULL, '
+          'tip_maintenance_due_date INTEGER NULL, updated_at INTEGER NULL, '
+          'synced_at INTEGER NULL, is_deleted INTEGER NOT NULL DEFAULT 0);',
+        );
+        raw.execute(
+          "INSERT INTO cue_equipment_rows VALUES ('c9', 'u1', 'Cơ cũ', "
+          "'playing', NULL, 12.4, 'hard', '[]', NULL, NULL, NULL, NULL, 0);",
+        );
+        raw.execute(
+          'CREATE TABLE pool_match_rows ('
+          'id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, '
+          'game_type TEXT NOT NULL, player_name TEXT NOT NULL, '
+          'opponent_name TEXT NOT NULL, target_racks INTEGER NOT NULL, '
+          'rack_winners TEXT NOT NULL, '
+          "shots TEXT NOT NULL DEFAULT '[]', "
+          'started_at INTEGER NOT NULL, completed_at INTEGER NULL);',
+        );
+        raw.execute(
+          "INSERT INTO pool_match_rows VALUES ('m9', 'u1', 'nineBall', 'An', "
+          "'Bình', 5, '[]', '[]', 1760400000, NULL);",
+        );
+        raw.execute('PRAGMA user_version = 9;');
+      },
+    );
+    final db = AppDatabase.forTesting(executor);
+    addTearDown(db.close);
+
+    expect(db.schemaVersion, 10);
+    final cue = (await db.select(db.cueEquipmentRows).getSingle());
+    expect(cue.shaftDiameterMm, 12.4);
+    expect(cue.shaftBrand, isNull);
+    expect(cue.tipBrand, isNull);
+    expect(cue.buttBrand, isNull);
+    final match = (await db.select(db.poolMatchRows).getSingle());
+    expect(match.cueId, isNull);
+    expect(match.updatedAt, isNull);
+    expect(match.syncedAt, isNull);
+    final timer = (await db.select(db.timerSessionRows).getSingle());
+    expect(timer.syncedAt, isNull);
+    final slot = (await db.select(db.scheduleSlotRows).getSingle());
+    expect(slot.updatedAt, isNull);
+    expect(slot.syncedAt, isNull);
+    expect(slot.isDeleted, isFalse);
+  });
+}
 void _createPracticeTables(dynamic raw) {
   raw.execute(
     'CREATE TABLE schedule_slot_rows (id TEXT NOT NULL PRIMARY KEY, '
@@ -314,5 +393,19 @@ void _createPracticeTables(dynamic raw) {
     'CREATE TABLE timer_session_rows (id TEXT NOT NULL PRIMARY KEY, '
     'date INTEGER NOT NULL, duration_sec INTEGER NOT NULL, '
     'cat TEXT NULL, cue_id TEXT NULL);',
+  );
+}
+
+/// Bảng luyện tập từ v5 trở đi: đã có cột chủ.
+void _createOwnedPracticeTables(dynamic raw) {
+  raw.execute(
+    'CREATE TABLE schedule_slot_rows (id TEXT NOT NULL PRIMARY KEY, '
+    "user_id TEXT NOT NULL DEFAULT '', day INTEGER NOT NULL, "
+    'time TEXT NOT NULL, label TEXT NOT NULL, cat TEXT NULL);',
+  );
+  raw.execute(
+    'CREATE TABLE timer_session_rows (id TEXT NOT NULL PRIMARY KEY, '
+    "user_id TEXT NOT NULL DEFAULT '', date INTEGER NOT NULL, "
+    'duration_sec INTEGER NOT NULL, cat TEXT NULL, cue_id TEXT NULL);',
   );
 }
