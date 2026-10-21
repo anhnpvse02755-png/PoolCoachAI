@@ -533,7 +533,10 @@ class _SituationScreenState extends ConsumerState<SituationScreen> {
                       : Vi.coachSubmit),
             ),
             const SizedBox(width: AppSpacing.md),
-            Text(Vi.coachTryCount(session.nextTry, coachMaxAnswers), style: theme.bodySmall),
+            // Đã kết thúc thì giữ số lần đã thử; chưa thử lần nào (xem đáp án
+            // ngay) thì không có dòng này.
+            if ((ended ? session.tries : session.nextTry) case final k when k > 0)
+              Text(Vi.coachTryCount(k, coachMaxAnswers), style: theme.bodySmall),
           ],
         ),
         Align(
