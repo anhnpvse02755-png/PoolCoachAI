@@ -44,6 +44,11 @@ enum CoachFault {
   spinUnneeded,
   strokeWorse,
   powerWorse,
+
+  /// Có áp phê, nhưng khác kiểu áp phê của cú gần nhất trong tập đạt (chỉ
+  /// gặp khi Planner phải dùng tầng áp phê). Không có trong bảng mục 6.7
+  /// của spec: thêm lúc làm T1 để không gán nhầm sang lỗi khác.
+  spinWorse,
 }
 
 /// Năm lỗi "hỏng cú" — cú không vào, chết cái hay giết cú sau.
