@@ -446,6 +446,53 @@ try {
     fail('thiếu id của A hoặc B, bỏ qua phần Lộ trình');
   }
 
+  // ─── Coach tình huống: coach_attempts (spec 2026-10-21 mục 11.4) ─────────
+  if (aId && bId) {
+    const attempt = {
+      id: randomUUID(),
+      situation_key: 'lib:pos-rail-1',
+      topic: 'position',
+      difficulty: 'easy',
+      answers: [{ kind: 'pot', pocket: 'bottomMiddle', stroke: 'stun', power: 45, outcome: 'best' }],
+      outcome: 'solved1',
+      first_fault: null,
+      scoring_version: 1,
+      started_at: '2026-10-21T03:00:00.000Z',
+      finished_at: '2026-10-21T03:01:00.000Z',
+    };
+    const cMade = await call('POST', '/items/coach_attempts', attempt, a.access_token);
+    cMade.status === 200
+      ? ok('A tạo được lần làm Coach')
+      : fail(`A tạo lần làm Coach → ${cMade.status} ${cMade.code}`);
+    const cAgain = await call('POST', '/items/coach_attempts', attempt, a.access_token);
+    cAgain.code === 'RECORD_NOT_UNIQUE'
+      ? ok('gửi lại lần làm cùng id → RECORD_NOT_UNIQUE (app coi là đã đồng bộ)')
+      : fail(`gửi lại lần làm cùng id → ${cAgain.status} ${cAgain.code}`);
+    const cList = await call('GET', '/items/coach_attempts', undefined, a.access_token);
+    Array.isArray(cList.data?.[0]?.answers)
+      ? ok('answers về dạng JSON, không phải chuỗi')
+      : fail(`answers về dạng ${typeof cList.data?.[0]?.answers}`);
+    const cPatch = await call(
+      'PATCH',
+      `/items/coach_attempts/${attempt.id}`,
+      { outcome: 'revealed' },
+      a.access_token,
+    );
+    cPatch.status === 403
+      ? ok('A không sửa được lần làm Coach')
+      : fail(`A sửa lần làm Coach → ${cPatch.status}`);
+    const cDelete = await call('DELETE', `/items/coach_attempts/${attempt.id}`, undefined, a.access_token);
+    cDelete.status === 403
+      ? ok('A không xoá được lần làm Coach')
+      : fail(`A xoá lần làm Coach → ${cDelete.status}`);
+    const bCoach = await call('GET', '/items/coach_attempts', undefined, b.access_token);
+    (bCoach.data ?? []).length === 0
+      ? ok('B không thấy lần làm Coach của A')
+      : fail(`B thấy ${bCoach.data.length} lần làm Coach`);
+  } else {
+    fail('thiếu id của A hoặc B, bỏ qua phần Coach');
+  }
+
   const adminRole = (await call('GET', '/roles?filter[name][_eq]=Administrator', undefined, admin.access_token)).data?.[0]?.id;
   await call('PATCH', '/users/me', { role: adminRole }, a.access_token);
   const roleAfter = await roleOf(users[0].email);

@@ -284,6 +284,41 @@ class AchievementRows extends Table {
   ];
 }
 
+// ─── Coach tình huống (spec 2026-10-21 mục 11) ─────────────────────────────
+
+/// Một lần làm tình huống Coach — chỉ thêm, không sửa. Ghi khi tình huống
+/// kết thúc (đạt, hiện đáp án, hay chưa đủ dữ liệu). Chỉ lưu câu trả lời của
+/// người chơi, không lưu đáp án; không đưa vào điểm thuần thục (Q2).
+class CoachAttemptRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+
+  /// `gen-v1-…` hoặc `lib:{id}`.
+  TextColumn get situationKey => text()();
+
+  /// `CoachTopic.name`.
+  TextColumn get topic => text()();
+
+  /// `CoachDifficulty.name`.
+  TextColumn get difficulty => text()();
+
+  /// JSON, tối đa 3 câu trả lời (coach_converters.dart).
+  TextColumn get answers => text()();
+
+  /// `CoachAttemptOutcome.name`.
+  TextColumn get outcome => text()();
+
+  /// `CoachFault.name` của lần sai đầu tiên.
+  TextColumn get firstFault => text().nullable()();
+  IntColumn get scoringVersion => integer()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get finishedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(
@@ -301,6 +336,7 @@ class AchievementRows extends Table {
     PlayerGoalRows,
     AchievementRows,
     PoolMatchRows,
+    CoachAttemptRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -310,7 +346,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -374,6 +410,10 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(scheduleSlotRows, scheduleSlotRows.updatedAt);
         await m.addColumn(scheduleSlotRows, scheduleSlotRows.syncedAt);
         await m.addColumn(scheduleSlotRows, scheduleSlotRows.isDeleted);
+      }
+      if (from < 11) {
+        // Chỉ thêm bảng (spec Coach mục 11.2): không đụng dữ liệu cũ.
+        await m.createTable(coachAttemptRows);
       }
     },
   );

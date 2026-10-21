@@ -5,6 +5,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/providers/coach_providers.dart';
+import 'package:poolcoachai/data/sync/coach_sync.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
@@ -175,6 +177,14 @@ void main() {
       now: () => today,
     );
     addTearDown(practiceSync.dispose);
+    server.routes['GET /items/coach_attempts'] = (_) => FakeDirectus.ok([]);
+    final coachSync = CoachSyncService(
+      db: db,
+      auth: auth,
+      api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+      now: () => today,
+    );
+    addTearDown(coachSync.dispose);
 
     final container = ProviderContainer(
       overrides: [
@@ -186,6 +196,7 @@ void main() {
         practiceSyncProvider.overrideWithValue(practiceSync),
         assessmentSyncProvider.overrideWithValue(assessmentSync),
         roadmapSyncProvider.overrideWithValue(roadmapSync),
+        coachSyncProvider.overrideWithValue(coachSync),
       ],
     );
     addTearDown(container.dispose);

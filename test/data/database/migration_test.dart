@@ -62,7 +62,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
 
     final at = DateTime(2026, 10, 14, 9);
@@ -139,7 +139,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
 
     final at = DateTime(2026, 10, 15, 9);
@@ -179,7 +179,7 @@ void main() {
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 10);
+      expect(db.schemaVersion, 11);
       expect((await db.select(db.scheduleSlotRows).get()).single.userId, '');
       expect((await db.select(db.timerSessionRows).get()).single.userId, '');
 
@@ -249,7 +249,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
     expect(match.userId, 'u1');
@@ -306,7 +306,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.id, 'cue-v8');
     expect(cue.updatedAt, isNull);
@@ -365,7 +365,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 10);
+    expect(db.schemaVersion, 11);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.shaftDiameterMm, 12.4);
     expect(cue.shaftBrand, isNull);
@@ -381,6 +381,48 @@ void main() {
     expect(slot.updatedAt, isNull);
     expect(slot.syncedAt, isNull);
     expect(slot.isDeleted, isFalse);
+  });
+
+  test('nâng từ v10 lên v11 chỉ thêm bảng lần làm Coach, giữ nguyên dữ liệu cũ', () async {
+    final executor = NativeDatabase.memory(
+      setup: (raw) {
+        raw.execute(
+          'CREATE TABLE drill_log_rows (id TEXT NOT NULL PRIMARY KEY, '
+          'drill_id TEXT NOT NULL, date INTEGER NOT NULL, score REAL NOT NULL, '
+          'attempts INTEGER NULL, notes TEXT NULL, user_id TEXT NOT NULL, '
+          'synced_at INTEGER NULL);',
+        );
+        raw.execute(
+          "INSERT INTO drill_log_rows VALUES ('v10', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);",
+        );
+        raw.execute('PRAGMA user_version = 10;');
+      },
+    );
+    final db = AppDatabase.forTesting(executor);
+    addTearDown(db.close);
+
+    expect(db.schemaVersion, 11);
+    expect((await db.select(db.drillLogRows).get()).single.id, 'v10');
+    expect(await db.select(db.coachAttemptRows).get(), isEmpty);
+    final at = DateTime(2026, 10, 21, 9);
+    await db.into(db.coachAttemptRows).insert(
+          CoachAttemptRowsCompanion.insert(
+            id: 'c1',
+            userId: 'u1',
+            situationKey: 'lib:pos-rail-1',
+            topic: 'position',
+            difficulty: 'easy',
+            answers: '[]',
+            outcome: 'solved1',
+            scoringVersion: 1,
+            startedAt: at,
+            finishedAt: at,
+          ),
+        );
+    final row = (await db.select(db.coachAttemptRows).get()).single;
+    expect(row.situationKey, 'lib:pos-rail-1');
+    expect(row.firstFault, isNull);
+    expect(row.syncedAt, isNull);
   });
 }
 void _createPracticeTables(dynamic raw) {

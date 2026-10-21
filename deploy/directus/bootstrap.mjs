@@ -265,6 +265,22 @@ await ensureCollection('achievements', 'Thành tích Lộ trình — chỉ thêm
   required('achieved_at', 'timestamp'),
 ]);
 
+// ─── 1d. Coach tình huống (spec 2026-10-21 mục 11.4) ───────────────────────
+// coach_attempts: chỉ thêm, mỗi lần làm tình huống một dòng. Chỉ có câu trả
+// lời của người chơi, không có đáp án; không đưa vào điểm thuần thục.
+await ensureCollection('coach_attempts', 'Lần làm tình huống Coach — chỉ thêm', [
+  pk,
+  required('situation_key', 'string'),
+  required('topic', 'string'),
+  required('difficulty', 'string'),
+  required('answers', 'json'),
+  required('outcome', 'string'),
+  nullable('first_fault', 'string'),
+  required('scoring_version', 'integer'),
+  required('started_at', 'timestamp'),
+  required('finished_at', 'timestamp'),
+]);
+
 // Equipment dùng updated_at/is_deleted để đồng bộ và xóa mềm đa thiết bị.
 await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng của người chơi', [
   pk,
@@ -439,6 +455,16 @@ const desiredPermissions = [
     validation: {},
   },
   { collection: 'achievements', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  // Lần làm Coach: chỉ thêm, không sửa, không xoá; chỉ đọc của mình.
+  {
+    collection: 'coach_attempts',
+    action: 'create',
+    fields: ['id', 'situation_key', 'topic', 'difficulty', 'answers', 'outcome', 'first_fault',
+      'scoring_version', 'started_at', 'finished_at'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'coach_attempts', action: 'read', fields: ['*'], permissions: { user_created: self } },
   // Equipment: đồng bộ CRUD theo quyền sở hữu; xóa chỉ bằng tombstone.
   {
     collection: 'cue_equipment',
