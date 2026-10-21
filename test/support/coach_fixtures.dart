@@ -1,4 +1,8 @@
 import 'package:poolcoachai/domain/coach/answer.dart';
+import 'package:poolcoachai/domain/coach/attempt.dart';
+import 'package:poolcoachai/domain/coach/coach_constants.dart';
+import 'package:poolcoachai/domain/coach/coach_topic.dart';
+import 'package:poolcoachai/domain/coach/difficulty.dart';
 import 'package:poolcoachai/domain/coach/coach_job.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
 import 'package:poolcoachai/domain/planner/safety_aim.dart';
@@ -84,3 +88,30 @@ AimShotFn missingAim(
         converged: real.converged,
       );
     };
+
+var _attemptCounter = 0;
+
+/// Một lần làm, xong lúc [minute] (số lớn hơn là mới hơn).
+CoachAttempt attempt(
+  CoachAttemptOutcome outcome, {
+  CoachTopic topic = CoachTopic.position,
+  CoachFault? fault,
+  int minute = 0,
+}) {
+  _attemptCounter++;
+  final at = DateTime(2026, 10, 21, 8).add(Duration(minutes: minute));
+  return CoachAttempt(
+    id: 'a$_attemptCounter',
+    userId: 'u1',
+    situationKey: 'lib:x$_attemptCounter',
+    topic: topic,
+    difficulty: CoachDifficulty.easy,
+    answers: const [],
+    outcome: outcome,
+    firstFault: fault,
+    scoringVersion: coachScoringVersion,
+    startedAt: at,
+    finishedAt: at,
+  );
+}
+
