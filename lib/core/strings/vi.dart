@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -15,6 +16,7 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
@@ -53,13 +55,13 @@ abstract final class Vi {
   /// băng trước rồi mới tới bi mục tiêu. "Cân bi" là **bank shot**: bi
   /// mục tiêu mới là bi chạm băng. Hai nhóm riêng, không gộp.
   static String skill(SkillCategory category) => switch (category) {
-        SkillCategory.aiming => 'Ngắm bi',
-        SkillCategory.position => 'Điều bi / Vị trí',
-        SkillCategory.breakShot => 'Phá',
-        SkillCategory.safety => 'Phòng thủ',
-        SkillCategory.kick => 'A băng',
-        SkillCategory.bank => 'Cân bi',
-      };
+    SkillCategory.aiming => 'Ngắm bi',
+    SkillCategory.position => 'Điều bi / Vị trí',
+    SkillCategory.breakShot => 'Phá',
+    SkillCategory.safety => 'Phòng thủ',
+    SkillCategory.kick => 'A băng',
+    SkillCategory.bank => 'Cân bi',
+  };
 
   /// Câu giải thích vì sao hôm nay lại là nhóm kỹ năng này.
   ///
@@ -69,17 +71,16 @@ abstract final class Vi {
   ///
   /// Sáu lý do phải ra sáu câu khác nhau. Dùng chung một câu là lớp
   /// suy luận nói mà người chơi không nghe được gì.
-  static String pickReason(PickReason reason, String skill) =>
-      switch (reason) {
-        PickReason.scheduled => 'Lịch tập hôm nay của bạn là $skill.',
-        PickReason.streakAtRisk =>
-          'Hai hôm rồi bạn chưa tập. Quay lại nhẹ nhàng với $skill.',
-        PickReason.weakest => '$skill đang là nhóm yếu nhất của bạn.',
-        PickReason.newcomer => 'Bắt đầu với $skill — nền của mọi cú đánh.',
-        PickReason.declining =>
-          '$skill đang đi xuống. Ôn lại trước khi thành điểm yếu.',
-        PickReason.rotation => 'Đã lâu bạn chưa tập $skill.',
-      };
+  static String pickReason(PickReason reason, String skill) => switch (reason) {
+    PickReason.scheduled => 'Lịch tập hôm nay của bạn là $skill.',
+    PickReason.streakAtRisk =>
+      'Hai hôm rồi bạn chưa tập. Quay lại nhẹ nhàng với $skill.',
+    PickReason.weakest => '$skill đang là nhóm yếu nhất của bạn.',
+    PickReason.newcomer => 'Bắt đầu với $skill — nền của mọi cú đánh.',
+    PickReason.declining =>
+      '$skill đang đi xuống. Ôn lại trước khi thành điểm yếu.',
+    PickReason.rotation => 'Đã lâu bạn chưa tập $skill.',
+  };
 
   // Màn đường dẫn không tồn tại.
   //
@@ -87,7 +88,8 @@ abstract final class Vi {
   // nội dung ngoại lệ ra màn hình: nó là tiếng Anh và lộ cấu trúc bên
   // trong, chẳng giúp gì người chơi.
   static const notFoundTitle = 'Không tìm thấy trang';
-  static const notFoundBody = 'Đường dẫn này không tồn tại. Hãy quay lại '
+  static const notFoundBody =
+      'Đường dẫn này không tồn tại. Hãy quay lại '
       'trang chủ để tiếp tục.';
   static const notFoundAction = 'Về trang chủ';
 
@@ -104,29 +106,228 @@ abstract final class Vi {
   // sinh ra — viết sẵn ở đây là đúng. Mỗi màn nói thẳng sẽ có gì ở bản
   // sau thay vì để trắng hoặc bịa nội dung cho có.
   static const homeTitle = 'Xin chào';
-  static const homeComing = 'Gợi ý của huấn luyện viên, mục tiêu hôm nay '
+  static const homeComing =
+      'Gợi ý của huấn luyện viên, mục tiêu hôm nay '
       'và tiến độ sẽ hiện ở đây.';
 
   static const trainingTitle = 'Trung tâm luyện tập';
-  static const trainingComing = 'Thư viện bài tập, lộ trình AI, mô phỏng '
+  static const trainingComing =
+      'Thư viện bài tập, lộ trình AI, mô phỏng '
       'góc cắt và đồng hồ luyện tập sẽ nằm ở đây.';
 
   static const playTitle = 'Thi đấu';
-  static const playComing = 'Ghi trận đấu, lịch sử trận và giải đấu sẽ '
+  static const playComing =
+      'Ghi trận đấu, lịch sử trận và giải đấu sẽ '
       'nằm ở đây.';
+  static const matchStart = 'Ghi trận mới';
+  static const matchEmpty = 'Chưa có trận đấu nào được ghi.';
+  static const matchGameType = 'Thể loại';
+  static const matchEightBall = '8 bi';
+  static const matchNineBall = '9 bi';
+  static const matchTenBall = '10 bi';
+  static const matchPlayerName = 'Tên của bạn';
+  static const matchOpponentName = 'Tên đối thủ';
+  static const matchTarget = 'Thắng bao nhiêu ván';
+  static const matchStartAction = 'Bắt đầu trận';
+  static const matchPlayerWinsRack = 'Tôi thắng ván';
+  static const matchOpponentWinsRack = 'Đối thủ thắng ván';
+  static const matchUndoRack = 'Hoàn tác ván gần nhất';
+  static const matchRecordShot = 'Ghi cú đánh';
+  static const matchUndoShot = 'Hoàn tác cú gần nhất';
+  static const matchShooter = 'Người đánh';
+  static const matchShotType = 'Loại cú';
+  static const matchShotOutcome = 'Kết quả cú';
+  static const matchPositionOutcome = 'Vị trí bi cái';
+  static const matchPositionUnknown = 'Chưa ghi';
+  static const matchPositionSuccessful = 'Đạt ý đồ';
+  static const matchPositionUnsuccessful = 'Không đạt';
+  static const matchShotNotes = 'Ghi chú (không bắt buộc)';
+  static const matchSaveShot = 'Lưu cú đánh';
+  static const matchShotRecorded = 'cú';
+  static const matchBreakShot = 'Phá';
+  static const matchNormalShot = 'Cú thường';
+  static const matchSafetyShot = 'Phòng thủ';
+  static const matchShotMade = 'Có bi';
+  static const matchShotMissed = 'Trượt';
+  static const matchShotFoul = 'Phạm lỗi';
+  static const matchShotScratch = 'Scratch';
+  static const matchCompleted = 'Đã kết thúc';
+  static const matchInProgress = 'Đang diễn ra';
+  static const matchNameRequired = 'Nhập tên của cả hai người chơi.';
+  static const matchTargetInvalid = 'Chọn số ván thắng hợp lệ.';
+  static const matchStartFailed =
+      'Không bắt đầu được trận đấu. Vui lòng thử lại.';
+  static const matchRecordFailed =
+      'Không cập nhật được kết quả trận đấu. Vui lòng thử lại.';
+  static String matchScore(
+    String player,
+    int playerScore,
+    int opponentScore,
+    String opponent,
+  ) => '$player $playerScore – $opponentScore $opponent';
+  static String matchRaceTo(int target) => 'Chạm $target ván thắng';
+  static String matchRackProgress(int count) => '$count ván đã ghi';
+  static String matchRackLabel(int number) => 'Ván $number';
+  static String matchShotNumber(int number) => 'Cú $number';
+  static String matchShotCount(int count) => '$count $matchShotRecorded';
+  static String matchGameTypeName(PoolGameType type) => switch (type) {
+    PoolGameType.eightBall => matchEightBall,
+    PoolGameType.nineBall => matchNineBall,
+    PoolGameType.tenBall => matchTenBall,
+  };
+  static String matchShotTypeName(MatchShotType type) => switch (type) {
+    MatchShotType.breakShot => matchBreakShot,
+    MatchShotType.normal => matchNormalShot,
+    MatchShotType.safety => matchSafetyShot,
+  };
+  static String matchShotOutcomeName(MatchShotOutcome outcome) =>
+      switch (outcome) {
+        MatchShotOutcome.made => matchShotMade,
+        MatchShotOutcome.missed => matchShotMissed,
+        MatchShotOutcome.foul => matchShotFoul,
+        MatchShotOutcome.scratch => matchShotScratch,
+      };
+  static String matchPositionOutcomeName(PositionOutcome? outcome) =>
+      switch (outcome) {
+        PositionOutcome.successful => matchPositionSuccessful,
+        PositionOutcome.unsuccessful => matchPositionUnsuccessful,
+        null => matchPositionUnknown,
+      };
+  static String matchShotSummary(MatchShot shot, {required String shooter}) =>
+      '${matchRackLabel(shot.rackNumber)} · ${matchShotNumber(shot.shotNumber)} · '
+      '$shooter · ${matchShotTypeName(shot.type)} · '
+      '${matchShotOutcomeName(shot.outcome)}';
 
   static const statsTitle = 'Thống kê';
-  static const statsComing = 'Biểu đồ tiến bộ theo từng nhóm kỹ năng, '
+  static const statsComing =
+      'Biểu đồ tiến bộ theo từng nhóm kỹ năng, '
       'kết hợp dữ liệu luyện tập và thi đấu.';
+  static const statsOverview = 'Tổng quan luyện tập';
+  static const statsTotalSessions = 'Tổng buổi tập';
+  static const statsDrillSessions = 'Buổi theo bài';
+  static const statsTimerSessions = 'Buổi tập tự do';
+  static const statsTimerTotal = 'Tổng thời gian tập tự do';
+  static const statsTimerWeek = 'Thời gian tập tự do tuần này';
+  static const statsStreak = 'Chuỗi ngày tập hiện tại';
+  static String statsStreakValue(int days) => '$days ngày';
+  static String statsDuration(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    return '$hours giờ $minutes phút';
+  }
+
+  static const statsRecordedMatches = 'Trận đã ghi (hoàn tất)';
+  static const statsMatchWinsLosses = 'Thắng / thua';
+  static const statsRecordedShots = 'Cú đã ghi';
+  static const statsMatchDetails = 'Chi tiết trận đấu';
+  static const statsBreaks = 'Cú phá';
+  static const statsSafeties = 'Cú phòng thủ';
+  static const statsMisses = 'Cú trượt';
+  static const statsFouls = 'Lỗi';
+  static const statsScratches = 'Scratch';
+  static const statsPositionSuccess = 'Vị trí bi cái đạt ý đồ';
+  static const statsNoShotRecords = 'Chưa có dữ liệu cú đánh.';
+  static const statsSkills = 'Tiến bộ theo nhóm kỹ năng';
+  static const statsDrillTrends = 'Xu hướng theo bài tập';
+  static const statsScoredSessions = 'buổi có thể chấm';
+  static const statsNoScoredSessions = 'Chưa có kết quả đủ dữ liệu để chấm.';
+  static const statsNoDrillTrends = 'Hãy hoàn thành bài tập để xem xu hướng.';
+  static const statsNoTraining =
+      'Hoàn thành bài tập hoặc lưu buổi tập tự do để bắt đầu thống kê.';
+  static const statsTargetAverage = 'Trung bình mục tiêu';
+  static const statsMatchAnalysisNotAvailable =
+      'Phân tích cú đánh, break, safety và vị trí sẽ có khi ghi nhận chi tiết từng cú.';
+  static String statsMatchCount(int recorded, int completed) =>
+      '$recorded ($completed)';
+  static String statsPositionCount(int success, int assessed) =>
+      '$success / $assessed';
+  static String statsPercent(int percent) => '$percent% mục tiêu';
+  static String statsRecentResults(List<int> percentages) =>
+      'Gần nhất: ${percentages.map((value) => '$value%').join(' · ')}';
 
   static const profileTitle = 'Hồ sơ';
-  static const profileComing = 'Hạng, chứng nhận, cơ bi-a và cài đặt sẽ '
+  static const equipmentTitle = 'Cơ bi-a';
+  static const equipmentCardBody =
+      'Quản lý cơ chính, cơ phá, cơ nhảy và thông tin đầu cơ.';
+  static const equipmentEmpty = 'Bạn chưa thêm cây cơ nào.';
+  static const equipmentAdd = 'Thêm cơ';
+  static const equipmentEdit = 'Sửa thông tin cơ';
+  static const equipmentName = 'Tên cây cơ';
+  static const equipmentNameRequired = 'Nhập tên cây cơ.';
+  static const equipmentType = 'Loại cơ';
+  static const equipmentPlayingCue = 'Cơ chính';
+  static const equipmentBreakCue = 'Cơ phá';
+  static const equipmentJumpCue = 'Cơ nhảy';
+  static const equipmentWeight = 'Trọng lượng (gram)';
+  static const equipmentTipDiameter = 'Đường kính đầu cơ (mm)';
+  static const equipmentTipHardness = 'Độ cứng đầu cơ';
+  static const equipmentNoHardness = 'Không chọn';
+  static const equipmentSoft = 'Mềm';
+  static const equipmentMedium = 'Trung bình';
+  static const equipmentHard = 'Cứng';
+  static const equipmentSkills = 'Nhóm kỹ năng phù hợp';
+  static const equipmentLastMaintenance = 'Lần bảo dưỡng đầu cơ gần nhất';
+  static const equipmentDueDate = 'Ngày dự kiến bảo dưỡng tiếp';
+  static const equipmentNoDate = 'Chưa đặt';
+  static const equipmentSelectDate = 'Chọn ngày';
+  static const equipmentClearDate = 'Xóa ngày';
+  static const equipmentDueDateInvalid =
+      'Ngày bảo dưỡng tiếp theo phải sau lần bảo dưỡng gần nhất.';
+  static const equipmentSave = 'Lưu cơ';
+  static const equipmentDelete = 'Xóa cơ';
+  static const equipmentDeleteQuestion = 'Xóa hồ sơ cây cơ này?';
+  static const equipmentDeleteWarning =
+      'Các buổi tập trước vẫn được giữ nhưng sẽ không còn liên kết với cây cơ này.';
+  static const equipmentDeleteFailed =
+      'Không xóa được hồ sơ cơ. Vui lòng thử lại.';
+  static const equipmentSaveFailed =
+      'Không lưu được hồ sơ cơ. Vui lòng thử lại.';
+  static const equipmentWeightInvalid = 'Nhập trọng lượng tính bằng gram.';
+  static const equipmentTipDiameterInvalid =
+      'Nhập đường kính đầu cơ tính bằng mm.';
+  static const equipmentDue = 'Đã đến ngày bảo dưỡng đầu cơ.';
+  static const equipmentDueSoon = 'Sắp đến ngày bảo dưỡng đầu cơ.';
+  static const equipmentReminderTitle = 'Nhắc bảo dưỡng đầu cơ';
+  static const equipmentNotificationTitle = 'Đến lịch bảo dưỡng đầu cơ';
+  static String equipmentNotificationBody(String cueName, int daysBefore) =>
+      '$cueName: lịch bảo dưỡng ${daysBefore == 0 ? 'hôm nay' : 'sau $daysBefore ngày'}.';
+  static const equipmentReminderEnabled =
+      'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
+  static const equipmentReminderDenied =
+      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
+  static const equipmentReminderEnable = 'Bật thông báo';
+  static const equipmentReminderPrompt =
+      'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó. Chỉ hoạt động khi ứng dụng đang mở.';
+  static const equipmentPracticeTime = 'Thời gian tập với cơ';
+  static const equipmentLastUsed = 'Lần dùng gần nhất';
+  static const equipmentNoRecordedPractice = 'Chưa có buổi tập ghi với cơ này.';
+  static const equipmentUnknownCue = 'Cơ đã xóa';
+  static const timerChooseCue = 'Cơ đang dùng (không bắt buộc)';
+  static const timerNoCue = 'Không chọn cơ';
+  static String equipmentTypeName(CueType type) => switch (type) {
+    CueType.playing => equipmentPlayingCue,
+    CueType.breakCue => equipmentBreakCue,
+    CueType.jump => equipmentJumpCue,
+  };
+  static String equipmentHardnessName(TipHardness hardness) =>
+      switch (hardness) {
+        TipHardness.soft => equipmentSoft,
+        TipHardness.medium => equipmentMedium,
+        TipHardness.hard => equipmentHard,
+      };
+  static String equipmentWeightValue(int grams) => '$grams g';
+  static String equipmentDiameterValue(double millimeters) =>
+      '${millimeters.toStringAsFixed(1)} mm';
+  static const profileComing =
+      'Hạng, chứng nhận, cơ bi-a và cài đặt sẽ '
       'nằm ở đây.';
 
-  static const coachComing = 'Hỏi huấn luyện viên hôm nay nên tập gì, '
+  static const coachComing =
+      'Hỏi huấn luyện viên hôm nay nên tập gì, '
       'hoặc vì sao trận vừa rồi thua.';
 
-  static const notificationsComing = 'Nhắc lịch tập, nhắc bảo dưỡng đầu cơ '
+  static const notificationsComing =
+      'Nhắc lịch tập, nhắc bảo dưỡng đầu cơ '
       'và đề xuất mới sẽ hiện ở đây.';
 
   // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
@@ -135,6 +336,14 @@ abstract final class Vi {
   // bài đọc. Chữ cố định nằm ở đây; con số và tên bài do lớp suy luận
   // đưa lên, không viết sẵn ở bất kỳ đâu.
   static const homeStreakUnit = 'ngày tập liên tiếp';
+  static String homePracticeWeek(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    return 'Tuần này: $hours giờ $minutes phút tập tự do';
+  }
+
+  static const homeScheduleTitle = 'Lịch tập hôm nay';
+  static const homeNoScheduleToday = 'Hôm nay chưa có lịch tập.';
   static const homeTodayTitle = 'Hôm nay';
   static const homeDrillTitle = 'Bài tập gợi ý';
   static const homeDrillOpen = 'Mở';
@@ -157,19 +366,68 @@ abstract final class Vi {
   // trúc bên trong và chẳng giúp gì người chơi — cùng một lý do đã
   // khiến màn không tìm thấy phải tự viết bằng tiếng Việt.
   static const dataErrorTitle = 'Không đọc được dữ liệu';
-  static const dataErrorBody = 'Có trục trặc khi đọc dữ liệu luyện tập. '
+  static const dataErrorBody =
+      'Có trục trặc khi đọc dữ liệu luyện tập. '
       'Hãy đóng app rồi mở lại.';
 
   // Thư viện bài tập — mục 6.2 của thiết kế.
   static const trainingFilterAll = 'Tất cả';
+  static const timerTitle = 'Đồng hồ luyện tập';
+  static const scheduleTitle = 'Lịch tập tuần';
+  static const timerCardBody =
+      'Tập tự do có bấm giờ, lưu thời lượng vào tiến độ.';
+  static const scheduleCardBody =
+      'Lên lịch tập cố định theo ngày và giờ trong tuần.';
+  static const timerCountUp = 'Đếm lên';
+  static const timerCountDown = 'Đếm ngược';
+  static const timerGoalDuration = 'Thời lượng mục tiêu';
+  static const timerHistoryTitle = 'Buổi tập gần đây';
+  static const timerNoCategory = 'Không chọn';
+  static String timerTargetMinutes(int minutes) => '$minutes phút';
+  static const timerStart = 'Bắt đầu';
+  static const timerPause = 'Tạm dừng';
+  static const timerResume = 'Tiếp tục';
+  static const timerFinish = 'Kết thúc và lưu';
+  static const timerChooseCategory = 'Nhóm kỹ năng (không bắt buộc)';
+  static const timerSaved = 'Đã lưu buổi tập';
+  static const timerSaveFailed = 'Không lưu được buổi tập. Vui lòng thử lại.';
+  static const timerEmptyHistory = 'Chưa có buổi tập tự do nào.';
+  static const scheduleAdd = 'Thêm lịch';
+  static const scheduleEdit = 'Sửa lịch';
+  static const scheduleEditTooltip = 'Sửa khung giờ tập';
+  static const scheduleEmpty = 'Chưa có lịch tập. Hãy thêm khung giờ đầu tiên.';
+  static const scheduleLabel = 'Tên buổi tập';
+  static const scheduleChooseDay = 'Ngày trong tuần';
+  static const scheduleChooseTime = 'Giờ bắt đầu';
+  static const scheduleChooseCategory = 'Nhóm kỹ năng (không bắt buộc)';
+  static const scheduleNoCategory = 'Không chọn';
+  static const scheduleSave = 'Lưu lịch';
+  static const scheduleCancel = 'Hủy';
+  static const scheduleLabelRequired = 'Nhập tên buổi tập.';
+  static const scheduleDeleteQuestion = 'Xóa khung giờ tập này?';
+  static const scheduleKeep = 'Giữ lại';
+  static const scheduleDelete = 'Xóa';
+  static const scheduleDeleteTooltip = 'Xóa lịch';
+  static const scheduleSaveFailed =
+      'Không lưu được lịch tập. Vui lòng thử lại.';
+  static const scheduleDeleteFailed =
+      'Không xóa được lịch tập. Vui lòng thử lại.';
+  static const scheduleDays = [
+    'Thứ Hai',
+    'Thứ Ba',
+    'Thứ Tư',
+    'Thứ Năm',
+    'Thứ Sáu',
+    'Thứ Bảy',
+    'Chủ Nhật',
+  ];
 
   /// Tỉ lệ đạt mục tiêu của lần tập gần nhất, hiện theo phần trăm.
   ///
   /// `1.0` là đúng mục tiêu nên hiện 100%. Đây là số do [drillRatio]
   /// tính, **không** phải điểm thô người chơi nhập: bài đạt khi trúng
   /// 8 trên 10 thì trúng 9 là 113% mục tiêu, không phải "9".
-  static String drillRatioPercent(double ratio) =>
-      '${(ratio * 100).round()}%';
+  static String drillRatioPercent(double ratio) => '${(ratio * 100).round()}%';
 
   /// Đã tập nhưng thiếu dữ liệu để chấm.
   ///
@@ -286,17 +544,17 @@ abstract final class Vi {
 
   /// Một câu cho mỗi loại lỗi — không bao giờ hiện nguyên văn lỗi server.
   static String authFailure(AuthFailure failure) => switch (failure) {
-        AuthFailure.wrongCredentials => 'Email hoặc mật khẩu không đúng.',
-        AuthFailure.emailTaken =>
-          'Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng Quên mật khẩu.',
-        AuthFailure.weakPassword => 'Mật khẩu cần ít nhất 8 ký tự.',
-        AuthFailure.network =>
-          'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.',
-        AuthFailure.resetLinkInvalid =>
-          'Link đặt lại mật khẩu đã hết hạn hoặc đã dùng. Hãy yêu cầu link mới.',
-        AuthFailure.sessionExpired => authSessionExpired,
-        AuthFailure.unknown => 'Máy chủ đang gặp lỗi. Hãy thử lại sau.',
-      };
+    AuthFailure.wrongCredentials => 'Email hoặc mật khẩu không đúng.',
+    AuthFailure.emailTaken =>
+      'Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng Quên mật khẩu.',
+    AuthFailure.weakPassword => 'Mật khẩu cần ít nhất 8 ký tự.',
+    AuthFailure.network =>
+      'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.',
+    AuthFailure.resetLinkInvalid =>
+      'Link đặt lại mật khẩu đã hết hạn hoặc đã dùng. Hãy yêu cầu link mới.',
+    AuthFailure.sessionExpired => authSessionExpired,
+    AuthFailure.unknown => 'Máy chủ đang gặp lỗi. Hãy thử lại sau.',
+  };
 
   // Mô phỏng góc cắt — docs/superpowers/specs/2026-10-01-poolcoachai-cut-angle-simulator-design.md.
   // Câu nào có số thì số do lõi table_geometry tính ra; ở đây chỉ ghép chữ.
@@ -309,20 +567,22 @@ abstract final class Vi {
   static const simNoPocket = 'Không lỗ nào đánh được từ vị trí này.';
 
   /// PRD §6.6 — không được bỏ.
-  static const simDisclaimer = 'Lực và đầu cơ là gợi ý định hướng dựa trên '
+  static const simDisclaimer =
+      'Lực và đầu cơ là gợi ý định hướng dựa trên '
       'hình học, không phải kết quả đo vật lý chính xác — dùng để tham khảo, '
       'người chơi vẫn cần tự canh lực thực tế.';
 
   /// Gắn sau mức áp phê mà lời khuyên gợi ý, khi mức đó dễ trượt cơ.
   static const simMiscueClause = ' (dễ Trượt cơ)';
 
-  static String get simMiscue => 'Lệch ${simTips(miscueTips)} đầu cơ dễ trượt cơ.';
+  static String get simMiscue =>
+      'Lệch ${simTips(miscueTips)} đầu cơ dễ trượt cơ.';
 
   static String simStroke(Stroke stroke) => switch (stroke) {
-        Stroke.stun => 'Đánh đứng bi',
-        Stroke.draw => 'Đánh trô bi',
-        Stroke.follow => 'Đánh cu lê',
-      };
+    Stroke.stun => 'Đánh đứng bi',
+    Stroke.draw => 'Đánh trô bi',
+    Stroke.follow => 'Đánh cu lê',
+  };
 
   /// Năm mức lực đứng cạnh nhau: chỉ số phần trăm là đủ rõ.
   static String simPowerPreset(double power) => '${power.round()}%';
@@ -332,62 +592,62 @@ abstract final class Vi {
       tips == tips.roundToDouble() ? '${tips.round()}' : '$tips';
 
   static String _side(SpinSide side) => switch (side) {
-        SpinSide.left => 'trái',
-        SpinSide.right => 'phải',
-      };
+    SpinSide.left => 'trái',
+    SpinSide.right => 'phải',
+  };
 
   static String simSpinChip(SideSpin spin) => switch (spin.side) {
-        null => 'Không',
-        SpinSide.left => 'Trái ${simTips(spin.tips)}',
-        SpinSide.right => 'Phải ${simTips(spin.tips)}',
-      };
+    null => 'Không',
+    SpinSide.left => 'Trái ${simTips(spin.tips)}',
+    SpinSide.right => 'Phải ${simTips(spin.tips)}',
+  };
 
   static String _spinLong(SideSpin spin) => switch (spin.side) {
-        null => 'không áp phê',
-        final side => 'áp phê ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
-      };
+    null => 'không áp phê',
+    final side => 'áp phê ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
+  };
 
   static String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   static String simPocket(Pocket pocket) => switch (pocket) {
-        Pocket.topLeft => 'góc trên trái',
-        Pocket.topMiddle => 'giữa trên',
-        Pocket.topRight => 'góc trên phải',
-        Pocket.bottomLeft => 'góc dưới trái',
-        Pocket.bottomMiddle => 'giữa dưới',
-        Pocket.bottomRight => 'góc dưới phải',
-      };
+    Pocket.topLeft => 'góc trên trái',
+    Pocket.topMiddle => 'giữa trên',
+    Pocket.topRight => 'góc trên phải',
+    Pocket.bottomLeft => 'góc dưới trái',
+    Pocket.bottomMiddle => 'giữa dưới',
+    Pocket.bottomRight => 'góc dưới phải',
+  };
 
   static String simBand(DifficultyBand band) => switch (band) {
-        DifficultyBand.easy => 'Dễ',
-        DifficultyBand.medium => 'Vừa',
-        DifficultyBand.hard => 'Khó',
-        DifficultyBand.veryHard => 'Rất khó',
-        DifficultyBand.extreme => 'Cực khó',
-        DifficultyBand.impossible => 'Không đánh được',
-      };
+    DifficultyBand.easy => 'Dễ',
+    DifficultyBand.medium => 'Vừa',
+    DifficultyBand.hard => 'Khó',
+    DifficultyBand.veryHard => 'Rất khó',
+    DifficultyBand.extreme => 'Cực khó',
+    DifficultyBand.impossible => 'Không đánh được',
+  };
 
   static String simUnmakeable(UnmakeableReason reason) => switch (reason) {
-        UnmakeableReason.overlap => 'Hai bi đang chồng lên nhau.',
-        UnmakeableReason.ghostOffTable =>
-          'Bi ảo nằm ngoài mặt bàn — bi mục tiêu sát băng, lỗ này không đánh được.',
-        UnmakeableReason.tooThin =>
-          'Góc cắt quá lớn (>${maxCutAngle.round()}°).',
-        UnmakeableReason.cueBlocked => 'Đường bi cái tới bi ảo bị bi khác chắn.',
-        UnmakeableReason.objectBlocked =>
-          'Đường bi mục tiêu vào lỗ bị bi khác chắn.',
-      };
+    UnmakeableReason.overlap => 'Hai bi đang chồng lên nhau.',
+    UnmakeableReason.ghostOffTable =>
+      'Bi ảo nằm ngoài mặt bàn — bi mục tiêu sát băng, lỗ này không đánh được.',
+    UnmakeableReason.tooThin => 'Góc cắt quá lớn (>${maxCutAngle.round()}°).',
+    UnmakeableReason.cueBlocked => 'Đường bi cái tới bi ảo bị bi khác chắn.',
+    UnmakeableReason.objectBlocked =>
+      'Đường bi mục tiêu vào lỗ bị bi khác chắn.',
+  };
 
   static String simPocketLine(Pocket pocket) => 'Lỗ: ${simPocket(pocket)}';
   static String simAngleLine(double angle) => 'Góc cắt: ${angle.round()}°';
   static String simBandLine(DifficultyBand band) => 'Độ khó: ${simBand(band)}';
-  static String simStrokeLine(Stroke stroke) => 'Kiểu đánh: ${simStroke(stroke)}';
+  static String simStrokeLine(Stroke stroke) =>
+      'Kiểu đánh: ${simStroke(stroke)}';
   static String simPowerLine(double power) => 'Lực: ${power.round()}%';
   static String simSpinLine(SideSpin spin) => switch (spin.side) {
-        null => 'Áp phê: không',
-        final side => 'Áp phê: ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
-      };
+    null => 'Áp phê: không',
+    final side => 'Áp phê: ${_side(side)} lệch ${simTips(spin.tips)} đầu cơ',
+  };
   static String simScratch(Pocket pocket) =>
       'Bi cái rơi lỗ ${simPocket(pocket)} (chết cái).';
 
@@ -398,9 +658,9 @@ abstract final class Vi {
   static const simObjectMissed = 'Bi mục tiêu không vào lỗ.';
 
   static String simElevation(CueElevation elevation) => switch (elevation) {
-        CueElevation.normal => 'Thường',
-        CueElevation.steep => 'Dốc',
-      };
+    CueElevation.normal => 'Thường',
+    CueElevation.steep => 'Dốc',
+  };
 
   static String simElevationLine(CueElevation elevation) =>
       'Độ dốc cơ: ${simElevation(elevation)}';
@@ -422,11 +682,13 @@ abstract final class Vi {
   /// bi" khi lệch từ một con bi trở lên. Có thêm [bhePercent] thì câu kết
   /// bằng lựa chọn SAWS (FHE = phần còn lại của 100). Dòng nào cũng kết
   /// bằng dấu chấm.
-  static String simSquirt(double deg,
-      [double? shiftTips,
-      double? ballDenominator,
-      int? bhePercent,
-      double? ballCount]) {
+  static String simSquirt(
+    double deg, [
+    double? shiftTips,
+    double? ballDenominator,
+    int? bhePercent,
+    double? ballCount,
+  ]) {
     final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°';
     if (shiftTips == null || (ballDenominator == null && ballCount == null)) {
       return '$base.';
@@ -434,7 +696,8 @@ abstract final class Vi {
     final ball = ballCount != null
         ? '${simTips(ballCount)} con bi'
         : '1/${simTips(ballDenominator!)} con bi';
-    final shift = '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} '
+    final shift =
+        '$base (điểm ngắm cần lệch khoảng ${simTips(shiftTips)} '
         'đầu cơ ≈ $ball)';
     if (bhePercent == null) return '$shift.';
     return '$shift → bạn có thể dùng SAWS ($bhePercent% BHE / '
@@ -444,18 +707,27 @@ abstract final class Vi {
   static String simRailCount(int count) => 'Bi cái chạm băng $count lần.';
 
   static String simAdvice(Advice advice) => switch (advice) {
-        AddSpinToAvoid(:final from, :final to, :final pocket) =>
-          _avoidText(from, to, pocket),
-        NoSpinAvoids(:final pocket) => 'Bi cái chết cái ở lỗ '
-            '${simPocket(pocket)}, áp phê không cứu được — đổi lực hoặc kiểu đánh.',
-        OverhitRisk(:final margin, :final fromPower, :final pocket, :final saferSpin) =>
-          'Nếu đánh quá lực khoảng +${margin.round()}% (từ ~${fromPower.round()}%), '
-              'bi cái có thể rơi lỗ ${simPocket(pocket)} (chết cái).'
-              '${saferSpin == null ? '' : ' ${_capitalize(_spinAdvised(saferSpin))} thì vẫn an toàn tới 100%.'}',
-        SpinCeiling(:final side, :final maxSafeTips, :final pocket) =>
-          'Đừng áp phê ${_side(side)} quá ${simTips(maxSafeTips)} đầu cơ — '
-              'bi cái sẽ rơi lỗ ${simPocket(pocket)}.',
-      };
+    AddSpinToAvoid(:final from, :final to, :final pocket) => _avoidText(
+      from,
+      to,
+      pocket,
+    ),
+    NoSpinAvoids(:final pocket) =>
+      'Bi cái chết cái ở lỗ '
+          '${simPocket(pocket)}, áp phê không cứu được — đổi lực hoặc kiểu đánh.',
+    OverhitRisk(
+      :final margin,
+      :final fromPower,
+      :final pocket,
+      :final saferSpin,
+    ) =>
+      'Nếu đánh quá lực khoảng +${margin.round()}% (từ ~${fromPower.round()}%), '
+          'bi cái có thể rơi lỗ ${simPocket(pocket)} (chết cái).'
+          '${saferSpin == null ? '' : ' ${_capitalize(_spinAdvised(saferSpin))} thì vẫn an toàn tới 100%.'}',
+    SpinCeiling(:final side, :final maxSafeTips, :final pocket) =>
+      'Đừng áp phê ${_side(side)} quá ${simTips(maxSafeTips)} đầu cơ — '
+          'bi cái sẽ rơi lỗ ${simPocket(pocket)}.',
+  };
 
   static String _spinAdvised(SideSpin spin) =>
       '${_spinLong(spin)}${spin.risksMiscue ? simMiscueClause : ''}';
@@ -502,15 +774,15 @@ abstract final class Vi {
       null => '$head $simNoPocket',
       Unmakeable(:final reason) => '$head ${simUnmakeable(reason)}',
       Makeable(:final geometry) => [
-          '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
-              '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
-          '${simElevationLine(elevation)}.',
-          ?notice,
-          if (aimed != null && aimed.trace.cueRailCount > 0)
-            simRailCount(aimed.trace.cueRailCount),
-          if (aimed?.trace.cuePocket != null) 'Chết cái.',
-          if (showingUncompensated) simShowingUncompensated,
-        ].join(' '),
+        '$head Lỗ ${simPocket(geometry.pocket)}, góc cắt '
+            '${geometry.angle.round()}°, ${simBand(bandFor(geometry.angle))}.',
+        '${simElevationLine(elevation)}.',
+        ?notice,
+        if (aimed != null && aimed.trace.cueRailCount > 0)
+          simRailCount(aimed.trace.cueRailCount),
+        if (aimed?.trace.cuePocket != null) 'Chết cái.',
+        if (showingUncompensated) simShowingUncompensated,
+      ].join(' '),
     };
   }
 
@@ -523,31 +795,33 @@ abstract final class Vi {
   static const planPlacingLabel = 'Đang đặt';
 
   static String planGame(GameType game) => switch (game) {
-        GameType.nineBall => '9 bi',
-        GameType.tenBall => '10 bi',
-        GameType.eightBall => '8 bi',
-      };
+    GameType.nineBall => '9 bi',
+    GameType.tenBall => '10 bi',
+    GameType.eightBall => '8 bi',
+  };
 
   static String planGroup(BallGroup group) => switch (group) {
-        BallGroup.solids => 'Trơn',
-        BallGroup.stripes => 'Sọc',
-      };
+    BallGroup.solids => 'Trơn',
+    BallGroup.stripes => 'Sọc',
+  };
 
   static String planPlacing(BallRole role) => switch (role) {
-        BallRole.mine => 'Bi của tôi',
-        BallRole.opponent => 'Bi đối thủ',
-        BallRole.eight => 'Bi 8',
-      };
+    BallRole.mine => 'Bi của tôi',
+    BallRole.opponent => 'Bi đối thủ',
+    BallRole.eight => 'Bi 8',
+  };
 
   static const planCueHint = 'Chạm lên bàn để đặt bi cái trước.';
 
   /// PRD §6.2: số bi gán theo thứ tự chạm.
-  static const planOrderHint = 'Chạm theo đúng thứ tự số: bi 1 trước, bi 2 sau…';
+  static const planOrderHint =
+      'Chạm theo đúng thứ tự số: bi 1 trước, bi 2 sau…';
   static const planUndo = 'Xoá bi cuối';
   static const planClear = 'Xoá hết';
   static const planStart = 'Lập kế hoạch';
 
-  static String planComputing(int step, int total) => 'Đang tính bước $step/$total…';
+  static String planComputing(int step, int total) =>
+      'Đang tính bước $step/$total…';
   static String planStepHeader(int step, int total) => 'Bước $step / $total';
   static String planBallLine(int number) => 'Bi $number';
 
@@ -557,13 +831,15 @@ abstract final class Vi {
 
   /// Thông tin, không phải cảnh báo. Không còn vế "hao khoảng 15% lực":
   /// lõi vật lý tính hao lực thật (spec quyết định 7).
-  static String planRailInfo(int count) => 'Bi cái chạm băng $count lần rồi tới vùng điều.';
+  static String planRailInfo(int count) =>
+      'Bi cái chạm băng $count lần rồi tới vùng điều.';
 
   /// Bước cuối: không có bi kế tiếp, nên không có vùng điều để tới.
   static String planRailInfoLast(int count) => 'Bi cái chạm băng $count lần.';
 
   /// PRD §6.5, nguyên văn.
-  static const planRiskWarning = 'Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái '
+  static const planRiskWarning =
+      'Lực cao / dùng trô — quá tay hoặc quá áp phê dễ chết cái '
       'hoặc sai số lớn hơn bình thường.';
 
   static String planMissAdvice(MissSide side) =>
@@ -594,7 +870,8 @@ abstract final class Vi {
   static const planSearchingSafety = 'Đang tìm cú thủ…';
 
   /// Lời của chủ sản phẩm, nguyên văn.
-  static const planSafetyCheckpoint = 'Tính toán cơ bản thì đánh như thế này là thủ tốt, '
+  static const planSafetyCheckpoint =
+      'Tính toán cơ bản thì đánh như thế này là thủ tốt, '
       'có thể có phương án tối ưu hơn nhưng sẽ mất thời gian tính toán. '
       'Bạn muốn tính tiếp hay không?';
   static const planSafetyContinue = 'Tính tiếp';
@@ -609,17 +886,18 @@ abstract final class Vi {
 
   /// Chú giải các lớp trên bàn (spec mục 7.1). Ngưỡng lấy từ hằng số planner.
   static List<String> get planLegend => [
-        'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',
-        'Ô vàng: tạm được — góc cắt bi sau ≤ ${zoneFair.round()}°.',
-        'Nét đứt trắng: bi cái tới bi mục tiêu. Nét đứt ngọc: bi cái sau va chạm.',
-        'Chấm vàng: bi cái chạm băng. Vòng trắng nét đứt: chỗ bi cái dừng.',
-        'Thanh vàng: chỗ bi cái dừng nếu lực lệch ±${powerJitter.round()}%.',
-        'Hai chấm cam: bi mục tiêu trôi tới đâu nếu trượt (dư dày / dư mỏng); '
-            'chấm đặc là hướng nên chọn.',
-      ];
+    'Ô xanh: vùng điều tốt — từ đây góc cắt bi sau ≤ ${zoneGood.round()}°.',
+    'Ô vàng: tạm được — góc cắt bi sau ≤ ${zoneFair.round()}°.',
+    'Nét đứt trắng: bi cái tới bi mục tiêu. Nét đứt ngọc: bi cái sau va chạm.',
+    'Chấm vàng: bi cái chạm băng. Vòng trắng nét đứt: chỗ bi cái dừng.',
+    'Thanh vàng: chỗ bi cái dừng nếu lực lệch ±${powerJitter.round()}%.',
+    'Hai chấm cam: bi mục tiêu trôi tới đâu nếu trượt (dư dày / dư mỏng); '
+        'chấm đặc là hướng nên chọn.',
+  ];
 
   /// Nhãn semantics của bàn khi bày bi — E2E đọc từ đây.
-  static String planSetupSummary({required bool hasCue, required int balls}) => hasCue
+  static String planSetupSummary({required bool hasCue, required int balls}) =>
+      hasCue
       ? 'Bàn bày bi. Đã đặt bi cái, $balls bi mục tiêu.'
       : 'Bàn bày bi. Chưa đặt bi cái.';
 
@@ -628,8 +906,12 @@ abstract final class Vi {
   /// Nhãn semantics của bàn ở màn từng bước (spec mục 7.4): bi, lỗ, kiểu
   /// đánh, lực của bước đang xem; bước phòng thủ có cú thủ thì câu đầu, câu
   /// ngắm và kết quả cho đối thủ. [step] null khi bước đầu còn đang tính.
-  static String planSummary(PlanStep? step,
-      {required int index, required int total, bool searchingSafety = false}) {
+  static String planSummary(
+    PlanStep? step, {
+    required int index,
+    required int total,
+    bool searchingSafety = false,
+  }) {
     const head = 'Bàn kế hoạch.';
     if (step == null) {
       return '$head ${searchingSafety ? planSearchingSafety : planComputing(index + 1, total)}';
@@ -647,25 +929,28 @@ abstract final class Vi {
   // Cú phòng thủ — docs/superpowers/specs/2026-10-07-poolcoachai-planner-safety-design.md.
   // Câu nào có số thì số do lõi tìm cú thủ tính ra; ở đây chỉ ghép chữ.
   // planSearchingSafety đã có từ Task 25c, cạnh câu hỏi của điểm hỏi.
-  static String safetySnookered(int ballNum) => 'Bi cái bị đui bi $ballNum — đánh A băng để thủ.';
+  static String safetySnookered(int ballNum) =>
+      'Bi cái bị đui bi $ballNum — đánh A băng để thủ.';
   static const safetyNoPot = 'Không còn đường ăn bi — nên thủ bi.';
 
   static String safetyHeadline(SafetyShot s) =>
-      s.reason == SafetyReason.snookered ? safetySnookered(s.ballNum) : safetyNoPot;
+      s.reason == SafetyReason.snookered
+      ? safetySnookered(s.ballNum)
+      : safetyNoPot;
 
   /// Câu ngắm: A băng nói chấm, trực tiếp nói độ dày. Không bao giờ nói độ.
   static String safetyAimLine(SafetyShot s) => switch (s.railAim) {
-        final aim? => safetyKick(s.rails, aim),
-        null => safetyThickness(s.thickness, s.side),
-      };
+    final aim? => safetyKick(s.rails, aim),
+    null => safetyThickness(s.thickness, s.side),
+  };
 
   /// Tên băng theo hướng nhìn trên màn.
   static String safetyRail(Rail rail) => switch (rail) {
-        Rail.left => 'băng ngắn trái',
-        Rail.right => 'băng ngắn phải',
-        Rail.top => 'băng dài trên',
-        Rail.bottom => 'băng dài dưới',
-      };
+    Rail.left => 'băng ngắn trái',
+    Rail.right => 'băng ngắn phải',
+    Rail.top => 'băng dài trên',
+    Rail.bottom => 'băng dài dưới',
+  };
 
   /// Số chấm, làm tròn nửa chấm sẵn ở lõi; dấu phẩy thập phân: "2,5".
   static String safetyDiamond(double d) =>
@@ -674,7 +959,8 @@ abstract final class Vi {
   static String safetyKick(int rails, RailAim aim) =>
       'A băng $rails băng: ngắm chấm ${safetyDiamond(aim.diamond)} ${safetyRail(aim.rail)}.';
 
-  static String _fraction(double thickness) => switch ((thickness * 8).round()) {
+  static String _fraction(double thickness) =>
+      switch ((thickness * 8).round()) {
         6 => '¾',
         4 => '½',
         2 => '¼',
@@ -683,7 +969,8 @@ abstract final class Vi {
       };
 
   /// Độ dày chạm bi, theo hướng nhìn từ bi cái.
-  static String safetyThickness(double thickness, ThicknessSide side) => switch (side) {
+  static String safetyThickness(double thickness, ThicknessSide side) =>
+      switch (side) {
         ThicknessSide.full => 'Ăn trọn bi.',
         ThicknessSide.left => 'Ăn ${_fraction(thickness)} bi, lệch bên trái.',
         ThicknessSide.right => 'Ăn ${_fraction(thickness)} bi, lệch bên phải.',
@@ -708,10 +995,10 @@ abstract final class Vi {
 
   /// Chú giải thêm khi bước đang xem là cú thủ (spec mục 5.1).
   static List<String> get planSafetyLegend => const [
-        'Vòng vàng đậm: điểm ngắm trên băng đầu tiên (A băng); số ở mép bàn là chấm.',
-        'Nét xám và vòng nét đứt xám: bi hợp lệ sau va chạm và chỗ nó dừng.',
-        'Nét đỏ mờ: cú dễ nhất của đối thủ sau cú thủ.',
-      ];
+    'Vòng vàng đậm: điểm ngắm trên băng đầu tiên (A băng); số ở mép bàn là chấm.',
+    'Nét xám và vòng nét đứt xám: bi hợp lệ sau va chạm và chỗ nó dừng.',
+    'Nét đỏ mờ: cú dễ nhất của đối thủ sau cú thủ.',
+  ];
 
   // ─── Đánh giá + hạng — tên bài BU (spec mục 5.1, 5.2, 11.3) ───────────────
   //
@@ -719,39 +1006,40 @@ abstract final class Vi {
   // ngoặc là tên bài của Billiard University, để đối chiếu với đề.
 
   static String buDrillName(String drillId) => switch (drillId) {
-        'F1' => 'Cắt góc (Cut Shot)',
-        'F2' => 'Đánh đứng bi (Stop Shot)',
-        'F3' => 'Đánh cu lê (Follow Shot)',
-        'F4' => 'Đánh trô bi (Draw Shot)',
-        'F5' => 'Đánh tâm tiến (Stun Shot)',
-        'F6' => 'Ăn bi (Ball Pocketing)',
-        'F7' => 'Bánh xe (Wagon Wheel)',
-        'F8' => 'Lưới đích (Grid Target)',
-        'S1' => 'Hàng bi (Line of Balls)',
-        'S2' => 'Ngắm bi sát băng (Rail Cuts)',
-        'S3' => 'Thế 9 bi (9-Ball Patterns)',
-        'S4' => 'Thế 8 bi (8-Ball Patterns)',
-        'S5' => 'Phòng thủ / bắt đui (Safety)',
-        'S6' => 'A băng (Kicks)',
-        'S7' => 'Cân bi (Banks)',
-        'S8' => 'Dựng cơ (Elevated cue)',
-        'S9' => 'Nhảy bi (Jump) hoặc Mát xê (Massé)',
-        'S10' => 'Phá (Break)',
-        _ => throw ArgumentError.value(drillId, 'drillId', 'không có bài này'),
-      };
+    'F1' => 'Cắt góc (Cut Shot)',
+    'F2' => 'Đánh đứng bi (Stop Shot)',
+    'F3' => 'Đánh cu lê (Follow Shot)',
+    'F4' => 'Đánh trô bi (Draw Shot)',
+    'F5' => 'Đánh tâm tiến (Stun Shot)',
+    'F6' => 'Ăn bi (Ball Pocketing)',
+    'F7' => 'Bánh xe (Wagon Wheel)',
+    'F8' => 'Lưới đích (Grid Target)',
+    'S1' => 'Hàng bi (Line of Balls)',
+    'S2' => 'Ngắm bi sát băng (Rail Cuts)',
+    'S3' => 'Thế 9 bi (9-Ball Patterns)',
+    'S4' => 'Thế 8 bi (8-Ball Patterns)',
+    'S5' => 'Phòng thủ / bắt đui (Safety)',
+    'S6' => 'A băng (Kicks)',
+    'S7' => 'Cân bi (Banks)',
+    'S8' => 'Dựng cơ (Elevated cue)',
+    'S9' => 'Nhảy bi (Jump) hoặc Mát xê (Massé)',
+    'S10' => 'Phá (Break)',
+    _ => throw ArgumentError.value(drillId, 'drillId', 'không có bài này'),
+  };
 
-  static String buDrillTitle(String drillId) => '$drillId · ${buDrillName(drillId)}';
+  static String buDrillTitle(String drillId) =>
+      '$drillId · ${buDrillName(drillId)}';
 
   static String buExamName(BuExam exam) => switch (exam) {
-        BuExam.fundamentals => 'Đề I — Cơ bản',
-        BuExam.skills => 'Đề II — Kỹ năng',
-      };
+    BuExam.fundamentals => 'Đề I — Cơ bản',
+    BuExam.skills => 'Đề II — Kỹ năng',
+  };
 
   static String buVersionName(ExamIIVersion v) => switch (v) {
-        ExamIIVersion.bachelors => 'Bachelors',
-        ExamIIVersion.masters => 'Masters',
-        ExamIIVersion.doctorate => 'Doctorate',
-      };
+    ExamIIVersion.bachelors => 'Bachelors',
+    ExamIIVersion.masters => 'Masters',
+    ExamIIVersion.doctorate => 'Doctorate',
+  };
 
   // ─── Đánh giá + hạng — bộ câu hỏi và mô tả hạng ────────────────────────────
   //
@@ -760,57 +1048,90 @@ abstract final class Vi {
   // spec mục 11.1, 11.2. Không sửa chữ ở đây mà không hỏi chủ sản phẩm.
 
   static String rankQuestion(int question) => switch (question) {
-        1 => 'Bạn đã chơi Pool được bao lâu?',
-        2 => 'Trung bình bạn chơi Pool bao nhiêu?',
-        3 => 'Trong một lượt cơ, bạn đã từng đi được nhiều nhất bao nhiêu bi?',
-        4 => 'Trong những thế bi bình thường, bạn thường đi được bao nhiêu bi?',
-        5 => 'Bạn đã từng Runout (đi chấm) chưa?',
-        6 => 'Trung bình bao nhiêu rack bạn có thể đi được một chấm?',
-        7 => 'Sau cú phá bi, bạn thường còn thế bi như thế nào?',
-        8 => 'Sau khi ăn một bi, bạn thường điều bi cái ở mức nào?',
-        _ => throw RangeError.range(question, 1, 8, 'question'),
-      };
+    1 => 'Bạn đã chơi Pool được bao lâu?',
+    2 => 'Trung bình bạn chơi Pool bao nhiêu?',
+    3 => 'Trong một lượt cơ, bạn đã từng đi được nhiều nhất bao nhiêu bi?',
+    4 => 'Trong những thế bi bình thường, bạn thường đi được bao nhiêu bi?',
+    5 => 'Bạn đã từng Runout (đi chấm) chưa?',
+    6 => 'Trung bình bao nhiêu rack bạn có thể đi được một chấm?',
+    7 => 'Sau cú phá bi, bạn thường còn thế bi như thế nào?',
+    8 => 'Sau khi ăn một bi, bạn thường điều bi cái ở mức nào?',
+    _ => throw RangeError.range(question, 1, 8, 'question'),
+  };
 
   static List<String> rankQuestionOptions(int question) => switch (question) {
-        1 => const ['Chưa từng chơi', 'Dưới 3 tháng', '3 – 6 tháng', '6 tháng – 1 năm',
-            '1 – 2 năm', '2 – 5 năm', 'Trên 5 năm'],
-        2 => const ['Dưới 2 giờ / tuần', '2 – 5 giờ / tuần', '5 – 10 giờ / tuần',
-            '10 – 20 giờ / tuần', 'Trên 20 giờ / tuần'],
-        3 => const ['1', '2', '3', '4', '5', '6', '7', '8', 'Dọn bàn (Run Out)'],
-        4 => const ['1', '2', '3', '4', '5', '6+', 'Thường xuyên Runout'],
-        5 => const ['Chưa bao giờ', 'Đã từng 1–2 lần', 'Thỉnh thoảng',
-            'Khá thường xuyên', 'Rất thường xuyên'],
-        6 => const ['Chưa từng', 'Hơn 100 rack', 'Khoảng 50 rack', 'Khoảng 20 rack',
-            'Khoảng 10 rack', 'Khoảng 5 rack', 'Khoảng 2–3 rack',
-            'Gần như rack nào cũng có thể'],
-        7 => const ['Thường không có bi đánh tiếp', 'Thường chỉ có 1 bi',
-            'Có thể đi tiếp 2–3 bi', 'Thường có layout thuận lợi',
-            'Thường có cơ hội đi chấm'],
-        8 => const ['Thường xuyên bị khó', 'Có lúc dễ, có lúc khó',
-            'Phần lớn còn bi đánh tiếp', 'Thường chủ động điều được bi cái',
-            'Có thể điều bi chính xác theo ý muốn'],
-        _ => throw RangeError.range(question, 1, 8, 'question'),
-      };
+    1 => const [
+      'Chưa từng chơi',
+      'Dưới 3 tháng',
+      '3 – 6 tháng',
+      '6 tháng – 1 năm',
+      '1 – 2 năm',
+      '2 – 5 năm',
+      'Trên 5 năm',
+    ],
+    2 => const [
+      'Dưới 2 giờ / tuần',
+      '2 – 5 giờ / tuần',
+      '5 – 10 giờ / tuần',
+      '10 – 20 giờ / tuần',
+      'Trên 20 giờ / tuần',
+    ],
+    3 => const ['1', '2', '3', '4', '5', '6', '7', '8', 'Dọn bàn (Run Out)'],
+    4 => const ['1', '2', '3', '4', '5', '6+', 'Thường xuyên Runout'],
+    5 => const [
+      'Chưa bao giờ',
+      'Đã từng 1–2 lần',
+      'Thỉnh thoảng',
+      'Khá thường xuyên',
+      'Rất thường xuyên',
+    ],
+    6 => const [
+      'Chưa từng',
+      'Hơn 100 rack',
+      'Khoảng 50 rack',
+      'Khoảng 20 rack',
+      'Khoảng 10 rack',
+      'Khoảng 5 rack',
+      'Khoảng 2–3 rack',
+      'Gần như rack nào cũng có thể',
+    ],
+    7 => const [
+      'Thường không có bi đánh tiếp',
+      'Thường chỉ có 1 bi',
+      'Có thể đi tiếp 2–3 bi',
+      'Thường có layout thuận lợi',
+      'Thường có cơ hội đi chấm',
+    ],
+    8 => const [
+      'Thường xuyên bị khó',
+      'Có lúc dễ, có lúc khó',
+      'Phần lớn còn bi đánh tiếp',
+      'Thường chủ động điều được bi cái',
+      'Có thể điều bi chính xác theo ý muốn',
+    ],
+    _ => throw RangeError.range(question, 1, 8, 'question'),
+  };
 
   static String rankDescription(Rank rank) => switch (rank) {
-        Rank.k => 'Người mới làm quen với Pool',
-        Rank.i => 'Đã biết luật chơi, kỹ thuật cơ bản',
-        Rank.h => 'Người chơi phong trào phổ biến, bắt đầu có khả năng điều bi',
-        Rank.g => 'Người chơi phong trào khá, có thể thi đấu ổn định với đa số CLB',
-        Rank.f => 'Bước đầu tham gia sân chơi thi đấu, trình độ cao trong nhóm phong trào',
-        Rank.e => 'Người chơi bán chuyên',
-        Rank.d => 'Người chơi mạnh, thường xuyên thi đấu',
-        Rank.c => 'Vận động viên trình độ cao',
-        Rank.b => 'Vận động viên rất mạnh',
-        Rank.a => 'Top đầu trong nước',
-        Rank.pro => 'Thi đấu chuyên nghiệp',
-      };
+    Rank.k => 'Người mới làm quen với Pool',
+    Rank.i => 'Đã biết luật chơi, kỹ thuật cơ bản',
+    Rank.h => 'Người chơi phong trào phổ biến, bắt đầu có khả năng điều bi',
+    Rank.g => 'Người chơi phong trào khá, có thể thi đấu ổn định với đa số CLB',
+    Rank.f =>
+      'Bước đầu tham gia sân chơi thi đấu, trình độ cao trong nhóm phong trào',
+    Rank.e => 'Người chơi bán chuyên',
+    Rank.d => 'Người chơi mạnh, thường xuyên thi đấu',
+    Rank.c => 'Vận động viên trình độ cao',
+    Rank.b => 'Vận động viên rất mạnh',
+    Rank.a => 'Top đầu trong nước',
+    Rank.pro => 'Thi đấu chuyên nghiệp',
+  };
 
   static String rankGroupName(RankGroup group) => switch (group) {
-        RankGroup.amateur => 'phong trào',
-        RankGroup.competitive => 'thi đấu',
-        RankGroup.pro => 'chuyên nghiệp',
-      };
+    RankGroup.amateur => 'phong trào',
+    RankGroup.competitive => 'thi đấu',
+    RankGroup.pro => 'chuyên nghiệp',
+  };
 
   // ─── Đánh giá + hạng — cách chấm và cách xếp bài ───────────────────────────
   //
@@ -818,133 +1139,177 @@ abstract final class Vi {
   // Cách xếp bài: dịch từ PDF của Billiard University, chủ sản phẩm duyệt
   // khi xem sơ đồ trên Chrome (D13 của kế hoạch).
 
-  static const _ladderRule = 'Thang vị trí: bắt đầu ở vị trí 4, vào thì lên một vị trí, '
+  static const _ladderRule =
+      'Thang vị trí: bắt đầu ở vị trí 4, vào thì lên một vị trí, '
       'trượt thì xuống một (trong khoảng 1–7). Đánh đủ 10 cú. Điểm = vị trí cuối + '
       'số lần vào khi đang ở vị trí 7, tối đa 10.';
 
-  static String buDrillScoring(String drillId, ExamIIVersion? v) => switch (drillId) {
-        'F1' => _ladderRule,
-        'F2' => '$_ladderRule Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo.',
-        'F3' => '$_ladderRule Bi cái dừng trong hoặc chồng lên khung giấy đích.',
-        'F4' => '$_ladderRule Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa.',
-        'F5' => '$_ladderRule Đích di chuyển thay cho bi cái: vị trí 1–3 đi thẳng tới đích, '
-            '5–7 phải bật băng cuối.',
-        'F6' => '10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm.',
-        'F7' => '10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ và chạm đúng bi đích được 1 điểm.',
-        'F8' => '5 đích, mỗi đích 4 lượt. Vào lỗ và bi cái dừng trong hoặc chồng lên đích '
-            'được 1 điểm.',
-        'S1' => 'Đánh theo thứ tự số, 2 lượt, lấy lượt cao hơn. Lượt 1 trọn điểm thì '
-            'không cần lượt 2.',
-        'S2' => '2 lượt, thứ tự tùy ý, lấy lượt cao hơn. Lượt 1 trọn điểm thì không cần lượt 2.',
-        'S3' => '3 thế, mỗi bi hợp lệ theo thứ tự được 1 điểm, cộng 2 thế thấp nhất. Bi 9 '
-            'vào sớm thì vẫn đánh nốt các bi còn lại theo thứ tự.'
-            '${v == ExamIIVersion.doctorate ? ' Thế 3: phải tới bi 7 và bi 9 bằng 3–4 băng.' : ''}',
-        'S4' => '3 thế, mỗi bi trước khi trượt được 1 điểm, cộng 2 thế thấp nhất. '
-            'Được chạm bi chướng ngại.',
-        'S5' => 'Mỗi vị trí bi cái 2 lượt, mỗi lần bắt đui được 1 điểm.',
-        'S6' || 'S7' || 'S8' => 'Mỗi cú thành công 1 điểm.',
-        // PDF bản Doctorate: "1 point for each successful shot (CB pocketed, no
-        // obstacle-ball contact)" và hình ghi "scratch in the corner" — bản này
-        // không có bi mục tiêu, cú thành công là đưa bi cái vào lỗ góc.
-        'S9' => 'Dùng nhảy bi (Jump) hoặc mát xê (Massé). Mỗi cú thành công 1 điểm.'
-            '${v == ExamIIVersion.doctorate ? ' Bản Doctorate: không có bi mục tiêu, cú thành công '
-                'là đưa bi cái vào lỗ góc mà không chạm bi chướng ngại.' : ' Được chết cái.'}',
-        'S10' => '3 lần phá, mỗi lần chấm 5 tiêu chí a–e, lấy trung vị điểm của 3 lần.',
-        _ => throw ArgumentError.value(drillId, 'drillId'),
-      };
+  static String buDrillScoring(
+    String drillId,
+    ExamIIVersion? v,
+  ) => switch (drillId) {
+    'F1' => _ladderRule,
+    'F2' =>
+      '$_ladderRule Bi mục tiêu phải vào và bi cái dừng chồng lên vòng bi ảo.',
+    'F3' => '$_ladderRule Bi cái dừng trong hoặc chồng lên khung giấy đích.',
+    'F4' =>
+      '$_ladderRule Tâm bi cái dừng trong hình chữ nhật 2×1 chấm cạnh lỗ giữa.',
+    'F5' =>
+      '$_ladderRule Đích di chuyển thay cho bi cái: vị trí 1–3 đi thẳng tới đích, '
+          '5–7 phải bật băng cuối.',
+    'F6' => '10 cú, mỗi cú 1 lượt, không được chết cái. Mỗi bi vào 1 điểm.',
+    'F7' => '10 bi đích trên băng, mỗi bi 2 lượt. Vào lỗ và chạm đúng bi đích được 1 điểm.',
+    'F8' =>
+      '5 đích, mỗi đích 4 lượt. Vào lỗ và bi cái dừng trong hoặc chồng lên đích '
+          'được 1 điểm.',
+    'S1' =>
+      'Đánh theo thứ tự số, 2 lượt, lấy lượt cao hơn. Lượt 1 trọn điểm thì '
+          'không cần lượt 2.',
+    'S2' => '2 lượt, thứ tự tùy ý, lấy lượt cao hơn. Lượt 1 trọn điểm thì không cần lượt 2.',
+    'S3' =>
+      '3 thế, mỗi bi hợp lệ theo thứ tự được 1 điểm, cộng 2 thế thấp nhất. Bi 9 '
+          'vào sớm thì vẫn đánh nốt các bi còn lại theo thứ tự.'
+          '${v == ExamIIVersion.doctorate ? ' Thế 3: phải tới bi 7 và bi 9 bằng 3–4 băng.' : ''}',
+    'S4' =>
+      '3 thế, mỗi bi trước khi trượt được 1 điểm, cộng 2 thế thấp nhất. '
+          'Được chạm bi chướng ngại.',
+    'S5' => 'Mỗi vị trí bi cái 2 lượt, mỗi lần bắt đui được 1 điểm.',
+    'S6' || 'S7' || 'S8' => 'Mỗi cú thành công 1 điểm.',
+    // PDF bản Doctorate: "1 point for each successful shot (CB pocketed, no
+    // obstacle-ball contact)" và hình ghi "scratch in the corner" — bản này
+    // không có bi mục tiêu, cú thành công là đưa bi cái vào lỗ góc.
+    'S9' =>
+      'Dùng nhảy bi (Jump) hoặc mát xê (Massé). Mỗi cú thành công 1 điểm.'
+          '${v == ExamIIVersion.doctorate ? ' Bản Doctorate: không có bi mục tiêu, cú thành công '
+                    'là đưa bi cái vào lỗ góc mà không chạm bi chướng ngại.' : ' Được chết cái.'}',
+    'S10' =>
+      '3 lần phá, mỗi lần chấm 5 tiêu chí a–e, lấy trung vị điểm của 3 lần.',
+    _ => throw ArgumentError.value(drillId, 'drillId'),
+  };
 
   static String buBreakCriterion(int index) => switch (index) {
-        0 => 'a: không chết cái',
-        1 => 'b: a, và bi cái không chạm băng',
-        2 => 'c: a, và bi cái dừng trong vùng 4 chấm ở giữa bàn',
-        3 => 'd: a, và có ít nhất 1 bi vào',
-        4 => 'e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn',
-        _ => throw RangeError.range(index, 0, 4, 'index'),
-      };
+    0 => 'a: không chết cái',
+    1 => 'b: a, và bi cái không chạm băng',
+    2 => 'c: a, và bi cái dừng trong vùng 4 chấm ở giữa bàn',
+    3 => 'd: a, và có ít nhất 1 bi vào',
+    4 => 'e: a, và có ít nhất 3 bi mục tiêu vào lỗ hoặc vượt qua vạch đầu bàn',
+    _ => throw RangeError.range(index, 0, 4, 'index'),
+  };
 
   /// Cách xếp bài, dịch từ PDF (Task 11 Step 3). Một nhánh cho mỗi bài; bài
   /// Đề II mà các bản khác nhau thì rẽ theo [v].
-  static String buDrillSetup(String drillId, ExamIIVersion? v) => switch (drillId) {
-        'F1' => 'Bi cái bắt đầu ở vị trí 4 trên đường chấm 1. Bi mục tiêu trên đường chấm 3, '
-            'cách băng cuối một khe bằng một bi; ăn bi mục tiêu vào lỗ góc gần nó. Vào thì '
-            'lên một vị trí (xa lỗ hơn), trượt thì xuống một vị trí. Được chết cái. '
-            'Có thể đánh từ phía bên kia bàn.',
-        'F2' => 'Bi cái và bi mục tiêu sát băng trên (bi cái cách băng không quá một chấm); '
-            'bi mục tiêu ở nửa chấm cạnh lỗ góc. Dán vòng đánh dấu chỗ bi mục tiêu và bi ảo. '
-            'Đánh đứng bi: ăn bi, bi cái dừng chồng lên vòng bi ảo. Bi cái được chạm băng. Ở vị trí 1 '
-            'được đặt bi cái trong khoảng vị trí 1–2.',
-        'F3' => 'Bi cái và bi mục tiêu luôn cách nhau 1 chấm, sát băng trên (bi cái cách băng '
-            'không quá một chấm). Khung giấy đích 8.5"×11" (bỏ lõi, chừa viền 1") đặt ở góc. '
-            'Đánh cu lê: ăn bi, bi cái theo vào khung. Bi cái và bi mục tiêu được chạm băng.',
-        'F4' => 'Bi cái và bi mục tiêu sát băng trên; bi mục tiêu ở nửa chấm cạnh lỗ góc. '
-            'Hình chữ nhật 2×1 chấm cạnh lỗ giữa cố định, góc đánh dấu bằng vòng dán. Đánh '
-            'trô bi: ăn bi, tâm bi cái dừng trong hình. Ở vị trí 1 được đặt bi cái '
-            'trong khoảng vị trí 1–2.',
-        'F5' => 'Bi mục tiêu ở dưới tâm bàn một bi, ăn vào lỗ giữa. Bi cái đặt tự do mỗi cú. '
-            'Đánh tâm tiến. Khung giấy đích bắt đầu ở vị trí 4 (cạnh dài áp băng cuối); các vị trí khác có '
-            'tâm thẳng chấm băng dài. Vị trí 1–3: bi cái đi thẳng tới đích; 5–7: bật băng cuối.',
-        'F6' => 'Hai vị trí bi cái, mỗi vị trí 5 cú vào các lỗ như hình. Mỗi cú một lần, '
-            'đánh theo thứ tự, không được chết cái.',
-        'F7' => 'Bi mục tiêu trên đường chấm 1 dưới lỗ giữa; 10 bi đích áp sát băng. Bi cái '
-            'đặt tự do mỗi cú. Ăn bi mục tiêu rồi cho bi cái chạm bi đích đang đánh; được '
-            'chạm băng ngay cạnh bi đích, không được chạm băng khác. Mỗi bi đích 2 lượt, xong '
-            'thì nhấc bi đích ra, bi bị xô lệch thì đặt lại.',
-        'F8' => 'Bi mục tiêu (bi 1) ở chấm (1, 1), ăn vào lỗ góc gần nó; bi cái như hình. '
-            'Năm khung giấy đích: hai cái sát băng trên, hai cái sát băng dưới, một cái giữa '
-            'bàn. Mỗi đích 4 lượt, đi đường nào tới đích cũng được.',
-        'S1' => 'Bi cái đặt tự do. Các bi xếp trên đường giữa bàn, bi 1 cách băng cuối một khe '
-            'một bi, giữa các bi là khe ${switch (v) {
-              ExamIIVersion.bachelors => 'ba bi',
-              ExamIIVersion.masters => 'hai bi',
-              _ => 'một bi',
-            }}. Ăn theo thứ tự số vào lỗ bất kỳ, không chết cái, không chạm bi còn lại; '
-            'chạm bi khác thì bi vừa vào vẫn tính nhưng lượt dừng.',
-        'S2' => 'Bi cái đặt tự do. Các bi áp sát băng như hình (và một bi ở tâm bàn). Ăn theo '
-            'thứ tự tùy ý, không chết cái, không đánh bi kết hợp, không chạm bi còn lại.',
-        'S3' => 'Bi cái đặt tự do. Xếp bi như hình của từng thế, ăn theo luật 9 bi: luôn chạm '
-            'bi số nhỏ nhất trước.',
-        'S4' => 'Bi cái đặt tự do. Ăn hết bi sọc theo thứ tự tùy ý rồi tới bi 8. Bi xám là bi '
-            'chướng ngại.',
-        'S5' => 'Bi 1 ở (2, 3). Cụm 9 bi chướng ngại xếp khít trong khung giấy đích 8.5"×11" '
-            'tâm (6, 1). Từ mỗi vị trí bi cái (${switch (v) {
-              ExamIIVersion.bachelors => '3',
-              ExamIIVersion.masters => '5',
-              _ => '7',
-            }} vị trí), đánh hợp lệ để bi 1 bị cụm bi che khỏi bi cái. Không được ăn bi 1; được '
-            'chạm cụm bi nhưng mọi bi phải còn trong hoặc chồng lên khung.',
-        'S6' => switch (v) {
-            ExamIIVersion.bachelors => 'Bi cái cố định ở (1, 1). A băng (băng dài dưới) vào '
-                'từng bi 1–3. Không chết cái, bi chạm băng sau va chạm.',
-            ExamIIVersion.masters => 'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài '
-                'vào từng bi 1–4. Cú 5: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1.',
-            _ => 'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài vào từng bi 1–4. Cú 5, '
-                '6: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1 và bi 3. Cú 7: bi cái đặt '
-                'tự do, A băng ba băng bất kỳ vào bi 2.',
-          },
-        'S7' => switch (v) {
-            ExamIIVersion.bachelors => 'Bi cái đặt tự do mỗi cú. Cân bi từng bi (cách nhau '
-                'một khe một bi) chéo bàn vào lỗ giữa.',
-            ExamIIVersion.masters => 'Bi mục tiêu ở (3, 3). Từ mỗi vị trí trong 5 vị trí bi '
-                'cái, cân bi chéo bàn vào lỗ giữa.',
-            _ => 'Bi mục tiêu ở (6, 3). Từ mỗi vị trí trong 7 vị trí bi cái, cân bi chéo bàn '
-                'vào lỗ góc.',
-          },
-        'S8' => 'Dựng cơ: ăn từng bi mục tiêu vào lỗ góc dưới phải từ vị trí bi cái đã chỉ, '
-            'không chết cái. Bi mục tiêu ở giữa bi cái và lỗ. Bi cái áp sát băng, hoặc áp '
-            'sát bi chướng ngại thẳng hướng cú đánh.',
-        'S9' => switch (v) {
-            ExamIIVersion.bachelors => 'Bi cái ở (1, 1); hai bi chướng ngại cách nhau một khe '
-                'một bi. Nhảy bi qua khe, hoặc mát xê vòng qua một bi (khi mát xê thì nhấc một '
-                'bi chướng ngại ra), rồi ăn bi treo miệng lỗ góc.',
-            ExamIIVersion.masters => 'Bi cái ở (1, 1), một bi chướng ngại trên đường bắn. Nhảy '
-                'bi hoặc mát xê qua/vòng bi chướng ngại, rồi ăn bi treo miệng lỗ góc.',
-            _ => 'Bi cái ở (1, 1), bi chướng ngại cách bi cái một khe hai bi trên đường bắn. '
-                'Nhảy bi hoặc mát xê qua/vòng bi chướng ngại, đưa bi cái vào lỗ góc.',
-          },
-        'S10' => 'Phá giá 9 bi, bi cái đặt tự do sau vạch đầu bàn. Vùng đích của bi cái là 4 '
-            'chấm ở giữa bàn. Phá 3 lần, chấm từng lần theo tiêu chí a–e.',
-        _ => throw ArgumentError.value(drillId, 'drillId', 'chưa dịch cách xếp bài'),
-      };
+  static String buDrillSetup(
+    String drillId,
+    ExamIIVersion? v,
+  ) => switch (drillId) {
+    'F1' =>
+      'Bi cái bắt đầu ở vị trí 4 trên đường chấm 1. Bi mục tiêu trên đường chấm 3, '
+          'cách băng cuối một khe bằng một bi; ăn bi mục tiêu vào lỗ góc gần nó. Vào thì '
+          'lên một vị trí (xa lỗ hơn), trượt thì xuống một vị trí. Được chết cái. '
+          'Có thể đánh từ phía bên kia bàn.',
+    'F2' =>
+      'Bi cái và bi mục tiêu sát băng trên (bi cái cách băng không quá một chấm); '
+          'bi mục tiêu ở nửa chấm cạnh lỗ góc. Dán vòng đánh dấu chỗ bi mục tiêu và bi ảo. '
+          'Đánh đứng bi: ăn bi, bi cái dừng chồng lên vòng bi ảo. Bi cái được chạm băng. Ở vị trí 1 '
+          'được đặt bi cái trong khoảng vị trí 1–2.',
+    'F3' =>
+      'Bi cái và bi mục tiêu luôn cách nhau 1 chấm, sát băng trên (bi cái cách băng '
+          'không quá một chấm). Khung giấy đích 8.5"×11" (bỏ lõi, chừa viền 1") đặt ở góc. '
+          'Đánh cu lê: ăn bi, bi cái theo vào khung. Bi cái và bi mục tiêu được chạm băng.',
+    'F4' =>
+      'Bi cái và bi mục tiêu sát băng trên; bi mục tiêu ở nửa chấm cạnh lỗ góc. '
+          'Hình chữ nhật 2×1 chấm cạnh lỗ giữa cố định, góc đánh dấu bằng vòng dán. Đánh '
+          'trô bi: ăn bi, tâm bi cái dừng trong hình. Ở vị trí 1 được đặt bi cái '
+          'trong khoảng vị trí 1–2.',
+    'F5' =>
+      'Bi mục tiêu ở dưới tâm bàn một bi, ăn vào lỗ giữa. Bi cái đặt tự do mỗi cú. '
+          'Đánh tâm tiến. Khung giấy đích bắt đầu ở vị trí 4 (cạnh dài áp băng cuối); các vị trí khác có '
+          'tâm thẳng chấm băng dài. Vị trí 1–3: bi cái đi thẳng tới đích; 5–7: bật băng cuối.',
+    'F6' =>
+      'Hai vị trí bi cái, mỗi vị trí 5 cú vào các lỗ như hình. Mỗi cú một lần, '
+          'đánh theo thứ tự, không được chết cái.',
+    'F7' =>
+      'Bi mục tiêu trên đường chấm 1 dưới lỗ giữa; 10 bi đích áp sát băng. Bi cái '
+          'đặt tự do mỗi cú. Ăn bi mục tiêu rồi cho bi cái chạm bi đích đang đánh; được '
+          'chạm băng ngay cạnh bi đích, không được chạm băng khác. Mỗi bi đích 2 lượt, xong '
+          'thì nhấc bi đích ra, bi bị xô lệch thì đặt lại.',
+    'F8' =>
+      'Bi mục tiêu (bi 1) ở chấm (1, 1), ăn vào lỗ góc gần nó; bi cái như hình. '
+          'Năm khung giấy đích: hai cái sát băng trên, hai cái sát băng dưới, một cái giữa '
+          'bàn. Mỗi đích 4 lượt, đi đường nào tới đích cũng được.',
+    'S1' =>
+      'Bi cái đặt tự do. Các bi xếp trên đường giữa bàn, bi 1 cách băng cuối một khe '
+          'một bi, giữa các bi là khe ${switch (v) {
+            ExamIIVersion.bachelors => 'ba bi',
+            ExamIIVersion.masters => 'hai bi',
+            _ => 'một bi',
+          }}. Ăn theo thứ tự số vào lỗ bất kỳ, không chết cái, không chạm bi còn lại; '
+          'chạm bi khác thì bi vừa vào vẫn tính nhưng lượt dừng.',
+    'S2' =>
+      'Bi cái đặt tự do. Các bi áp sát băng như hình (và một bi ở tâm bàn). Ăn theo '
+          'thứ tự tùy ý, không chết cái, không đánh bi kết hợp, không chạm bi còn lại.',
+    'S3' =>
+      'Bi cái đặt tự do. Xếp bi như hình của từng thế, ăn theo luật 9 bi: luôn chạm '
+          'bi số nhỏ nhất trước.',
+    'S4' =>
+      'Bi cái đặt tự do. Ăn hết bi sọc theo thứ tự tùy ý rồi tới bi 8. Bi xám là bi '
+          'chướng ngại.',
+    'S5' =>
+      'Bi 1 ở (2, 3). Cụm 9 bi chướng ngại xếp khít trong khung giấy đích 8.5"×11" '
+          'tâm (6, 1). Từ mỗi vị trí bi cái (${switch (v) {
+            ExamIIVersion.bachelors => '3',
+            ExamIIVersion.masters => '5',
+            _ => '7',
+          }} vị trí), đánh hợp lệ để bi 1 bị cụm bi che khỏi bi cái. Không được ăn bi 1; được '
+          'chạm cụm bi nhưng mọi bi phải còn trong hoặc chồng lên khung.',
+    'S6' => switch (v) {
+      ExamIIVersion.bachelors =>
+        'Bi cái cố định ở (1, 1). A băng (băng dài dưới) vào '
+            'từng bi 1–3. Không chết cái, bi chạm băng sau va chạm.',
+      ExamIIVersion.masters =>
+        'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài '
+            'vào từng bi 1–4. Cú 5: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1.',
+      _ =>
+        'Cú 1–4: bi cái cố định ở (1, 1), A băng một băng dài vào từng bi 1–4. Cú 5, '
+            '6: bi cái đặt tự do, A băng hai băng bất kỳ vào bi 1 và bi 3. Cú 7: bi cái đặt '
+            'tự do, A băng ba băng bất kỳ vào bi 2.',
+    },
+    'S7' => switch (v) {
+      ExamIIVersion.bachelors =>
+        'Bi cái đặt tự do mỗi cú. Cân bi từng bi (cách nhau '
+            'một khe một bi) chéo bàn vào lỗ giữa.',
+      ExamIIVersion.masters =>
+        'Bi mục tiêu ở (3, 3). Từ mỗi vị trí trong 5 vị trí bi '
+            'cái, cân bi chéo bàn vào lỗ giữa.',
+      _ =>
+        'Bi mục tiêu ở (6, 3). Từ mỗi vị trí trong 7 vị trí bi cái, cân bi chéo bàn '
+            'vào lỗ góc.',
+    },
+    'S8' =>
+      'Dựng cơ: ăn từng bi mục tiêu vào lỗ góc dưới phải từ vị trí bi cái đã chỉ, '
+          'không chết cái. Bi mục tiêu ở giữa bi cái và lỗ. Bi cái áp sát băng, hoặc áp '
+          'sát bi chướng ngại thẳng hướng cú đánh.',
+    'S9' => switch (v) {
+      ExamIIVersion.bachelors =>
+        'Bi cái ở (1, 1); hai bi chướng ngại cách nhau một khe '
+            'một bi. Nhảy bi qua khe, hoặc mát xê vòng qua một bi (khi mát xê thì nhấc một '
+            'bi chướng ngại ra), rồi ăn bi treo miệng lỗ góc.',
+      ExamIIVersion.masters =>
+        'Bi cái ở (1, 1), một bi chướng ngại trên đường bắn. Nhảy '
+            'bi hoặc mát xê qua/vòng bi chướng ngại, rồi ăn bi treo miệng lỗ góc.',
+      _ =>
+        'Bi cái ở (1, 1), bi chướng ngại cách bi cái một khe hai bi trên đường bắn. '
+            'Nhảy bi hoặc mát xê qua/vòng bi chướng ngại, đưa bi cái vào lỗ góc.',
+    },
+    'S10' =>
+      'Phá giá 9 bi, bi cái đặt tự do sau vạch đầu bàn. Vùng đích của bi cái là 4 '
+          'chấm ở giữa bàn. Phá 3 lần, chấm từng lần theo tiêu chí a–e.',
+    _ => throw ArgumentError.value(
+      drillId,
+      'drillId',
+      'chưa dịch cách xếp bài',
+    ),
+  };
 
   // Sơ đồ bài kiểm tra — D12 của kế hoạch.
   static const buLayoutsTitle = 'Sơ đồ bài kiểm tra';
@@ -954,13 +1319,15 @@ abstract final class Vi {
       'Sơ đồ $k / $n · ${buDrillTitle(l.drillId)}'
       '${l.version == null ? '' : ' · ${buVersionName(l.version!)}'} · hình ${l.variant}';
 
-  static String buLayoutSource(String source) => 'Nguồn: Billiard University — $source';
+  static String buLayoutSource(String source) =>
+      'Nguồn: Billiard University — $source';
 
   // Bộ câu hỏi xác định hạng — spec mục 7.2.
   static const onboardingTitle = 'Xác định hạng';
   static const onboardingLater = 'Để sau';
   static const onboardingIntroTitle = 'Xác định hạng của bạn';
-  static const onboardingIntroBody = 'Trả lời 8 câu hỏi ngắn, app gợi ý một hạng. Bạn '
+  static const onboardingIntroBody =
+      'Trả lời 8 câu hỏi ngắn, app gợi ý một hạng. Bạn '
       'xác nhận hoặc tự chọn hạng khác. Muốn có hạng đã kiểm chứng, hãy làm bài kiểm tra '
       'Billiard University ở mục Hồ sơ.';
   static const onboardingStart = 'Bắt đầu';
@@ -971,7 +1338,8 @@ abstract final class Vi {
   static const onboardingConfirm = 'Xác nhận';
   static const onboardingChooseOther = 'Chọn hạng khác';
   static const onboardingChooseTitle = 'Chọn hạng của bạn';
-  static const onboardingLocked = 'Hạng của bạn đã được kiểm chứng bằng bài kiểm tra '
+  static const onboardingLocked =
+      'Hạng của bạn đã được kiểm chứng bằng bài kiểm tra '
       'Billiard University. Từ giờ chỉ bài kiểm tra mới đổi được hạng.';
 
   /// Câu miễn trừ bắt buộc ở mọi màn hiện hạng (spec mục 4.3).
@@ -981,20 +1349,24 @@ abstract final class Vi {
   // Làm bài kiểm tra — spec mục 7.3.
   static const buTestTitle = 'Bài kiểm tra BU';
   static const buPrepTitle = 'Chuẩn bị';
-  static const buPrepIntro = 'Bài kiểm tra gồm Đề I (Cơ bản) và Đề II (Kỹ năng) của '
+  static const buPrepIntro =
+      'Bài kiểm tra gồm Đề I (Cơ bản) và Đề II (Kỹ năng) của '
       'Billiard University. Mỗi đề mất khoảng 40–60 phút. Điểm Đề I quyết định bản '
       'Đề II (Bachelors, Masters hoặc Doctorate). Đề II làm ngay hoặc để buổi khác đều được.';
-  static const buSourceLine = 'Đề bài: Billiard University (billiarduniversity.org) — '
+  static const buSourceLine =
+      'Đề bài: Billiard University (billiarduniversity.org) — '
       'Dr. Dave Alciatore và Bob Jewett.';
   static const buTableSizeLabel = 'Kích thước bàn';
   static String buTableSize(TableSize s) => switch (s) {
-        TableSize.sevenFoot => '7 feet',
-        TableSize.eightFoot => '8 feet',
-        TableSize.nineFootPlus => '9 feet trở lên',
-      };
-  static const buDoctorateNeedsNine = 'Bản Doctorate chỉ làm trên bàn 9 feet trở lên.';
+    TableSize.sevenFoot => '7 feet',
+    TableSize.eightFoot => '8 feet',
+    TableSize.nineFootPlus => '9 feet trở lên',
+  };
+  static const buDoctorateNeedsNine =
+      'Bản Doctorate chỉ làm trên bàn 9 feet trở lên.';
   static const buStart = 'Bắt đầu Đề I';
-  static String buRetestFrom(DateTime d) => 'Lần kiểm tra trước đã hoàn tất. '
+  static String buRetestFrom(DateTime d) =>
+      'Lần kiểm tra trước đã hoàn tất. '
       'Lần kế tiếp làm được từ ngày ${shortDate(d)}.';
   static const buLoadFailed = 'Không đọc được bài kiểm tra trên máy.';
 
@@ -1021,17 +1393,17 @@ abstract final class Vi {
   }
 
   static String buShotYes(String drillId) => switch (drillId) {
-        'S5' => 'Bắt đui được',
-        'S6' => 'Chạm bi',
-        'F7' || 'F8' || 'S8' || 'S9' => 'Đạt',
-        _ => 'Vào',
-      };
+    'S5' => 'Bắt đui được',
+    'S6' => 'Chạm bi',
+    'F7' || 'F8' || 'S8' || 'S9' => 'Đạt',
+    _ => 'Vào',
+  };
 
   static String buShotNo(String drillId) => switch (drillId) {
-        'S5' => 'Không bắt đui',
-        'F7' || 'F8' || 'S8' || 'S9' => 'Không đạt',
-        _ => 'Trượt',
-      };
+    'S5' => 'Không bắt đui',
+    'F7' || 'F8' || 'S8' || 'S9' => 'Không đạt',
+    _ => 'Trượt',
+  };
 
   static const buCountLess = 'Bớt một bi';
   static const buCountMore = 'Thêm một bi';
@@ -1043,33 +1415,42 @@ abstract final class Vi {
   static const buExamIReadyTitle = 'Xong Đề I';
   static const buExamIReadyAction = 'Chấm Đề I';
   static String buExamIScore(int s) => 'Điểm Đề I: $s / $examIMax';
-  static String buPlacement(ExamIIVersion v) => 'Bạn làm Đề II bản ${buVersionName(v)}.';
+  static String buPlacement(ExamIIVersion v) =>
+      'Bạn làm Đề II bản ${buVersionName(v)}.';
   static const buPlacementSmallTable =
       'Đề I đạt mức Doctorate nhưng bàn nhỏ hơn 9 feet, nên làm bản Masters.';
   static const buExamIINow = 'Làm Đề II ngay';
   static const buExamIILater = 'Để buổi khác';
   static const buFinishTitle = 'Xong Đề II';
   static const buFinishAction = 'Hoàn tất và xem kết quả';
-  static String buCompletionTooSoon(DateTime d) => 'Lần kiểm tra trước hoàn tất chưa đủ 14 '
+  static String buCompletionTooSoon(DateTime d) =>
+      'Lần kiểm tra trước hoàn tất chưa đủ 14 '
       'ngày. Lần này hoàn tất được từ ngày ${shortDate(d)}; các cú đã nhập vẫn còn nguyên.';
   static const buResultTitle = 'Kết quả kiểm tra';
   static String buDrillScoreLine(String id, int score, int max) =>
       '${buDrillTitle(id)}: $score / $max';
-  static String buExamScoreLine(BuExam e, int s, int max) => '${buExamName(e)}: $s / $max';
+  static String buExamScoreLine(BuExam e, int s, int max) =>
+      '${buExamName(e)}: $s / $max';
   static String buTotal(int total) => 'Điểm BU: $total / $buTotalMax';
   static String buBand(BuRankBand b) => 'Mức BU: ${b.buLevels}';
   static String buFargo(BuRankBand b) => 'Fargo tham chiếu: ${b.fargo}';
   static const buResultDone = 'Xong';
 
   /// Câu kết quả hạng — đúng một câu cho mỗi luật của spec mục 4.2.
-  static String rankOutcome(RankOutcome o, Rank? before, Rank result) => switch (o) {
-        RankOutcome.firstRank => 'Bạn nhận hạng ${result.label}, đã kiểm chứng.',
-        RankOutcome.promoted => 'Lên hạng: ${before!.label} → ${result.label}, đã kiểm chứng.',
-        RankOutcome.confirmed => 'Giữ hạng ${result.label}, nay đã kiểm chứng.',
-        RankOutcome.warned => 'Kết quả tương đương hạng ${result.label}, thấp hơn hạng hiện '
-            'tại ${before!.label}. Hạng giữ nguyên và có cảnh báo cho tới khi một lần sau '
-            'đạt ${before.label} trở lên.',
-      };
+  static String rankOutcome(
+    RankOutcome o,
+    Rank? before,
+    Rank result,
+  ) => switch (o) {
+    RankOutcome.firstRank => 'Bạn nhận hạng ${result.label}, đã kiểm chứng.',
+    RankOutcome.promoted =>
+      'Lên hạng: ${before!.label} → ${result.label}, đã kiểm chứng.',
+    RankOutcome.confirmed => 'Giữ hạng ${result.label}, nay đã kiểm chứng.',
+    RankOutcome.warned =>
+      'Kết quả tương đương hạng ${result.label}, thấp hơn hạng hiện '
+          'tại ${before!.label}. Hạng giữ nguyên và có cảnh báo cho tới khi một lần sau '
+          'đạt ${before.label} trở lên.',
+  };
 
   static const buCancelTest = 'Hủy lần kiểm tra này';
   static const buCancelConfirmBody =
@@ -1078,18 +1459,21 @@ abstract final class Vi {
 
   // Hạng trên Hồ sơ, Trang chủ và màn Hạng — spec mục 4.3, 7.4.
   static String rankSource(RankSource s) => switch (s) {
-        RankSource.estimated => 'ước lượng',
-        RankSource.selfDeclared => 'tự khai',
-        RankSource.verified => 'đã kiểm chứng',
-      };
+    RankSource.estimated => 'ước lượng',
+    RankSource.selfDeclared => 'tự khai',
+    RankSource.verified => 'đã kiểm chứng',
+  };
   static const rankInfo = 'Về bảng hạng';
   static const rankInfoTitle = 'Bảng hạng PoolCoachAI';
   static const rankTableTitle = 'Quy đổi điểm Billiard University sang hạng';
   static String rankBandRange(BuRankBand b) => '${b.min}–${b.max} điểm';
-  static String rankBandLevels(BuRankBand b) => 'Mức BU: ${b.buLevels} · Fargo ${b.fargo}';
-  static const rankProNote = 'PRO chỉ có khi tự khai. Bài kiểm tra BU cao nhất ra hạng A.';
+  static String rankBandLevels(BuRankBand b) =>
+      'Mức BU: ${b.buLevels} · Fargo ${b.fargo}';
+  static const rankProNote =
+      'PRO chỉ có khi tự khai. Bài kiểm tra BU cao nhất ra hạng A.';
   static const rankNone = 'Bạn chưa có hạng.';
-  static String rankWarning(Rank w) => 'Lần kiểm tra gần nhất cho kết quả tương đương hạng '
+  static String rankWarning(Rank w) =>
+      'Lần kiểm tra gần nhất cho kết quả tương đương hạng '
       '${w.label}, thấp hơn hạng hiện tại.';
   static String rankLastTest(DateTime d, int total, Rank r) =>
       'Lần kiểm tra gần nhất: ${shortDate(d)} · $total điểm · hạng ${r.label}';
@@ -1106,14 +1490,18 @@ abstract final class Vi {
       '${shortDate(d)} · $total điểm · hạng ${r.label}';
   static String rankHistoryCancelled(DateTime d) => '${shortDate(d)} · đã hủy';
   static const homeRankCardTitle = 'Xác định hạng của bạn';
-  static const homeRankCardBody = 'Trả lời 8 câu hỏi để có hạng gợi ý, hoặc làm bài kiểm tra '
+  static const homeRankCardBody =
+      'Trả lời 8 câu hỏi để có hạng gợi ý, hoặc làm bài kiểm tra '
       'Billiard University để có hạng đã kiểm chứng.';
   static String signOutPendingAssessment(int n) =>
       'Còn $n mục hạng hoặc bài kiểm tra chưa đồng bộ, đăng xuất sẽ mất.';
-  static const signOutActiveTest = 'Lần kiểm tra đang làm dở sẽ mất khi đăng xuất.';
+  static const signOutActiveTest =
+      'Lần kiểm tra đang làm dở sẽ mất khi đăng xuất.';
 
   static String signOutPendingRoadmap(int count) =>
       'Còn $count mục tiêu hoặc thành tích chưa lên máy chủ — đăng xuất bây giờ sẽ mất.';
+  static String signOutPendingEquipment(int count) =>
+      'Còn $count hồ sơ cơ chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
 
   // ─── Lộ trình (spec 2026-10-15) ─────────────────────────────────────────────
   //

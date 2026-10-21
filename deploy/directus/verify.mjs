@@ -207,6 +207,84 @@ try {
       ? ok('B không sửa được mục tiêu của A')
       : fail(`B sửa mục tiêu của A → ${bGoalPatch.status}`);
 
+    // ─── Equipment: đồng bộ theo chủ sở hữu, xóa bằng tombstone ─────────
+    const cueId = randomUUID();
+    const cue = {
+      id: cueId,
+      name: 'Cơ kiểm thử',
+      type: 'playing',
+      weight_grams: 540,
+      tip_diameter_mm: 12.5,
+      tip_hardness: 'medium',
+      skill_categories: ['aiming'],
+      last_tip_maintenance: '2026-10-01',
+      tip_maintenance_due_date: '2026-12-01',
+      updated_at: '2026-10-20T03:00:00.000Z',
+      is_deleted: false,
+    };
+    const cueMade = await call('POST', '/items/cue_equipment', cue, a.access_token);
+    cueMade.status === 200 || cueMade.status === 201
+      ? ok('A tạo được hồ sơ cơ')
+      : fail(`A tạo hồ sơ cơ → ${cueMade.status} ${cueMade.code}`);
+    const cueOwner = await call(
+      'GET',
+      `/items/cue_equipment/${cueId}?fields=id,user_created`,
+      undefined,
+      admin.access_token,
+    );
+    cueOwner.data?.user_created === aId
+      ? ok('server gán chủ hồ sơ cơ là A')
+      : fail(`chủ hồ sơ cơ không phải A: ${cueOwner.data?.user_created ?? '(null)'}`);
+    const aCues = await call(
+      'GET',
+      '/items/cue_equipment?fields=id,user_created',
+      undefined,
+      a.access_token,
+    );
+    aCues.data?.length === 1
+      ? ok('A đọc được hồ sơ cơ của mình')
+      : fail(`A đọc được ${aCues.data?.length} hồ sơ cơ`);
+    const bCues = await call('GET', '/items/cue_equipment', undefined, b.access_token);
+    (bCues.data ?? []).length === 0
+      ? ok('B không thấy hồ sơ cơ của A')
+      : fail(`B thấy ${bCues.data.length} hồ sơ cơ`);
+    const cuePatch = await call(
+      'PATCH',
+      `/items/cue_equipment/${cueId}`,
+      { name: 'Cơ đã sửa', updated_at: '2026-10-21T03:00:00.000Z' },
+      a.access_token,
+    );
+    cuePatch.status === 200
+      ? ok('A cập nhật được hồ sơ cơ của mình')
+      : fail(`A cập nhật hồ sơ cơ → ${cuePatch.status} ${cuePatch.code}`);
+    const bCuePatch = await call(
+      'PATCH',
+      `/items/cue_equipment/${cueId}`,
+      { name: 'Ghi đè' },
+      b.access_token,
+    );
+    bCuePatch.status === 403
+      ? ok('B không sửa được hồ sơ cơ của A')
+      : fail(`B sửa hồ sơ cơ của A → ${bCuePatch.status}`);
+    const cueDeleted = await call(
+      'PATCH',
+      `/items/cue_equipment/${cueId}`,
+      { is_deleted: true, updated_at: '2026-10-22T03:00:00.000Z' },
+      a.access_token,
+    );
+    cueDeleted.status === 200
+      ? ok('A xóa mềm hồ sơ cơ bằng tombstone')
+      : fail(`A xóa mềm hồ sơ cơ → ${cueDeleted.status} ${cueDeleted.code}`);
+    const cueHardDelete = await call(
+      'DELETE',
+      `/items/cue_equipment/${cueId}`,
+      undefined,
+      a.access_token,
+    );
+    cueHardDelete.status === 403
+      ? ok('A không xóa cứng hồ sơ cơ')
+      : fail(`A xóa cứng hồ sơ cơ → ${cueHardDelete.status}`);
+
     const ach = {
       id: randomUUID(),
       kind: 'chuoiNgay',

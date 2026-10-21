@@ -57,6 +57,7 @@ class DrillLogRows extends Table {
 /// Khung giờ lịch tập hằng tuần.
 class ScheduleSlotRows extends Table {
   TextColumn get id => text()();
+  TextColumn get userId => text().withDefault(const Constant(''))();
   IntColumn get day => integer()();
   TextColumn get time => text()();
   TextColumn get label => text()();
@@ -69,10 +70,48 @@ class ScheduleSlotRows extends Table {
 /// Buổi tập tự do đo bằng đồng hồ.
 class TimerSessionRows extends Table {
   TextColumn get id => text()();
+  TextColumn get userId => text().withDefault(const Constant(''))();
   DateTimeColumn get date => dateTime()();
   IntColumn get durationSec => integer()();
   TextColumn get cat => text().nullable()();
   TextColumn get cueId => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Cây cơ của người chơi và thông tin bảo dưỡng đầu cơ.
+class CueEquipmentRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+  TextColumn get name => text()();
+  TextColumn get type => text()();
+  IntColumn get weightGrams => integer().nullable()();
+  RealColumn get tipDiameterMm => real().nullable()();
+  TextColumn get tipHardness => text().nullable()();
+  TextColumn get skillCategories => text()();
+  DateTimeColumn get lastTipMaintenance => dateTime().nullable()();
+  DateTimeColumn get tipMaintenanceDueDate => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Một trận bida đã bắt đầu hoặc hoàn tất.
+class PoolMatchRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+  TextColumn get gameType => text()();
+  TextColumn get playerName => text()();
+  TextColumn get opponentName => text()();
+  IntColumn get targetRacks => integer()();
+  TextColumn get rackWinners => text()();
+  TextColumn get shots => text().withDefault(const Constant('[]'))();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -168,8 +207,8 @@ class BuDrillResultRows extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {testId, drillId},
-      ];
+    {testId, drillId},
+  ];
 }
 
 // ─── Lộ trình (spec 2026-10-15 mục 6) ──────────────────────────────────────
@@ -213,25 +252,29 @@ class AchievementRows extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {userId, kind, refId},
-      ];
+    {userId, kind, refId},
+  ];
 }
 
 // ─── Database ───────────────────────────────────────────────────────────────
 
-@DriftDatabase(tables: [
-  DrillRows,
-  KnowledgeRows,
-  DrillLogRows,
-  ScheduleSlotRows,
-  TimerSessionRows,
-  AuthSessionRows,
-  PlayerRankRows,
-  BuTestRows,
-  BuDrillResultRows,
-  PlayerGoalRows,
-  AchievementRows,
-])
+@DriftDatabase(
+  tables: [
+    DrillRows,
+    KnowledgeRows,
+    DrillLogRows,
+    ScheduleSlotRows,
+    TimerSessionRows,
+    CueEquipmentRows,
+    AuthSessionRows,
+    PlayerRankRows,
+    BuTestRows,
+    BuDrillResultRows,
+    PlayerGoalRows,
+    AchievementRows,
+    PoolMatchRows,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -239,34 +282,55 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (Migrator m) async {
-          await m.createAll();
-        },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            // Buổi tập v1 không có chủ; chủ sản phẩm chọn bỏ dữ liệu thử
-            // thay vì gán bừa cho người đăng nhập đầu tiên.
-            await m.deleteTable('drill_log_rows');
-            await m.createTable(drillLogRows);
-            await m.createTable(authSessionRows);
-          }
-          if (from < 3) {
-            // Chỉ thêm bảng: không đụng dữ liệu cũ (spec mục 6.1).
-            await m.createTable(playerRankRows);
-            await m.createTable(buTestRows);
-            await m.createTable(buDrillResultRows);
-          }
-          if (from < 4) {
-            // Chỉ thêm bảng (spec 2026-10-15 mục 6).
-            await m.createTable(playerGoalRows);
-            await m.createTable(achievementRows);
-          }
-        },
-      );
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        // Buổi tập v1 không có chủ; chủ sản phẩm chọn bỏ dữ liệu thử
+        // thay vì gán bừa cho người đăng nhập đầu tiên.
+        await m.deleteTable('drill_log_rows');
+        await m.createTable(drillLogRows);
+        await m.createTable(authSessionRows);
+      }
+      if (from < 3) {
+        // Chỉ thêm bảng: không đụng dữ liệu cũ (spec mục 6.1).
+        await m.createTable(playerRankRows);
+        await m.createTable(buTestRows);
+        await m.createTable(buDrillResultRows);
+      }
+      if (from < 4) {
+        // Chỉ thêm bảng (spec 2026-10-15 mục 6).
+        await m.createTable(playerGoalRows);
+        await m.createTable(achievementRows);
+      }
+      if (from < 5) {
+        // Gắn buổi tập tự do và lịch tuần với tài khoản để không lộ
+        // dữ liệu cho người đăng nhập sau trên cùng thiết bị.
+        await m.addColumn(scheduleSlotRows, scheduleSlotRows.userId);
+        await m.addColumn(timerSessionRows, timerSessionRows.userId);
+      }
+      if (from < 6) {
+        await m.createTable(cueEquipmentRows);
+      }
+      if (from < 7) {
+        await m.createTable(poolMatchRows);
+      } else if (from < 8) {
+        await m.addColumn(poolMatchRows, poolMatchRows.shots);
+      }
+      if (from < 9) {
+        if (from >= 6) {
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.updatedAt);
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.syncedAt);
+          await m.addColumn(cueEquipmentRows, cueEquipmentRows.isDeleted);
+        }
+      }
+    },
+  );
 
   static QueryExecutor _openConnection() {
     // Trên web, drift chạy SQLite bằng WebAssembly trong một worker.
@@ -300,10 +364,12 @@ class AppDatabase extends _$AppDatabase {
       ..addColumns([drillLogRows.id, drillLogRows.userId])
       ..where(drillLogRows.syncedAt.isNull());
     return query
-        .map((row) => (
-              id: row.read(drillLogRows.id)!,
-              userId: row.read(drillLogRows.userId)!,
-            ))
+        .map(
+          (row) => (
+            id: row.read(drillLogRows.id)!,
+            userId: row.read(drillLogRows.userId)!,
+          ),
+        )
         .watch();
   }
 }

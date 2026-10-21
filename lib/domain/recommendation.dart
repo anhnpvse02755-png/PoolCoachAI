@@ -21,10 +21,11 @@ Drill? pickDrillInCategory({
   required Map<String, List<DrillLog>> logsByDrillOldestFirst,
   required Set<String> excludeDrillIds,
 }) {
-  final candidates = drills
-      .where((d) => d.cat == cat && !excludeDrillIds.contains(d.id))
-      .toList()
-    ..sort((a, b) => a.level.compareTo(b.level));
+  final candidates =
+      drills
+          .where((d) => d.cat == cat && !excludeDrillIds.contains(d.id))
+          .toList()
+        ..sort((a, b) => a.level.compareTo(b.level));
 
   if (candidates.isEmpty) return null;
 
@@ -109,8 +110,9 @@ bool _sameDay(DateTime a, DateTime b) =>
     ...logs.map((l) => l.date),
     ...timerSessions.map((t) => t.date),
   ];
-  final activeTodayOrYesterday =
-      activeDates.any((d) => _sameDay(d, today) || _sameDay(d, yesterday));
+  final activeTodayOrYesterday = activeDates.any(
+    (d) => _sameDay(d, today) || _sameDay(d, yesterday),
+  );
 
   // Luật 2 — sắp mất streak.
   if (!activeTodayOrYesterday && activeDates.isNotEmpty) {
@@ -121,9 +123,7 @@ bool _sameDay(DateTime a, DateTime b) =>
       final drill = drillById[log.drillId];
       if (drill != null) counts[drill.cat] = counts[drill.cat]! + 1;
     }
-    final easiest = counts.entries.reduce(
-      (a, b) => b.value < a.value ? b : a,
-    );
+    final easiest = counts.entries.reduce((a, b) => b.value < a.value ? b : a);
     return (cat: easiest.key, reason: PickReason.streakAtRisk);
   }
 
@@ -187,6 +187,8 @@ class TodayRecommendation {
     required this.article,
     required this.readyDrillIds,
     required this.streak,
+    required this.practiceSecondsThisWeek,
+    required this.todaySchedule,
   });
 
   final SkillCategory cat;
@@ -202,6 +204,8 @@ class TodayRecommendation {
 
   final List<String> readyDrillIds;
   final int streak;
+  final int practiceSecondsThisWeek;
+  final List<ScheduleSlot> todaySchedule;
 }
 
 /// Số ngày tập liên tiếp tính tới hôm nay.
@@ -236,6 +240,21 @@ int streakDays({
 }
 
 String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+int freePracticeSecondsThisWeek({
+  required List<TimerSession> timerSessions,
+  required DateTime today,
+}) {
+  final todayStart = DateTime(today.year, today.month, today.day);
+  final monday = todayStart.subtract(Duration(days: todayStart.weekday - 1));
+  final tomorrow = todayStart.add(const Duration(days: 1));
+  return timerSessions
+      .where(
+        (session) =>
+            !session.date.isBefore(monday) && session.date.isBefore(tomorrow),
+      )
+      .fold(0, (total, session) => total + session.durationSec);
+}
 
 /// Tính gợi ý hôm nay từ toàn bộ dữ liệu người chơi.
 TodayRecommendation computeRecommendation({
@@ -288,10 +307,13 @@ TodayRecommendation computeRecommendation({
     drill: drill,
     article: article,
     readyDrillIds: pi.readyDrillIds,
-    streak: streakDays(
-      logs: logs,
+    streak: streakDays(logs: logs, timerSessions: timerSessions, today: today),
+    practiceSecondsThisWeek: freePracticeSecondsThisWeek(
       timerSessions: timerSessions,
       today: today,
     ),
+    todaySchedule: schedule
+        .where((slot) => slot.day == today.weekday - 1)
+        .toList(growable: false),
   );
 }

@@ -20,11 +20,13 @@ import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/assessment_sync.dart';
+import 'package:poolcoachai/data/sync/cue_equipment_sync.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
+import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
@@ -121,6 +123,9 @@ void main() {
           FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/achievements'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/achievements'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/cue_equipment'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/cue_equipment'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)));
     final assessmentSync = AssessmentSyncService(
       db: db,
@@ -137,6 +142,13 @@ void main() {
       now: () => today,
     );
     addTearDown(roadmapSync.dispose);
+    final cueEquipmentSync = CueEquipmentSyncService(
+      db: db,
+      auth: auth,
+      api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+      now: () => today,
+    );
+    addTearDown(cueEquipmentSync.dispose);
 
     final container = ProviderContainer(
       overrides: [
@@ -144,6 +156,7 @@ void main() {
         nowProvider.overrideWithValue(() => today),
         authRepositoryProvider.overrideWithValue(auth),
         syncServiceProvider.overrideWithValue(sync),
+        cueEquipmentSyncProvider.overrideWithValue(cueEquipmentSync),
         assessmentSyncProvider.overrideWithValue(assessmentSync),
         roadmapSyncProvider.overrideWithValue(roadmapSync),
       ],
@@ -170,6 +183,16 @@ void main() {
     await openProfile(tester);
 
     expect(find.text(Vi.profileSignedInAs('An')), findsOneWidget);
+  });
+
+  testWidgets('mở quản lý cơ từ Hồ sơ', (tester) async {
+    await openProfile(tester);
+
+    await tester.tap(find.text(Vi.equipmentTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EquipmentScreen), findsOneWidget);
+    expect(find.text(Vi.equipmentEmpty), findsOneWidget);
   });
 
   testWidgets('không còn buổi chờ thì đăng xuất ngay, xoá dữ liệu trên máy', (

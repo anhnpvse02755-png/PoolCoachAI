@@ -265,6 +265,21 @@ await ensureCollection('achievements', 'Thành tích Lộ trình — chỉ thêm
   required('achieved_at', 'timestamp'),
 ]);
 
+// Equipment dùng updated_at/is_deleted để đồng bộ và xóa mềm đa thiết bị.
+await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng của người chơi', [
+  pk,
+  required('name', 'string'),
+  required('type', 'string'),
+  nullable('weight_grams', 'integer'),
+  nullable('tip_diameter_mm', 'decimal'),
+  nullable('tip_hardness', 'string'),
+  required('skill_categories', 'json'),
+  nullable('last_tip_maintenance', 'date'),
+  nullable('tip_maintenance_due_date', 'date'),
+  required('updated_at', 'timestamp'),
+  required('is_deleted', 'boolean'),
+]);
+
 // ─── 2. Role Player và policy của nó ────────────────────────────────────────
 async function findOrCreate(path, name, payload) {
   const found = await api('GET', `${path}?filter[name][_eq]=${encodeURIComponent(name)}`, undefined, token);
@@ -386,6 +401,35 @@ const desiredPermissions = [
     validation: {},
   },
   { collection: 'achievements', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  // Equipment: đồng bộ CRUD theo quyền sở hữu; xóa chỉ bằng tombstone.
+  {
+    collection: 'cue_equipment',
+    action: 'create',
+    fields: [
+      'id', 'name', 'type', 'weight_grams', 'tip_diameter_mm', 'tip_hardness',
+      'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
+      'updated_at', 'is_deleted',
+    ],
+    permissions: {},
+    validation: {},
+  },
+  {
+    collection: 'cue_equipment',
+    action: 'read',
+    fields: ['*'],
+    permissions: { user_created: self },
+  },
+  {
+    collection: 'cue_equipment',
+    action: 'update',
+    fields: [
+      'name', 'type', 'weight_grams', 'tip_diameter_mm', 'tip_hardness',
+      'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
+      'updated_at', 'is_deleted',
+    ],
+    permissions: { user_created: self },
+    validation: {},
+  },
 ];
 
 const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policy.id}&limit=-1`, undefined, token);

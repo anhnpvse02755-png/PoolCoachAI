@@ -10,7 +10,9 @@ import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
 import '../../support/test_data.dart';
@@ -22,6 +24,8 @@ void main() {
     List<Drill>? drills,
     List<KnowledgeArticle>? knowledge,
     List<DrillLog>? logs,
+    List<TimerSession>? timerSessions,
+    List<ScheduleSlot>? schedule,
     GoalRecord? goal,
   }) async {
     final router = createAppRouter(auth: signedInGate());
@@ -30,6 +34,8 @@ void main() {
       drills: drills,
       knowledge: knowledge,
       logs: logs,
+      timerSessions: timerSessions,
+      schedule: schedule,
       goal: goal,
     );
     addTearDown(container.dispose);
@@ -55,6 +61,35 @@ void main() {
 
     expect(find.text('0'), findsOneWidget);
     expect(find.text(Vi.homeStreakUnit), findsOneWidget);
+  });
+
+  testWidgets('hiện lịch hôm nay và tổng thời gian tập tự do trong tuần', (
+    tester,
+  ) async {
+    await openHome(
+      tester,
+      schedule: const [
+        ScheduleSlot(
+          id: 's1',
+          day: 1,
+          time: '19:00',
+          label: 'Tập điều bi',
+          cat: SkillCategory.position,
+        ),
+      ],
+      timerSessions: [
+        TimerSession(
+          id: 't1',
+          date: DateTime(2026, 9, 21, 10),
+          durationSec: 1800,
+        ),
+      ],
+    );
+
+    expect(find.text(Vi.homeScheduleTitle), findsOneWidget);
+    expect(find.text('Tập điều bi'), findsOneWidget);
+    expect(find.text('19:00'), findsOneWidget);
+    expect(find.text(Vi.homePracticeWeek(1800)), findsOneWidget);
   });
 
   testWidgets('hiện câu lý do của nhóm được chọn, không nuốt lý do', (

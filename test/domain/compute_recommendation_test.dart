@@ -3,6 +3,7 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
@@ -77,6 +78,28 @@ void main() {
 
       expect(rec.drill, isNull);
     });
+
+    test('lịch đúng thứ hiện ở Home và điều khiển nhóm gợi ý', () {
+      final slot = ScheduleSlot(
+        id: 's1',
+        day: _today.weekday - 1,
+        time: '19:00',
+        label: 'Tập cân bi',
+        cat: SkillCategory.bank,
+      );
+      final rec = computeRecommendation(
+        drills: const [_aimDrill],
+        logs: const [],
+        knowledge: const [],
+        timerSessions: const [],
+        schedule: [slot],
+        today: _today,
+      );
+
+      expect(rec.todaySchedule, [slot]);
+      expect(rec.cat, SkillCategory.bank);
+      expect(rec.reason, PickReason.scheduled);
+    });
   });
 
   group('streakDays', () {
@@ -99,10 +122,7 @@ void main() {
           ),
       ];
 
-      expect(
-        streakDays(logs: logs, timerSessions: const [], today: _today),
-        3,
-      );
+      expect(streakDays(logs: logs, timerSessions: const [], today: _today), 3);
     });
 
     test('buổi tập tự do cũng tính vào streak', () {
@@ -136,10 +156,7 @@ void main() {
         ),
       ];
 
-      expect(
-        streakDays(logs: logs, timerSessions: const [], today: _today),
-        1,
-      );
+      expect(streakDays(logs: logs, timerSessions: const [], today: _today), 1);
     });
 
     test('tập hôm qua nhưng chưa tập hôm nay vẫn giữ streak', () {
@@ -153,10 +170,39 @@ void main() {
         ),
       ];
 
-      expect(
-        streakDays(logs: logs, timerSessions: const [], today: _today),
-        1,
+      expect(streakDays(logs: logs, timerSessions: const [], today: _today), 1);
+    });
+  });
+
+  group('freePracticeSecondsThisWeek', () {
+    test('chỉ cộng buổi từ thứ Hai đến hết hôm nay', () {
+      final seconds = freePracticeSecondsThisWeek(
+        timerSessions: [
+          TimerSession(
+            id: 'monday',
+            date: DateTime(2026, 9, 14, 9),
+            durationSec: 900,
+          ),
+          TimerSession(
+            id: 'today',
+            date: DateTime(2026, 9, 17, 21),
+            durationSec: 1800,
+          ),
+          TimerSession(
+            id: 'last-week',
+            date: DateTime(2026, 9, 13, 21),
+            durationSec: 3000,
+          ),
+          TimerSession(
+            id: 'future',
+            date: DateTime(2026, 9, 18, 8),
+            durationSec: 6000,
+          ),
+        ],
+        today: _today,
       );
+
+      expect(seconds, 2700);
     });
   });
 }

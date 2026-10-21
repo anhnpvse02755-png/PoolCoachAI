@@ -8,6 +8,7 @@ abstract final class Routes {
   static const play = '/play';
   static const stats = '/stats';
   static const profile = '/profile';
+  static const equipment = '$profile/equipment';
 
   // Mở đè lên shell
   static const coach = '/coach';
@@ -29,6 +30,8 @@ abstract final class Routes {
 
   /// Lộ trình — trong nhánh Luyện tập, không thêm tab.
   static const roadmap = '$training/roadmap';
+  static const timer = '$training/timer';
+  static const schedule = '$training/schedule';
 
   /// Chi tiết hạng — mở đè lên shell (spec mục 7.1).
   static const rank = '/rank';
@@ -80,6 +83,7 @@ abstract final class Routes {
   /// có tham số cũng không thể lọt lưới như route thường.
   static const all = <String>[
     ...tabs,
+    equipment,
     coach,
     notifications,
     drillPattern,
@@ -87,6 +91,8 @@ abstract final class Routes {
     simulator,
     planner,
     roadmap,
+    timer,
+    schedule,
     rank,
     rankLayouts,
     onboardingRank,

@@ -18,12 +18,17 @@ import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/timer_session.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+
 import 'fake_auth.dart';
 
 /// Dữ liệu và bộ chứa provider dùng chung cho mọi widget test.
@@ -70,6 +75,10 @@ ProviderContainer testContainer({
   List<Drill>? drills,
   List<KnowledgeArticle>? knowledge,
   List<DrillLog>? logs,
+  List<TimerSession>? timerSessions,
+  List<ScheduleSlot>? schedule,
+  List<CueEquipment>? equipment,
+  List<PoolMatch>? matches,
   DateTime? now,
   AuthRepository? auth,
   PlayerRank? rank,
@@ -83,21 +92,40 @@ ProviderContainer testContainer({
     overrides: [
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
-      knowledgeProvider
-          .overrideWith((ref) => Stream.value(knowledge ?? testKnowledge)),
-      drillLogsProvider
-          .overrideWith((ref) => Stream.value(logs ?? const <DrillLog>[])),
-      authRepositoryProvider
-          .overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
+      knowledgeProvider.overrideWith(
+        (ref) => Stream.value(knowledge ?? testKnowledge),
+      ),
+      drillLogsProvider.overrideWith(
+        (ref) => Stream.value(logs ?? const <DrillLog>[]),
+      ),
+      timerSessionsProvider.overrideWith(
+        (ref) => Stream.value(timerSessions ?? const <TimerSession>[]),
+      ),
+      scheduleProvider.overrideWith(
+        (ref) => Stream.value(schedule ?? const <ScheduleSlot>[]),
+      ),
+      cueEquipmentProvider.overrideWith(
+        (ref) => Stream.value(equipment ?? const <CueEquipment>[]),
+      ),
+      matchesProvider.overrideWith(
+        (ref) => Stream.value(matches ?? const <PoolMatch>[]),
+      ),
+      authRepositoryProvider.overrideWithValue(
+        auth ?? FakeAuthRepository.signedIn(),
+      ),
       playerRankProvider.overrideWith((ref) => Stream.value(rank)),
-      buTestsProvider.overrideWith((ref) => Stream.value(tests ?? const <BuTest>[])),
+      buTestsProvider.overrideWith(
+        (ref) => Stream.value(tests ?? const <BuTest>[]),
+      ),
       activeTestProvider.overrideWith((ref) => Stream.value(activeTest)),
       goalProvider.overrideWith((ref) => Stream.value(goal)),
       achievementsProvider.overrideWith(
         (ref) => Stream.value(achievements ?? const <Achievement>[]),
       ),
       if (buResult != null)
-        latestBuResultProvider.overrideWithValue(AsyncData<BuResult?>(buResult)),
+        latestBuResultProvider.overrideWithValue(
+          AsyncData<BuResult?>(buResult),
+        ),
     ],
   );
 }
@@ -139,8 +167,14 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
 ///
 /// [rankLag] làm stream hạng trễ như Drift trên web (chạy trong worker):
 /// dòng vừa ghi tới màn hình sau một nhịp.
-ProviderContainer dbContainer(AppDatabase db,
-    {AuthRepository? auth, DateTime? now, Duration? rankLag, List<DrillLog>? logs}) {
+ProviderContainer dbContainer(
+  AppDatabase db, {
+  AuthRepository? auth,
+  DateTime? now,
+  DateTime Function()? clock,
+  Duration? rankLag,
+  List<DrillLog>? logs,
+}) {
   return ProviderContainer(
     overrides: [
       if (rankLag != null)
@@ -153,13 +187,15 @@ ProviderContainer dbContainer(AppDatabase db,
           });
         }),
       appDatabaseProvider.overrideWithValue(db),
-      nowProvider.overrideWithValue(() => now ?? testToday),
+      nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(testDrills)),
       knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),
       drillLogsProvider.overrideWith(
         (ref) => Stream.value(logs ?? const <DrillLog>[]),
       ),
-      authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository.signedIn()),
+      authRepositoryProvider.overrideWithValue(
+        auth ?? FakeAuthRepository.signedIn(),
+      ),
     ],
   );
 }

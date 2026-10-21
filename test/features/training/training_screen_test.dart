@@ -10,7 +10,9 @@ import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
+import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
+import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 
 import '../../support/test_data.dart';
 
@@ -44,14 +46,13 @@ void main() {
     required DateTime date,
     required num score,
     int? attempts = 10,
-  }) =>
-      DrillLog(
-        id: id,
-        drillId: 'd1',
-        date: date,
-        score: score,
-        attempts: attempts,
-      );
+  }) => DrillLog(
+    id: id,
+    drillId: 'd1',
+    date: date,
+    score: score,
+    attempts: attempts,
+  );
 
   testWidgets('bài chưa từng tập thì không hiện con số nào', (tester) async {
     await openTraining(tester, const []);
@@ -60,8 +61,9 @@ void main() {
     expect(find.text(Vi.drillRatioUnknown), findsNothing);
   });
 
-  testWidgets('đã tập thì hiện tỉ lệ đạt mục tiêu, không phải điểm thô',
-      (tester) async {
+  testWidgets('đã tập thì hiện tỉ lệ đạt mục tiêu, không phải điểm thô', (
+    tester,
+  ) async {
     await openTraining(tester, [
       log(id: 'l1', date: DateTime(2026, 9, 20), score: 9),
     ]);
@@ -71,8 +73,9 @@ void main() {
     expect(find.text('9.0'), findsNothing);
   });
 
-  testWidgets('lấy lần tập gần nhất, không phải lần tập đầu tiên',
-      (tester) async {
+  testWidgets('lấy lần tập gần nhất, không phải lần tập đầu tiên', (
+    tester,
+  ) async {
     await openTraining(tester, [
       log(id: 'cu', date: DateTime(2026, 9, 18), score: 4),
       log(id: 'moi', date: DateTime(2026, 9, 21), score: 8),
@@ -82,8 +85,9 @@ void main() {
     expect(find.text('50%'), findsNothing);
   });
 
-  testWidgets('thiếu số lần thử thì nói chưa chấm được, không quy về 0',
-      (tester) async {
+  testWidgets('thiếu số lần thử thì nói chưa chấm được, không quy về 0', (
+    tester,
+  ) async {
     await openTraining(tester, [
       log(id: 'thieu', date: DateTime(2026, 9, 20), score: 9, attempts: null),
     ]);
@@ -101,16 +105,21 @@ void main() {
     expect(find.byType(SimulatorScreen), findsOneWidget);
   });
 
-  testWidgets('thẻ Kế hoạch dọn bàn nằm ngay dưới thẻ mô phỏng và mở đúng màn', (tester) async {
-    await openTraining(tester, const []);
+  testWidgets(
+    'thẻ Kế hoạch dọn bàn nằm ngay dưới thẻ mô phỏng và mở đúng màn',
+    (tester) async {
+      await openTraining(tester, const []);
 
-    expect(tester.getTopLeft(find.text(Vi.planTitle)).dy,
-        greaterThan(tester.getTopLeft(find.text(Vi.simTitle)).dy));
-    await tester.tap(find.text(Vi.planTitle));
-    await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text(Vi.planTitle)).dy,
+        greaterThan(tester.getTopLeft(find.text(Vi.simTitle)).dy),
+      );
+      await tester.tap(find.text(Vi.planTitle));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(PlannerScreen), findsOneWidget);
-  });
+      expect(find.byType(PlannerScreen), findsOneWidget);
+    },
+  );
 
   testWidgets('thẻ Lộ trình mở màn chọn mục tiêu', (tester) async {
     await openTraining(tester, const []);
@@ -119,14 +128,29 @@ void main() {
     expect(find.text(Vi.goalPickTitle), findsOneWidget);
   });
 
+  testWidgets('thẻ Đồng hồ mở màn lưu buổi tập tự do', (tester) async {
+    await openTraining(tester, const []);
+    await tester.tap(find.text(Vi.timerTitle));
+    await tester.pumpAndSettle();
+    expect(find.byType(TimerScreen), findsOneWidget);
+  });
+
+  testWidgets('thẻ Lịch tập mở màn lịch tuần', (tester) async {
+    await openTraining(tester, const []);
+    await tester.tap(find.text(Vi.scheduleTitle));
+    await tester.pumpAndSettle();
+    expect(find.byType(ScheduleScreen), findsOneWidget);
+  });
+
   // Mô phỏng không cần dữ liệu bài tập, nên thẻ không được biến mất khi
   // danh sách bài đang tải hay tải lỗi.
   for (final (name, drills) in <(String, Stream<List<Drill>>)>[
     ('đang tải', StreamController<List<Drill>>().stream),
     ('tải lỗi', Stream<List<Drill>>.error(StateError('mất mạng'))),
   ]) {
-    testWidgets('thẻ Mô phỏng góc cắt vẫn hiện khi danh sách bài $name',
-        (tester) async {
+    testWidgets('thẻ Mô phỏng góc cắt vẫn hiện khi danh sách bài $name', (
+      tester,
+    ) async {
       final router = createAppRouter(auth: signedInGate());
       addTearDown(router.dispose);
       final base = testContainer();
