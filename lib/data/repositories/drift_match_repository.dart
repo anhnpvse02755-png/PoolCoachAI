@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/match_codec.dart';

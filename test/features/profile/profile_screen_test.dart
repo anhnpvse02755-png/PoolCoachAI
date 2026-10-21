@@ -21,6 +21,7 @@ import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/assessment_sync.dart';
 import 'package:poolcoachai/data/sync/cue_equipment_sync.dart';
+import 'package:poolcoachai/data/sync/practice_sync.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
@@ -39,6 +40,7 @@ void main() {
     int pending = 0,
     int unsyncable = 0,
     bool pendingRoadmap = false,
+    bool pendingPractice = false,
   }) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -68,6 +70,20 @@ void main() {
               score: double.infinity,
             ),
           );
+    }
+    if (pendingPractice) {
+      await db.into(db.poolMatchRows).insert(
+        PoolMatchRowsCompanion.insert(
+          id: 'match-pending',
+          userId: 'u1',
+          gameType: 'nineBall',
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 3,
+          rackWinners: '[]',
+          startedAt: today,
+        ),
+      );
     }
     if (pendingRoadmap) {
       final goal = GoalRecord(
@@ -124,6 +140,9 @@ void main() {
       ..routes['GET /items/achievements'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/achievements'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/pool_matches'] = ((_) => FakeDirectus.ok([]))
+      ..routes['GET /items/timer_sessions'] = ((_) => FakeDirectus.ok([]))
+      ..routes['GET /items/schedule_slots'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/cue_equipment'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/cue_equipment'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)));
@@ -149,6 +168,13 @@ void main() {
       now: () => today,
     );
     addTearDown(cueEquipmentSync.dispose);
+    final practiceSync = PracticeSyncService(
+      db: db,
+      auth: auth,
+      api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+      now: () => today,
+    );
+    addTearDown(practiceSync.dispose);
 
     final container = ProviderContainer(
       overrides: [
@@ -157,6 +183,7 @@ void main() {
         authRepositoryProvider.overrideWithValue(auth),
         syncServiceProvider.overrideWithValue(sync),
         cueEquipmentSyncProvider.overrideWithValue(cueEquipmentSync),
+        practiceSyncProvider.overrideWithValue(practiceSync),
         assessmentSyncProvider.overrideWithValue(assessmentSync),
         roadmapSyncProvider.overrideWithValue(roadmapSync),
       ],
@@ -240,6 +267,28 @@ void main() {
 
     expect(auth.calls, ['signOut']);
     expect(await db.select(db.playerGoalRows).get(), isEmpty);
+  });
+
+  testWidgets('còn trận chờ đồng bộ thì cảnh báo, Đồng bộ trước đẩy trận lên', (
+    tester,
+  ) async {
+    final (db, auth, server) = await openProfile(
+      tester,
+      pendingPractice: true,
+    );
+    server.routes['POST /items/pool_matches'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+
+    await tester.tap(find.text(Vi.profileSignOut));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.signOutPendingPractice(1)), findsOneWidget);
+
+    await tester.tap(find.text(Vi.signOutSyncFirst));
+    await tester.pumpAndSettle();
+
+    expect(server.sent('POST', '/items/pool_matches'), hasLength(1));
+    expect(auth.calls, ['signOut']);
+    expect(await db.select(db.poolMatchRows).get(), isEmpty);
   });
 
   testWidgets('Đồng bộ trước đẩy mục tiêu Lộ trình rồi mới đăng xuất', (

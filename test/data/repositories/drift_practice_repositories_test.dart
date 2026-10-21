@@ -54,7 +54,11 @@ void main() {
   test(
     'weekly schedules are sorted and changes stay within the account',
     () async {
-      final repository = DriftScheduleRepository(db, userId: 'u1');
+      final repository = DriftScheduleRepository(
+        db,
+        userId: 'u1',
+        now: () => DateTime(2026, 10, 20, 9),
+      );
       await repository.save(
         const ScheduleSlot(
           id: 'late',
@@ -122,7 +126,13 @@ void main() {
       expect((await repository.watchAll().first).map((slot) => slot.id), [
         'early',
       ]);
-      expect((await db.select(db.scheduleSlotRows).get()).length, 2);
+      // Xóa là xóa mềm: dòng ở lại làm tombstone chờ đồng bộ.
+      final rows = await db.select(db.scheduleSlotRows).get();
+      expect(rows.length, 3);
+      final tombstone = rows.singleWhere((slot) => slot.id == 'late');
+      expect(tombstone.isDeleted, isTrue);
+      expect(tombstone.syncedAt, isNull);
+      expect(tombstone.updatedAt, isNotNull);
 
       for (final invalidSlot in [
         const ScheduleSlot(
@@ -136,6 +146,25 @@ void main() {
       }
     },
   );
+
+  test('saving a removed slot again revives it as pending', () async {
+    final repository = DriftScheduleRepository(
+      db,
+      userId: 'u1',
+      now: () => DateTime(2026, 10, 20, 9),
+    );
+    const slot = ScheduleSlot(id: 's', day: 0, time: '08:00', label: 'Sáng');
+    await repository.save(slot);
+    await repository.remove('s');
+    expect(await repository.watchAll().first, isEmpty);
+
+    await repository.save(slot);
+
+    expect((await repository.watchAll().first).single.id, 's');
+    final row = (await db.select(db.scheduleSlotRows).get()).single;
+    expect(row.isDeleted, isFalse);
+    expect(row.syncedAt, isNull);
+  });
 
   test('stores the break-jump type and brand fields round-trip', () async {
     final repository = DriftCueEquipmentRepository(db, userId: 'u1');

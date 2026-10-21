@@ -57,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
 
     slots = await db.select(db.scheduleSlotRows).get();
-    expect(slots, isEmpty);
+    expect(slots.single.isDeleted, isTrue);
     expect(find.text(Vi.scheduleEmpty), findsOneWidget);
   });
 }

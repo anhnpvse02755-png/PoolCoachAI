@@ -30,6 +30,7 @@ Future<void> restoreSession(ProviderContainer container) async {
 void startSync(ProviderContainer container) {
   container.read(syncServiceProvider);
   container.read(cueEquipmentSyncProvider);
+  container.read(practiceSyncProvider);
   container.read(maintenanceReminderServiceProvider).start();
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);

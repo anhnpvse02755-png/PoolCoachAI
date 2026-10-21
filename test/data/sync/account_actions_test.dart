@@ -89,6 +89,73 @@ void main() {
     },
   );
 
+  test(
+    'đếm trận, buổi tập tự do và lịch chưa đồng bộ của đúng tài khoản, bỏ dòng mồ côi',
+    () async {
+      final at = DateTime(2026, 10, 21);
+      await db.into(db.poolMatchRows).insert(
+        PoolMatchRowsCompanion.insert(
+          id: 'm1',
+          userId: 'u1',
+          gameType: 'nineBall',
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 3,
+          rackWinners: '[]',
+          startedAt: at,
+        ),
+      );
+      await db.into(db.poolMatchRows).insert(
+        PoolMatchRowsCompanion.insert(
+          id: 'm-synced',
+          userId: 'u1',
+          gameType: 'nineBall',
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 3,
+          rackWinners: '[]',
+          startedAt: at,
+          syncedAt: Value(at),
+        ),
+      );
+      await db.into(db.timerSessionRows).insert(
+        TimerSessionRowsCompanion.insert(
+          id: 't1',
+          userId: const Value('u1'),
+          date: at,
+          durationSec: 60,
+        ),
+      );
+      await db.into(db.timerSessionRows).insert(
+        TimerSessionRowsCompanion.insert(
+          id: 't-orphan',
+          date: at,
+          durationSec: 60,
+        ),
+      );
+      await db.into(db.scheduleSlotRows).insert(
+        ScheduleSlotRowsCompanion.insert(
+          id: 's1',
+          userId: const Value('u1'),
+          day: 0,
+          time: '19:00',
+          label: 'Tập',
+        ),
+      );
+      await db.into(db.scheduleSlotRows).insert(
+        ScheduleSlotRowsCompanion.insert(
+          id: 's-u2',
+          userId: const Value('u2'),
+          day: 0,
+          time: '19:00',
+          label: 'Người khác',
+        ),
+      );
+
+      expect(await pendingPracticeCount(db, 'u1'), 3);
+    },
+  );
+
   test('bấm Đăng xuất thì xoá buổi của người đó, giữ của người khác', () async {
     final auth = FakeAuthRepository.signedIn(userId: 'u1');
     await addLog('a', 'u1');

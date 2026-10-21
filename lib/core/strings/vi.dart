@@ -1525,6 +1525,8 @@ abstract final class Vi {
 
   static String signOutPendingRoadmap(int count) =>
       'Còn $count mục tiêu hoặc thành tích chưa lên máy chủ — đăng xuất bây giờ sẽ mất.';
+  static String signOutPendingPractice(int count) =>
+      'Còn $count trận, buổi tập tự do hoặc lịch tập chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
   static String signOutPendingEquipment(int count) =>
       'Còn $count hồ sơ cơ chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
 

@@ -134,15 +134,22 @@ class DriftCueEquipmentRepository implements CueEquipmentRepository {
 }
 
 class DriftScheduleRepository implements ScheduleRepository {
-  DriftScheduleRepository(this._db, {required this._userId});
+  DriftScheduleRepository(
+    this._db, {
+    required this._userId,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final AppDatabase _db;
   final String _userId;
+  final DateTime Function() _now;
 
   @override
   Stream<List<ScheduleSlot>> watchAll() =>
       (_db.select(_db.scheduleSlotRows)
-            ..where((row) => row.userId.equals(_userId))
+            ..where(
+              (row) => row.userId.equals(_userId) & row.isDeleted.equals(false),
+            )
             ..orderBy([
               (row) => OrderingTerm.asc(row.day),
               (row) => OrderingTerm.asc(row.time),
@@ -175,13 +182,29 @@ class DriftScheduleRepository implements ScheduleRepository {
       await _db
           .into(_db.scheduleSlotRows)
           .insertOnConflictUpdate(
-            toScheduleSlotRow(slot).copyWith(userId: Value(_userId)),
+            toScheduleSlotRow(slot).copyWith(
+              userId: Value(_userId),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
+              isDeleted: const Value(false),
+            ),
           );
     });
   }
 
   @override
-  Future<void> remove(String id) => (_db.delete(
-    _db.scheduleSlotRows,
-  )..where((row) => row.userId.equals(_userId) & row.id.equals(id))).go();
+  Future<void> remove(String id) =>
+      (_db.update(_db.scheduleSlotRows)..where(
+            (row) =>
+                row.userId.equals(_userId) &
+                row.id.equals(id) &
+                row.isDeleted.equals(false),
+          ))
+          .write(
+            ScheduleSlotRowsCompanion(
+              isDeleted: const Value(true),
+              updatedAt: Value(_now()),
+              syncedAt: const Value(null),
+            ),
+          );
 }

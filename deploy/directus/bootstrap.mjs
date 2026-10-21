@@ -284,6 +284,40 @@ await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng 
   required('is_deleted', 'boolean'),
 ]);
 
+// Trận đấu (kèm rack và cú đánh như app lưu), buổi tập tự do và lịch tập tuần.
+// pool_matches và schedule_slots: bản sửa mới nhất thắng (updated_at); lịch xóa
+// bằng tombstone. timer_sessions: chỉ thêm. cue_id là chuỗi thường, không phải
+// quan hệ: trận và buổi tập giữ cue_id cả khi cơ đã bị xóa mềm.
+await ensureCollection('pool_matches', 'Trận đấu của người chơi, gồm rack và cú đánh', [
+  pk,
+  required('game_type', 'string'),
+  required('player_name', 'string'),
+  required('opponent_name', 'string'),
+  required('target_racks', 'integer'),
+  required('rack_winners', 'json'),
+  required('shots', 'json'),
+  nullable('cue_id', 'string'),
+  required('started_at', 'timestamp'),
+  nullable('completed_at', 'timestamp'),
+  required('updated_at', 'timestamp'),
+]);
+await ensureCollection('timer_sessions', 'Buổi tập tự do đo bằng đồng hồ — chỉ thêm', [
+  pk,
+  required('date', 'timestamp'),
+  required('duration_sec', 'integer'),
+  nullable('cat', 'string'),
+  nullable('cue_id', 'string'),
+]);
+await ensureCollection('schedule_slots', 'Khung giờ trong lịch tập hằng tuần', [
+  pk,
+  required('day', 'integer'),
+  required('time', 'string'),
+  required('label', 'string'),
+  nullable('cat', 'string'),
+  required('updated_at', 'timestamp'),
+  required('is_deleted', 'boolean'),
+]);
+
 // ─── 2. Role Player và policy của nó ────────────────────────────────────────
 async function findOrCreate(path, name, payload) {
   const found = await api('GET', `${path}?filter[name][_eq]=${encodeURIComponent(name)}`, undefined, token);
@@ -433,6 +467,49 @@ const desiredPermissions = [
       'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
       'updated_at', 'is_deleted',
     ],
+    permissions: { user_created: self },
+    validation: {},
+  },
+  // Trận đấu: sửa được (rack, cú đánh); không xoá.
+  {
+    collection: 'pool_matches',
+    action: 'create',
+    fields: ['id', 'game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'pool_matches', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'pool_matches',
+    action: 'update',
+    fields: ['game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at'],
+    permissions: { user_created: self },
+    validation: {},
+  },
+  // Buổi tập tự do: chỉ thêm, không sửa, không xoá.
+  {
+    collection: 'timer_sessions',
+    action: 'create',
+    fields: ['id', 'date', 'duration_sec', 'cat', 'cue_id'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'timer_sessions', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  // Lịch tập: xoá chỉ bằng tombstone.
+  {
+    collection: 'schedule_slots',
+    action: 'create',
+    fields: ['id', 'day', 'time', 'label', 'cat', 'updated_at', 'is_deleted'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'schedule_slots', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'schedule_slots',
+    action: 'update',
+    fields: ['day', 'time', 'label', 'cat', 'updated_at', 'is_deleted'],
     permissions: { user_created: self },
     validation: {},
   },

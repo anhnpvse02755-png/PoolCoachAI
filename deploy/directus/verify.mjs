@@ -300,6 +300,121 @@ try {
       ? ok('A không xóa cứng hồ sơ cơ')
       : fail(`A xóa cứng hồ sơ cơ → ${cueHardDelete.status}`);
 
+    // ─── Trận đấu, buổi tập tự do, lịch tập ─────────────────────────────
+    const matchId = randomUUID();
+    const matchBody = {
+      id: matchId,
+      game_type: 'nineBall',
+      player_name: 'An',
+      opponent_name: 'Bình',
+      target_racks: 3,
+      rack_winners: ['player'],
+      shots: [],
+      cue_id: randomUUID(),
+      started_at: '2026-10-21T08:00:00.000Z',
+      completed_at: null,
+      updated_at: '2026-10-21T08:05:00.000Z',
+    };
+    const mMade = await call('POST', '/items/pool_matches', matchBody, a.access_token);
+    mMade.status === 200 || mMade.status === 201
+      ? ok('A tạo được trận đấu')
+      : fail(`A tạo trận → ${mMade.status} ${mMade.code}`);
+    const mOwner = await call(
+      'GET',
+      `/items/pool_matches/${matchId}?fields=id,user_created,rack_winners,cue_id`,
+      undefined,
+      admin.access_token,
+    );
+    mOwner.data?.user_created === aId && Array.isArray(mOwner.data?.rack_winners)
+      ? ok('server gán chủ trận là A, rack_winners về dạng JSON')
+      : fail(`chủ/định dạng trận sai: ${JSON.stringify(mOwner.data)}`);
+    const bMatches = await call('GET', '/items/pool_matches', undefined, b.access_token);
+    (bMatches.data ?? []).length === 0
+      ? ok('B không thấy trận của A')
+      : fail(`B thấy ${bMatches.data.length} trận`);
+    const mPatch = await call(
+      'PATCH',
+      `/items/pool_matches/${matchId}`,
+      { rack_winners: ['player', 'player'], updated_at: '2026-10-21T08:10:00.000Z' },
+      a.access_token,
+    );
+    mPatch.status === 200
+      ? ok('A cập nhật được trận của mình')
+      : fail(`A cập nhật trận → ${mPatch.status} ${mPatch.code}`);
+    const bMatchPatch = await call(
+      'PATCH',
+      `/items/pool_matches/${matchId}`,
+      { player_name: 'Ghi đè' },
+      b.access_token,
+    );
+    bMatchPatch.status === 403
+      ? ok('B không sửa được trận của A')
+      : fail(`B sửa trận của A → ${bMatchPatch.status}`);
+    const mDelete = await call('DELETE', `/items/pool_matches/${matchId}`, undefined, a.access_token);
+    mDelete.status === 403
+      ? ok('A không xóa cứng trận')
+      : fail(`A xóa cứng trận → ${mDelete.status}`);
+
+    const timer = {
+      id: randomUUID(),
+      date: '2026-10-21T07:00:00.000Z',
+      duration_sec: 900,
+      cat: 'aiming',
+      cue_id: null,
+    };
+    const tMade = await call('POST', '/items/timer_sessions', timer, a.access_token);
+    tMade.status === 200 || tMade.status === 201
+      ? ok('A tạo được buổi tập tự do')
+      : fail(`A tạo buổi tập tự do → ${tMade.status} ${tMade.code}`);
+    const tAgain = await call('POST', '/items/timer_sessions', timer, a.access_token);
+    tAgain.code === 'RECORD_NOT_UNIQUE'
+      ? ok('gửi lại buổi tập cùng id → RECORD_NOT_UNIQUE (app coi là đã đồng bộ)')
+      : fail(`gửi lại buổi tập → ${tAgain.status} ${tAgain.code}`);
+    const tPatch = await call(
+      'PATCH',
+      `/items/timer_sessions/${timer.id}`,
+      { duration_sec: 1 },
+      a.access_token,
+    );
+    tPatch.status === 403
+      ? ok('A không sửa được buổi tập tự do')
+      : fail(`A sửa buổi tập tự do → ${tPatch.status}`);
+    const bTimers = await call('GET', '/items/timer_sessions', undefined, b.access_token);
+    (bTimers.data ?? []).length === 0
+      ? ok('B không thấy buổi tập tự do của A')
+      : fail(`B thấy ${bTimers.data.length} buổi tập tự do`);
+
+    const slot = {
+      id: randomUUID(),
+      day: 2,
+      time: '19:00',
+      label: 'Tập ngắm',
+      cat: 'aiming',
+      updated_at: '2026-10-21T08:00:00.000Z',
+      is_deleted: false,
+    };
+    const sMade = await call('POST', '/items/schedule_slots', slot, a.access_token);
+    sMade.status === 200 || sMade.status === 201
+      ? ok('A tạo được khung lịch tập')
+      : fail(`A tạo lịch tập → ${sMade.status} ${sMade.code}`);
+    const sTomb = await call(
+      'PATCH',
+      `/items/schedule_slots/${slot.id}`,
+      { is_deleted: true, updated_at: '2026-10-21T09:00:00.000Z' },
+      a.access_token,
+    );
+    sTomb.status === 200
+      ? ok('A xóa mềm khung lịch bằng tombstone')
+      : fail(`A xóa mềm lịch → ${sTomb.status} ${sTomb.code}`);
+    const sHard = await call('DELETE', `/items/schedule_slots/${slot.id}`, undefined, a.access_token);
+    sHard.status === 403
+      ? ok('A không xóa cứng khung lịch')
+      : fail(`A xóa cứng lịch → ${sHard.status}`);
+    const bSlots = await call('GET', '/items/schedule_slots', undefined, b.access_token);
+    (bSlots.data ?? []).length === 0
+      ? ok('B không thấy lịch tập của A')
+      : fail(`B thấy ${bSlots.data.length} khung lịch`);
+
     const ach = {
       id: randomUUID(),
       kind: 'chuoiNgay',
