@@ -909,3 +909,23 @@ Mỗi việc có tệp riêng. Hai việc không cùng sửa một tệp, trừ 
 Có thể chạy song song: sau T0, các việc **T1, T4, T5, T6, T7** độc lập về tệp. **T2 và T3** chạy song song với nhau, nhưng chốt kiểu dữ liệu gợi ý trong buổi đầu của T2. **T8, T9** làm sau cùng.
 
 Sau T9: dừng cho chủ sản phẩm xem (mục 14.6) → merge → deploy bằng `deploy/publish.sh` → hỏi chủ sản phẩm trước khi tạo collection `coach_attempts` trên production → chạy `coach.mjs` trên trang thật.
+
+---
+
+## 18. Ghi chú lúc làm Giai đoạn A (21/10/2026, nhánh `feat/coach`)
+
+Hai sự thật người viết đánh dấu là chưa kiểm đã được kiểm bằng test: số thứ 10 000 của Park–Miller từ seed 1 đúng là 399 268 537 (`generator_test`); trên `railTable` cú Đánh đứng bi 60 % (26,37) nằm trong dung sai của cú tốt nhất Đánh đứng bi 45 % (25,74), còn Đánh trô bi 30 % (37,82) thì không (`grading_test`).
+
+Chỗ làm khác spec, kèm lý do:
+
+| Chỗ | Spec ghi | Đã làm | Lý do |
+|---|---|---|---|
+| 8.4 | Ngưỡng 50 / 75 | `weakCutoff` 55 / `strongCutoff` 75 | Spec bảo dùng đúng hằng số có sẵn; hằng số là 55 |
+| 6.7 | 11 lỗi | Thêm `spinWorse` | Người chơi có áp phê nhưng khác kiểu áp phê của cú gần nhất (chỉ gặp ở tầng 2): không lỗi nào trong bảng mô tả đúng. Gợi ý 2 là câu mới `Hint2Spin` |
+| 10.2 | Nhóm lỗi không liệt kê `objectMissed` | `objectMissed` thuộc *chọn lỗ*; `spinWorse` thuộc *vị trí bi cái* | Mỗi lỗi phải thuộc đúng một nhóm |
+| 4.2, 13 | Bàn hiện ≤ 100 ms sau Bắt đầu | Ngắm bi / Vị trí sinh ngẫu nhiên: bàn hiện khi thế bàn đã qua lượt vật lý (đo trên VM: trung vị 146 / 244 ms); Phòng thủ / A băng và thư viện hiện ngay | Hiện thế bàn của lượt hình học rồi đổi khi lượt vật lý bác thì người chơi đang chọn cú trên một bàn sẽ biến mất. Tình huống kế tiếp được sinh sẵn (8.7) nên "Tình huống mới" vẫn hiện ngay |
+| 4.3 | Web ≥ 900 px: bàn trái, bảng phải ("TablePanelLayout đã hỗ trợ") | Bàn trên, bảng dưới ở mọi cỡ | `TablePanelLayout` hiện chỉ có bố cục dọc; thêm bố cục ngang là đổi cả màn Mô phỏng và Kế hoạch, để việc riêng |
+| 7.3, D8 | Bước phòng thủ dùng `planStepLines` | `planStepLines` bỏ dòng "Bước 1 / 1" và mọi dòng có "°" | Dòng đối thủ và dòng góc bi cái bị lệch của Planner có số độ; D8 cấm số độ trong chữ của Coach |
+| 9.5 | Kiểm "vị trí hợp lệ theo 8.3" cho mọi mục | Sơ đồ BU được phép bi chạm nhau | Cụm bi xếp sát của BU chạm nhau thật |
+| 15 | Danh sách câu | Thêm `coachHint2Spin`, `coachLibraryCaption`, `coachLibrarySource`, `coachLibraryEnd`, `signOutPendingCoach`, `sawsSpeedWord`, `sawsSpinAdvice` | Các chỗ trên, màn thư viện, cảnh báo đăng xuất khi còn lần làm chưa đồng bộ, và câu SAWS dùng chung với màn Mô phỏng (Q5) |
+| 14.5 | `coach.mjs` chạy trên bản cục bộ và trang thật | Chỉ chạy trên bản cục bộ dựng từ `tool/e2e/coach_main.dart` (đăng nhập sẵn trên máy, API trỏ về chỗ không có server) | Không tạo người dùng nào trên Directus thật; chạy trên trang thật sau khi deploy và có collection `coach_attempts` |
