@@ -5,9 +5,11 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/maintenance_notification_platform.dart';
+import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/maintenance_schedule.dart';
 
 class MaintenanceReminderService {
   MaintenanceReminderService({
@@ -47,8 +49,33 @@ class MaintenanceReminderService {
         SignedOut() => null,
       });
     });
-    _timer = Timer.periodic(_checkEvery, (_) => checkNow());
+    // Android/iOS: hệ điều hành giữ lịch, không cần timer.
+    if (_scheduler == null) {
+      _timer = Timer.periodic(_checkEvery, (_) => checkNow());
+    }
     checkNow();
+  }
+
+  MaintenanceScheduler? get _scheduler => _platform.scheduler;
+
+  late final Future<void> _permissionLoaded = _platform.refresh();
+  Future<void> _syncChain = Future.value();
+
+  /// Android/iOS: đặt lại toàn bộ lịch theo danh sách cơ hiện tại. Xếp
+  /// hàng để hai lần đặt không chạy chồng lên nhau.
+  void _syncSchedule(MaintenanceScheduler scheduler) {
+    _syncChain = _syncChain.then((_) async {
+      await _permissionLoaded;
+      if (_disposed) return;
+      final userId = _userId;
+      if (userId == null) {
+        await scheduler.cancelAll();
+      } else if (_platform.permission == 'granted') {
+        await scheduler.replaceAll(
+          computeMaintenanceSchedule(_cues, now: _now().toLocal()),
+        );
+      }
+    }).catchError((Object _) {});
   }
 
   Future<String?> requestPermission() async {
@@ -59,6 +86,11 @@ class MaintenanceReminderService {
   }
 
   void checkNow() {
+    final scheduler = _scheduler;
+    if (scheduler != null) {
+      if (!_disposed) _syncSchedule(scheduler);
+      return;
+    }
     if (_disposed ||
         _userId == null ||
         !_platform.isSupported ||
@@ -103,7 +135,10 @@ class MaintenanceReminderService {
     _userId = userId;
     _cues = const [];
     unawaited(_equipmentSubscription?.cancel());
-    if (userId == null || _disposed) return;
+    if (userId == null || _disposed) {
+      if (_started) checkNow(); // đăng xuất: huỷ lịch đã đặt
+      return;
+    }
     _equipmentSubscription =
         (_db.select(_db.cueEquipmentRows)..where(
               (row) => row.userId.equals(userId) & row.isDeleted.equals(false),
