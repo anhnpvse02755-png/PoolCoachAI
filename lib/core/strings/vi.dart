@@ -1,5 +1,6 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -336,9 +337,57 @@ abstract final class Vi {
       'Hỏi huấn luyện viên hôm nay nên tập gì, '
       'hoặc vì sao trận vừa rồi thua.';
 
-  static const notificationsComing =
-      'Nhắc lịch tập, nhắc bảo dưỡng đầu cơ '
-      'và đề xuất mới sẽ hiện ở đây.';
+  // Thông báo — nội dung do bộ lập lịch (lib/domain/notifications) điền
+  // từ dữ liệu thật của người chơi.
+  static String notificationKind(NotificationKind kind) => switch (kind) {
+    NotificationKind.maintenance => 'Bảo dưỡng đầu cơ',
+    NotificationKind.schedule => 'Lịch tập',
+    NotificationKind.streak => 'Chuỗi ngày tập',
+  };
+  static String notificationKindHint(NotificationKind kind) => switch (kind) {
+    NotificationKind.maintenance =>
+      'Lúc 09:00, 7 ngày trước và đúng ngày đến hạn bảo dưỡng đầu cơ.',
+    NotificationKind.schedule =>
+      'Nhắc $scheduleReminderLeadMinutes phút trước mỗi khung giờ trong lịch tập tuần.',
+    NotificationKind.streak =>
+      'Lúc $streakReminderHour:00 nếu bạn có chuỗi từ $streakReminderMinDays ngày trở lên mà hôm nay chưa ghi buổi tập.',
+  };
+  static const scheduleReminderTitle = 'Sắp đến giờ tập';
+  static String scheduleReminderBody(
+    String label,
+    String time,
+    int minutesBefore,
+    SkillCategory? category,
+  ) =>
+      '$label bắt đầu lúc $time, còn $minutesBefore phút.'
+      '${category == null ? '' : ' Nhóm kỹ năng: ${skill(category)}.'}';
+  static const streakReminderTitle = 'Giữ chuỗi ngày tập';
+  static String streakReminderBody(int days) =>
+      'Bạn đang có chuỗi $days ngày tập liên tiếp nhưng hôm nay chưa ghi buổi tập nào.';
+
+  static const notificationsSettingsTitle = 'Loại thông báo';
+  static const notificationsUpcomingTitle = 'Sắp tới trong 7 ngày';
+  static const notificationsUpcomingEmpty =
+      'Chưa có thông báo nào trong 7 ngày tới.';
+  static const notificationsToday = 'Hôm nay';
+  static const notificationsTomorrow = 'Ngày mai';
+  static String notificationsDay(DateTime day) =>
+      '${scheduleDays[day.weekday - 1]}, '
+      '${day.day.toString().padLeft(2, '0')}/'
+      '${day.month.toString().padLeft(2, '0')}';
+  static String notificationsTime(DateTime at) =>
+      '${at.hour.toString().padLeft(2, '0')}:'
+      '${at.minute.toString().padLeft(2, '0')}';
+  static const notificationsPermissionTitle = 'Quyền thông báo';
+  static const notificationsPermissionGranted = 'Đã bật thông báo.';
+  static const notificationsPermissionDenied =
+      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt của thiết bị hoặc trình duyệt.';
+  static const notificationsPermissionPrompt =
+      'Bật thông báo để nhận nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
+  static const notificationsPermissionUnsupported =
+      'Thiết bị hoặc trình duyệt này không hỗ trợ thông báo.';
+  static const notificationsWebOnlyWhileOpen =
+      'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở.';
 
   // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
   //

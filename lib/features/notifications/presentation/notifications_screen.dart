@@ -19,7 +19,7 @@ class NotificationsScreen extends StatelessWidget {
       body: const PcEmptyState(
         icon: Icons.notifications_active_outlined,
         title: Vi.notificationsTitle,
-        body: Vi.notificationsComing,
+        body: Vi.notificationsUpcomingEmpty,
       ),
     );
   }
