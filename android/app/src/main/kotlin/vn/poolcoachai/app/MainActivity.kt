@@ -1,4 +1,4 @@
-package com.poolcoachai.poolcoachai
+package vn.poolcoachai.app
 
 import io.flutter.embedding.android.FlutterActivity
 

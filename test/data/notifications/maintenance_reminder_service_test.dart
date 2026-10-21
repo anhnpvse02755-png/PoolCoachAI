@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/maintenance_notification_platform.dart';
 import 'package:poolcoachai/data/notifications/maintenance_reminder_service.dart';
+import 'package:poolcoachai/data/notifications/maintenance_scheduler.dart';
+import 'package:poolcoachai/domain/maintenance_schedule.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
@@ -99,9 +101,102 @@ void main() {
     reminders.checkNow();
     expect(platform.notifications, isEmpty);
   });
+
+  group('native scheduling', () {
+    late _FakeScheduler scheduler;
+
+    MaintenanceReminderService scheduling() => MaintenanceReminderService(
+      db: db,
+      auth: auth,
+      now: () => now,
+      platform: _SchedulingPlatform(scheduler),
+    );
+
+    setUp(() => scheduler = _FakeScheduler());
+
+    test('schedules nothing until permission is granted', () async {
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final reminders = scheduling()..start();
+      addTearDown(reminders.dispose);
+      await pumpEventQueue();
+      expect(scheduler.scheduled, isEmpty);
+      expect(reminders.permission, 'default');
+
+      expect(await reminders.requestPermission(), 'granted');
+      await pumpEventQueue();
+      expect(scheduler.scheduled.map((r) => r.daysBefore), [7, 0]);
+    });
+
+    test('picks up an existing grant and reschedules when cues change', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final reminders = scheduling()..start();
+      addTearDown(reminders.dispose);
+      await pumpEventQueue();
+      expect(reminders.permission, 'granted');
+      expect(scheduler.scheduled, hasLength(2));
+
+      await saveCue(id: 'cue-2', dueDate: DateTime(2026, 11, 20));
+      await pumpEventQueue();
+      expect(scheduler.scheduled, hasLength(4));
+
+      await DriftCueEquipmentRepository(db, userId: 'u1').remove('cue-2');
+      await pumpEventQueue();
+      expect(scheduler.scheduled, hasLength(2));
+    });
+
+    test('cancels everything on sign-out', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final reminders = scheduling()..start();
+      addTearDown(reminders.dispose);
+      await pumpEventQueue();
+      expect(scheduler.scheduled, isNotEmpty);
+
+      auth.emit(const SignedOut());
+      await pumpEventQueue();
+      expect(scheduler.scheduled, isEmpty);
+      expect(scheduler.cancelAllCalls, greaterThan(0));
+    });
+  });
+}
+
+class _FakeScheduler implements MaintenanceScheduler {
+  bool granted = false;
+  int permissionRequests = 0;
+  List<MaintenanceReminder> scheduled = const [];
+  int cancelAllCalls = 0;
+
+  @override
+  Future<bool> hasPermission() async => granted;
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return granted = true;
+  }
+
+  @override
+  Future<void> replaceAll(List<MaintenanceReminder> reminders) async {
+    scheduled = reminders;
+  }
+
+  @override
+  Future<void> cancelAll() async {
+    cancelAllCalls++;
+    scheduled = const [];
+  }
+}
+
+class _SchedulingPlatform extends MaintenanceNotificationPlatform {
+  _SchedulingPlatform(MaintenanceScheduler scheduler)
+    : super(scheduler: scheduler);
 }
 
 class _FakeNotificationPlatform extends MaintenanceNotificationPlatform {
+  @override
+  MaintenanceScheduler? get scheduler => null;
+
   String permissionValue = 'default';
   int permissionRequests = 0;
   final notifications = <({String title, String body, String tag})>[];
