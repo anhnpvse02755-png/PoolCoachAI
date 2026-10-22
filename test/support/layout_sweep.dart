@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'rich_data.dart';
@@ -73,4 +73,47 @@ Future<void> sweepRoutes(
       reason: '${config.name}: ${route.path} tràn khi cuộn',
     );
   }
+}
+
+/// Hộp thoại không tràn, nút cuối cùng (nút xác nhận) nằm trên bàn phím,
+/// và mọi ô nhập cuộn tới được, bấm được, nằm trọn trên bàn phím.
+///
+/// Thiếu chỗ thì thân hộp thoại có thể bị ép còn 0 px: ô nhập biến mất
+/// mà Flutter không báo tràn, nên phải thử với tới từng ô.
+Future<void> expectDialogFitsAboveKeyboard(
+  WidgetTester tester, {
+  required double screenHeight,
+  required double keyboard,
+}) async {
+  expect(tester.takeException(), isNull);
+  final dialog = find.byType(AlertDialog);
+  final buttons = find.descendant(
+    of: dialog,
+    matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+  );
+  expect(
+    tester.getBottomLeft(buttons.last).dy,
+    lessThanOrEqualTo(screenHeight - keyboard),
+  );
+  final fields = find.descendant(
+    of: dialog,
+    matching: find.byWidgetPredicate((w) => w is FormField),
+  );
+  final count = fields.evaluate().length;
+  expect(count, greaterThan(0), reason: 'hộp thoại không có ô nhập nào');
+  for (var i = 0; i < count; i++) {
+    await tester.ensureVisible(fields.at(i));
+    await tester.pumpAndSettle();
+    expect(
+      fields.at(i).hitTestable(),
+      findsOneWidget,
+      reason: 'ô nhập thứ ${i + 1} không cuộn tới được',
+    );
+    expect(
+      tester.getBottomLeft(fields.at(i)).dy,
+      lessThanOrEqualTo(screenHeight - keyboard),
+      reason: 'ô nhập thứ ${i + 1} nằm dưới bàn phím',
+    );
+  }
+  expect(tester.takeException(), isNull);
 }

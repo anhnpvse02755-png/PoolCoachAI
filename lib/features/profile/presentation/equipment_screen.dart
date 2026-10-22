@@ -85,157 +85,156 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Máy ngang, bàn phím mở: hộp thoại chỉ còn ~150 px. Tiêu đề
+          // cuộn cùng ô nhập, chỉ hàng nút đứng yên trên bàn phím.
+          scrollable: true,
           title: Text(existing == null ? Vi.equipmentAdd : Vi.equipmentEdit),
           content: SizedBox(
             width: 420,
             child: Form(
               key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      initialValue: name,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentName,
-                      ),
-                      textCapitalization: TextCapitalization.words,
-                      onSaved: (value) => name = value?.trim() ?? '',
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? Vi.equipmentNameRequired
-                          : null,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    initialValue: name,
+                    decoration: const InputDecoration(
+                      labelText: Vi.equipmentName,
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<CueType>(
-                      initialValue: type,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentType,
-                      ),
-                      items: CueType.values
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(Vi.equipmentTypeName(value)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: dialogSaving
-                          ? null
-                          : (value) {
-                              if (value != null) {
-                                setDialogState(() => type = value);
-                              }
-                            },
+                    textCapitalization: TextCapitalization.words,
+                    onSaved: (value) => name = value?.trim() ?? '',
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? Vi.equipmentNameRequired
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<CueType>(
+                    initialValue: type,
+                    decoration: const InputDecoration(
+                      labelText: Vi.equipmentType,
                     ),
-                    const SizedBox(height: 8),
-                    _brandField(
-                      key: const Key('cue-shaft-brand'),
-                      label: Vi.equipmentShaftBrand,
-                      initial: shaftBrand,
-                      onSaved: (value) => shaftBrand = value,
-                    ),
-                    TextFormField(
-                      key: const Key('cue-shaft-diameter'),
-                      initialValue: diameter,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentShaftDiameter,
-                        suffixText: Vi.unitMm,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      onSaved: (value) => diameter = value?.trim() ?? '',
-                      validator: (value) =>
-                          _positiveNumberValidator(value, integer: false),
-                    ),
-                    _brandField(
-                      key: const Key('cue-tip-brand'),
-                      label: Vi.equipmentTipBrand,
-                      initial: tipBrand,
-                      onSaved: (value) => tipBrand = value,
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<TipHardness?>(
-                      initialValue: hardness,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentTipHardness,
-                      ),
-                      items: [
-                        const DropdownMenuItem<TipHardness?>(
-                          value: null,
-                          child: Text(Vi.equipmentNoHardness),
-                        ),
-                        ...TipHardness.values.map(
+                    items: CueType.values
+                        .map(
                           (value) => DropdownMenuItem(
                             value: value,
-                            child: Text(Vi.equipmentHardnessName(value)),
+                            child: Text(Vi.equipmentTypeName(value)),
                           ),
-                        ),
-                      ],
-                      onChanged: dialogSaving
-                          ? null
-                          : (value) => setDialogState(() => hardness = value),
+                        )
+                        .toList(),
+                    onChanged: dialogSaving
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setDialogState(() => type = value);
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 8),
+                  _brandField(
+                    key: const Key('cue-shaft-brand'),
+                    label: Vi.equipmentShaftBrand,
+                    initial: shaftBrand,
+                    onSaved: (value) => shaftBrand = value,
+                  ),
+                  TextFormField(
+                    key: const Key('cue-shaft-diameter'),
+                    initialValue: diameter,
+                    decoration: const InputDecoration(
+                      labelText: Vi.equipmentShaftDiameter,
+                      suffixText: Vi.unitMm,
                     ),
-                    _brandField(
-                      key: const Key('cue-butt-brand'),
-                      label: Vi.equipmentButtBrand,
-                      initial: buttBrand,
-                      onSaved: (value) => buttBrand = value,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                    TextFormField(
-                      key: const Key('cue-weight'),
-                      initialValue: weight,
-                      decoration: const InputDecoration(
-                        labelText: Vi.equipmentWeight,
+                    onSaved: (value) => diameter = value?.trim() ?? '',
+                    validator: (value) =>
+                        _positiveNumberValidator(value, integer: false),
+                  ),
+                  _brandField(
+                    key: const Key('cue-tip-brand'),
+                    label: Vi.equipmentTipBrand,
+                    initial: tipBrand,
+                    onSaved: (value) => tipBrand = value,
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<TipHardness?>(
+                    initialValue: hardness,
+                    decoration: const InputDecoration(
+                      labelText: Vi.equipmentTipHardness,
+                    ),
+                    items: [
+                      const DropdownMenuItem<TipHardness?>(
+                        value: null,
+                        child: Text(Vi.equipmentNoHardness),
                       ),
-                      keyboardType: TextInputType.number,
-                      onSaved: (value) => weight = value?.trim() ?? '',
-                      validator: (value) =>
-                          _positiveNumberValidator(value, integer: true),
+                      ...TipHardness.values.map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(Vi.equipmentHardnessName(value)),
+                        ),
+                      ),
+                    ],
+                    onChanged: dialogSaving
+                        ? null
+                        : (value) => setDialogState(() => hardness = value),
+                  ),
+                  _brandField(
+                    key: const Key('cue-butt-brand'),
+                    label: Vi.equipmentButtBrand,
+                    initial: buttBrand,
+                    onSaved: (value) => buttBrand = value,
+                  ),
+                  TextFormField(
+                    key: const Key('cue-weight'),
+                    initialValue: weight,
+                    decoration: const InputDecoration(
+                      labelText: Vi.equipmentWeight,
                     ),
-                    const SizedBox(height: 12),
-                    const Text(Vi.equipmentSkills),
-                    Wrap(
-                      spacing: 6,
-                      children: SkillCategory.values
-                          .map(
-                            (skill) => FilterChip(
-                              label: Text(Vi.skill(skill)),
-                              selected: skills.contains(skill),
-                              onSelected: dialogSaving
-                                  ? null
-                                  : (selected) => setDialogState(() {
-                                      if (selected) {
-                                        skills.add(skill);
-                                      } else {
-                                        skills.remove(skill);
-                                      }
-                                    }),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 8),
-                    _MaintenanceDateField(
-                      label: Vi.equipmentLastMaintenance,
-                      value: lastMaintenance,
-                      currentDate: currentDate,
-                      formatDate: _formatDate,
-                      onChanged: (value) =>
-                          setDialogState(() => lastMaintenance = value),
-                    ),
-                    _MaintenanceDateField(
-                      label: Vi.equipmentDueDate,
-                      value: dueDate,
-                      currentDate: currentDate,
-                      formatDate: _formatDate,
-                      onChanged: (value) =>
-                          setDialogState(() => dueDate = value),
-                    ),
-                  ],
-                ),
+                    keyboardType: TextInputType.number,
+                    onSaved: (value) => weight = value?.trim() ?? '',
+                    validator: (value) =>
+                        _positiveNumberValidator(value, integer: true),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(Vi.equipmentSkills),
+                  Wrap(
+                    spacing: 6,
+                    children: SkillCategory.values
+                        .map(
+                          (skill) => FilterChip(
+                            label: Text(Vi.skill(skill)),
+                            selected: skills.contains(skill),
+                            onSelected: dialogSaving
+                                ? null
+                                : (selected) => setDialogState(() {
+                                    if (selected) {
+                                      skills.add(skill);
+                                    } else {
+                                      skills.remove(skill);
+                                    }
+                                  }),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  _MaintenanceDateField(
+                    label: Vi.equipmentLastMaintenance,
+                    value: lastMaintenance,
+                    currentDate: currentDate,
+                    formatDate: _formatDate,
+                    onChanged: (value) =>
+                        setDialogState(() => lastMaintenance = value),
+                  ),
+                  _MaintenanceDateField(
+                    label: Vi.equipmentDueDate,
+                    value: dueDate,
+                    currentDate: currentDate,
+                    formatDate: _formatDate,
+                    onChanged: (value) => setDialogState(() => dueDate = value),
+                  ),
+                ],
               ),
             ),
           ),
@@ -559,9 +558,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         leading: const Icon(Icons.notifications_active_outlined),
         title: const Text(Vi.equipmentReminderTitle),
         subtitle: Text(message),
-        trailing:
-            permission != 'granted' &&
-                permission != 'denied'
+        trailing: permission != 'granted' && permission != 'denied'
             ? TextButton(
                 onPressed: _requestMaintenanceNotifications,
                 child: const Text(Vi.equipmentReminderEnable),

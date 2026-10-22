@@ -37,91 +37,88 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Máy ngang, bàn phím mở: hộp thoại chỉ còn ~150 px. Tiêu đề
+          // cuộn cùng ô nhập, chỉ hàng nút đứng yên trên bàn phím.
+          scrollable: true,
           title: Text(existing == null ? Vi.scheduleAdd : Vi.scheduleEdit),
           content: Form(
             key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    initialValue: label,
-                    decoration: const InputDecoration(
-                      labelText: Vi.scheduleLabel,
-                    ),
-                    textCapitalization: TextCapitalization.sentences,
-                    onSaved: (value) => label = value?.trim() ?? '',
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? Vi.scheduleLabelRequired
-                        : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: label,
+                  decoration: const InputDecoration(
+                    labelText: Vi.scheduleLabel,
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: day,
-                    decoration: const InputDecoration(
-                      labelText: Vi.scheduleChooseDay,
-                    ),
-                    items: [
-                      for (
-                        var index = 0;
-                        index < Vi.scheduleDays.length;
-                        index++
-                      )
-                        DropdownMenuItem(
-                          value: index,
-                          child: Text(Vi.scheduleDays[index]),
-                        ),
-                    ],
-                    onChanged: dialogSaving
+                  textCapitalization: TextCapitalization.sentences,
+                  onSaved: (value) => label = value?.trim() ?? '',
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? Vi.scheduleLabelRequired
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue: day,
+                  decoration: const InputDecoration(
+                    labelText: Vi.scheduleChooseDay,
+                  ),
+                  items: [
+                    for (var index = 0; index < Vi.scheduleDays.length; index++)
+                      DropdownMenuItem(
+                        value: index,
+                        child: Text(Vi.scheduleDays[index]),
+                      ),
+                  ],
+                  onChanged: dialogSaving
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            setDialogState(() => day = value);
+                          }
+                        },
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(Vi.scheduleChooseTime),
+                  trailing: TextButton(
+                    onPressed: dialogSaving
                         ? null
-                        : (value) {
-                            if (value != null) {
-                              setDialogState(() => day = value);
+                        : () async {
+                            final selected = await showTimePicker(
+                              context: dialogContext,
+                              initialTime: time,
+                            );
+                            if (selected != null) {
+                              setDialogState(() => time = selected);
                             }
                           },
+                    child: Text(time.format(dialogContext)),
                   ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(Vi.scheduleChooseTime),
-                    trailing: TextButton(
-                      onPressed: dialogSaving
-                          ? null
-                          : () async {
-                              final selected = await showTimePicker(
-                                context: dialogContext,
-                                initialTime: time,
-                              );
-                              if (selected != null) {
-                                setDialogState(() => time = selected);
-                              }
-                            },
-                      child: Text(time.format(dialogContext)),
+                ),
+                DropdownButtonFormField<SkillCategory?>(
+                  initialValue: category,
+                  decoration: const InputDecoration(
+                    labelText: Vi.scheduleChooseCategory,
+                  ),
+                  items: [
+                    const DropdownMenuItem<SkillCategory?>(
+                      value: null,
+                      child: Text(Vi.scheduleNoCategory),
                     ),
-                  ),
-                  DropdownButtonFormField<SkillCategory?>(
-                    initialValue: category,
-                    decoration: const InputDecoration(
-                      labelText: Vi.scheduleChooseCategory,
+                    ...SkillCategory.values.map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(Vi.skill(value)),
+                      ),
                     ),
-                    items: [
-                      const DropdownMenuItem<SkillCategory?>(
-                        value: null,
-                        child: Text(Vi.scheduleNoCategory),
-                      ),
-                      ...SkillCategory.values.map(
-                        (value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(Vi.skill(value)),
-                        ),
-                      ),
-                    ],
-                    onChanged: dialogSaving
-                        ? null
-                        : (value) => setDialogState(() => category = value),
-                  ),
-                ],
-              ),
+                  ],
+                  onChanged: dialogSaving
+                      ? null
+                      : (value) => setDialogState(() => category = value),
+                ),
+              ],
             ),
           ),
           actions: [

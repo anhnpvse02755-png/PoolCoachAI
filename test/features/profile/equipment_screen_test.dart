@@ -11,10 +11,12 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
 void main() {
-  testWidgets('creates, edits and deletes cue equipment', (tester) async {
+  /// Mở màn Dụng cụ trên một cơ sở dữ liệu trong bộ nhớ.
+  Future<AppDatabase> openEquipment(WidgetTester tester) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final container = dbContainer(db);
@@ -27,13 +29,21 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return db;
+  }
+
+  testWidgets('creates, edits and deletes cue equipment', (tester) async {
+    final db = await openEquipment(tester);
 
     await tester.tap(find.text(Vi.equipmentAdd));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Cơ thi đấu');
     await tester.enterText(find.byKey(const Key('cue-weight')), '540');
     await tester.enterText(find.byKey(const Key('cue-shaft-diameter')), '12.5');
-    await tester.enterText(find.byKey(const Key('cue-shaft-brand')), 'Predator');
+    await tester.enterText(
+      find.byKey(const Key('cue-shaft-brand')),
+      'Predator',
+    );
     await tester.enterText(find.byKey(const Key('cue-tip-brand')), 'Kamui');
     await tester.enterText(find.byKey(const Key('cue-butt-brand')), 'Cuetec');
     await tester.ensureVisible(find.text(Vi.skill(SkillCategory.aiming)));
@@ -318,5 +328,37 @@ void main() {
       find.text(Vi.cueWinRateLine(wins: 4, completed: 10, percent: 40)),
       findsOneWidget,
     );
+  });
+
+  testWidgets('điện thoại ngang, bàn phím mở: hộp thoại cơ cuộn được, '
+      'nút Lưu trên bàn phím', (tester) async {
+    applyScreen(tester, const Size(740, 360));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+    await openEquipment(tester);
+    await tester.tap(find.text(Vi.equipmentAdd));
+    await tester.pumpAndSettle();
+    await expectDialogFitsAboveKeyboard(
+      tester,
+      screenHeight: 360,
+      keyboard: 160,
+    );
+    await scrollThroughAll(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('điện thoại ngang: lịch chọn ngày bảo dưỡng không tràn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(740, 360));
+    await openEquipment(tester);
+    await tester.tap(find.text(Vi.equipmentAdd));
+    await tester.pumpAndSettle();
+    final pick = find.byTooltip(Vi.equipmentSelectDate).first;
+    await tester.ensureVisible(pick);
+    await tester.pumpAndSettle();
+    await tester.tap(pick);
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

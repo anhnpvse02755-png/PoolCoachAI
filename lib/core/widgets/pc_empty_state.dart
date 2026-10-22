@@ -27,8 +27,9 @@ class PcEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Cuộn được: máy ngang mà bàn phím mở thì chỗ còn lại thấp hơn nội dung.
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
