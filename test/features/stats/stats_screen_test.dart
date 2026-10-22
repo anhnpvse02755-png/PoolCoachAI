@@ -2,62 +2,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
 void main() {
-  testWidgets('shows training totals, skill performance, and drill trends', (
-    tester,
-  ) async {
-    final container = testContainer(
-      logs: [
-        for (var i = 0; i < 3; i++)
-          DrillLog(
-            id: 'log-$i',
-            drillId: 'd1',
-            date: DateTime(2026, 9, 20 + i),
-            score: 8 + i,
-            attempts: 10,
-          ),
-      ],
-      timerSessions: [
-        TimerSession(id: 'timer', date: testToday, durationSec: 3600),
-      ],
-      matches: [
-        PoolMatch(
-          id: 'match',
-          gameType: PoolGameType.nineBall,
-          playerName: 'An',
-          opponentName: 'Bình',
-          targetRacks: 3,
-          rackWinners: const [
-            RackWinner.player,
-            RackWinner.opponent,
-            RackWinner.player,
-            RackWinner.player,
-          ],
-          shots: [
-            MatchShot(
-              id: 'shot',
-              rackNumber: 1,
-              shotNumber: 1,
-              shooter: RackWinner.player,
-              type: MatchShotType.breakShot,
-              outcome: MatchShotOutcome.scratch,
-              positionOutcome: PositionOutcome.successful,
-              recordedAt: testToday,
-            ),
-          ],
-          startedAt: testToday,
-          completedAt: testToday,
+  /// Đủ cả ba nguồn: buổi tập bài, buổi bấm giờ và một trận đã xong.
+  ProviderContainer fullContainer() => testContainer(
+    logs: [
+      for (var i = 0; i < 3; i++)
+        DrillLog(
+          id: 'log-$i',
+          drillId: 'd1',
+          date: DateTime(2026, 9, 20 + i),
+          score: 8 + i,
+          attempts: 10,
         ),
-      ],
-    );
+    ],
+    timerSessions: [
+      TimerSession(id: 'timer', date: testToday, durationSec: 3600),
+    ],
+    matches: [
+      PoolMatch(
+        id: 'match',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 3,
+        rackWinners: const [
+          RackWinner.player,
+          RackWinner.opponent,
+          RackWinner.player,
+          RackWinner.player,
+        ],
+        shots: [
+          MatchShot(
+            id: 'shot',
+            rackNumber: 1,
+            shotNumber: 1,
+            shooter: RackWinner.player,
+            type: MatchShotType.breakShot,
+            outcome: MatchShotOutcome.scratch,
+            positionOutcome: PositionOutcome.successful,
+            recordedAt: testToday,
+          ),
+        ],
+        startedAt: testToday,
+        completedAt: testToday,
+      ),
+    ],
+  );
+
+  /// Mở màn Thống kê với [fullContainer].
+  Future<void> openStats(WidgetTester tester) async {
+    final container = fullContainer();
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -67,6 +71,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('shows training totals, skill performance, and drill trends', (
+    tester,
+  ) async {
+    await openStats(tester);
 
     expect(find.text(Vi.statsOverview), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
@@ -96,6 +106,44 @@ void main() {
     expect(
       find.textContaining(Vi.statsMatchAnalysisNotAvailable),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('lưới chỉ số ở 360: hai ô một hàng', (tester) async {
+    applyScreen(tester, const Size(360, 640));
+    await openStats(tester);
+    final top = tester.getTopLeft(find.text(Vi.statsTotalSessions)).dy;
+    expect(tester.getTopLeft(find.text(Vi.statsDrillSessions)).dy, top);
+    expect(
+      tester.getTopLeft(find.text(Vi.statsTimerSessions)).dy,
+      greaterThan(top),
+    );
+  });
+
+  testWidgets('lưới chỉ số ở 800: ba ô một hàng', (tester) async {
+    applyScreen(tester, const Size(800, 1280));
+    await openStats(tester);
+    final top = tester.getTopLeft(find.text(Vi.statsTotalSessions)).dy;
+    expect(tester.getTopLeft(find.text(Vi.statsTimerSessions)).dy, top);
+    expect(
+      tester.getTopLeft(find.text(Vi.statsTimerTotal)).dy,
+      greaterThan(top),
+    );
+  });
+
+  testWidgets('chữ ×1.5 ở 360: ô không tràn, hai ô cùng hàng cao bằng nhau', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640), textScale: 1.5);
+    await openStats(tester);
+    expect(tester.takeException(), isNull);
+    // .first là PcCard gần nhất: ô chỉ số, không phải thẻ bọc ngoài nếu có.
+    Size card(String label) => tester.getSize(
+      find.ancestor(of: find.text(label), matching: find.byType(PcCard)).first,
+    );
+    expect(
+      card(Vi.statsTotalSessions).height,
+      card(Vi.statsDrillSessions).height,
     );
   });
 
