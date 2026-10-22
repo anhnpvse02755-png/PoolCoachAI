@@ -14,4 +14,12 @@ abstract final class AppLayout {
   /// Ở 360 dp mỗi ô trong năm ô của thanh chỉ rộng 72 dp, nhãn không còn
   /// chỗ để to thêm. Thanh bên không bị giới hạn này.
   static const double navBarLabelMaxTextScale = 1.0;
+
+  /// Bề ngang từ đó màn thuộc loại "vừa" của Material 3: dưới 600 dp là
+  /// điện thoại dọc. Mọi điện thoại nằm ngang rộng ít nhất 640 dp nên đều
+  /// thuộc loại vừa.
+  ///
+  /// Từ mốc này shell đổi thanh tab dưới thành thanh bên: thanh dưới ăn
+  /// 80 dp trong 360 dp chiều cao của máy ngang, còn chiều ngang thì dư.
+  static const double mediumWidth = 600;
 }

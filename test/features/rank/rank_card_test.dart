@@ -9,6 +9,7 @@ import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 
@@ -58,7 +59,9 @@ void main() {
 
   testWidgets('Hồ sơ: lịch sử có cả lần hoàn tất và lần đã hủy', (tester) async {
     await pump(tester, Routes.profile, rank: verifiedD, tests: [done, cancelled]);
-    await tester.scrollUntilVisible(find.text(Vi.rankHistoryCancelled(cancelled.cancelledAt!)), 200);
+    // Thanh điều hướng bên cũng cuộn được: chỉ đúng danh sách của Hồ sơ.
+    await tester.scrollUntilVisible(find.text(Vi.rankHistoryCancelled(cancelled.cancelledAt!)), 200,
+        scrollable: find.descendant(of: find.byType(ProfileScreen), matching: find.byType(Scrollable)).first);
     expect(find.text(Vi.rankHistoryCompleted(done.completedAt!, 137, Rank.d)), findsOneWidget);
     expect(find.text(Vi.rankHistoryCancelled(cancelled.cancelledAt!)), findsOneWidget);
   });

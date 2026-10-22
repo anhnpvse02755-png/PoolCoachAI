@@ -11,6 +11,12 @@ const sweepConfigs = <SweepConfig>[
     size: Size(360, 640),
     textScale: 2.0,
   ),
+  (name: 'điện thoại ngang 740×360', size: Size(740, 360), textScale: 1.0),
+  (
+    name: 'điện thoại ngang 740×360, chữ lớn',
+    size: Size(740, 360),
+    textScale: 2.0,
+  ),
   (name: 'máy tính bảng dọc 800×1280', size: Size(800, 1280), textScale: 1.0),
   (name: 'máy tính 1280×800', size: Size(1280, 800), textScale: 1.0),
 ];
