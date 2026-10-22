@@ -1,0 +1,159 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/assessment/bu_test.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/timer_session.dart';
+
+import 'roadmap_fixtures.dart';
+import 'test_data.dart';
+
+const _longPlayer = 'Nguyễn Văn Trường Giang';
+const _longOpponent = 'Trần Thị Bích Ngọc Hạnh';
+
+/// Dữ liệu đầy, tên dài: quét tràn phải gặp hàng thật, không chỉ màn trống.
+ProviderContainer richContainer() => testContainer(
+  logs: sessions('d1', 8, [
+    for (var i = 1; i <= 7; i++) testToday.subtract(Duration(days: i)),
+  ]),
+  timerSessions: [
+    TimerSession(
+      id: 'timer-1',
+      date: testToday,
+      durationSec: 3600,
+      cueId: 'cue-long',
+    ),
+    TimerSession(
+      id: 'timer-2',
+      date: testToday.subtract(const Duration(days: 1)),
+      durationSec: 1800,
+    ),
+  ],
+  schedule: const [
+    ScheduleSlot(
+      id: 's1',
+      day: 1,
+      time: '19:00',
+      label: 'Tập điều bi và dọn bàn 9 bi theo bộ đề BU',
+      cat: SkillCategory.position,
+    ),
+    ScheduleSlot(
+      id: 's2',
+      day: 3,
+      time: '06:30',
+      label: 'Ngắm bi cắt mỏng',
+      cat: SkillCategory.aiming,
+    ),
+  ],
+  equipment: [
+    CueEquipment(
+      id: 'cue-long',
+      name: 'Cơ chơi Predator Revo 12.4 Carbon ngọn dài bản giới hạn',
+      type: CueType.values.first,
+      shaftBrand: 'Predator',
+      shaftDiameterMm: 12.4,
+      tipBrand: 'Kamui Black Super Soft',
+      buttBrand: 'Cuetec Cynergy',
+      skillCategories: const [SkillCategory.aiming, SkillCategory.position],
+      lastTipMaintenance: DateTime(2026, 8, 15),
+      tipMaintenanceDueDate: DateTime(2026, 9, 15), // quá hạn so với testToday
+    ),
+    const CueEquipment(
+      id: 'cue-break',
+      name: 'Cơ phá nhảy',
+      type: CueType.breakJump,
+      skillCategories: [SkillCategory.aiming],
+    ),
+  ],
+  matches: [
+    // stats_screen_test.dart, đổi tên người chơi cho dài và thêm cơ.
+    PoolMatch(
+      id: 'match',
+      gameType: PoolGameType.nineBall,
+      playerName: _longPlayer,
+      opponentName: _longOpponent,
+      targetRacks: 3,
+      rackWinners: const [
+        RackWinner.player,
+        RackWinner.opponent,
+        RackWinner.player,
+        RackWinner.player,
+      ],
+      shots: [
+        MatchShot(
+          id: 'shot',
+          rackNumber: 1,
+          shotNumber: 1,
+          shooter: RackWinner.player,
+          type: MatchShotType.breakShot,
+          outcome: MatchShotOutcome.scratch,
+          positionOutcome: PositionOutcome.successful,
+          recordedAt: testToday,
+        ),
+      ],
+      startedAt: testToday,
+      completedAt: testToday,
+      cueId: 'cue-long',
+    ),
+    // Một trận đang đánh dở.
+    PoolMatch(
+      id: 'match-2',
+      gameType: PoolGameType.nineBall,
+      playerName: _longPlayer,
+      opponentName: _longOpponent,
+      targetRacks: 3,
+      rackWinners: const [RackWinner.opponent],
+      startedAt: testToday,
+    ),
+  ],
+  rank: PlayerRank(
+    rank: Rank.d,
+    source: RankSource.verified,
+    buScore: 137,
+    testId: 't1',
+    onboardingState: OnboardingState.done,
+    updatedAt: testToday,
+  ),
+  tests: [
+    BuTest(
+      id: 't1',
+      startedAt: testToday.subtract(const Duration(days: 4)),
+      tableSize: TableSize.nineFootPlus,
+      completedAt: testToday.subtract(const Duration(days: 3)),
+      examIScore: 60,
+      examIIVersion: ExamIIVersion.masters,
+      examIIScore: 77,
+      totalScore: 137,
+      resultRank: Rank.d,
+    ),
+  ],
+  goal: GoalRecord(
+    updatedAt: testToday,
+    goal: PlayerGoal(
+      goalId: 'g',
+      kind: GoalKind.thuanThucKyNang,
+      category: SkillCategory.aiming,
+      createdAt: testToday,
+    ),
+  ),
+  achievements: [
+    Achievement(
+      kind: AchievementKind.chuoiNgay,
+      refId: '7',
+      achievedAt: testToday,
+    ),
+  ],
+  buResult: BuResult(
+    testId: 't1',
+    completedAt: testToday.subtract(const Duration(days: 3)),
+    total: 137,
+    lost: const {'F1': 5, 'F3': 4, 'S5': 6},
+  ),
+);
