@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_layout.dart';
 import 'package:poolcoachai/core/theme/app_theme.dart';
 
 /// Widget gốc của PoolCoachAI.
@@ -31,7 +32,8 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
   /// Router truyền từ ngoài vào thuộc về người gọi — kiểm thử tự dựng
   /// rồi tự dọn. Dispose hộ sẽ giết router ngay dưới chân người gọi.
   bool get _ownsRouter => widget.router == null;
-  late final GoRouter _router = widget.router ??
+  late final GoRouter _router =
+      widget.router ??
       createAppRouter(
         auth: ref.read(authGateProvider),
         onboarding: ref.read(onboardingGateProvider),
@@ -62,6 +64,19 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
       supportedLocales: const [Locale('vi')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       debugShowCheckedModeBanner: false,
+      // Kẹp chữ hệ thống ở một chỗ cho cả app, và chừa tai thỏ hai bên khi
+      // máy nằm ngang. Dải cạnh tai thỏ tô màu nền app thay vì để đen.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: AppLayout.maxTextScale,
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      ),
     );
   }
 }

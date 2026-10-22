@@ -10,6 +10,7 @@ import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -150,6 +151,53 @@ void main() {
       );
     }
 
+    testWidgets(
+      'điện thoại ngang, bàn phím mở: hộp thoại bắt đầu trận cuộn được, '
+      'nút Bắt đầu trên bàn phím',
+      (tester) async {
+        applyScreen(tester, const Size(740, 360));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+        await addCue('c1', 'Cơ Một');
+        await pump(tester);
+        await tester.tap(find.text(Vi.matchStart));
+        await tester.pumpAndSettle();
+        await expectDialogFitsAboveKeyboard(
+          tester,
+          screenHeight: 360,
+          keyboard: 160,
+        );
+        await scrollThroughAll(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'điện thoại ngang, bàn phím mở: hộp thoại ghi cú đánh cuộn được, '
+      'nút Lưu trên bàn phím',
+      (tester) async {
+        // Tạo trận ở cỡ mặc định như test đầu file, rồi mới xoay ngang.
+        await pump(tester);
+        await startWithNames(tester);
+        await tester.tap(find.text(Vi.matchStartAction));
+        await tester.pumpAndSettle();
+        // Nút mở hộp thoại nằm dưới vùng bàn phím: mở trước, bàn phím
+        // bật lên sau, như khi chạm vào ô ghi chú.
+        applyScreen(tester, const Size(740, 360));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(Vi.matchRecordShot));
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+        await tester.pumpAndSettle();
+        await expectDialogFitsAboveKeyboard(
+          tester,
+          screenHeight: 360,
+          keyboard: 160,
+        );
+        await scrollThroughAll(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('defaults to no cue and lets the player pick one', (
       tester,
     ) async {
@@ -230,8 +278,11 @@ void main() {
       await pump(tester);
       expect(find.text(Vi.matchCueLine('Cơ Một')), findsOneWidget);
 
-      await DriftCueEquipmentRepository(db, userId: 'u1', now: () => at)
-          .remove('c1');
+      await DriftCueEquipmentRepository(
+        db,
+        userId: 'u1',
+        now: () => at,
+      ).remove('c1');
       await tester.pumpAndSettle();
 
       expect(

@@ -60,13 +60,7 @@ class StatsScreen extends ConsumerWidget {
         children: [
           Text(Vi.statsOverview, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+          _MetricGrid(
             children: [
               _MetricCard(
                 label: Vi.statsTotalSessions,
@@ -176,12 +170,19 @@ class StatsScreen extends ConsumerWidget {
                         Row(
                           children: [
                             Expanded(child: Text(Vi.skill(skill.category))),
-                            Text(
-                              skill.averageTargetRatio == null
-                                  ? Vi.statsNoScoredSessions
-                                  : Vi.statsPercent(
-                                      (skill.averageTargetRatio! * 100).round(),
-                                    ),
+                            const SizedBox(width: 8),
+                            // Chưa có buổi chấm điểm thì đây là cả một câu:
+                            // xuống dòng trong nửa bên phải, không tràn.
+                            Expanded(
+                              child: Text(
+                                skill.averageTargetRatio == null
+                                    ? Vi.statsNoScoredSessions
+                                    : Vi.statsPercent(
+                                        (skill.averageTargetRatio! * 100)
+                                            .round(),
+                                      ),
+                                textAlign: TextAlign.end,
+                              ),
                             ),
                           ],
                         ),
@@ -300,6 +301,81 @@ class _CueWinRateCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Lưới ô chỉ số: mỗi ô rộng ít nhất [_minTileWidth], hai tới bốn ô một
+/// hàng tuỳ bề ngang. Các ô cùng hàng cao bằng ô nhiều chữ nhất, nên chữ to
+/// lên thì ô cao theo chứ không tràn.
+class _MetricGrid extends StatefulWidget {
+  const _MetricGrid({required this.children});
+
+  static const _minTileWidth = 220.0;
+
+  final List<Widget> children;
+
+  @override
+  State<_MetricGrid> createState() => _MetricGridState();
+}
+
+class _MetricGridState extends State<_MetricGrid> {
+  // Font của app tải lúc chạy và tới sau khung hình đầu. Flutter 3.47 vẽ lại
+  // chữ khi font tới nhưng giữ bộ đo kích thước nội tại cũ của chữ
+  // (rendering/paragraph.dart, systemFontsDidChange), mà IntrinsicHeight đọc
+  // đúng bộ đo đó: hàng ô giữ chiều cao đo bằng font dự phòng, chữ thật rộng
+  // hơn thì xuống dòng và tràn khỏi ô. Font đổi thì dựng lại các hàng để chữ
+  // được đo lại từ đầu.
+  var _fontsVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    PaintingBinding.instance.systemFonts.addListener(_onFontsChanged);
+  }
+
+  @override
+  void dispose() {
+    PaintingBinding.instance.systemFonts.removeListener(_onFontsChanged);
+    super.dispose();
+  }
+
+  void _onFontsChanged() => setState(() => _fontsVersion++);
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    key: ValueKey(_fontsVersion),
+    builder: (context, constraints) {
+      final columns = (constraints.maxWidth / _MetricGrid._minTileWidth)
+          .floor()
+          .clamp(2, 4);
+      return Column(
+        children: [
+          for (
+            var start = 0;
+            start < widget.children.length;
+            start += columns
+          ) ...[
+            if (start > 0) const SizedBox(height: 8),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = start; i < start + columns; i++) ...[
+                    if (i > start) const SizedBox(width: 8),
+                    // Hàng cuối thiếu ô thì chừa chỗ trống cho cột thẳng hàng.
+                    Expanded(
+                      child: i < widget.children.length
+                          ? widget.children[i]
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    },
+  );
 }
 
 class _MetricCard extends StatelessWidget {

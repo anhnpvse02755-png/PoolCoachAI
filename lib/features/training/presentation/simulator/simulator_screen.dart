@@ -347,6 +347,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
     return PcRootScaffold(
       title: Vi.simTitle,
+      // Bàn bi cần từng điểm ảnh: không chặn bề rộng đọc.
+      maxBodyWidth: double.infinity,
       body: TablePanelLayout(
         table: _table,
         tableBuilder: (layout) => Semantics(

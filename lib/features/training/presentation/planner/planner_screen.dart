@@ -43,6 +43,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final planned = _planned;
     return PcRootScaffold(
       title: Vi.planTitle,
+      // Bàn bi cần từng điểm ảnh: không chặn bề rộng đọc.
+      maxBodyWidth: double.infinity,
       body: planned == null
           ? PlannerSetupView(
               draft: _draft,

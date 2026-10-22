@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/library.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_painter.dart';
@@ -22,7 +23,7 @@ class CoachLibraryScreen extends StatelessWidget {
     final i = index;
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.coachLibraryTitle)),
-      body: i == null
+      body: PcReadableWidth(child: i == null
           ? ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
@@ -39,7 +40,7 @@ class CoachLibraryScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: _EntryCard(entry: all[i], k: i + 1, n: all.length),
                 )
-              : const Center(child: Text(Vi.coachLibraryEnd)),
+              : const Center(child: Text(Vi.coachLibraryEnd))),
     );
   }
 }

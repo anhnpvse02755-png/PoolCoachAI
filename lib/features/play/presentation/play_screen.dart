@@ -37,6 +37,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Máy ngang, bàn phím mở: hộp thoại chỉ còn ~150 px. Tiêu đề
+          // cuộn cùng ô nhập, chỉ hàng nút đứng yên trên bàn phím.
+          scrollable: true,
           title: const Text(Vi.matchStart),
           content: SizedBox(
             width: 400,
@@ -112,9 +115,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                       key: const Key('match-cue'),
                       initialValue: cueId,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchCue,
-                      ),
+                      decoration: const InputDecoration(labelText: Vi.matchCue),
                       items: [
                         const DropdownMenuItem<String?>(
                           value: null,
@@ -217,106 +218,107 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          // Máy ngang, bàn phím mở: hộp thoại chỉ còn ~150 px. Tiêu đề
+          // cuộn cùng ô nhập, chỉ hàng nút đứng yên trên bàn phím.
+          scrollable: true,
           title: const Text(Vi.matchRecordShot),
           content: SizedBox(
             width: 420,
             child: Form(
               key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<RackWinner>(
-                      key: const Key('match-shot-shooter'),
-                      initialValue: shooter,
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchShooter,
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                          value: RackWinner.player,
-                          child: Text(match.playerName),
-                        ),
-                        DropdownMenuItem(
-                          value: RackWinner.opponent,
-                          child: Text(match.opponentName),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => shooter = value);
-                        }
-                      },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<RackWinner>(
+                    key: const Key('match-shot-shooter'),
+                    initialValue: shooter,
+                    decoration: const InputDecoration(
+                      labelText: Vi.matchShooter,
                     ),
-                    DropdownButtonFormField<MatchShotType>(
-                      key: const Key('match-shot-type'),
-                      initialValue: type,
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchShotType,
+                    items: [
+                      DropdownMenuItem(
+                        value: RackWinner.player,
+                        child: Text(match.playerName),
                       ),
-                      items: MatchShotType.values
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(Vi.matchShotTypeName(value)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) setDialogState(() => type = value);
-                      },
+                      DropdownMenuItem(
+                        value: RackWinner.opponent,
+                        child: Text(match.opponentName),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => shooter = value);
+                      }
+                    },
+                  ),
+                  DropdownButtonFormField<MatchShotType>(
+                    key: const Key('match-shot-type'),
+                    initialValue: type,
+                    decoration: const InputDecoration(
+                      labelText: Vi.matchShotType,
                     ),
-                    DropdownButtonFormField<MatchShotOutcome>(
-                      key: const Key('match-shot-outcome'),
-                      initialValue: outcome,
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchShotOutcome,
-                      ),
-                      items: MatchShotOutcome.values
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(Vi.matchShotOutcomeName(value)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => outcome = value);
-                        }
-                      },
-                    ),
-                    DropdownButtonFormField<PositionOutcome?>(
-                      key: const Key('match-position-outcome'),
-                      initialValue: positionOutcome,
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchPositionOutcome,
-                      ),
-                      items: [
-                        const DropdownMenuItem<PositionOutcome?>(
-                          value: null,
-                          child: Text(Vi.matchPositionUnknown),
-                        ),
-                        ...PositionOutcome.values.map(
+                    items: MatchShotType.values
+                        .map(
                           (value) => DropdownMenuItem(
                             value: value,
-                            child: Text(Vi.matchPositionOutcomeName(value)),
+                            child: Text(Vi.matchShotTypeName(value)),
                           ),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setDialogState(() => positionOutcome = value),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setDialogState(() => type = value);
+                    },
+                  ),
+                  DropdownButtonFormField<MatchShotOutcome>(
+                    key: const Key('match-shot-outcome'),
+                    initialValue: outcome,
+                    decoration: const InputDecoration(
+                      labelText: Vi.matchShotOutcome,
                     ),
-                    TextFormField(
-                      key: const Key('match-shot-notes'),
-                      decoration: const InputDecoration(
-                        labelText: Vi.matchShotNotes,
+                    items: MatchShotOutcome.values
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(Vi.matchShotOutcomeName(value)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => outcome = value);
+                      }
+                    },
+                  ),
+                  DropdownButtonFormField<PositionOutcome?>(
+                    key: const Key('match-position-outcome'),
+                    initialValue: positionOutcome,
+                    decoration: const InputDecoration(
+                      labelText: Vi.matchPositionOutcome,
+                    ),
+                    items: [
+                      const DropdownMenuItem<PositionOutcome?>(
+                        value: null,
+                        child: Text(Vi.matchPositionUnknown),
                       ),
-                      maxLength: 240,
-                      onSaved: (value) => notes = value?.trim() ?? '',
+                      ...PositionOutcome.values.map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(Vi.matchPositionOutcomeName(value)),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => positionOutcome = value),
+                  ),
+                  TextFormField(
+                    key: const Key('match-shot-notes'),
+                    decoration: const InputDecoration(
+                      labelText: Vi.matchShotNotes,
                     ),
-                  ],
-                ),
+                    maxLength: 240,
+                    onSaved: (value) => notes = value?.trim() ?? '',
+                  ),
+                ],
               ),
             ),
           ),
@@ -417,7 +419,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             Text(score, style: Theme.of(context).textTheme.titleLarge),
             if (match.cueId != null)
               Text(
-                Vi.matchCueLine(cueNames[match.cueId] ?? Vi.equipmentUnknownCue),
+                Vi.matchCueLine(
+                  cueNames[match.cueId] ?? Vi.equipmentUnknownCue,
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             Text(
@@ -512,7 +516,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   Widget build(BuildContext context) {
     final matchesAsync = ref.watch(matchesProvider);
     final cueNames = {
-      for (final cue in ref.watch(cueEquipmentProvider).value ?? const <CueEquipment>[])
+      for (final cue
+          in ref.watch(cueEquipmentProvider).value ?? const <CueEquipment>[])
         cue.id: cue.name,
     };
 

@@ -73,6 +73,22 @@ abstract final class AppTheme {
           ),
         ),
       ),
+      // Thanh bên (từ 600 dp) mặc đúng màu thanh tab dưới. Nhãn cũng dùng
+      // textMuted chứ không phải textDisabled, cùng lý do tương phản 4.5:1
+      // như trên.
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: AppColors.bgDeep,
+        indicatorColor: AppColors.accent.withValues(alpha: 0.18),
+        elevation: 0,
+        selectedLabelTextStyle: AppTypography.label.copyWith(
+          color: AppColors.accent,
+        ),
+        unselectedLabelTextStyle: AppTypography.label.copyWith(
+          color: AppColors.textMuted,
+        ),
+        selectedIconTheme: const IconThemeData(color: AppColors.accent),
+        unselectedIconTheme: const IconThemeData(color: AppColors.textMuted),
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,

@@ -1,0 +1,75 @@
+import 'dart:math' as math;
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/table_panel_layout.dart';
+
+import '../support/layout_sweep.dart';
+import '../support/rich_data.dart';
+import '../support/route_cases.dart';
+
+/// Mọi route ở từng cỡ màn: điện thoại, máy tính bảng, máy tính.
+const sweepConfigs = <SweepConfig>[
+  (name: 'điện thoại dọc 360×640', size: Size(360, 640), textScale: 1.0),
+  (
+    name: 'điện thoại dọc 360×640, chữ lớn',
+    size: Size(360, 640),
+    textScale: 2.0,
+  ),
+  (name: 'điện thoại ngang 740×360', size: Size(740, 360), textScale: 1.0),
+  (
+    name: 'điện thoại ngang 740×360, chữ lớn',
+    size: Size(740, 360),
+    textScale: 2.0,
+  ),
+  (name: 'máy tính bảng dọc 800×1280', size: Size(800, 1280), textScale: 1.0),
+  (name: 'máy tính 1280×800', size: Size(1280, 800), textScale: 1.0),
+];
+
+void main() {
+  for (final config in sweepConfigs) {
+    testWidgets('${config.name}: mọi màn đã đăng nhập không tràn', (
+      tester,
+    ) async {
+      await sweepRoutes(tester, config, signedIn: true);
+    });
+    testWidgets('${config.name}: mọi màn chưa đăng nhập không tràn', (
+      tester,
+    ) async {
+      await sweepRoutes(tester, config, signedIn: false);
+    });
+  }
+
+  testWidgets(
+    'máy tính 1280×800: màn đọc không rộng quá 840, màn có bàn không bị chặn',
+    (tester) async {
+      applyScreen(tester, const Size(1280, 800));
+      final router = await pumpRoutedApp(tester, container: richContainer());
+      for (final route in signedInRouteCases.values) {
+        router.go(route.path);
+        await tester.pumpAndSettle();
+        if (tableScreens.contains(route.screen)) {
+          expect(
+            tester.getSize(find.byType(TablePanelLayout)).width,
+            greaterThan(AppLayout.readableMaxWidth),
+            reason: route.path,
+          );
+        } else {
+          final widest = tester
+              .stateList<ScrollableState>(find.byType(Scrollable))
+              .where(
+                (s) => axisDirectionToAxis(s.axisDirection) == Axis.vertical,
+              )
+              .map((s) => s.context.size!.width)
+              .fold<double>(0, math.max);
+          expect(
+            widest,
+            lessThanOrEqualTo(AppLayout.readableMaxWidth),
+            reason: route.path,
+          );
+        }
+      }
+    },
+  );
+}

@@ -6,12 +6,12 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
 void main() {
-  testWidgets('weekly schedule can be created, edited and removed', (
-    tester,
-  ) async {
+  /// Mở màn Lịch tập trên một cơ sở dữ liệu trong bộ nhớ.
+  Future<AppDatabase> openSchedule(WidgetTester tester) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     final container = dbContainer(db);
@@ -24,6 +24,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return db;
+  }
+
+  testWidgets('weekly schedule can be created, edited and removed', (
+    tester,
+  ) async {
+    final db = await openSchedule(tester);
 
     await tester.tap(find.text(Vi.scheduleAdd));
     await tester.pumpAndSettle();
@@ -59,5 +66,38 @@ void main() {
     slots = await db.select(db.scheduleSlotRows).get();
     expect(slots.single.isDeleted, isTrue);
     expect(find.text(Vi.scheduleEmpty), findsOneWidget);
+  });
+
+  testWidgets('điện thoại ngang, bàn phím mở: hộp thoại lịch tập cuộn được, '
+      'nút Lưu trên bàn phím', (tester) async {
+    applyScreen(tester, const Size(740, 360));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+    await openSchedule(tester);
+    await tester.tap(find.text(Vi.scheduleAdd));
+    await tester.pumpAndSettle();
+    await expectDialogFitsAboveKeyboard(
+      tester,
+      screenHeight: 360,
+      keyboard: 160,
+    );
+    await scrollThroughAll(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('điện thoại ngang: bảng chọn giờ không tràn', (tester) async {
+    applyScreen(tester, const Size(740, 360));
+    await openSchedule(tester);
+    await tester.tap(find.text(Vi.scheduleAdd));
+    await tester.pumpAndSettle();
+    final timeButton = find.descendant(
+      of: find.widgetWithText(ListTile, Vi.scheduleChooseTime),
+      matching: find.byType(TextButton),
+    );
+    await tester.ensureVisible(timeButton);
+    await tester.pumpAndSettle();
+    await tester.tap(timeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(TimePickerDialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

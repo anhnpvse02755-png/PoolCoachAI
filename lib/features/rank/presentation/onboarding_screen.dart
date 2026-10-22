@@ -8,6 +8,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_rank_badge.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/questionnaire.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
@@ -111,7 +112,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
         ],
       ),
-      body: SafeArea(
+      body: PcReadableWidth(child: SafeArea(
         child: locked
             ? _padded([
                 const Text(Vi.onboardingLocked),
@@ -124,7 +125,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 _Step.suggestion => _suggestion(context),
                 _Step.choose => _choose(context),
               },
-      ),
+      )),
     );
   }
 

@@ -10,6 +10,7 @@ import 'package:poolcoachai/features/notifications/presentation/notifications_sc
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 import 'package:poolcoachai/features/training/presentation/training_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -32,6 +33,8 @@ void main() {
     });
 
     testWidgets('thanh tab là NavigationBar của Material 3', (tester) async {
+      // Thanh tab dưới là bố cục điện thoại dọc; từ 600 dp là thanh bên.
+      applyScreen(tester, const Size(360, 640));
       final container = testContainer();
       addTearDown(container.dispose);
       final router = createAppRouter(auth: signedInGate());
@@ -194,8 +197,9 @@ void main() {
       );
     });
 
-    testWidgets('thanh tiêu đề không mang tên app, và chỉ có một thanh',
-        (tester) async {
+    testWidgets('thanh tiêu đề không mang tên app, và chỉ có một thanh', (
+      tester,
+    ) async {
       final container = testContainer();
       addTearDown(container.dispose);
       final router = createAppRouter(auth: signedInGate());
@@ -221,8 +225,9 @@ void main() {
       );
     });
 
-    testWidgets('mở Coach từ tab vẫn chỉ thấy một thanh tiêu đề',
-        (tester) async {
+    testWidgets('mở Coach từ tab vẫn chỉ thấy một thanh tiêu đề', (
+      tester,
+    ) async {
       final container = testContainer();
       addTearDown(container.dispose);
       final router = createAppRouter(auth: signedInGate());
@@ -249,31 +254,33 @@ void main() {
       );
     });
 
-    testWidgets('đường dẫn không tồn tại ra màn tiếng Việt, không lộ ngoại lệ',
-        (tester) async {
-      final container = testContainer();
-      addTearDown(container.dispose);
-      final router = createAppRouter(auth: signedInGate());
-      addTearDown(router.dispose);
+    testWidgets(
+      'đường dẫn không tồn tại ra màn tiếng Việt, không lộ ngoại lệ',
+      (tester) async {
+        final container = testContainer();
+        addTearDown(container.dispose);
+        final router = createAppRouter(auth: signedInGate());
+        addTearDown(router.dispose);
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: PoolCoachApp(router: router),
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: PoolCoachApp(router: router),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      router.go('/khong-he-co-duong-dan-nay');
-      await tester.pumpAndSettle();
+        router.go('/khong-he-co-duong-dan-nay');
+        await tester.pumpAndSettle();
 
-      expect(find.text(Vi.notFoundTitle), findsOneWidget);
-      expect(
-        find.textContaining('Exception'),
-        findsNothing,
-        reason: 'không đẩy nội dung ngoại lệ ra trước mặt người dùng',
-      );
-    });
+        expect(find.text(Vi.notFoundTitle), findsOneWidget);
+        expect(
+          find.textContaining('Exception'),
+          findsNothing,
+          reason: 'không đẩy nội dung ngoại lệ ra trước mặt người dùng',
+        );
+      },
+    );
 
     testWidgets('mỗi tab giữ ngăn xếp riêng: mở Coach từ tab Luyện tập '
         'rồi quay lại vẫn ở Luyện tập', (tester) async {

@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/core/widgets/pc_section_header.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
@@ -38,7 +39,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.notificationsTitle)),
-      body: ListView(
+      body: PcReadableWidth(child: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           _permissionCard(),
@@ -71,7 +72,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           else
             ..._grouped(upcoming, now),
         ],
-      ),
+      )),
     );
   }
 

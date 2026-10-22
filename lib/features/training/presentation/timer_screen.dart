@@ -183,6 +183,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           const SizedBox(height: 12),
           DropdownButtonFormField<SkillCategory?>(
             initialValue: _category,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: Vi.timerChooseCategory,
             ),
@@ -208,6 +209,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           else
             DropdownButtonFormField<String?>(
               initialValue: _cueId,
+              // Tên cơ do người dùng gõ, có thể rất dài: ô chọn chiếm đúng
+              // bề ngang, tên quá dài thì cắt bằng dấu ba chấm.
+              isExpanded: true,
               decoration: const InputDecoration(labelText: Vi.timerChooseCue),
               items: [
                 const DropdownMenuItem<String?>(
@@ -219,6 +223,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                     value: cue.id,
                     child: Text(
                       '${cue.name} · ${Vi.equipmentTypeName(cue.type)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
