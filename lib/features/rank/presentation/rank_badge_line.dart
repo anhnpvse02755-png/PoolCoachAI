@@ -18,7 +18,13 @@ class RankBadgeLine extends StatelessWidget {
       children: [
         PcRankBadge(rank: rank.rank!, showWord: true),
         const SizedBox(width: AppSpacing.sm),
-        Text(Vi.rankSource(rank.source!), style: Theme.of(context).textTheme.bodySmall),
+        // Nhãn nguồn là một cụm chữ: hẹp thì xuống dòng, không đẩy ⓘ ra ngoài.
+        Flexible(
+          child: Text(
+            Vi.rankSource(rank.source!),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
         IconButton(
           tooltip: Vi.rankInfo,
           icon: const Icon(Icons.info_outline),
