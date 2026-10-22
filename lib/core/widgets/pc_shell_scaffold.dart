@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_layout.dart';
 
 /// Khung bọc 5 tab: thanh điều hướng dưới và nút Huấn luyện viên nổi
 /// dùng được ở mọi tab.
@@ -58,16 +59,18 @@ class PcShellScaffold extends StatelessWidget {
         onPressed: () => context.push(Routes.coach),
         child: const Icon(Icons.psychology_outlined),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _onTap,
-        destinations: [
-          for (var i = 0; i < _icons.length; i++)
-            NavigationDestination(
-              icon: Icon(_icons[i]),
-              label: _labels[i],
-            ),
-        ],
+      // Nhãn thanh dưới giữ cỡ gốc: năm ô trên 360 dp không còn chỗ cho
+      // chữ to hơn (Flutter tự kẹp ở 1.3, mức thấp hơn thắng).
+      bottomNavigationBar: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: AppLayout.navBarLabelMaxTextScale,
+        child: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: _onTap,
+          destinations: [
+            for (var i = 0; i < _icons.length; i++)
+              NavigationDestination(icon: Icon(_icons[i]), label: _labels[i]),
+          ],
+        ),
       ),
     );
   }

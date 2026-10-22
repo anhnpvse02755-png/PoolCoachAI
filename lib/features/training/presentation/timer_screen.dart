@@ -183,6 +183,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           const SizedBox(height: 12),
           DropdownButtonFormField<SkillCategory?>(
             initialValue: _category,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: Vi.timerChooseCategory,
             ),
