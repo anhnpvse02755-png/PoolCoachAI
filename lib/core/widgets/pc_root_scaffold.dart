@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 
 /// Khung của một màn gốc trong shell 5 tab.
 ///
@@ -11,13 +13,22 @@ import 'package:poolcoachai/core/strings/vi.dart';
 /// tự mang thanh của mình thì lúc nào cũng đúng một thanh, và tên trên
 /// đó là tên người dùng đang xem.
 class PcRootScaffold extends StatelessWidget {
-  const PcRootScaffold({required this.title, required this.body, super.key});
+  const PcRootScaffold({
+    required this.title,
+    required this.body,
+    this.maxBodyWidth = AppLayout.readableMaxWidth,
+    super.key,
+  });
 
   /// Tên màn, hiện trên thanh tiêu đề.
   final String title;
 
   /// Nội dung màn.
   final Widget body;
+
+  /// Thân màn rộng tối đa ngần này, đặt giữa; vô hạn là không chặn (màn có
+  /// bàn bi). Thanh tiêu đề luôn rộng hết.
+  final double maxBodyWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +43,9 @@ class PcRootScaffold extends StatelessWidget {
           ),
         ],
       ),
-      body: body,
+      body: maxBodyWidth.isFinite
+          ? PcReadableWidth(maxWidth: maxBodyWidth, child: body)
+          : body,
     );
   }
 }

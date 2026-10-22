@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 
@@ -17,7 +18,7 @@ class RankScreen extends ConsumerWidget {
     final rank = ref.watch(playerRankProvider);
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.rankScreenTitle)),
-      body: ListView(
+      body: PcReadableWidth(child: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           const RankCard(showDetailsLink: false),
@@ -34,7 +35,7 @@ class RankScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
           const TestHistoryList(),
         ],
-      ),
+      )),
     );
   }
 }

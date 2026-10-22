@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/features/rank/presentation/bu_layout_painter.dart';
 
@@ -19,7 +20,7 @@ class LayoutGalleryScreen extends StatelessWidget {
     final i = index;
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.buLayoutsTitle)),
-      body: i == null
+      body: PcReadableWidth(child: i == null
           ? ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
@@ -31,7 +32,7 @@ class LayoutGalleryScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: _LayoutCard(layout: all[i], k: i + 1, n: all.length),
                 )
-              : const Center(child: Text(Vi.buLayoutsEnd)),
+              : const Center(child: Text(Vi.buLayoutsEnd))),
     );
   }
 }

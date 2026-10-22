@@ -22,4 +22,10 @@ abstract final class AppLayout {
   /// Từ mốc này shell đổi thanh tab dưới thành thanh bên: thanh dưới ăn
   /// 80 dp trong 360 dp chiều cao của máy ngang, còn chiều ngang thì dư.
   static const double mediumWidth = 600;
+
+  /// Bề rộng tối đa của nội dung màn đọc trên cửa sổ rộng, đặt giữa.
+  ///
+  /// Danh sách kéo dài 1200 dp rất khó đọc. Màn có bàn bi thì không bị
+  /// chặn: bàn cần từng điểm ảnh.
+  static const double readableMaxWidth = 840;
 }

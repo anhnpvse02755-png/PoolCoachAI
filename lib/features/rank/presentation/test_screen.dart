@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/data/repositories/assessment_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
@@ -87,7 +88,7 @@ class _TestScreenState extends ConsumerState<TestScreen> {
     if (finished != null) {
       return Scaffold(
         appBar: AppBar(title: const Text(Vi.buResultTitle)),
-        body: SafeArea(child: TestResultView(testId: finished.testId, outcome: finished.outcome)),
+        body: PcReadableWidth(child: SafeArea(child: TestResultView(testId: finished.testId, outcome: finished.outcome))),
       );
     }
     final active = ref.watch(activeTestProvider);
@@ -104,14 +105,14 @@ class _TestScreenState extends ConsumerState<TestScreen> {
             ),
         ],
       ),
-      body: SafeArea(
+      body: PcReadableWidth(child: SafeArea(
         child: switch (active) {
           AsyncData(value: final s?) => _activeBody(s),
           AsyncData() => const _PrepView(),
           AsyncError() => const Center(child: Text(Vi.buLoadFailed)),
           _ => const Center(child: CircularProgressIndicator()),
         },
-      ),
+      )),
     );
   }
 

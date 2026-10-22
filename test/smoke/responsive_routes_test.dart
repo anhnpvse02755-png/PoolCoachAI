@@ -1,7 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/features/training/presentation/simulator/table_panel_layout.dart';
 
 import '../support/layout_sweep.dart';
+import '../support/rich_data.dart';
+import '../support/route_cases.dart';
 
 /// Mọi route ở từng cỡ màn: điện thoại, máy tính bảng, máy tính.
 const sweepConfigs = <SweepConfig>[
@@ -34,4 +40,36 @@ void main() {
       await sweepRoutes(tester, config, signedIn: false);
     });
   }
+
+  testWidgets(
+    'máy tính 1280×800: màn đọc không rộng quá 840, màn có bàn không bị chặn',
+    (tester) async {
+      applyScreen(tester, const Size(1280, 800));
+      final router = await pumpRoutedApp(tester, container: richContainer());
+      for (final route in signedInRouteCases.values) {
+        router.go(route.path);
+        await tester.pumpAndSettle();
+        if (tableScreens.contains(route.screen)) {
+          expect(
+            tester.getSize(find.byType(TablePanelLayout)).width,
+            greaterThan(AppLayout.readableMaxWidth),
+            reason: route.path,
+          );
+        } else {
+          final widest = tester
+              .stateList<ScrollableState>(find.byType(Scrollable))
+              .where(
+                (s) => axisDirectionToAxis(s.axisDirection) == Axis.vertical,
+              )
+              .map((s) => s.context.size!.width)
+              .fold<double>(0, math.max);
+          expect(
+            widest,
+            lessThanOrEqualTo(AppLayout.readableMaxWidth),
+            reason: route.path,
+          );
+        }
+      }
+    },
+  );
 }

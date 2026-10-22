@@ -8,6 +8,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
+import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_recommendation.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
@@ -55,7 +56,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.coachTitle)),
-      body: ListView(
+      body: PcReadableWidth(child: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           if (rec != null) ...[
@@ -127,7 +128,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

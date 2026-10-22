@@ -101,7 +101,7 @@ const signedOutRouteCases = <String, RouteCase>{
 };
 
 /// Màn có thân là `TablePanelLayout`: bàn bi và bảng điều khiển.
-const tableScreens = <Type>{SimulatorScreen, PlannerScreen};
+const tableScreens = <Type>{SimulatorScreen, PlannerScreen, SituationScreen};
 
 /// Dựng app với [container] rồi trả router để test tự lái.
 Future<GoRouter> pumpRoutedApp(
