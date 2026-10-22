@@ -23,6 +23,14 @@ abstract final class AppLayout {
   /// 80 dp trong 360 dp chiều cao của máy ngang, còn chiều ngang thì dư.
   static const double mediumWidth = 600;
 
+  /// Chiều cao dưới mức này là loại "thấp" của Material 3: điện thoại nằm
+  /// ngang, cao 360–430 dp.
+  ///
+  /// Ở đó thanh bên không chứa nổi năm mục có nhãn cộng nút Coach (cần gần
+  /// 400 dp, mà máy 360 dp trừ thanh trạng thái chỉ còn 336), nên chỉ mục
+  /// đang chọn hiện nhãn.
+  static const double compactHeight = 480;
+
   /// Bề rộng tối đa của nội dung màn đọc trên cửa sổ rộng, đặt giữa.
   ///
   /// Danh sách kéo dài 1200 dp rất khó đọc. Màn có bàn bi thì không bị

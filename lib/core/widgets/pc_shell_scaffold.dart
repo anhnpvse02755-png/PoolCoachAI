@@ -8,7 +8,8 @@ import 'package:poolcoachai/core/theme/app_layout.dart';
 ///
 /// Dưới [AppLayout.mediumWidth] (điện thoại dọc): thanh tab dưới và nút
 /// Coach nổi. Từ mốc đó (điện thoại ngang, máy tính bảng, máy tính): thanh
-/// bên có nhãn, cuộn được, nút Coach đứng đầu thanh. Hai bố cục dùng chung
+/// bên có nhãn, cuộn được, nút Coach đứng đầu thanh; trên máy nằm ngang thấp
+/// hơn [AppLayout.compactHeight] chỉ mục đang chọn hiện nhãn. Hai bố cục dùng chung
 /// một [navigationShell]; go_router gắn sẵn `GlobalKey` cho nó, nên xoay
 /// máy giữa chừng vẫn giữ nguyên tab đang mở, ngăn xếp và trạng thái màn.
 ///
@@ -89,7 +90,12 @@ class PcShellScaffold extends StatelessWidget {
           NavigationRail(
             selectedIndex: navigationShell.currentIndex,
             onDestinationSelected: _onTap,
-            labelType: NavigationRailLabelType.all,
+            // Máy nằm ngang thấp: chỉ mục đang chọn hiện nhãn, mục khác chỉ
+            // biểu tượng, để đủ năm mục và nút Coach trong một màn.
+            labelType:
+                MediaQuery.sizeOf(context).height < AppLayout.compactHeight
+                ? NavigationRailLabelType.selected
+                : NavigationRailLabelType.all,
             // Máy ngang chỉ cao 360 dp: chữ lớn thì năm mục cộng nút Coach
             // dài hơn thế, nên thanh phải cuộn được.
             scrollable: true,

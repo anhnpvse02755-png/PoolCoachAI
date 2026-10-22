@@ -182,7 +182,35 @@ void main() {
       tester.widget<NavigationRail>(find.byType(NavigationRail)).scrollable,
       isTrue,
     );
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).labelType,
+      NavigationRailLabelType.all,
+    );
   });
+
+  for (final scale in [1.0, 1.5]) {
+    testWidgets(
+      'điện thoại ngang có thanh trạng thái, chữ ×$scale: đủ năm mục và nút '
+      'Coach trong màn, thanh bên không phải cuộn',
+      (tester) async {
+        applyScreen(tester, const Size(740, 360), textScale: scale);
+        tester.view.padding = const FakeViewPadding(top: 24);
+        tester.view.viewPadding = const FakeViewPadding(top: 24);
+        await pumpShell(tester);
+        final rail = tester.state<ScrollableState>(
+          find.descendant(
+            of: find.byType(NavigationRail),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(
+          rail.position.maxScrollExtent,
+          0,
+          reason: 'mục cuối của thanh bên phải hiện mà không cần cuộn',
+        );
+      },
+    );
+  }
 
   testWidgets('thanh bên chuyển nhánh và giữ ngăn xếp như thanh dưới', (
     tester,
