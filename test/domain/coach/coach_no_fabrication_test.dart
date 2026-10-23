@@ -3,6 +3,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/data/seed/seed_knowledge.dart';
 import 'package:poolcoachai/domain/coach/answer.dart';
+import 'package:poolcoachai/domain/coach/chat_filter.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_job.dart';
 import 'package:poolcoachai/domain/coach/coach_recommendation.dart';
@@ -130,13 +131,9 @@ void main() {
   });
 
   group('4. không có số độ, không "ngắm lệch", không "tối ưu"', () {
-    final aimPattern = RegExp(r'ngắm\s+(lệch|dày hơn|mỏng hơn)', caseSensitive: false);
     void check(Iterable<String> lines) {
       for (final l in lines) {
-        expect(l, isNot(contains('°')), reason: l);
-        expect(aimPattern.hasMatch(l), isFalse, reason: l);
-        expect(l, isNot(contains('lệch điểm ngắm')), reason: l);
-        expect(l.toLowerCase(), isNot(contains('tối ưu')), reason: l);
+        expect(coachBannedRule(l), isNull, reason: l);
       }
     }
 
