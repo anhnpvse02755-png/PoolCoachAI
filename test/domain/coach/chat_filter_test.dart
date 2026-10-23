@@ -118,4 +118,28 @@ void main() {
       expect(coachReplyBlock('Có $huge buổi.', facts), CoachBlockRule.unknownNumber);
     });
   });
+
+  group('sửa vòng 2 (review)', () {
+    const factsWithNineBall = <String, Object?>{
+      'skills': {
+        'aiming': {'mastery': 62},
+      },
+      'matches': {
+        'last': {'gameType': 'nineBall'},
+      },
+    };
+
+    test('1. "phần trăm" không phải chữ số "trăm"; số trước nó vẫn kiểm tra như %', () {
+      expect(coachReplyBlock('Tỷ lệ thắng 62 phần trăm.', factsWithNineBall), isNull);
+    });
+
+    test('2. tên môn chơi dạng enum (nineBall) cho số của môn đó đi qua ở nơi khác trong câu', () {
+      expect(coachReplyBlock('Trận gần nhất là 9 bi.', factsWithNineBall), isNull);
+      expect(coachReplyBlock('Bạn mạnh nhất ở 9 bi.', factsWithNineBall), isNull);
+    });
+
+    test('3. chuỗi ngữ cảnh ván đấu cho phép dấu phẩy, không chỉ "và"/"hay"', () {
+      expect(coachReplyBlock('Luật 8 bi, 9 bi và 10 bi khác nhau.', const <String, Object?>{}), isNull);
+    });
+  });
 }

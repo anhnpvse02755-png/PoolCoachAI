@@ -41,6 +41,11 @@ final _numeralWordPattern = RegExp(
   caseSensitive: false,
 );
 
+/// "phần trăm" là từ chỉ phần trăm, không phải chữ số "trăm" — fix round 2,
+/// mục 1. Thay bằng "%" để số đứng trước được kiểm tra đúng như "N%", và để
+/// "trăm" không còn khớp [_numeralWordPattern] nữa.
+final _percentWordPattern = RegExp(r'phần\s+trăm');
+
 final _aimShiftPattern = RegExp(r'ngắm\s+(lệch|dày hơn|mỏng hơn)');
 final _spinRatioPattern = RegExp(r'\b(BHE|FHE)\b', caseSensitive: false);
 
@@ -57,14 +62,27 @@ final _letterPattern = RegExp(r'^\p{L}$', unicode: true);
 final _separatorPattern = RegExp('[.,]');
 
 /// Chỉ xoá "N bi" khi có ngữ cảnh ván đấu đứng trước (trực tiếp hoặc qua một
-/// chuỗi "N bi và/hay N bi") — fix round 1, mục 2. Không có ngữ cảnh thì số
-/// phải qua kiểm tra như mọi số khác, để không ẩn số bịa (ví dụ "ăn 10 bi").
+/// chuỗi "N bi và/hay/, N bi") — fix round 1, mục 2; dấu phẩy trong chuỗi
+/// thêm ở fix round 2, mục 3 ("Luật 8 bi, 9 bi và 10 bi"). Không có ngữ cảnh
+/// thì số phải qua kiểm tra như mọi số khác, để không ẩn số bịa (ví dụ
+/// "ăn 10 bi").
 final _gameContextChainPattern = RegExp(
   r'(?:luật|pool|ván|trận|giải|chơi|kiểu|môn|loại|bàn)\s+'
-  r'(?:(?<![\d.,])(?:8|9|10) bi(?!\p{L})\s+(?:và|hay)\s+)*'
+  r'(?:(?<![\d.,])(?:8|9|10) bi(?!\p{L})(?:,\s+|\s+(?:và|hay)\s+))*'
   r'(?<![\d.,])(?:8|9|10) bi(?!\p{L})',
   unicode: true,
 );
+
+/// Tên môn chơi dạng enum — tên các giá trị `PoolGameType` trong
+/// `lib/domain/pool_match.dart`, được serialize bằng `.name` (xem
+/// `lib/domain/coach/coach_context.dart`, khoá "gameType"). Dùng để cho số
+/// của môn chơi đi qua dù "N bi" ở xa từ ngữ cảnh ván đấu trong câu (ví dụ
+/// "Trận gần nhất là 9 bi.") — fix round 2, mục 2.
+const _gameTypeNumbers = <String, int>{
+  'eightBall': 8,
+  'nineBall': 9,
+  'tenBall': 10,
+};
 
 /// Mẫu cấm chung của mọi câu Coach (Giai đoạn A và chat): số độ (kể cả ký
 /// hiệu º/˚ và số viết bằng chữ), ngắm lệch, "tối ưu". Không cần facts —
@@ -95,6 +113,8 @@ Set<int> coachAllowedNumbers(Map<String, Object?> facts) {
         allowed.add(((value / 100) * 1000).round());
       }
     } else if (value is String) {
+      final gameNumber = _gameTypeNumbers[value];
+      if (gameNumber != null) allowed.add(gameNumber * 1000);
       for (final m in _numberTokenPattern.allMatches(value)) {
         final scaled = _scaledNumberOf(m.group(0)!);
         if (scaled != null) allowed.add(scaled);
@@ -148,7 +168,10 @@ bool _passesCountException(String rest, int scaled) {
 }
 
 CoachBlockRule? _unknownNumberRule(String raw, Map<String, Object?> facts) {
-  final cleaned = raw.toLowerCase().replaceAll(_gameContextChainPattern, '');
+  final cleaned = raw
+      .toLowerCase()
+      .replaceAll(_gameContextChainPattern, '')
+      .replaceAll(_percentWordPattern, '%');
   if (_numeralWordPattern.hasMatch(cleaned)) return CoachBlockRule.unknownNumber;
   final allowed = coachAllowedNumbers(facts);
   for (final m in _numberTokenPattern.allMatches(cleaned)) {
