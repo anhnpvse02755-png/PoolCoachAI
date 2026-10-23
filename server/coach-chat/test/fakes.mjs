@@ -131,6 +131,32 @@ export function claudeStream({ text = 'Hôm nay tập Phòng thủ.', stopReason
   return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
 }
 
+/// Luồng Claude giả "treo mãi" (M4): trả `message_start` ngay rồi KHÔNG BAO
+/// GIỜ tự đóng hay gửi thêm gì — mô phỏng thân phản hồi bị treo giữa luồng
+/// (ví dụ mất kết nối phía Claude sau khi đã bắt đầu trả lời). `fetch` thật
+/// tự báo lỗi cho thân đang đọc khi [signal] phát 'abort'; fetch giả ở đây
+/// không có tầng mạng thật để làm điều đó, nên phải tự mô phỏng — thiếu bước
+/// này thì test treo mãi, không phải lỗi gì khác.
+export function claudeHangingStream(signal) {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(
+        `event: message_start\ndata: ${JSON.stringify({
+          type: 'message_start',
+          message: { id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-opus-5',
+            content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 900, output_tokens: 1 } },
+        })}\n\n`,
+      ));
+      const onAbort = () => controller.error(new DOMException('Hết giờ chờ Claude (giả lập)', 'AbortError'));
+      if (signal) {
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+      }
+    },
+  });
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
 /// Phản hồi lỗi giả của Claude: thân JSON `{type: 'error', error: {...}}` với
 /// mã trạng thái HTTP [status] và kiểu lỗi Anthropic [type].
 export function claudeError(status, type) {

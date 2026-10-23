@@ -37,9 +37,33 @@ test('CLAUDE_MODEL rỗng hoặc chỉ khoảng trắng thì dùng mặc định
   assert.equal(loadConfig({ ...base, CLAUDE_MODEL: '   ' }).model, 'claude-opus-5');
 });
 test('PORT phải là số nguyên 1–65535', () => {
-  for (const bad of ['9000abc', '0', '65536', '-1', '3.5', ' ']) {
+  for (const bad of ['9000abc', '0', '65536', '-1', '3.5']) {
     assert.throws(() => loadConfig({ ...base, PORT: bad }), /PORT/);
   }
   assert.equal(loadConfig({ ...base, PORT: '65535' }).port, 65535);
   assert.equal(loadConfig({ ...base, PORT: '1' }).port, 1);
+});
+
+// M3: PORT/CLAUDE_EFFORT/CLAUDE_FALLBACKS/DAILY_QUESTION_LIMIT trước đây đọc
+// bằng `env.X ?? default`, nên biến đặt thành '' hay chỉ khoảng trắng bị coi
+// là "có đặt" rồi hỏng khuôn (vd. CLAUDE_EFFORT='low ' không khớp Set các
+// effort hợp lệ) — dịch vụ crash-loop vì một biến tuỳ chọn để trống. Giờ
+// dùng `isBlank(v) ? default : v.trim()`, giống cách CLAUDE_MODEL đã làm.
+test('M3: biến tuỳ chọn để trống (rỗng hoặc chỉ khoảng trắng) thì dùng mặc định, không crash-loop', () => {
+  for (const blank of ['', '   ', '\t']) {
+    const c = loadConfig({ ...base, PORT: blank, CLAUDE_EFFORT: blank, CLAUDE_FALLBACKS: blank, DAILY_QUESTION_LIMIT: blank });
+    assert.deepEqual([c.port, c.effort, c.fallbacks, c.dailyLimit], [8080, 'low', true, 30]);
+  }
+});
+test('M3: biến tuỳ chọn có khoảng trắng quanh giá trị hợp lệ thì cắt rồi mới xét (vd. "low ")', () => {
+  const c = loadConfig({ ...base, PORT: ' 9000 ', CLAUDE_EFFORT: ' medium ', CLAUDE_FALLBACKS: ' off ', DAILY_QUESTION_LIMIT: ' 10 ' });
+  assert.deepEqual([c.port, c.effort, c.fallbacks, c.dailyLimit], [9000, 'medium', false, 10]);
+});
+test('M3: DIRECTUS_URL cắt khoảng trắng quanh giá trị rồi mới bỏ "/" cuối', () => {
+  const c = loadConfig({ ...base, DIRECTUS_URL: '  https://directus.test/  ' });
+  assert.equal(c.directusUrl, 'https://directus.test');
+});
+test('M3: mỗi origin trong ALLOWED_ORIGINS bị bỏ "/" cuối', () => {
+  const c = loadConfig({ ...base, ALLOWED_ORIGINS: 'https://a.test/, https://b.test//, http://localhost:5555' });
+  assert.deepEqual(c.allowedOrigins, ['https://a.test', 'https://b.test', 'http://localhost:5555']);
 });

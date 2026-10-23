@@ -118,6 +118,37 @@ function clipTurnText(text) {
   return text.slice(0, cutAt);
 }
 
+/// Gom mọi số trong [value] (đi sâu vào object/array) thành chuỗi, cho
+/// factNumbers dùng dưới dạng tập so khớp.
+function factNumbers(value, out = new Set()) {
+  if (typeof value === 'number' && Number.isFinite(value)) out.add(String(value));
+  else if (Array.isArray(value)) for (const v of value) factNumbers(v, out);
+  else if (value && typeof value === 'object') for (const v of Object.values(value)) factNumbers(v, out);
+  return out;
+}
+
+/// Xỉ gần luật unknownNumber của bộ lọc app (I2c — lib/domain/coach/chat_filter.dart):
+/// liệt các dãy số trong [text] không khớp số nào có trong [facts]. KHÔNG lặp lại
+/// hệt luật Dart (số dạng chữ, số lượt/trận nhỏ được miễn, …) — chỉ để chủ sản
+/// phẩm nhìn lướt qua, GHI NHẬN mềm (controller ruling 2), không bao giờ tính hỏng.
+function unknownNumberCandidates(text, facts) {
+  const known = factNumbers(facts);
+  const found = text.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  const unknown = found.filter((n) => !known.has(n) && !known.has(n.replace(',', '.')));
+  return [...new Set(unknown)];
+}
+
+/// In một dòng GHI NHẬN cho [label] liệt các dãy số có thể lạ trong [text] so
+/// với [facts] (xỉ gần luật unknownNumber — xem unknownNumberCandidates).
+function noteUnknownNumbers(label, text, facts) {
+  const unknown = unknownNumberCandidates(text, facts);
+  note(
+    unknown.length === 0
+      ? `${label}: không thấy dãy số nào lạ so với FACTS (xỉ gần luật unknownNumber của bộ lọc app)`
+      : `${label}: dãy số có thể lạ so với FACTS — ${unknown.join(', ')} (xỉ gần luật unknownNumber của bộ lọc app; bộ lọc Dart thật có thêm luật miễn số dạng chữ/lượt nhỏ, chủ sản phẩm tự xem lại câu trả lời)`,
+  );
+}
+
 /// Gọi HTTP, cố gắng đọc JSON; trả về {status, body, raw}. Không bao giờ in
 /// `token` hay thân yêu cầu ra log (không có bí mật nào trong đó, nhưng vẫn
 /// tránh in access token cho chắc).
@@ -216,6 +247,7 @@ try {
         const text = r.body?.text ?? '';
         answer1Text = text;
         check(/[ăâđêôơưĂÂĐÊÔƠƯ]/.test(text), 'câu hỏi 1: câu trả lời có chữ tiếng Việt');
+        noteUnknownNumbers('câu hỏi 1', text, FACTS);
         note(
           text.includes('Phòng thủ')
             ? 'câu hỏi 1: câu trả lời có nhắc "Phòng thủ" (đi theo thẻ Hôm nay, spec §2)'
@@ -249,6 +281,7 @@ try {
       if (r.status === 200) {
         const text = r.body?.text ?? '';
         check(/[ăâđêôơưĂÂĐÊÔƠƯ]/.test(text), 'câu hỏi 2: câu trả lời có chữ tiếng Việt');
+        noteUnknownNumbers('câu hỏi 2', text, FACTS);
         const cacheRead = r.body?.usage?.cacheRead;
         note(
           typeof cacheRead === 'number' && cacheRead > 0

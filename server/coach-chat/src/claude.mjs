@@ -62,8 +62,11 @@ export function classifyClaudeError(err) {
 }
 
 /// Tạo client Claude cho Coach Chat. [fetch] được tiêm vào để test không gọi Claude thật
-/// (global-constraints: tests offline).
-export function createClaude({ apiKey, model, effort, fallbacks, fetch, maxRetries = 1, timeout = 60_000 }) {
+/// (global-constraints: tests offline). [timeout] của SDK chỉ phủ lúc đợi header phản hồi;
+/// thân đang stream không có hạn nào riêng và `maxRetries` có thể gấp đôi lần đợi đó (M4),
+/// nên [deadlineMs] phủ cả lượt gọi — từ lúc gửi tới khi đọc xong thân — qua
+/// `AbortSignal.timeout`. Tham số hoá để test tiêm hạn ngắn, không phải chờ 120s thật.
+export function createClaude({ apiKey, model, effort, fallbacks, fetch, maxRetries = 1, timeout = 60_000, deadlineMs = 120_000 }) {
   const client = new Anthropic({ apiKey, fetch, maxRetries, timeout });
 
   /// Hỏi Claude một câu, với [facts], [history] và [question] (spec mục 7.4, 7.7). Đọc
@@ -78,7 +81,7 @@ export function createClaude({ apiKey, model, effort, fallbacks, fetch, maxRetri
       ...(fallbacks ? { betas: [FALLBACK_BETA], fallbacks: 'default' } : {}),
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: buildMessages(history, facts, nfc(question)),
-    });
+    }, { signal: AbortSignal.timeout(deadlineMs) });
     const message = await stream.finalMessage();
 
     const usage = {

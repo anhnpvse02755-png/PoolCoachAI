@@ -15,7 +15,7 @@ function isBlank(v) {
 function parseAllowedOrigins(raw) {
   return raw
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/+$/, ''))
     .filter((s) => s.length > 0);
 }
 
@@ -47,20 +47,20 @@ export function loadConfig(env) {
   const allowedOrigins = isBlank(allowedOriginsRaw) ? [] : parseAllowedOrigins(allowedOriginsRaw);
   if (allowedOrigins.length === 0) missingOrBad.push('ALLOWED_ORIGINS');
 
-  const portRaw = env.PORT ?? '8080';
+  const portRaw = isBlank(env.PORT) ? '8080' : env.PORT.trim();
   const port = parsePort(portRaw);
   if (port === null) missingOrBad.push('PORT');
 
   const modelRaw = env.CLAUDE_MODEL;
   const model = isBlank(modelRaw) ? 'claude-opus-5' : modelRaw.trim();
 
-  const effort = env.CLAUDE_EFFORT ?? 'low';
+  const effort = isBlank(env.CLAUDE_EFFORT) ? 'low' : env.CLAUDE_EFFORT.trim();
   if (!EFFORTS.has(effort)) missingOrBad.push('CLAUDE_EFFORT');
 
-  const fallbacksRaw = env.CLAUDE_FALLBACKS ?? 'default';
+  const fallbacksRaw = isBlank(env.CLAUDE_FALLBACKS) ? 'default' : env.CLAUDE_FALLBACKS.trim();
   if (!FALLBACKS.has(fallbacksRaw)) missingOrBad.push('CLAUDE_FALLBACKS');
 
-  const dailyLimitRaw = env.DAILY_QUESTION_LIMIT ?? '30';
+  const dailyLimitRaw = isBlank(env.DAILY_QUESTION_LIMIT) ? '30' : env.DAILY_QUESTION_LIMIT.trim();
   const dailyLimit = Number.parseInt(dailyLimitRaw, 10);
   if (!Number.isInteger(dailyLimit) || dailyLimit <= 0 || String(dailyLimit) !== dailyLimitRaw.trim()) {
     missingOrBad.push('DAILY_QUESTION_LIMIT');
@@ -77,7 +77,7 @@ export function loadConfig(env) {
     effort,
     fallbacks: fallbacksRaw === 'default',
     dailyLimit,
-    directusUrl: directusUrlRaw.replace(/\/+$/, ''),
+    directusUrl: directusUrlRaw.trim().replace(/\/+$/, ''),
     directusServiceToken,
     allowedOrigins,
   };

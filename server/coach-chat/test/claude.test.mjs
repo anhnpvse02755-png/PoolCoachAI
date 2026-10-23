@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import Anthropic from '@anthropic-ai/sdk';
 import { buildMessages, createClaude, classifyClaudeError } from '../src/claude.mjs';
 import { SYSTEM_PROMPT } from '../src/prompt.mjs';
-import { fakeFetch, claudeStream, claudeError } from './fakes.mjs';
+import { fakeFetch, claudeStream, claudeError, claudeHangingStream } from './fakes.mjs';
 
 function setup({ reply = () => claudeStream(), fallbacks = true } = {}) {
   const requests = [];
@@ -70,6 +71,21 @@ test('lỗi SDK theo thứ tự cụ thể tới chung', async () => {
   }
   assert.equal(classifyClaudeError(new Error('lỗi lập trình')), null);
 });
+
+// M4: timeout 60s của SDK (claude.mjs cũ) chỉ phủ đợi header, không phủ thân đang stream;
+// maxRetries có thể gấp đôi lần đợi. deadlineMs tiêm vào đây mô phỏng AbortSignal.timeout
+// phủ toàn bộ lượt gọi (cả khi đang đọc thân), nên phải test riêng, ngắn, không chờ 120s thật.
+test('M4: thân luồng treo mãi thì bị huỷ sau deadlineMs, lỗi là APIUserAbortError, phân loại 502 upstream',
+  { timeout: 2000 }, async () => {
+    const claude = async (_url, init) => claudeHangingStream(init.signal);
+    const c = createClaude({
+      apiKey: 'sk-test-key', model: 'claude-opus-5', effort: 'low', fallbacks: true,
+      fetch: fakeFetch({ claude }), maxRetries: 0, deadlineMs: 30,
+    });
+    const err = await c.ask(input).then(() => null, (e) => e);
+    assert.ok(err instanceof Anthropic.APIUserAbortError, `muốn APIUserAbortError, được ${err?.constructor?.name}: ${err?.message}`);
+    assert.deepEqual(classifyClaudeError(err), { status: 502, code: 'upstream' });
+  });
 
 // Ruling của Task 2 review: bộ lọc của app chặn chữ Unicode tổ hợp (NFD), nên câu hỏi, từng
 // lượt lịch sử, và câu trả lời phải được chuẩn hoá về NFC trước khi dùng. Dùng

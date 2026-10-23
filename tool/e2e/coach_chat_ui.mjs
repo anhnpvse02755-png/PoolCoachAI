@@ -22,6 +22,10 @@ if (!process.argv[2]) throw new Error('Thiếu địa chỉ app: node tool/e2e/c
 const APP = process.argv[2].replace(/\/$/, '');
 const LIMIT = Number(process.env.COACH_CHAT_LIMIT ?? 30);
 const SAMPLE_QUESTION = 'Hôm nay tôi nên tập gì?';
+// Chép đúng từng chữ từ Vi.coachChatInsufficient (lib/core/strings/vi.dart) — I2c.
+// Không import được file Dart vào một script Node, nên chép tay; lệch một chữ là
+// bài này không còn nhận ra đúng câu app thật hiện khi bộ lọc chặn câu trả lời.
+const COACH_CHAT_INSUFFICIENT = 'Chưa đủ dữ liệu để trả lời câu này.';
 const shots = path.join(process.env.TMP ?? os.tmpdir(), 'pcai-coach-chat');
 const email = `e2e-coach-chat-${Date.now()}@poolcoachai.example.com`;
 
@@ -35,6 +39,12 @@ let failed = 0;
 function check(ok, what) {
   console.log(`${ok ? 'ĐẠT ' : 'HỎNG'}  ${what}`);
   if (!ok) failed++;
+}
+// Quan sát mềm (I2c, cùng kiểu controller ruling 2 của coach_chat.mjs): in ra
+// để chủ sản phẩm biết, không bao giờ tính hỏng bài — câu trả lời của Claude
+// không tất định 100%, và bộ lọc app có thể hợp lệ chặn một câu trả lời.
+function note(what) {
+  console.log(`GHI NHẬN  ${what}`);
 }
 
 /// Chờ tới [timeoutMs] cho nút semantics khớp [label] hết aria-disabled.
@@ -91,6 +101,14 @@ try {
   check(text.includes(SAMPLE_QUESTION), `câu hỏi "${SAMPLE_QUESTION}" hiện trong hội thoại`);
   check(!text.includes('Huấn luyện viên đang trả lời…'), 'không còn trạng thái "đang trả lời"');
   check(!text.includes('Chưa gửi được câu hỏi.'), 'không còn lỗi "Chưa gửi được câu hỏi."');
+  // I2c: quan sát mềm — in ra bong bóng trả lời có phải đúng câu "chưa đủ dữ liệu"
+  // của app không (Claude có thể đã từ chối/bị cắt, hoặc bộ lọc Dart đã chặn câu trả
+  // lời), không tính hỏng bài vì câu trả lời của Claude không tất định 100%.
+  note(
+    text.includes(COACH_CHAT_INSUFFICIENT)
+      ? `bong bóng trả lời là câu "chưa đủ dữ liệu" của app (Vi.coachChatInsufficient) — xem lại câu hỏi mẫu/facts hoặc log server`
+      : 'bong bóng trả lời không phải câu "chưa đủ dữ liệu" của app',
+  );
 
   for (const size of SHOT_SIZES) {
     await tab.send('Emulation.setDeviceMetricsOverride', {

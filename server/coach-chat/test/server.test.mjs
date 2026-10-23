@@ -136,6 +136,32 @@ test('R15: addUsage lỗi (chỉ PATCH cộng token sập) vẫn trả lời 200
   assert.deepEqual([errorLine.event, errorLine.where], ['error', 'addUsage']);
   assertIsoAt(errorLine.at);
 });
+test('M11a: Claude lỗi rồi hoàn lượt cũng lỗi — vẫn trả đúng mã đã phân loại từ lỗi Claude, không phải lỗi hoàn lượt; có dòng nhật ký lỗi riêng where:"refund"', async (t) => {
+  // Người dùng mới trong ngày: take() tạo dòng bằng POST (createUsage, questions:1 đặt
+  // sẵn trong thân tạo), không qua PATCH — nên PATCH mang khoá `questions` duy nhất
+  // trong cả lượt hỏi thất bại này là của refund() (server.mjs:188-192), chặn thẳng nó.
+  const s = await start(t, {
+    wrapFetch: (base) => async (input, init) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'PATCH' && init?.body) {
+        const patch = JSON.parse(init.body);
+        if ('questions' in patch) {
+          return new Response(JSON.stringify({ errors: [{ extensions: { code: 'SERVICE_UNAVAILABLE' } }] }),
+            { status: 503, headers: { 'content-type': 'application/json' } });
+        }
+      }
+      return base(input, init);
+    },
+  });
+  s.setReply(() => claudeError(529, 'overloaded_error')); // -> classifyClaudeError: {status:503, code:'busy'}
+  const r = await ask(s.base);
+  assert.deepEqual([r.status, (await r.json()).error], [503, 'busy']);
+  // Hoàn lượt không thành (PATCH của refund() bị chặn), nên lượt đã trừ ở take() còn nguyên.
+  assert.equal(s.directus.rows.get('user-a_2026-10-22').questions, 1);
+  const errorLine = s.lines.map((l) => JSON.parse(l)).find((l) => l.event === 'error' && l.where === 'refund');
+  assert.ok(errorLine, 'thiếu dòng nhật ký lỗi where:"refund"');
+  assertIsoAt(errorLine.at);
+});
 test('hạn mức: GET quota', async (t) => {
   const s = await start(t);
   const r = await fetch(`${s.base}/v1/coach-chat/quota`, { headers: { authorization: 'Bearer tok-a' } });

@@ -31,11 +31,14 @@ giờ tự tính số mới. Bốn endpoint:
   model, remainingToday, usage: {input, output, cacheRead}}`; `400` body
   sai; `401` token sai/hết hạn; `413 {error: "invalid", field: "body"}` thân
   yêu cầu vượt quá 64 KB; `429 {error: "quota", limit, resetAt}`;
-  `502 {error: "refused"|"truncated"|"upstream"}` Claude từ chối, bị cắt,
-  hoặc lỗi khác; `503 {error: "busy"}` Claude quá tải; `503 {error:
-  "unavailable"}` Directus không trả lời được HOẶC máy chủ coach-chat không
-  kết nối được tới Claude — hai nguyên nhân khác hẳn nhau cho cùng một mã,
-  xem mục 11.
+  `502 {error: "refused"|"truncated", remainingToday}` Claude từ chối hoặc
+  bị cắt, lượt KHÔNG được hoàn nên thân có `remainingToday` (R7); `502
+  {error: "upstream"}` lỗi Claude API khác, ĐÃ hoàn lượt nên thân không có
+  `remainingToday`; `503 {error: "busy"}` Claude quá tải, đã hoàn lượt;
+  `503 {error: "unavailable"}` Directus không trả lời được HOẶC máy chủ
+  coach-chat không kết nối được tới Claude — hai nguyên nhân khác hẳn nhau
+  cho cùng một mã, xem mục 11; `500 {error: "internal"}` lỗi không phân
+  loại được từ Claude hoặc lỗi lập trình ở bước khác, xem mục 11.
 - `POST /v1/coach-chat/blocked` body `{rule}` — app báo một câu trả lời đã
   bị bộ lọc phía app (`chat_filter.dart`) chặn → `204`; `400` rule sai;
   `401` token sai; `413` thân yêu cầu vượt quá 64 KB; `503 {error:
@@ -70,14 +73,9 @@ trên Easypanel (mục 6).
 | `DAILY_QUESTION_LIMIT` | Không | `30` | Hạn mức câu hỏi mỗi người mỗi ngày, tính theo giờ Việt Nam. |
 | `CLAUDE_FALLBACKS` | Không | `default` | `default` (bật dự phòng phía máy chủ) hoặc `off` — dùng `off` khi đổi model mà gặp `502 upstream` (mục 9). |
 
-`PORT`, `CLAUDE_EFFORT`, `CLAUDE_FALLBACKS` và `DAILY_QUESTION_LIMIT` đọc
-bằng `env.X ?? mặc_định` trong `config.mjs` — chỉ THIẾU HẲN biến mới dùng
-mặc định. Đặt biến đó thành chuỗi rỗng vẫn bị coi là "có đặt", rồi hỏng vì
-sai khuôn, và dịch vụ không khởi động được: `main.mjs` in
-`Thiếu hoặc sai biến môi trường: …` ra stderr rồi thoát mã 1 — trên
-Easypanel, service khởi động lại ngay nên nhìn giống crash-loop. **Để trống
-một biến tuỳ chọn thì BỎ HẲN biến đó, ĐỪNG đặt giá trị rỗng.** (`CLAUDE_MODEL`
-là ngoại lệ — để rỗng vẫn rơi về mặc định.)
+Biến tuỳ chọn (`PORT`, `CLAUDE_MODEL`, `CLAUDE_EFFORT`, `CLAUDE_FALLBACKS`,
+`DAILY_QUESTION_LIMIT`) bỏ hẳn HAY để giá trị rỗng đều rơi về mặc định
+(`config.mjs`, `isBlank`) — không còn khác nhau, không còn gây crash-loop.
 
 ## 3. Việc chủ sản phẩm cần làm, trước khi deploy
 
@@ -167,6 +165,13 @@ mục 6.
      tuỳ chọn `CLAUDE_MODEL`, `CLAUDE_EFFORT`, `DAILY_QUESTION_LIMIT`,
      `CLAUDE_FALLBACKS` — để trống thì bỏ hẳn biến, đừng đặt rỗng (mục 2).
    - Domain: `poolcoachai-coach.kjdybl.easypanel.host` → cổng **8080**.
+   - **Chạy ĐÚNG MỘT replica — KHÔNG bật auto-scale hay nhiều instance.**
+     Hạn mức mỗi người mỗi ngày (`quota.mjs`) khoá bằng một `Map` trong bộ
+     nhớ của một tiến trình (`withLock`, `quota.mjs:43`), không phải khoá
+     phân tán qua Directus — hai replica trở lên mỗi cái tự khoá riêng,
+     không biết gì về yêu cầu đang chạy ở replica khác, nên hai câu hỏi
+     cùng lúc của một người có thể lọt qua cả hai mà vẫn được cả hai
+     replica tính là còn lượt.
 2. Deploy bằng thủ tục MCP `deployAppService` (qua `execute_destructive` —
    đổi hạ tầng thật, **cần chủ sản phẩm đồng ý**).
 3. Kiểm `inspectAppService` → trường `commit.hash` đúng là đầu `main` hiện
@@ -217,7 +222,11 @@ chỉ lần đầu — mỗi bài tốn (hoặc không tốn) khác nhau:
     node tool/e2e/coach_chat.mjs
   ```
   Gọi Claude thật **hai lần** (hai câu hỏi) — khoảng **4 xu Mỹ** một lần
-  chạy (mục 12).
+  chạy (mục 12). `COACH_CHAT_URL` phải là origin trần —
+  `scheme://host[:port]`, KHÔNG dấu `/` cuối, KHÔNG đường dẫn (đúng:
+  `https://poolcoachai-coach.kjdybl.easypanel.host`; sai: có `/` cuối, hay
+  thêm `.../v1`) — bài này nối thẳng chuỗi đó với từng đường dẫn endpoint,
+  lệch dạng sẽ gọi nhầm đường dẫn.
 - `DIRECTUS_URL=… DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… node tool/e2e/coach_chat_ui.mjs https://poolcoachai.kjdybl.easypanel.host`
   — một câu hỏi thật trên Chrome thật, trừ một lượt hạn mức của tài khoản
   thử.
@@ -250,12 +259,16 @@ service `coach-chat`; trường `rule` trong mỗi dòng nói rõ luật nào �
   không phải lỗi hạn mức hay lỗi Claude. App không nên gửi facts/history lớn
   đến vậy; nếu gặp liên tục, xem có gì làm facts hay lịch sử chat phình to
   bất thường không (`lib/domain/coach/coach_context.dart`).
-- `503 {error: "busy"}`: Claude đang giới hạn tốc độ hoặc quá tải — thử lại
-  sau, không phải lỗi của dịch vụ coach-chat hay của Directus.
-- `503 {error: "unavailable"}`: KHÔNG phải Claude quá tải. Directus không
-  trả lời được lúc xác thực hoặc lúc đọc/ghi hạn mức, HOẶC máy chủ coach-chat
-  không kết nối được tới Claude (lỗi mạng/kết nối, không phải Claude từ chối
-  hay quá tải). Che cả trường hợp token dịch vụ sai, sai `DIRECTUS_URL`, hay
+- `503 {error: "busy"}`: Claude báo giới hạn tốc độ (`RateLimitError` của
+  SDK, `claude.mjs:56`) hoặc quá tải (`APIError` với `status` 529 hay
+  `type` `overloaded_error`, `claude.mjs:58-59`) — thử lại sau, không phải
+  lỗi của dịch vụ coach-chat hay của Directus. Đã hoàn lượt.
+- `503 {error: "unavailable"}`: KHÔNG phải Claude quá tải (đó là `busy`
+  trên). Directus không trả lời được lúc xác thực hoặc lúc đọc/ghi hạn mức,
+  HOẶC máy chủ coach-chat không kết nối được tới Claude — cụ thể
+  `APIConnectionError` của SDK (`claude.mjs:57`), tức không nhận được phản
+  hồi HTTP nào từ Claude, khác với Claude có phản hồi nhưng từ chối hay quá
+  tải. Che cả trường hợp token dịch vụ sai, sai `DIRECTUS_URL`, hay
   `bootstrap.mjs` chưa chạy — **`/healthz` vẫn trả `ok` trong mọi trường hợp
   này**, vì `/healthz` không gọi Directus (mục 1), nên "healthz ok" KHÔNG
   chứng minh token đúng. Kiểm theo thứ tự:
@@ -265,38 +278,64 @@ service `coach-chat`; trường `rule` trong mỗi dòng nói rõ luật nào �
   - `bootstrap.mjs` đã chạy và `verify.mjs` đã báo "Tất cả kiểm tra đều qua"
     chưa (mục 4);
   - log Easypanel của service có đúng dòng `"error":"unavailable"` ở đúng
-    thời điểm lỗi không — log trống hẳn quanh đó thì service có thể đang
-    không khởi động được (thiếu/sai biến môi trường, mục 2) chứ không phải
-    Directus. Phân biệt rõ hai trường hợp: dịch vụ coach-chat còn sống nhưng
-    Directus (hoặc Claude) không trả lời được thì CÓ trả `503
-    {"error":"unavailable"}` (thân JSON thật, log có dòng tương ứng); dịch vụ
-    coach-chat chết hẳn (crash-loop, ví dụ thiếu biến môi trường bắt buộc ở
-    mục 2) thì KHÔNG CÓ CÁCH NÀO trả JSON đó — không có gì đang chạy để trả
-    lời — lớp reverse proxy của Easypanel tự trả một mã 502/503 riêng của
-    nó, KHÔNG có trường `error` nào trong thân trả lời, và log của service
-    trống hẳn vì chính service không chạy để ghi log.
-- `502 {error: "refused"}`: Claude từ chối trả lời câu đó.
+    thời điểm lỗi không. Phân biệt rõ hai trường hợp: dịch vụ coach-chat còn
+    sống nhưng Directus (hoặc Claude) không trả lời được thì CÓ trả `503
+    {"error":"unavailable"}` (thân JSON thật, log có dòng tương ứng mỗi-yêu-
+    cầu); dịch vụ coach-chat chết hẳn (crash-loop, ví dụ thiếu biến môi
+    trường bắt buộc ở mục 2) thì KHÔNG CÓ CÁCH NÀO trả JSON đó — không có gì
+    đang chạy để nhận yêu cầu — lớp reverse proxy của Easypanel tự trả một
+    mã 502/503 riêng của nó, KHÔNG có trường `error` nào trong thân trả
+    lời. Log KHÔNG trống hẳn: `main.mjs` in dòng `Thiếu hoặc sai biến môi
+    trường: …` ra stderr MỖI LẦN khởi động lại (mục 2), nên một crash-loop
+    hiện ra là dòng đó LẶP LẠI liên tục — khác với dòng log mỗi-yêu-cầu dạng
+    JSON thường (`method`/`path`/`status`/…, mục 1), vì server chưa bao giờ
+    mở cổng để nhận yêu cầu nào. Log thật sự trống hẳn (không cả dòng lặp
+    đó) thì lỗi ở tầng khác hẳn (container/hạ tầng), không phải biến môi
+    trường.
+- `502 {error: "refused"}`: Claude từ chối trả lời câu đó. Không hoàn lượt
+  (R7).
 - `502 {error: "truncated"}`: câu trả lời bị cắt trước khi xong (ví dụ chạm
-  trần token).
-- `502 {error: "upstream"}`: lỗi Claude API không thuộc hai dạng trên — mã dễ
-  gặp nhất, vì `classifyClaudeError` (`claude.mjs:58-59`) gom MỌI lỗi
-  `APIError` khác `529`/`overloaded_error` (hai mã đó mới là `busy`) vào đây,
-  bất kể nguyên nhân thật: `ANTHROPIC_API_KEY` sai hoặc đã bị thu hồi (HTTP
-  401), `CLAUDE_MODEL` viết sai tên model (HTTP 404), hay vấn đề thanh toán,
-  kể cả đã chạm hạn mức chi tiêu theo tháng ở mục 3 bước 2 (HTTP 402
-  `billing_error` — nhiều khả năng đây là CÁCH chạm hạn mức đó sẽ hiện ra với
-  chủ sản phẩm, không phải một mã lỗi riêng biệt). Log chỉ ghi đúng
-  `"error":"upstream"`, KHÔNG giữ mã HTTP gốc hay thông báo của SDK (không
-  phải SDK báo "refused", "truncated" hay một thông báo lỗi riêng), nên
-  KHÔNG phân biệt được ba nguyên nhân trên chỉ từ log. Lặp lại nhiều lần thì
-  kiểm theo thứ tự sau TRƯỚC, đừng đổi model hay effort trước: (1) trên
-  Anthropic Console — khoá API còn hợp lệ, và hạn mức chi tiêu theo tháng
-  (mục 3 bước 2) chưa chạm; (2) biến `CLAUDE_MODEL` đặt trên Easypanel (mục
-  2) có đúng tên model không. Đổi model hay đặt `CLAUDE_FALLBACKS=off` chỉ là
-  cách xử lý riêng cho trường hợp đổi sang `claude-sonnet-5` ở mục 9, KHÔNG
-  phải cách xử lý chung cho mọi `502 upstream`.
-- `401`: vấn đề ở token của người chơi (hết phiên), không phải lỗi hạn mức —
-  app đã có đường xử lý hết phiên riêng.
+  trần token). Không hoàn lượt (R7).
+- `502 {error: "upstream"}`: lỗi Claude API không thuộc `busy` hay
+  `unavailable` trên — mã dễ gặp nhất, vì `classifyClaudeError`
+  (`claude.mjs:55-61`) xét `RateLimitError` và `APIConnectionError` TRƯỚC
+  (hai lớp con cụ thể hơn của `APIError` trong SDK, `claude.mjs:56-57`), rồi
+  mới gom MỌI `APIError` còn lại khác `529`/`overloaded_error`
+  (`claude.mjs:58-59`) vào đây — tức KHÔNG CHỈ loại trừ mã 529/
+  `overloaded_error`, mà loại trừ cả giới hạn tốc độ và mất kết nối đã xét
+  riêng ở trên. Bất kể nguyên nhân thật: `ANTHROPIC_API_KEY` sai hoặc đã bị
+  thu hồi (HTTP 401), `CLAUDE_MODEL` viết sai tên model (HTTP 404), hay vấn
+  đề thanh toán, kể cả đã chạm hạn mức chi tiêu theo tháng ở mục 3 bước 2
+  (HTTP 402 `billing_error` — nhiều khả năng đây là CÁCH chạm hạn mức đó sẽ
+  hiện ra với chủ sản phẩm, không phải một mã lỗi riêng biệt). Log chỉ ghi
+  đúng `"error":"upstream"`, KHÔNG giữ mã HTTP gốc hay thông báo của SDK
+  (không phải SDK báo "refused", "truncated" hay một thông báo lỗi riêng),
+  nên KHÔNG phân biệt được các nguyên nhân trên chỉ từ log. Lặp lại nhiều
+  lần thì kiểm theo thứ tự sau TRƯỚC, đừng đổi model hay effort trước: (1)
+  trên Anthropic Console — khoá API còn hợp lệ, và hạn mức chi tiêu theo
+  tháng (mục 3 bước 2) chưa chạm; (2) biến `CLAUDE_MODEL` đặt trên Easypanel
+  (mục 2) có đúng tên model không. Đổi model hay đặt `CLAUDE_FALLBACKS=off`
+  chỉ là cách xử lý riêng cho trường hợp đổi sang `claude-sonnet-5` ở mục 9,
+  KHÔNG phải cách xử lý chung cho mọi `502 upstream`. Đã hoàn lượt (khác với
+  `refused`/`truncated` trên — hai mã đó KHÔNG hoàn, xem mục 1).
+- `500 {error: "internal"}`: lỗi không phân loại được từ Claude
+  (`classifyClaudeError` trả `null` — không phải `RateLimitError`,
+  `APIConnectionError` hay `APIError` của SDK, ví dụ SDK ném lỗi giao thức)
+  HOẶC một lỗi lập trình không lường được ở bước khác (xác thực, hạn mức,
+  ghi nhật ký…, `server.mjs` dispatch catch-all). Trường hợp đầu đã hoàn
+  lượt (đi theo đường xử lý lỗi Claude chung); trường hợp sau có hoàn hay
+  không tuỳ chỗ lỗi xảy ra trước hay sau khi Claude đã trả lời xong — không
+  có quy tắc chung, xem log `"event":"error"` (`where`) và log mỗi-yêu-cầu
+  đi kèm để biết cụ thể.
+- `401`: xác thực với Directus không qua — token sai, hết hạn, hay KHÔNG
+  được Directus mà máy chủ coach-chat đang nói tới nhận ra. App xử lý mã
+  này qua đường lỗi coach-chat chung (`CoachChatUnavailable`), KHÔNG có UX
+  "hết phiên" riêng cho Coach Chat. Một nguyên nhân dễ bỏ sót: `DIRECTUS_URL`
+  đặt cho service coach-chat (mục 6) lệch với Directus mà app thật đang
+  đăng nhập vào — access token của người chơi chỉ hợp lệ với đúng Directus
+  đã cấp nó, nên lệch `DIRECTUS_URL` hiện ra giống hệt một token hết hạn, dù
+  phiên của người chơi vẫn còn nguyên trên Directus đúng. Không phải lỗi
+  hạn mức.
 - Hạn mức đặt lại lúc **00:00 giờ Việt Nam** (UTC+7), không phải giờ UTC hay
   giờ máy chủ.
 
@@ -307,6 +346,16 @@ nghìn token vào (phần lời dặn hệ thống được đệm) và vài tr�
 `claude-opus-5` ($5 / $25 mỗi triệu token vào/ra) ≈ **2 xu Mỹ/câu**; với
 `claude-sonnet-5` ($2 / $10) ≈ **1 xu Mỹ/câu**. Ở trần 30 câu/ngày, Opus 5 ra
 khoảng **0,6 đô Mỹ/người/ngày** nếu MỘT người dùng hết hạn mức một ngày.
+
+Ước tính trên giấy này giả định MỌI câu hỏi được chính `CLAUDE_MODEL` đang
+đặt trả lời, và đệm lời dặn hệ thống có hiệu lực (ít token vào hơn). Khi
+`CLAUDE_FALLBACKS=default` (mục 2, mục 9), Claude có thể tự chuyển một yêu
+cầu cụ thể sang model dự phòng khác — đệm gắn theo từng model, nên yêu cầu
+đó mất đệm, tốn nhiều token vào hơn ước tính trên. Số token Directus ghi lại
+(dưới đây) vẫn đúng cho yêu cầu đó, nhưng ƯỚC TÍNH TRÊN GIẤY sẽ hụt
+(undercount) nếu có fallback xảy ra; soi trường `model` trong log (mục 1)
+để biết một yêu cầu có thật sự được trả lời bởi model khác `CLAUDE_MODEL`
+không.
 
 Số đó là chi phí MỖI NGƯỜI, không phải trần tổng chi phí: đăng ký Directus mở
 công khai (`deploy/directus/bootstrap.mjs` đặt `public_registration: true`),
