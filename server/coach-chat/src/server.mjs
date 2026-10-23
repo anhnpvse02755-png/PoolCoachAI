@@ -82,18 +82,33 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
 
   /// Ghi đúng một dòng nhật ký JSON cho yêu cầu — không bao giờ câu hỏi,
   /// câu trả lời, facts hay token (R17); id người dùng luôn được băm.
-  function writeLog({ method, path, status, userId, model, stop, usage, startedAt, extra }) {
+  /// `at` luôn lấy từ đồng hồ thật (spec 7.6), không phải `now` được tiêm
+  /// cho logic nghiệp vụ/test. `error`, khi có, chỉ là mã lỗi đã phân loại
+  /// (ví dụ 'busy'|'unavailable'|'internal'|'not_found'), không bao giờ nội
+  /// dung (controller ruling 5).
+  function writeLog({ method, path, status, userId, model, stop, usage, startedAt, error, extra }) {
     log(JSON.stringify({
       method,
       path,
       status,
+      at: new Date().toISOString(),
+      ms: Date.now() - startedAt,
       ...(userId != null ? { user: hashUserId(userId) } : {}),
+      ...(error !== undefined ? { error } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(stop !== undefined ? { stop } : {}),
       ...(usage ? { in: usage.input, out: usage.output, cacheRead: usage.cacheRead } : {}),
       ...(extra ?? {}),
-      ms: Date.now() - startedAt,
     }));
+  }
+
+  /// Ghi một dòng chẩn đoán cho lỗi bị nuốt ở một bước phụ (hoàn lượt, cộng
+  /// token) hay lỗi không lường được — tách khỏi dòng nhật ký mỗi-yêu-cầu
+  /// vì không mang đủ các trường chuẩn (method/path/status/ms). `message`
+  /// ở đây luôn là message của [DirectusError]/lỗi nội bộ do ta tạo ra (chỉ
+  /// mã trạng thái/mã lỗi), không bao giờ nội dung của người chơi.
+  function logError(where, err) {
+    log(JSON.stringify({ event: 'error', where, message: err?.message ?? String(err), at: new Date().toISOString() }));
   }
 
   /// Hồi âm có nhãn lỗi của yêu cầu không phải JSON hợp lệ hoặc không đúng
@@ -102,15 +117,13 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     return err instanceof RequestError ? err.field : fallback;
   }
 
-  async function handleChatPost(req, res, origin) {
-    const startedAt = Date.now();
-
+  async function handleChatPost(req, res, origin, startedAt) {
     // 1. Đọc thân thô, giới hạn MAX_BODY_BYTES trước khi parse JSON
     // (controller ruling 1): luôn đọc hết luồng, vượt trần trả 413.
     const raw = await readRawBody(req, MAX_BODY_BYTES);
     if (raw.overLimit) {
       sendJson(res, 413, { error: 'invalid', field: 'body' }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: 413, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: 413, error: 'invalid', startedAt });
       return;
     }
 
@@ -121,14 +134,14 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     } catch (err) {
       if (err instanceof DirectusError) {
         sendJson(res, 503, { error: 'unavailable' }, origin, config.allowedOrigins);
-        writeLog({ method: 'POST', path: PATH_CHAT, status: 503, startedAt });
+        writeLog({ method: 'POST', path: PATH_CHAT, status: 503, error: 'unavailable', startedAt });
         return;
       }
       throw err;
     }
     if (userId === null) {
       sendJson(res, 401, { error: 'unauthorized' }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: 401, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: 401, error: 'unauthorized', startedAt });
       return;
     }
 
@@ -139,7 +152,7 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       parsed = parseChatRequest(json);
     } catch (err) {
       sendJson(res, 400, { error: 'invalid', field: invalidField(err, 'body') }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: 400, userId, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: 400, error: 'invalid', userId, startedAt });
       return;
     }
 
@@ -150,20 +163,24 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     } catch (err) {
       if (err instanceof DirectusError) {
         sendJson(res, 503, { error: 'unavailable' }, origin, config.allowedOrigins);
-        writeLog({ method: 'POST', path: PATH_CHAT, status: 503, userId, startedAt });
+        writeLog({ method: 'POST', path: PATH_CHAT, status: 503, error: 'unavailable', userId, startedAt });
         return;
       }
       throw err;
     }
     if (!take.ok) {
       sendJson(res, 429, { error: 'quota', limit: take.limit, resetAt: take.resetAt }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: 429, userId, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: 429, error: 'quota', userId, startedAt });
       return;
     }
     const { day, remainingToday } = take;
 
     // 5. Gọi Claude. Lỗi SDK/transport thì hoàn lượt trước (chỉ sau khi
-    // chắc đã trừ được — controller ruling 3), ghi lỗi hoàn lượt và nuốt.
+    // chắc đã trừ được — controller ruling 3). Hoàn với BẤT KỲ lỗi ném ra
+    // từ claude.ask, kể cả lỗi không phân loại được (classifyClaudeError
+    // trả null → 500/'internal'): người chơi không nhận được câu trả lời
+    // nên không nên mất lượt (controller ruling, fix round 1 #2). Từ
+    // chối/bị cắt (R7) không ném lỗi — vẫn tốn lượt, không hoàn ở đây.
     let ask;
     try {
       ask = await claude.ask(parsed);
@@ -171,11 +188,11 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       try {
         await quota.refund(userId, day);
       } catch (refundErr) {
-        log(JSON.stringify({ event: 'error', where: 'refund', message: refundErr.message }));
+        logError('refund', refundErr);
       }
       const classified = classifyClaudeError(err) ?? { status: 500, code: 'internal' };
       sendJson(res, classified.status, { error: classified.code }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: classified.status, userId, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: classified.status, error: classified.code, userId, startedAt });
       return;
     }
 
@@ -184,12 +201,12 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     try {
       await quota.addUsage(userId, day, ask.usage);
     } catch (err) {
-      log(JSON.stringify({ event: 'error', where: 'addUsage', message: err.message }));
+      logError('addUsage', err);
     }
 
     if (ask.kind === 'refused' || ask.kind === 'truncated') {
       sendJson(res, 502, { error: ask.kind, remainingToday }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_CHAT, status: 502, userId, model: ask.model, stop: ask.stopReason, usage: ask.usage, startedAt });
+      writeLog({ method: 'POST', path: PATH_CHAT, status: 502, error: ask.kind, userId, model: ask.model, stop: ask.stopReason, usage: ask.usage, startedAt });
       return;
     }
 
@@ -202,23 +219,21 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     writeLog({ method: 'POST', path: PATH_CHAT, status: 200, userId, model: ask.model, stop: ask.stopReason, usage: ask.usage, startedAt });
   }
 
-  async function handleQuotaGet(req, res, origin) {
-    const startedAt = Date.now();
-
+  async function handleQuotaGet(req, res, origin, startedAt) {
     let userId;
     try {
       userId = await auth.userFor(req.headers.authorization);
     } catch (err) {
       if (err instanceof DirectusError) {
         sendJson(res, 503, { error: 'unavailable' }, origin, config.allowedOrigins);
-        writeLog({ method: 'GET', path: PATH_QUOTA, status: 503, startedAt });
+        writeLog({ method: 'GET', path: PATH_QUOTA, status: 503, error: 'unavailable', startedAt });
         return;
       }
       throw err;
     }
     if (userId === null) {
       sendJson(res, 401, { error: 'unauthorized' }, origin, config.allowedOrigins);
-      writeLog({ method: 'GET', path: PATH_QUOTA, status: 401, startedAt });
+      writeLog({ method: 'GET', path: PATH_QUOTA, status: 401, error: 'unauthorized', startedAt });
       return;
     }
 
@@ -228,7 +243,7 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     } catch (err) {
       if (err instanceof DirectusError) {
         sendJson(res, 503, { error: 'unavailable' }, origin, config.allowedOrigins);
-        writeLog({ method: 'GET', path: PATH_QUOTA, status: 503, userId, startedAt });
+        writeLog({ method: 'GET', path: PATH_QUOTA, status: 503, error: 'unavailable', userId, startedAt });
         return;
       }
       throw err;
@@ -238,13 +253,11 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     writeLog({ method: 'GET', path: PATH_QUOTA, status: 200, userId, startedAt });
   }
 
-  async function handleBlockedPost(req, res, origin) {
-    const startedAt = Date.now();
-
+  async function handleBlockedPost(req, res, origin, startedAt) {
     const raw = await readRawBody(req, MAX_BODY_BYTES);
     if (raw.overLimit) {
       sendJson(res, 413, { error: 'invalid', field: 'body' }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 413, startedAt });
+      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 413, error: 'invalid', startedAt });
       return;
     }
 
@@ -254,14 +267,14 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     } catch (err) {
       if (err instanceof DirectusError) {
         sendJson(res, 503, { error: 'unavailable' }, origin, config.allowedOrigins);
-        writeLog({ method: 'POST', path: PATH_BLOCKED, status: 503, startedAt });
+        writeLog({ method: 'POST', path: PATH_BLOCKED, status: 503, error: 'unavailable', startedAt });
         return;
       }
       throw err;
     }
     if (userId === null) {
       sendJson(res, 401, { error: 'unauthorized' }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 401, startedAt });
+      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 401, error: 'unauthorized', startedAt });
       return;
     }
 
@@ -271,7 +284,7 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       parsed = parseBlockedReport(json);
     } catch (err) {
       sendJson(res, 400, { error: 'invalid', field: invalidField(err, 'body') }, origin, config.allowedOrigins);
-      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 400, userId, startedAt });
+      writeLog({ method: 'POST', path: PATH_BLOCKED, status: 400, error: 'invalid', userId, startedAt });
       return;
     }
 
@@ -281,13 +294,16 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
 
   /// Preflight CORS (R16): nguồn được phép → 204 kèm tiêu đề CORS; nguồn lạ
   /// → 403, không tiêu đề; không có Origin (app điện thoại) → 204 thường.
-  function handleOptions(req, res, origin) {
+  /// Mỗi nhánh đều ghi một dòng nhật ký mỗi-yêu-cầu (controller ruling 6).
+  function handleOptions(req, res, origin, path, startedAt) {
     if (!origin) {
       sendNoBody(res, 204);
+      writeLog({ method: 'OPTIONS', path, status: 204, startedAt });
       return;
     }
     if (!config.allowedOrigins.includes(origin)) {
       sendNoBody(res, 403);
+      writeLog({ method: 'OPTIONS', path, status: 403, startedAt });
       return;
     }
     sendNoBody(res, 204, {
@@ -297,38 +313,41 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       'Access-Control-Allow-Headers': 'authorization, content-type',
       'Access-Control-Max-Age': '86400',
     });
+    writeLog({ method: 'OPTIONS', path, status: 204, startedAt });
   }
 
-  async function dispatch(req, res) {
+  async function dispatch(req, res, startedAt) {
     const origin = req.headers.origin;
     const url = new URL(req.url, 'http://coach-chat.internal');
     const path = url.pathname;
 
     if (req.method === 'OPTIONS') {
-      handleOptions(req, res, origin);
+      handleOptions(req, res, origin, path, startedAt);
       return;
     }
     if (req.method === 'GET' && path === PATH_HEALTHZ) {
       sendText(res, 200, 'ok', origin, config.allowedOrigins);
-      return;
+      return; // healthz không ghi nhật ký (ngoại lệ theo bảng hợp đồng dây).
     }
     if (req.method === 'GET' && path === PATH_QUOTA) {
-      await handleQuotaGet(req, res, origin);
+      await handleQuotaGet(req, res, origin, startedAt);
       return;
     }
     if (req.method === 'POST' && path === PATH_CHAT) {
-      await handleChatPost(req, res, origin);
+      await handleChatPost(req, res, origin, startedAt);
       return;
     }
     if (req.method === 'POST' && path === PATH_BLOCKED) {
-      await handleBlockedPost(req, res, origin);
+      await handleBlockedPost(req, res, origin, startedAt);
       return;
     }
     sendJson(res, 404, { error: 'not_found' }, origin, config.allowedOrigins);
+    writeLog({ method: req.method, path, status: 404, error: 'not_found', startedAt });
   }
 
   return function handler(req, res) {
-    dispatch(req, res).catch((err) => {
+    const startedAt = Date.now();
+    dispatch(req, res, startedAt).catch((err) => {
       if (!res.headersSent) {
         try {
           sendJson(res, 500, { error: 'internal' }, req.headers.origin, config.allowedOrigins);
@@ -336,7 +355,10 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
           // Mất kết nối trước khi trả lời được — không còn gì để làm.
         }
       }
-      log(JSON.stringify({ event: 'error', where: 'handler', message: err?.message ?? String(err) }));
+      // Lỗi không lường được (vd. lỗi lập trình) vẫn chỉ một dòng nhật ký
+      // mỗi-yêu-cầu, mã lỗi chứ không phải nội dung (controller ruling 5, 6).
+      const path = new URL(req.url, 'http://coach-chat.internal').pathname;
+      writeLog({ method: req.method, path, status: res.statusCode, error: 'internal', startedAt });
     });
   };
 }

@@ -18,7 +18,7 @@ function main() {
   const handler = createApp({ config });
   const server = http.createServer(handler);
   server.listen(config.port, () => {
-    process.stdout.write(`${JSON.stringify({ event: 'listening', port: config.port, model: config.model })}\n`);
+    process.stdout.write(`${JSON.stringify({ event: 'listening', port: config.port, model: config.model, at: new Date().toISOString() })}\n`);
   });
 
   process.on('SIGTERM', () => {
