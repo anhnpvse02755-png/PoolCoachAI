@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
@@ -7,6 +10,8 @@ import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
 import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
@@ -17,6 +22,7 @@ import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 
 import '../../support/coach_chat_fixtures.dart';
+import '../../support/fake_coach_chat.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -89,4 +95,40 @@ void main() {
     expect(result.hasError, isTrue);
     expect(result.error, error);
   });
+
+  test(
+    'gửi hai lần liên tiếp không chờ lần đầu xong: chỉ một yêu cầu tới backend (ruling)',
+    () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repo = CoachChatRepository(db, userId: 'u1');
+      final chat = FakeCoachChat()..hold = Completer<void>();
+
+      final container = testContainer(
+        coachChat: chat,
+        coachChatRepo: repo,
+        coachContext: AsyncData(fullCoachContext()),
+      );
+      addTearDown(container.dispose);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+
+      final controller = container.read(coachChatControllerProvider.notifier);
+      final first = controller.send('Câu hỏi thứ nhất');
+      final second = controller.send('Câu hỏi thứ hai'); // không chờ lần đầu
+
+      // Dù chưa mở khoá `hold`, cú gửi thứ hai đã bị chặn ngay từ bước đồng
+      // bộ (trước await đầu tiên) của hàm `send` — không cần đợi backend.
+      await pumpEventQueue();
+      expect(chat.asked, hasLength(1));
+
+      chat.hold!.complete();
+      await first;
+      await second;
+
+      expect(chat.asked, hasLength(1));
+      expect(chat.asked.single.question, 'Câu hỏi thứ nhất');
+      expect(container.read(coachChatControllerProvider).status, CoachChatStatus.idle);
+    },
+  );
 }

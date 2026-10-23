@@ -103,6 +103,7 @@ ProviderContainer testContainer({
   CoachChatBackend? coachChat,
   CoachChatRepository? coachChatRepo,
   List<CoachChatEntry>? coachChatTurns,
+  AsyncValue<List<CoachChatEntry>>? coachChatTurnsAsync,
   AsyncValue<CoachContext>? coachContext,
 }) {
   return ProviderContainer(
@@ -115,7 +116,12 @@ ProviderContainer testContainer({
       // Không widget test nào được chạm mạng: luôn thay backend thật.
       coachChatBackendProvider.overrideWithValue(coachChat ?? FakeCoachChat()),
       coachChatRepositoryProvider.overrideWithValue(coachChatRepo),
-      if (coachChatTurns != null)
+      // `coachChatTurnsAsync` thắng `coachChatTurns`: test cần dựng thẳng
+      // một AsyncValue (vd. đang tải lại còn giá trị cũ, controller review
+      // Task 9/10) không đi qua được một Stream bình thường.
+      if (coachChatTurnsAsync != null)
+        coachChatTurnsProvider.overrideWithValue(coachChatTurnsAsync)
+      else if (coachChatTurns != null)
         coachChatTurnsProvider.overrideWith((ref) => Stream.value(coachChatTurns)),
       if (coachContext != null) coachContextProvider.overrideWithValue(coachContext),
       nowProvider.overrideWithValue(() => now ?? testToday),

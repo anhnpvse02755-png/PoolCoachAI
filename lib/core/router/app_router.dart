@@ -12,6 +12,7 @@ import 'package:poolcoachai/features/auth/presentation/forgot_password_screen.da
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/register_screen.dart';
 import 'package:poolcoachai/features/auth/presentation/reset_password_screen.dart';
+import 'package:poolcoachai/features/coach/presentation/coach_chat_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_library_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/situation_screen.dart';
@@ -180,6 +181,10 @@ GoRouter createAppRouter({
           builder: (context, state) => CoachLibraryScreen(
             index: int.tryParse(state.uri.queryParameters['i'] ?? ''),
           ),
+        ),
+        GoRoute(
+          path: 'chat',
+          builder: (context, state) => const CoachChatScreen(),
         ),
       ],
     ),

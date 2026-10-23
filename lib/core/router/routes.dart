@@ -20,6 +20,9 @@ abstract final class Routes {
   /// Thư viện tình huống mẫu (spec Coach mục 9.4).
   static const coachLibrary = '$coach/library';
 
+  /// Hỏi huấn luyện viên — chat tự do (spec Giai đoạn B, Task 10).
+  static const coachChat = '$coach/chat';
+
   /// Tình huống sinh ngẫu nhiên: cùng tham số thì ra cùng thế bàn.
   static String coachGenerated(String topic, String difficulty, int seed) =>
       '$coachSituation?topic=$topic&d=$difficulty&seed=$seed';
@@ -106,6 +109,7 @@ abstract final class Routes {
     coach,
     coachSituation,
     coachLibrary,
+    coachChat,
     notifications,
     drillPattern,
     drillSessionPattern,
