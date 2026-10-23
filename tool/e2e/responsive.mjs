@@ -48,6 +48,7 @@ const ROUTES = [
   { name: 'rank', path: '/rank', title: 'Hạng của bạn' },
   { name: 'coach', path: '/coach', title: 'Huấn luyện viên AI' },
   { name: 'coach-library', path: '/coach/library', title: 'Thư viện tình huống' },
+  { name: 'coach-chat', path: '/coach/chat', title: 'Hỏi huấn luyện viên' },
 ];
 
 let failed = 0;
