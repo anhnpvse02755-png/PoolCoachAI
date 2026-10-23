@@ -102,40 +102,52 @@ typedef CoachChatState = ({CoachChatStatus status, String? pending, int? remaini
 final coachChatControllerProvider = NotifierProvider<CoachChatController, CoachChatState>(CoachChatController.new);
 
 class CoachChatController extends Notifier<CoachChatState> {
-  bool _disposed = true;
-
-  /// Tăng mỗi khi một câu hỏi (thành công, hết lượt, hay lỗi) xong việc —
-  /// để `loadQuota()` bỏ kết quả của mình nếu đã có phản hồi mới hơn trả
-  /// lời trong lúc nó đang chờ mạng (ruling controller).
-  int _epoch = 0;
+  /// Token riêng của generation `build()` hiện tại. Riverpod TÁI DÙNG cùng
+  /// một instance `Notifier` khi một provider đang watch (ở đây
+  /// `currentUserIdProvider`) đổi giá trị — `build()` chạy lại trên CHÍNH
+  /// controller này, không tạo instance mới. Vì vậy một field instance
+  /// dùng chung (kiểu `bool _disposed`) bị `build()` mới ghi đè NGAY, nên
+  /// một continuation async còn sống từ generation cũ mà đọc field đó SAU
+  /// await sẽ thấy giá trị của generation mới (sai) chứ không phải của
+  /// chính nó. Mỗi `build()` tạo một `_Gen` MỚI; mọi hàm async phải chụp
+  /// `final gen = _gen;` NGAY ĐẦU (trước await đầu tiên) rồi chỉ so với
+  /// `gen` đã chụp đó về sau — không bao giờ đọc lại `_gen` (ruling review
+  /// Task 10 fix round 1, I1).
+  late _Gen _gen;
 
   @override
   CoachChatState build() {
     // Đổi tài khoản thì watch này đổi giá trị, build() chạy lại, trạng thái
     // về mặc định — không mang lịch sử gửi/đang chờ của tài khoản trước.
     ref.watch(currentUserIdProvider);
-    _disposed = false;
-    _epoch = 0;
-    ref.onDispose(() => _disposed = true);
+    final gen = _Gen();
+    _gen = gen;
+    // Đóng trên biến cục bộ `gen`, không phải field `_gen` — generation
+    // SAU lúc này đã có `_Gen` khác, không được phép làm token của
+    // generation NÀY biến mất đúng lúc nó cần đánh dấu disposed.
+    ref.onDispose(() => gen.disposed = true);
     return (status: CoachChatStatus.idle, pending: null, remaining: null);
   }
 
   /// Tải số lượt hỏi còn lại hôm nay — gọi khi mở màn, trước khi người chơi
   /// hỏi gì. Bỏ kết quả nếu đang gửi câu hỏi (phản hồi câu đó sẽ tự mang
-  /// `remaining` mới hơn), hay nếu một câu đã xong việc trong lúc đang chờ
-  /// (epoch đổi) — nuốt lỗi, giữ nguyên `remaining` cũ.
+  /// `remaining` mới hơn), nếu generation này đã qua (đổi tài khoản khi
+  /// đang chờ mạng), hay nếu một câu đã xong việc trong lúc đang chờ (epoch
+  /// đổi) — nuốt lỗi, giữ nguyên `remaining` cũ.
   Future<void> loadQuota() async {
     if (state.status == CoachChatStatus.sending) return;
-    final epochAtStart = _epoch;
+    final gen = _gen;
+    final epochAtStart = gen.epoch;
+    final backend = ref.read(coachChatBackendProvider);
     int remaining;
     try {
-      remaining = await ref.read(coachChatBackendProvider).remainingToday();
+      remaining = await backend.remainingToday();
     } on Object {
       return;
     }
-    if (_disposed) return;
+    if (gen.disposed) return;
     if (state.status == CoachChatStatus.sending) return;
-    if (_epoch != epochAtStart) return;
+    if (gen.epoch != epochAtStart) return;
     state = (status: state.status, pending: state.pending, remaining: remaining);
   }
 
@@ -157,28 +169,39 @@ class CoachChatController extends Notifier<CoachChatState> {
       return;
     }
 
+    // Chụp hết mọi thứ cần dùng SAU await ngay tại đây — trước await đầu
+    // tiên của hàm này. `repo`/`backend`/`now` đúng tài khoản lúc bấm Gửi;
+    // `gen` là token của generation hiện tại. Sau điểm này hàm không được
+    // gọi `ref.read`/`ref.watch` lần nào nữa (dù ref đã bị dọn hay build()
+    // đã chạy lại, các biến cục bộ này vẫn đúng và an toàn để dùng).
+    final gen = _gen;
+    final backend = ref.read(coachChatBackendProvider);
+    final now = ref.read(nowProvider);
+
     final context = contextAsync.value;
     state = (status: CoachChatStatus.sending, pending: q, remaining: state.remaining);
 
-    final history = coachChatHistory(
-      await repo.recentTurns(coachChatHistoryTurns),
-      insufficientText: Vi.coachChatInsufficient,
-    );
-
-    final backend = ref.read(coachChatBackendProvider);
-    final askedAt = ref.read(nowProvider)();
     try {
+      // Để trong try: lỗi đọc lịch sử (DB hỏng...) phải rơi vào nhánh lỗi
+      // chung ở dưới, không được bỏ dở để `state.status` kẹt ở `sending`
+      // mãi (M1, review Task 10 fix round 1).
+      final history = coachChatHistory(
+        await repo.recentTurns(coachChatHistoryTurns),
+        insufficientText: Vi.coachChatInsufficient,
+      );
+      final askedAt = now();
       final answer = await backend.reply(context, history, q);
-      _epoch++;
-      // Lưu trước, bất kể màn đã rời đi hay chưa (R19, R20) — câu trả lời
-      // không được mất chỉ vì người chơi đã sang màn khác.
-      final answeredAt = ref.read(nowProvider)();
+      gen.epoch++;
+      // Lưu trước, bất kể generation này đã qua hay chưa (R19, R20) — câu
+      // trả lời không được mất chỉ vì người chơi đã sang màn khác hay đổi
+      // tài khoản; luôn lưu vào đúng repo đã chụp lúc bấm Gửi.
+      final answeredAt = now();
       await repo.addExchange(question: q, askedAt: askedAt, reply: answer.reply, answeredAt: answeredAt);
-      if (_disposed) return;
+      if (gen.disposed) return;
       state = (status: CoachChatStatus.idle, pending: null, remaining: answer.remainingToday);
     } on Object catch (e) {
-      _epoch++;
-      if (_disposed) return;
+      gen.epoch++;
+      if (gen.disposed) return;
       state = switch (e) {
         CoachChatQuotaExceeded() => (status: CoachChatStatus.idle, pending: null, remaining: 0),
         _ when e == AuthFailure.sessionExpired => (
@@ -205,8 +228,18 @@ class CoachChatController extends Notifier<CoachChatState> {
   Future<void> clear() async {
     final repo = ref.read(coachChatRepositoryProvider);
     if (repo == null) return;
+    final gen = _gen;
     await repo.clear();
-    if (_disposed) return;
+    if (gen.disposed) return;
     state = (status: CoachChatStatus.idle, pending: null, remaining: state.remaining);
   }
+}
+
+/// Token riêng cho mỗi lần `build()` chạy — xem field `_gen` ở trên.
+/// `epoch` tăng mỗi khi một câu hỏi (thành công, hết lượt, hay lỗi) xong
+/// việc trong CÙNG generation — để `loadQuota()` bỏ kết quả của mình nếu
+/// một câu đã trả lời xong trong lúc nó đang chờ mạng (ruling controller).
+class _Gen {
+  bool disposed = false;
+  int epoch = 0;
 }

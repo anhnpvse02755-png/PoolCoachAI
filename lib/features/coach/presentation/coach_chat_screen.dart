@@ -64,9 +64,8 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
         ],
       ),
     );
-    if (yes == true) {
-      await ref.read(coachChatControllerProvider.notifier).clear();
-    }
+    if (yes != true || !mounted) return;
+    await ref.read(coachChatControllerProvider.notifier).clear();
   }
 
   @override
@@ -108,41 +107,61 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
         ],
       ),
       body: PcReadableWidth(
-        child: Column(
-          children: [
-            Expanded(child: _buildList(state, turns)),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: CoachChatScreen.inputKey,
-                      controller: _controller,
-                      maxLength: coachChatMaxQuestion,
-                      enabled: fieldEnabled,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: Vi.coachChatInputHint,
-                        counterText: '',
-                        helperText: helperText,
+        // `LayoutBuilder` ở đây để biết chiều cao THẬT còn lại cho cả thân
+        // màn (Scaffold đã tự co lại tránh bàn phím) — ô nhập co giãn theo
+        // chữ (vẫn `minLines: 1`) nhưng không bao giờ được cao hơn phần
+        // dành cho nó; cao hơn thì cuộn ngay bên trong ô, không tràn ra
+        // ngoài và không đẩy mất nút Gửi (I4, review Task 10 fix round 1).
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final totalHeight = constraints.maxHeight.isFinite ? constraints.maxHeight : 480.0;
+            final inputMaxHeight = (totalHeight * 0.6).clamp(56.0, 220.0).toDouble();
+            return Column(
+              children: [
+                Expanded(child: _buildList(state, turns)),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: inputMaxHeight),
+                          child: TextField(
+                            key: CoachChatScreen.inputKey,
+                            controller: _controller,
+                            maxLength: coachChatMaxQuestion,
+                            enabled: fieldEnabled,
+                            minLines: 1,
+                            // `null` (không phải 4 cố định): để chiều cao
+                            // thật của ô nhập chỉ bị chặn bởi
+                            // `ConstrainedBox` phía trên — tự cuộn bên
+                            // trong khi chữ cần nhiều chỗ hơn `inputMaxHeight`
+                            // cho phép, thay vì cứ cố xin đủ 4 dòng rồi tràn
+                            // màn ở màn ngang + bàn phím + chữ lớn.
+                            maxLines: null,
+                            decoration: InputDecoration(
+                              hintText: Vi.coachChatInputHint,
+                              counterText: '',
+                              helperText: helperText,
+                            ),
+                            onSubmitted: canSend ? (_) => _send(trimmed) : null,
+                          ),
+                        ),
                       ),
-                      onSubmitted: canSend ? (_) => _send(trimmed) : null,
-                    ),
+                      const SizedBox(width: AppSpacing.sm),
+                      IconButton.filled(
+                        key: CoachChatScreen.sendKey,
+                        tooltip: Vi.coachChatSend,
+                        icon: const Icon(Icons.send),
+                        onPressed: canSend ? () => _send(trimmed) : null,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  IconButton.filled(
-                    key: CoachChatScreen.sendKey,
-                    tooltip: Vi.coachChatSend,
-                    icon: const Icon(Icons.send),
-                    onPressed: canSend ? () => _send(trimmed) : null,
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -154,21 +173,40 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
         final maxWidth = constraints.maxWidth * 0.85;
         final items = <Widget>[];
 
+        // Khoá từng mục bằng danh tính nội dung của nó (id lượt chat,
+        // 'pending', 'status'), không để Flutter ghép theo VỊ TRÍ trong
+        // danh sách: chèn/xoá mục "đang trả lời"/"pending" ở đầu danh sách
+        // đẩy mọi lượt cũ hơn sang vị trí khác, nên nếu không khoá, Flutter
+        // tái dùng SemanticsNode của một lượt cũ cho nội dung khác (hay
+        // ngược lại) — bong bóng câu trả lời cũ bị đổi số hiệu nút và cờ
+        // vùng loa bám nhầm (I2, review Task 10 fix round 1).
         if (state.status == CoachChatStatus.sending) {
-          // `liveRegion` trên một Semantics không phải biên (container mặc
-          // định false) không gắn được vào nút nào cả — nút con gần nhất có
-          // biên riêng (hoặc không có biên nào) sẽ không mang cờ này. Phải
-          // tự làm biên (`container: true`) thì "đang trả lời" mới thật sự
-          // là vùng loa cho trình đọc màn hình.
-          items.add(Semantics(liveRegion: true, container: true, child: _thinkingRow(context)));
+          // Khoá (I2) + vùng loa (I3) đặt thẳng trong `_bubble` qua
+          // `_thinkingRow` (một Semantics container duy nhất) — bọc thêm
+          // một Semantics(container: true) nữa ở ngoài sẽ ra HAI nút biên
+          // lồng nhau, trình đọc màn hình đọc "đang trả lời" hai lần (đã
+          // thấy khi test vùng loa đỏ lại sau khi M2 đổi dòng này thành
+          // bong bóng — bong bóng tự có Semantics container riêng của nó).
+          items.add(_thinkingRow(context, maxWidth));
         } else if (state.status == CoachChatStatus.failed) {
-          items.add(_failedRow(context));
+          // Cùng vùng loa như "đang trả lời" ở trên — gửi hỏng cũng phải
+          // được trình đọc màn hình đọc ra ngay (I3, review Task 10 fix
+          // round 1).
+          items.add(
+            Semantics(
+              key: const ValueKey('status'),
+              liveRegion: true,
+              container: true,
+              child: _failedRow(context),
+            ),
+          );
         }
 
         if (state.pending != null) {
           items.add(
             _bubble(
               context,
+              key: const ValueKey('pending'),
               fromPlayer: true,
               text: state.pending!,
               insufficient: false,
@@ -184,6 +222,7 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
           items.add(
             _bubble(
               context,
+              key: ValueKey(turn.id),
               fromPlayer: turn.fromPlayer,
               text: turn.text,
               insufficient: turn.insufficient,
@@ -213,12 +252,19 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
     );
   }
 
-  Widget _thinkingRow(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Text(Vi.coachChatThinking, style: Theme.of(context).textTheme.bodySmall),
-    ),
+  // Bong bóng như của huấn luyện viên (M2, review Task 10 fix round 1) —
+  // trước đây chỉ là chữ trần, không có hình bong bóng như các lượt khác.
+  // Khoá (I2) và vùng loa (I3) đặt thẳng vào ĐÂY — `_bubble` đã tự có một
+  // Semantics container riêng của nó; bọc thêm một Semantics container nữa
+  // ở `_buildList` sẽ ra hai vùng loa lồng nhau, đọc trùng lặp.
+  Widget _thinkingRow(BuildContext context, double maxWidth) => _bubble(
+    context,
+    key: const ValueKey('status'),
+    fromPlayer: false,
+    text: Vi.coachChatThinking,
+    insufficient: false,
+    maxWidth: maxWidth,
+    liveRegion: true,
   );
 
   Widget _failedRow(BuildContext context) => Padding(
@@ -258,6 +304,7 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
 
   Widget _bubble(
     BuildContext context, {
+    Key? key,
     required bool fromPlayer,
     required String text,
     required bool insufficient,
@@ -272,6 +319,7 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
         : colors.secondaryContainer;
     final foreground = insufficient ? colors.onSurfaceVariant : null;
     return Align(
+      key: key,
       alignment: fromPlayer ? Alignment.centerRight : Alignment.centerLeft,
       child: Semantics(
         container: true,

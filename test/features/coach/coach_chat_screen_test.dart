@@ -229,7 +229,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(Vi.coachChatError), findsOneWidget);
-      expect(find.text('truncated'), findsNothing);
+      // `find.text` khớp đúng hệt — nếu lỗi thật bị NỐI vào sau câu chung
+      // (vd. "Rất tiếc... truncated") thay vì thay hẳn, `find.text('truncated')`
+      // vẫn báo findsNothing sai (không khớp đúng hệt chuỗi dài hơn), lọt
+      // qua con rò lỗi thật ra UI (M4, review Task 10 fix round 1).
+      expect(find.textContaining('truncated'), findsNothing);
       expect(find.text('Câu hỏi bị lỗi mạng'), findsOneWidget);
       expect(chat.asked, hasLength(1));
 
@@ -291,6 +295,12 @@ void main() {
       tester.widget<IconButton>(find.byKey(CoachChatScreen.clearKey)).onPressed,
       isNull,
     );
+    // Không chỉ bong bóng biến khỏi màn — DB trên máy phải thật sự trống
+    // (xoá nhầm còn sót lại trong repo sẽ hiện lại ngay khi mở màn lần sau)
+    // và vì không còn lượt nào, câu mẫu phải hiện lại (M5, review Task 10
+    // fix round 1).
+    expect(await repo.recentTurns(10), isEmpty);
+    expect(find.text(Vi.coachChatSamples.first), findsOneWidget);
   });
 
   testWidgets(
@@ -348,6 +358,20 @@ void main() {
       tester.widget<IconButton>(find.byKey(CoachChatScreen.sendKey)).onPressed,
       isNull,
     );
+
+    // Icon mặt cười là một cặp surrogate UTF-16 — `.length` của nó là 2,
+    // không phải 1. 300 icon "trông ít chữ" nhưng đã là 600 đơn vị UTF-16,
+    // vượt quá 500. Chốt chặn phải đếm đúng theo `.length` (UTF-16, khớp
+    // R12) — nếu ai đó lỡ đổi sang đếm số ký tự nhìn thấy (grapheme, vd.
+    // qua package `characters`), 300 icon sẽ lọt qua sai (I5, review Task
+    // 10 fix round 1).
+    expect('😀'.length, 2);
+    controller.text = '😀' * 300;
+    await tester.pump();
+    expect(
+      tester.widget<IconButton>(find.byKey(CoachChatScreen.sendKey)).onPressed,
+      isNull,
+    );
   });
 
   testWidgets('rời màn khi câu trả lời đang chờ vẫn lưu được câu trả lời (R20, giữ sống)', (
@@ -368,6 +392,12 @@ void main() {
     await tester.pump();
 
     final saved = await repo.recentTurns(10);
+    // Không chỉ câu TRẢ LỜI phải được lưu — câu HỎI gốc cũng phải còn đúng
+    // nguyên văn (không rỗng, không lẫn câu khác) dù người chơi đã rời màn
+    // trước khi backend trả lời xong (M5, review Task 10 fix round 1).
+    expect(saved, hasLength(2));
+    expect(saved.first.fromPlayer, isTrue);
+    expect(saved.first.text, 'Câu hỏi trước khi rời màn');
     expect(saved.last.fromPlayer, isFalse);
     expect(saved.last.text, chat.replyText);
 
@@ -402,6 +432,16 @@ void main() {
 
     final coachBubble = tester.getSemantics(find.text(chat.replyText));
     expect(coachBubble.flagsCollection.isLiveRegion, isTrue);
+
+    // Gửi hỏng cũng phải là vùng loa — trình đọc màn hình phải đọc ngay
+    // câu lỗi chung, không phải im lặng chờ người chơi tự dò ra màn đổi gì
+    // (I3, review Task 10 fix round 1).
+    chat.nextError = const CoachChatUnavailable('fx-live-region-fail');
+    await typeAndSend(tester, 'Câu hỏi kiểm vùng loa khi lỗi');
+    await tester.pumpAndSettle();
+
+    final failed = tester.getSemantics(find.text(Vi.coachChatError));
+    expect(failed.flagsCollection.isLiveRegion, isTrue);
 
     handle.dispose();
   });
@@ -451,6 +491,54 @@ void main() {
         tester.getBottomLeft(find.byKey(CoachChatScreen.sendKey)).dy,
         lessThanOrEqualTo(360 - 160),
       );
+
+      // Gõ một câu đủ dài để tự xuống hơn 4 dòng ở đúng cỡ màn + chữ 2x
+      // này — ô nhập phải tự cuộn BÊN TRONG nó, không tràn ra ngoài màn và
+      // không đẩy mất nút Gửi khỏi vùng còn bấm được (I4, review Task 10
+      // fix round 1). Trước đây `maxLines: 4` cố định cộng bàn phím 160px +
+      // chữ 2x ở màn ngang 360 cao là tràn thật (RenderFlex overflow).
+      await tester.enterText(find.byKey(CoachChatScreen.inputKey), _sweepQuestion);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      expect(find.byKey(CoachChatScreen.sendKey).hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomLeft(find.byKey(CoachChatScreen.sendKey)).dy,
+        lessThanOrEqualTo(360 - 160),
+      );
+    },
+  );
+
+  testWidgets(
+    'gửi câu thứ hai không đổi số hiệu nút trợ năng của bong bóng trả lời '
+    'thứ nhất (I2, review Task 10 fix round 1)',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final repo = newRepo();
+      final chat = FakeCoachChat();
+      await openChat(tester, repo: repo, chat: chat);
+
+      await typeAndSend(tester, 'Câu hỏi thứ nhất');
+      await tester.pumpAndSettle();
+      expect(find.text(chat.replyText), findsOneWidget);
+      final firstReplyId = tester.getSemantics(find.text(chat.replyText)).id;
+
+      // Gửi câu thứ hai, giữ lại chưa trả lời: chèn thêm mục "pending" +
+      // "đang trả lời" lên TRƯỚC bong bóng trả lời thứ nhất trong danh sách
+      // children (ListView đảo ngược — mới nhất ở đầu danh sách). Không
+      // khoá, Flutter ghép lại SemanticsNode theo VỊ TRÍ khi loại khớp:
+      // bong bóng trả lời thứ nhất (giờ lùi xuống hai vị trí trong children)
+      // bị đổi sang số hiệu nút của một mục khác đang ở vị trí đó trước khi
+      // chèn, dù nội dung của nó không đổi.
+      chat.hold = Completer<void>();
+      await typeAndSend(tester, 'Câu hỏi thứ hai');
+
+      final firstReplyIdAfterInsert = tester.getSemantics(find.text(chat.replyText)).id;
+      expect(firstReplyIdAfterInsert, firstReplyId);
+
+      chat.hold!.complete();
+      await tester.pumpAndSettle();
+      handle.dispose();
     },
   );
 
