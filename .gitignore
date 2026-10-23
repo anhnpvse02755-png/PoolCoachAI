@@ -44,6 +44,9 @@ ios/Flutter/flutter_export_environment.sh
 # Coverage
 coverage/
 
+# Node
+server/coach-chat/node_modules/
+
 # Brainstorming companion
 .superpowers/
 
