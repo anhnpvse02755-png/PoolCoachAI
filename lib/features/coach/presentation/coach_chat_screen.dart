@@ -108,10 +108,13 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
       ),
       body: PcReadableWidth(
         // `LayoutBuilder` ở đây để biết chiều cao THẬT còn lại cho cả thân
-        // màn (Scaffold đã tự co lại tránh bàn phím) — ô nhập co giãn theo
-        // chữ (vẫn `minLines: 1`) nhưng không bao giờ được cao hơn phần
-        // dành cho nó; cao hơn thì cuộn ngay bên trong ô, không tràn ra
-        // ngoài và không đẩy mất nút Gửi (I4, review Task 10 fix round 1).
+        // màn (Scaffold đã tự co lại tránh bàn phím) — `ConstrainedBox` phía
+        // dưới dùng chiều cao đó làm chốt chặn tràn THẬT (I4, review Task 10
+        // fix round 1): cao hơn phần dành cho nó thì cuộn ngay bên trong ô,
+        // không tràn ra ngoài và không đẩy mất nút Gửi. Chốt chặn này độc
+        // lập với luật 4 dòng ở `maxLines` bên dưới — không phải `maxLines`
+        // ngăn tràn (sửa lại nhận định sai ở round 1, review Task 10 fix
+        // round 2).
         child: LayoutBuilder(
           builder: (context, constraints) {
             final totalHeight = constraints.maxHeight.isFinite ? constraints.maxHeight : 480.0;
@@ -133,13 +136,21 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
                             maxLength: coachChatMaxQuestion,
                             enabled: fieldEnabled,
                             minLines: 1,
-                            // `null` (không phải 4 cố định): để chiều cao
-                            // thật của ô nhập chỉ bị chặn bởi
-                            // `ConstrainedBox` phía trên — tự cuộn bên
-                            // trong khi chữ cần nhiều chỗ hơn `inputMaxHeight`
-                            // cho phép, thay vì cứ cố xin đủ 4 dòng rồi tràn
-                            // màn ở màn ngang + bàn phím + chữ lớn.
-                            maxLines: null,
+                            // Luật riêng: ô nhập không được cao hơn 4 dòng dù
+                            // màn còn thừa chỗ (màn dọc/máy tính bảng/máy
+                            // tính để bàn) — gõ nhiều hơn 4 dòng thì tự cuộn
+                            // BÊN TRONG ô, không cho ô cao thêm. Chốt chặn
+                            // tràn ở màn ngang + bàn phím + chữ lớn là
+                            // `ConstrainedBox` phía trên (xem bình luận ở
+                            // trên), không phải `maxLines` — `ConstrainedBox`
+                            // vẫn áp dụng với `maxLines: 4` nên không tràn
+                            // lại (xác nhận test "điện thoại ngang" dưới);
+                            // round 1 từng đổi thành `null` để "tránh tràn"
+                            // nhưng đó là nhận định sai, và nó vô tình bỏ
+                            // luôn luật 4 dòng, cho ô nhập cao tới 6-7,7 dòng
+                            // ở màn dọc/máy tính bảng/máy tính để bàn khi gõ
+                            // nhiều (sửa lại, review Task 10 fix round 2).
+                            maxLines: 4,
                             decoration: InputDecoration(
                               hintText: Vi.coachChatInputHint,
                               counterText: '',
@@ -265,6 +276,10 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
     insufficient: false,
     maxWidth: maxWidth,
     liveRegion: true,
+    // `Vi.coachChatThinking` ("Huấn luyện viên đang trả lời…") đã tự có tên
+    // huấn luyện viên — bỏ nhãn mặc định để không đọc tên hai lần (M2 tái
+    // phát, review Task 10 fix round 2).
+    semanticsLabel: '',
   );
 
   Widget _failedRow(BuildContext context) => Padding(
@@ -310,6 +325,13 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
     required bool insufficient,
     required double maxWidth,
     bool liveRegion = false,
+    // Ghi đè nhãn vùng loa mặc định (Bạn/Huấn luyện viên). Dùng cho dòng
+    // "đang trả lời": `text` của nó ("Huấn luyện viên đang trả lời…") đã tự
+    // nói rõ ai đang nói rồi — nhãn mặc định "Huấn luyện viên" nối thêm vào
+    // sẽ làm trình đọc màn hình đọc tên hai lần liền ("Huấn luyện viên,
+    // Huấn luyện viên đang trả lời…"). Truyền `''` ở lời gọi đó để chỉ còn
+    // đúng nhãn của `text` (sửa lại M2, review Task 10 fix round 2).
+    String? semanticsLabel,
   }) {
     final colors = Theme.of(context).colorScheme;
     final background = insufficient
@@ -324,7 +346,7 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
       child: Semantics(
         container: true,
         liveRegion: liveRegion,
-        label: fromPlayer ? Vi.coachChatFromPlayer : Vi.coachChatFromCoach,
+        label: semanticsLabel ?? (fromPlayer ? Vi.coachChatFromPlayer : Vi.coachChatFromCoach),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: Container(

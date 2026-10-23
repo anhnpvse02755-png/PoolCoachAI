@@ -426,6 +426,15 @@ void main() {
     expect(pending.flagsCollection.isLiveRegion, isTrue);
     final thinking = tester.getSemantics(find.text(Vi.coachChatThinking));
     expect(thinking.flagsCollection.isLiveRegion, isTrue);
+    // Chữ "Huấn luyện viên đang trả lời…" đã tự nói rõ ai đang trả lời —
+    // nhãn vùng loa mặc định của `_bubble` không được nối thêm "Huấn luyện
+    // viên" một lần nữa phía trước, nếu không trình đọc màn hình đọc "Huấn
+    // luyện viên, Huấn luyện viên đang trả lời…" (sửa lại, review Task 10
+    // fix round 2).
+    expect(
+      RegExp(RegExp.escape(Vi.coachChatFromCoach)).allMatches(thinking.label).length,
+      1,
+    );
 
     chat.hold!.complete();
     await tester.pumpAndSettle();
@@ -493,10 +502,14 @@ void main() {
       );
 
       // Gõ một câu đủ dài để tự xuống hơn 4 dòng ở đúng cỡ màn + chữ 2x
-      // này — ô nhập phải tự cuộn BÊN TRONG nó, không tràn ra ngoài màn và
-      // không đẩy mất nút Gửi khỏi vùng còn bấm được (I4, review Task 10
-      // fix round 1). Trước đây `maxLines: 4` cố định cộng bàn phím 160px +
-      // chữ 2x ở màn ngang 360 cao là tràn thật (RenderFlex overflow).
+      // này — ô nhập phải tự cuộn BÊN TRONG nó (maxLines: 4), không tràn ra
+      // ngoài màn và không đẩy mất nút Gửi khỏi vùng còn bấm được. Chốt
+      // chặn tràn thật ở đây là `ConstrainedBox` theo chiều cao còn lại của
+      // màn (xem `coach_chat_screen.dart`), không phải `maxLines` — bản gốc
+      // (không có `ConstrainedBox`, trước review Task 10 fix round 1) tràn
+      // thật (RenderFlex overflow) vì thiếu chốt chặn chiều cao đó, không
+      // phải vì `maxLines: 4` riêng nó sai (review Task 10 fix round 2,
+      // sửa lại I4).
       await tester.enterText(find.byKey(CoachChatScreen.inputKey), _sweepQuestion);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -506,6 +519,41 @@ void main() {
         tester.getBottomLeft(find.byKey(CoachChatScreen.sendKey)).dy,
         lessThanOrEqualTo(360 - 160),
       );
+    },
+  );
+
+  testWidgets(
+    'màn dọc, gõ 6 dòng: ô nhập chỉ cao bằng 4 dòng, không cao hơn (quy '
+    'định 4 dòng, review Task 10 fix round 2)',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await openChat(tester, repo: newRepo());
+
+      final editableText = find.descendant(
+        of: find.byKey(CoachChatScreen.inputKey),
+        matching: find.byType(EditableText),
+      );
+
+      await tester.enterText(find.byKey(CoachChatScreen.inputKey), 'một dòng');
+      await tester.pump();
+      final oneLineHeight = tester.getSize(editableText).height;
+
+      // 6 dòng, nhiều hơn luật 4 dòng — ô nhập phải tự cuộn BÊN TRONG nó
+      // (maxLines: 4), chiều cao vùng chữ phải DỪNG lại ở đúng 4 dòng, không
+      // được cao tới 6 dòng dù màn dọc còn thừa chỗ (review Task 10 fix
+      // round 2, sửa lại luật 4 dòng mà round 1 vô tình bỏ khi đổi
+      // `maxLines` thành `null`).
+      await tester.enterText(
+        find.byKey(CoachChatScreen.inputKey),
+        List.generate(6, (i) => 'dòng số ${i + 1}').join('\n'),
+      );
+      await tester.pump();
+      final sixLinesTypedHeight = tester.getSize(editableText).height;
+
+      expect(sixLinesTypedHeight, closeTo(oneLineHeight * 4, 0.5));
     },
   );
 
