@@ -15,6 +15,7 @@ import { registerThrowaway, deleteUserByEmail } from './throwaway_user.mjs';
 // app bắt buộc và không có mặc định: không bao giờ lỡ chạy nhầm vào bản thật.
 const need = (n) => process.env[n] ?? (() => { throw new Error(`Thiếu ${n}`); })();
 need('DIRECTUS_URL');
+need('DIRECTUS_ADMIN_EMAIL');
 need('DIRECTUS_ADMIN_PASSWORD');
 if (!process.argv[2]) throw new Error('Thiếu địa chỉ app: node tool/e2e/coach_chat_ui.mjs <appUrl>');
 

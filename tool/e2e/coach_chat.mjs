@@ -38,12 +38,20 @@ const QUESTION_2 = 'Tôi đang yếu kỹ năng nào?';
 // bài này (không mạng, không commit): facts này và một history hai lượt đều
 // qua parseChatRequest(). `today.category` là `safety`, `reason` là
 // `weakest`, và `skillLevels.weak` nhất quán với nó, như brief Task 13 đòi.
+// `skills.safety` có mastery thật (35, dưới weakBelow=55) với đủ sessions
+// (3 = minSessions): bản trước round này để sessions=0/mastery=null mà vẫn
+// bị liệt yếu nhất, điều app thật không bao giờ tạo ra, vì categoryMastery
+// trả null khi sessions < minSessions (player_intelligence.dart:28) — không
+// thể vừa null vừa "yếu nhất" (controller review, fix round 1 #M9).
+// trend='notEnoughData' vì 3 buổi chưa đủ 4 buổi tối thiểu để tính xu hướng
+// (categoryTrend, player_intelligence.dart:49); CategoryInsight.trend không
+// bao giờ là JSON null trong toFacts() thật (coach_context.dart:76).
 const FACTS = {
   skills: {
     aiming: { mastery: null, trend: null, sessions: 0 },
     position: { mastery: null, trend: null, sessions: 0 },
     breakShot: { mastery: null, trend: null, sessions: 0 },
-    safety: { mastery: null, trend: null, sessions: 0 },
+    safety: { mastery: 35, trend: 'notEnoughData', sessions: 3 },
     kick: { mastery: null, trend: null, sessions: 0 },
     bank: { mastery: null, trend: null, sessions: 0 },
   },
@@ -82,6 +90,23 @@ function check(ok, what) {
 // giờ tính hỏng — câu trả lời của Claude không tất định 100%.
 function note(what) {
   console.log(`GHI NHẬN  ${what}`);
+}
+
+// Khớp MAX_TURN_CHARS của server/coach-chat/src/validate.mjs (parseTurn từ
+// chối mọi lượt lịch sử dài hơn số này). Clip câu trả lời 1 trước khi đưa
+// vào lịch sử của câu hỏi 2 — không clip thì một câu trả lời dài làm câu
+// hỏi 2 hỏng ở bước parseTurn, mất luôn phép đo cacheRead (I5, fix round 1).
+const MAX_TURN_CHARS = 1000;
+
+/// Clip ở MAX_TURN_CHARS đơn vị UTF-16, không cắt giữa một cặp surrogate —
+/// cùng thuật toán với _clipTurnText (lib/domain/coach/coach_context.dart:
+/// 263-268): nếu ký tự ngay trước điểm cắt là nửa đầu cặp surrogate
+/// (0xD800–0xDBFF) thì lùi điểm cắt lại một đơn vị, bỏ cả cặp.
+function clipTurnText(text) {
+  if (text.length <= MAX_TURN_CHARS) return text;
+  const lastUnit = text.charCodeAt(MAX_TURN_CHARS - 1);
+  const cutAt = lastUnit >= 0xd800 && lastUnit <= 0xdbff ? MAX_TURN_CHARS - 1 : MAX_TURN_CHARS;
+  return text.slice(0, cutAt);
 }
 
 /// Gọi HTTP, cố gắng đọc JSON; trả về {status, body, raw}. Không bao giờ in
@@ -177,7 +202,7 @@ try {
         timeoutMs: 180000,
         body: { facts: FACTS, history: [], question: QUESTION_1 },
       });
-      check(r.status === 200, `câu hỏi 1 → 200 (được ${r.status}, ${JSON.stringify(r.body)})`);
+      check(r.status === 200, r.status === 200 ? 'câu hỏi 1 → 200' : `câu hỏi 1 → 200 (được ${r.status}, ${JSON.stringify(r.body)})`);
       if (r.status === 200) {
         const text = r.body?.text ?? '';
         answer1Text = text;
@@ -202,14 +227,16 @@ try {
     // Brief bước 7: câu hỏi 2 "Tôi đang yếu kỹ năng nào?" — lịch sử là [câu hỏi 1, trả lời 1].
     try {
       const history =
-        answer1Text === undefined ? [] : [{ fromPlayer: true, text: QUESTION_1 }, { fromPlayer: false, text: answer1Text }];
+        answer1Text === undefined
+          ? []
+          : [{ fromPlayer: true, text: QUESTION_1 }, { fromPlayer: false, text: clipTurnText(answer1Text) }];
       const r = await call(`${COACH_CHAT_URL}${PATH_CHAT}`, {
         method: 'POST',
         token,
         timeoutMs: 180000,
         body: { facts: FACTS, history, question: QUESTION_2 },
       });
-      check(r.status === 200, `câu hỏi 2 → 200 (được ${r.status}, ${JSON.stringify(r.body)})`);
+      check(r.status === 200, r.status === 200 ? 'câu hỏi 2 → 200' : `câu hỏi 2 → 200 (được ${r.status}, ${JSON.stringify(r.body)})`);
       if (r.status === 200) {
         const text = r.body?.text ?? '';
         check(/[ăâđêôơưĂÂĐÊÔƠƯ]/.test(text), 'câu hỏi 2: câu trả lời có chữ tiếng Việt');
