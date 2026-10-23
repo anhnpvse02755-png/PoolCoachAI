@@ -43,3 +43,6 @@ const coachRecurringMin = 3;
 
 /// Tăng khi hằng số chấm của Planner hoặc Coach đổi. Lưu trong mỗi lần làm.
 const coachScoringVersion = 1;
+
+/// Số trận đã xong gần nhất đưa vào ngữ cảnh Coach Chat (spec Giai đoạn B).
+const coachChatRecentMatches = 10;

@@ -1,8 +1,12 @@
 import 'package:poolcoachai/domain/coach/attempt.dart';
+import 'package:poolcoachai/domain/coach/chat_facts.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/practice_constants.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
@@ -38,6 +42,10 @@ final class CoachContext {
     required this.currentStep,
     required this.coachStats,
     required this.lastSituation,
+    required this.weak,
+    required this.strong,
+    required this.today,
+    required this.matches,
   });
 
   final Map<SkillCategory, CategoryInsight> skills;
@@ -45,6 +53,18 @@ final class CoachContext {
   final RoadmapStepFacts? currentStep;
   final Map<CoachTopic, CoachTopicStats> coachStats;
   final CoachSituationFacts? lastSituation;
+
+  /// Nhóm dưới ngưỡng yếu, yếu nhất trước (`PlayerIntelligence.weak`).
+  final List<SkillCategory> weak;
+
+  /// Nhóm từ ngưỡng mạnh trở lên, mạnh nhất trước (`PlayerIntelligence.strong`).
+  final List<SkillCategory> strong;
+
+  /// Gợi ý hôm nay, dạng dữ liệu; `null` khi chưa tính được.
+  final TodayFacts? today;
+
+  /// Lịch sử trận gần nhất, dạng dữ liệu.
+  final MatchFacts matches;
 
   /// JSON khoá ổn định: đổi tên khoá là đổi hợp đồng với Giai đoạn B.
   Map<String, Object?> toFacts() => {
@@ -84,6 +104,52 @@ final class CoachContext {
                 'firstFaultGroup': lastSituation!.firstFaultGroup?.name,
                 'answers': lastSituation!.answers,
               },
+        'skillLevels': {
+          'weak': [for (final cat in weak) cat.name],
+          'strong': [for (final cat in strong) cat.name],
+          'weakBelow': PracticeConstants.weakCutoff,
+          'strongFrom': PracticeConstants.strongCutoff,
+          'minSessions': PracticeConstants.minSessions,
+        },
+        'today': today == null
+            ? null
+            : {
+                'category': today!.category.name,
+                'reason': today!.reason.name,
+                'drillId': today!.drillId,
+                'drillName': today!.drillName,
+                'articleTitle': today!.articleTitle,
+                'streak': today!.streak,
+                'practiceMinutesThisWeek': today!.practiceMinutesThisWeek,
+                'scheduledToday': today!.scheduledToday,
+              },
+        'matches': {
+          'recent': {
+            'played': matches.played,
+            'won': matches.won,
+            'lost': matches.lost,
+          },
+          'last': matches.last == null
+              ? null
+              : {
+                  'gameType': matches.last!.gameType.name,
+                  'targetRacks': matches.last!.targetRacks,
+                  'racksWon': matches.last!.racksWon,
+                  'racksLost': matches.last!.racksLost,
+                  'won': matches.last!.won,
+                  'shots': {
+                    for (final type in matches.last!.shots.keys)
+                      type.name: {
+                        for (final entry in matches.last!.shots[type]!.entries)
+                          entry.key.name: entry.value,
+                      },
+                  },
+                  'positionOutcomes': {
+                    for (final entry in matches.last!.positionOutcomes.entries)
+                      entry.key.name: entry.value,
+                  },
+                },
+        },
       };
 }
 
@@ -93,6 +159,8 @@ CoachContext buildCoachContext({
   required Rank? rank,
   required RoadmapStep? currentStep,
   required List<CoachAttempt> attempts,
+  required TodayRecommendation? today,
+  required List<PoolMatch> matches,
 }) {
   final last = attempts.isEmpty
       ? null
@@ -111,6 +179,10 @@ CoachContext buildCoachContext({
             firstFaultGroup: last.firstFault == null ? null : faultGroupOf(last.firstFault!),
             answers: last.answers.length,
           ),
+    weak: pi.weak,
+    strong: pi.strong,
+    today: today == null ? null : todayFactsOf(today),
+    matches: matchFactsOf(matches),
   );
 }
 
