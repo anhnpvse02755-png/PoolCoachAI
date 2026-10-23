@@ -163,7 +163,7 @@ mục 6.
      `DIRECTUS_SERVICE_TOKEN` (= giá trị `COACH_CHAT_SERVICE_TOKEN` ở mục 4),
      `ALLOWED_ORIGINS=https://poolcoachai.kjdybl.easypanel.host,http://localhost:5555`;
      tuỳ chọn `CLAUDE_MODEL`, `CLAUDE_EFFORT`, `DAILY_QUESTION_LIMIT`,
-     `CLAUDE_FALLBACKS` — để trống thì bỏ hẳn biến, đừng đặt rỗng (mục 2).
+     `CLAUDE_FALLBACKS` — bỏ hẳn hay để rỗng đều dùng mặc định (mục 2).
    - Domain: `poolcoachai-coach.kjdybl.easypanel.host` → cổng **8080**.
    - **Chạy ĐÚNG MỘT replica — KHÔNG bật auto-scale hay nhiều instance.**
      Hạn mức mỗi người mỗi ngày (`quota.mjs`) khoá bằng một `Map` trong bộ
@@ -193,6 +193,20 @@ sản phẩm có đường dẫn khác:
 export FLUTTER=/c/Users/anhnpv/flutter/bin/flutter.bat
 export DART=/c/Users/anhnpv/flutter/bin/dart.bat
 ```
+
+**Địa chỉ dịch vụ coach-chat trong app.** App gọi dịch vụ ở `COACH_CHAT_URL`
+gắn vào lúc build (`--dart-define`, `lib/core/config.dart`). Không truyền gì
+thì dùng mặc định `https://poolcoachai-coach.kjdybl.easypanel.host` — đúng
+domain đặt ở mục 6 bước 1, nên bình thường không cần làm gì. Giá trị này phải
+là origin trần, `scheme://host[:port]`: client bỏ hẳn mọi đường dẫn trong đó
+(`lib/data/remote/coach_chat_client.dart:125`, `_baseUrl.replace(path: …)`)
+— `https://host/coach` sẽ gọi `https://host/v1/coach-chat`, không phải
+`https://host/coach/v1/coach-chat`, nên dịch vụ phải nằm ở gốc domain của
+riêng nó. Nếu domain đổi: `deploy/publish.sh` build web không kèm
+`--dart-define` và chỉ chạy trên cây sạch, nên sửa `defaultValue` trong
+`lib/core/config.dart` rồi commit trước bước 1 (bản APK build từ commit đó
+cũng nhận giá trị mới; riêng lệnh build APK ở bước 3 còn nhận thêm được
+`--dart-define=COACH_CHAT_URL=…`).
 
 1. **Cần chủ sản phẩm đồng ý** — đẩy nhánh `deploy-easypanel` lên GitHub
    thật (`publish.sh:50`). Từ **bản checkout chính** (không phải worktree):
@@ -351,11 +365,16 @@ khoảng **0,6 đô Mỹ/người/ngày** nếu MỘT người dùng hết hạn
 đặt trả lời, và đệm lời dặn hệ thống có hiệu lực (ít token vào hơn). Khi
 `CLAUDE_FALLBACKS=default` (mục 2, mục 9), Claude có thể tự chuyển một yêu
 cầu cụ thể sang model dự phòng khác — đệm gắn theo từng model, nên yêu cầu
-đó mất đệm, tốn nhiều token vào hơn ước tính trên. Số token Directus ghi lại
-(dưới đây) vẫn đúng cho yêu cầu đó, nhưng ƯỚC TÍNH TRÊN GIẤY sẽ hụt
-(undercount) nếu có fallback xảy ra; soi trường `model` trong log (mục 1)
-để biết một yêu cầu có thật sự được trả lời bởi model khác `CLAUDE_MODEL`
-không.
+đó mất đệm, tốn nhiều token vào hơn, và ƯỚC TÍNH TRÊN GIẤY sẽ hụt
+(undercount). Số token Directus ghi lại (dưới đây) cũng KHÔNG đủ để tính
+tiền cho yêu cầu đó: khi dự phòng phía máy chủ chạy, các cột token của
+`coach_chat_usage` chỉ giữ usage của LẦN GỌI đã trả lời (`claude.mjs:85-92`
+đọc `usage` của tin nhắn cuối) — lần gọi trước đó bị từ chối giữa chừng vẫn
+bị tính tiền nhưng không bao giờ vào các cột này. Các cột cũng không ghi
+model nào đã trả lời; muốn biết, soi trường `model` của dòng log mỗi yêu cầu
+(mục 1). Cột `input_tokens` còn gộp cả token ghi đệm (cache write), vốn tính
+giá khác token vào thường. **Nguồn đúng cho chi phí là trang usage của
+Anthropic Console** (mục 3).
 
 Số đó là chi phí MỖI NGƯỜI, không phải trần tổng chi phí: đăng ký Directus mở
 công khai (`deploy/directus/bootstrap.mjs` đặt `public_registration: true`),
@@ -367,6 +386,8 @@ biết trước mức chấp nhận được, không phải một lớp dự ph�
 thêm tài khoản để hỏi tiếp).
 
 Đo thật bằng hai nguồn:
-- Trang usage của Anthropic Console (workspace PoolCoachAI, mục 3).
+- Trang usage của Anthropic Console (workspace PoolCoachAI, mục 3) — nguồn
+  đúng cho chi phí.
 - Tổng ba cột `input_tokens`/`output_tokens`/`cache_read_tokens` của
-  collection Directus `coach_chat_usage` (mỗi dòng là một người một ngày).
+  collection Directus `coach_chat_usage` (mỗi dòng là một người một ngày) —
+  chỉ để thấy ai hỏi nhiều, không để tính tiền (lý do ở đoạn trên).

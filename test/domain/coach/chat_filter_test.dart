@@ -287,5 +287,31 @@ void main() {
         expect(coachReplyBlock(line, {'line': line}), isNull, reason: line);
       }
     });
+
+    group('vòng sửa cuối', () {
+      test('"lựa chọn", "phương án" là từ chỉ số lượng: cho qua với facts người mới', () {
+        expect(coachReplyBlock('Bạn có 2 lựa chọn:', newPlayerFacts), isNull);
+        expect(coachReplyBlock('Có 2 phương án', newPlayerFacts), isNull);
+        expect(
+          coachReplyBlock('Bạn có 2 lựa chọn:\n1. Tập Ngắm bi.\n2. Tập Phòng thủ.', newPlayerFacts),
+          isNull,
+        );
+      });
+
+      test('"bước" không phải từ chỉ số lượng: "2 bước" nói về dữ liệu Lộ trình, vẫn bị chặn', () {
+        expect(coachReplyBlock('Bạn đã xong 2 bước của Lộ trình.', newPlayerFacts), CoachBlockRule.unknownNumber);
+      });
+
+      test('"nửa đầu cơ" là lượng áp phê: bị chặn như spinRatio', () {
+        expect(coachReplyBlock('Áp phê trái nửa đầu cơ.', newPlayerFacts), CoachBlockRule.spinRatio);
+        expect(coachReplyBlock('Nửa đầu gậy là đủ.', newPlayerFacts), CoachBlockRule.spinRatio);
+      });
+
+      test('độ dày chạm bi vẫn cho qua: "Ăn ½ bi", "Ăn nửa bi", "Ăn trọn bi"', () {
+        for (final text in ['Ăn ½ bi, lệch bên trái.', 'Ăn nửa bi, lệch bên phải.', 'Ăn trọn bi.', 'Ăn ¼ bi.']) {
+          expect(coachReplyBlock(text, newPlayerFacts), isNull, reason: text);
+        }
+      });
+    });
   });
 }

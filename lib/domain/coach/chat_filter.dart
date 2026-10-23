@@ -7,6 +7,9 @@ import 'package:poolcoachai/domain/coach/coach_context.dart';
 enum CoachBlockRule { empty, decomposed, degree, aimShift, optimal, spinRatio, unknownNumber }
 
 /// Từ chỉ số lượng: một con số 0–10 đứng trước từ này không bị chặn (luật R6).
+/// "lựa chọn", "phương án" thêm ở vòng sửa cuối ("Bạn có 2 lựa chọn:" hay
+/// đứng trước một danh sách đánh số). Cố ý KHÔNG có "bước": "2 bước" là nói
+/// về dữ liệu Lộ trình của người chơi, con số đó phải có trong facts.
 const coachChatCountWords = <String>[
   'nhóm',
   'câu',
@@ -17,6 +20,8 @@ const coachChatCountWords = <String>[
   'kỹ năng',
   'mẹo',
   'gợi ý',
+  'lựa chọn',
+  'phương án',
 ];
 
 /// Số chữ số tối đa của một token số; token dài hơn không bao giờ hợp lệ
@@ -51,10 +56,12 @@ final _percentWordPattern = RegExp(r'phần\s+trăm');
 final _aimShiftPattern = RegExp(r'ngắm\s+(lệch|dày hơn|mỏng hơn)');
 final _spinRatioPattern = RegExp(r'\b(BHE|FHE)\b', caseSensitive: false);
 
-/// Lượng áp phê nói bằng số đầu cơ ("1 đầu cơ", "0,5 đầu gậy"): Coach Chat
-/// không bao giờ nói lượng áp phê, kể cả khi con số có trong facts — chỉ Mô
-/// phỏng và tình huống Coach nói (M2, review cuối). So trên chữ thường.
-final _spinAmountPattern = RegExp(r'\d+(?:[.,]\d+)?\s*đầu\s+(?:cơ|gậy)');
+/// Lượng áp phê nói bằng số đầu cơ ("1 đầu cơ", "0,5 đầu gậy", "nửa đầu
+/// cơ"): Coach Chat không bao giờ nói lượng áp phê, kể cả khi con số có trong
+/// facts — chỉ Mô phỏng và tình huống Coach nói (M2, review cuối; "nửa" thêm
+/// ở vòng sửa cuối). Độ dày chạm bi ("ăn nửa bi") không có "đầu cơ" nên
+/// không dính. So trên chữ thường.
+final _spinAmountPattern = RegExp(r'(?:\d+(?:[.,]\d+)?|nửa)\s*đầu\s+(?:cơ|gậy)');
 
 /// Khoảng trắng không ngắt dòng (U+00A0, U+202F, U+2007): đọc như dấu cách.
 final _noBreakSpacePattern = RegExp(r'[\u00A0\u202F\u2007]');
