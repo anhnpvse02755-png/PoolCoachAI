@@ -12,19 +12,23 @@ class CoachChatRepository {
   final AppDatabase _db;
   final String userId;
 
-  /// Lượt của người này, cũ nhất trước.
+  /// Lượt của người này, cũ nhất trước. Sắp theo [id] (tự tăng) — thứ tự hội
+  /// thoại thật (R18), không theo [CoachChatTurnRows.createdAt]: đồng hồ máy
+  /// có thể chạy lùi, giờ ghi không còn tin được để sắp thứ tự (controller
+  /// review Task 9).
   Stream<List<CoachChatEntry>> watchTurns() =>
       (_db.select(_db.coachChatTurnRows)
             ..where((t) => t.userId.equals(userId))
-            ..orderBy([(t) => OrderingTerm.asc(t.createdAt), (t) => OrderingTerm.asc(t.id)]))
+            ..orderBy([(t) => OrderingTerm.asc(t.id)]))
           .watch()
           .map((rows) => rows.map(_toEntry).toList());
 
-  /// [count] lượt cuối của người này, cũ trước.
+  /// [count] lượt cuối của người này, cũ trước. Sắp theo [id], lý do như
+  /// [watchTurns].
   Future<List<CoachChatEntry>> recentTurns(int count) async {
     final rows = await (_db.select(_db.coachChatTurnRows)
           ..where((t) => t.userId.equals(userId))
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt), (t) => OrderingTerm.desc(t.id)])
+          ..orderBy([(t) => OrderingTerm.desc(t.id)])
           ..limit(count))
         .get();
     return rows.reversed.map(_toEntry).toList();
@@ -74,7 +78,7 @@ class CoachChatRepository {
 
     final staleIds = await (_db.select(_db.coachChatTurnRows)
           ..where((t) => t.userId.equals(userId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt), (t) => OrderingTerm.asc(t.id)])
+          ..orderBy([(t) => OrderingTerm.asc(t.id)])
           ..limit(excess))
         .map((row) => row.id)
         .get();

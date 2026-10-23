@@ -255,5 +255,14 @@ List<CoachChatTurn> coachChatHistory(List<CoachChatEntry> entries, {required Str
   ];
 }
 
-String _clipTurnText(String text) =>
-    text.length <= coachChatMaxTurnChars ? text : text.substring(0, coachChatMaxTurnChars);
+/// Clip ở [coachChatMaxTurnChars] ký tự, nhưng không cắt giữa một cặp
+/// surrogate (vd. emoji): nếu ký tự ngay trước điểm cắt là nửa đầu
+/// (high surrogate, 0xD800–0xDBFF) thì lùi điểm cắt lại một ký tự, bỏ cả
+/// cặp — tránh để lại một surrogate lẻ không giải mã được (controller
+/// review Task 9).
+String _clipTurnText(String text) {
+  if (text.length <= coachChatMaxTurnChars) return text;
+  final lastUnit = text.codeUnitAt(coachChatMaxTurnChars - 1);
+  final cutAt = lastUnit >= 0xD800 && lastUnit <= 0xDBFF ? coachChatMaxTurnChars - 1 : coachChatMaxTurnChars;
+  return text.substring(0, cutAt);
+}

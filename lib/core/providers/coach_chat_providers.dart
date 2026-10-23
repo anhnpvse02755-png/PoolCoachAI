@@ -23,6 +23,13 @@ final coachChatBackendProvider = Provider<CoachChatBackend>(
   ),
 );
 
+/// Đã tải xong và không phải giá trị cũ của tài khoản trước (đang tải lại) —
+/// như `_ready` trong `roadmap_providers.dart`. Chỉ `hasValue` là chưa đủ:
+/// một `StreamProvider` đang xây lại (vd. đổi tài khoản) vẫn giữ giá trị cũ
+/// kèm `isLoading == true`; dùng giá trị đó sẽ lẫn dữ liệu tài khoản trước
+/// vào ngữ cảnh Coach Chat của tài khoản mới (controller review Task 9).
+bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
+
 /// Ngữ cảnh gửi cho Coach Chat (R21): gộp sáu nguồn, mọi số đã tính sẵn
 /// (spec Giai đoạn B mục 7 — LLM chỉ diễn giải, không tính lại).
 final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
@@ -40,11 +47,11 @@ final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   if (matchesAsync.hasError) return AsyncError(matchesAsync.error!, matchesAsync.stackTrace!);
 
   if (pi == null ||
-      !rankAsync.hasValue ||
-      roadmapAsync.isLoading ||
-      !attemptsAsync.hasValue ||
-      todayAsync.isLoading ||
-      !matchesAsync.hasValue) {
+      !_ready(rankAsync) ||
+      !_ready(roadmapAsync) ||
+      !_ready(attemptsAsync) ||
+      !_ready(todayAsync) ||
+      !_ready(matchesAsync)) {
     return const AsyncLoading();
   }
 
@@ -52,9 +59,9 @@ final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
     buildCoachContext(
       pi: pi,
       rank: rankAsync.requireValue?.rank,
-      currentStep: roadmapAsync.value?.currentStep,
+      currentStep: roadmapAsync.requireValue?.currentStep,
       attempts: attemptsAsync.requireValue,
-      today: todayAsync.value,
+      today: todayAsync.requireValue,
       matches: matchesAsync.requireValue,
     ),
   );

@@ -156,4 +156,27 @@ void main() {
     expect(h[0].text, longText.substring(0, coachChatMaxTurnChars));
     expect(h[1].text.length, coachChatMaxTurnChars);
   });
+
+  test(
+    'clip không cắt giữa cặp surrogate: emoji nằm đúng ở điểm cắt bị bỏ cả cặp, '
+    'không để lại surrogate lẻ (ruling controller Task 9)',
+    () {
+      // 999 'a', rồi một emoji (2 code unit UTF-16, cặp surrogate), rồi thêm
+      // chữ — code unit ở chỉ số 999 (coachChatMaxTurnChars - 1) là nửa đầu
+      // (high surrogate) của emoji, đúng ngay điểm cắt.
+      final text = '${List.filled(999, 'a').join()}😀${List.filled(200, 'a').join()}';
+      expect(text.codeUnitAt(coachChatMaxTurnChars - 1), inInclusiveRange(0xD800, 0xDBFF));
+
+      final entries = [(id: 1, at: DateTime(2026, 10, 22), fromPlayer: true, text: text, insufficient: false)];
+      final h = coachChatHistory(entries, insufficientText: 'CHƯA ĐỦ');
+
+      // Lùi điểm cắt về 999 (bỏ cả cặp), không phải cắt ở 1000 (làm rơi mất
+      // nửa sau, để lại một high surrogate lẻ không giải mã được).
+      expect(h.single.text.length, 999);
+      expect(h.single.text, List.filled(999, 'a').join());
+      for (final unit in h.single.text.codeUnits) {
+        expect(unit, isNot(inInclusiveRange(0xD800, 0xDFFF)), reason: 'không được để lại surrogate lẻ');
+      }
+    },
+  );
 }
