@@ -24,3 +24,22 @@ test('giá trị sai cũng là lỗi', () => {
     assert.throws(() => loadConfig({ ...base, ...bad }), /Thiếu hoặc sai biến môi trường/);
   }
 });
+test('biến bắt buộc chỉ có khoảng trắng cũng coi là thiếu (spec 7.7)', () => {
+  assert.throws(() => loadConfig({ ...base, ANTHROPIC_API_KEY: '   ' }), /ANTHROPIC_API_KEY/);
+  assert.throws(() => loadConfig({ ...base, DIRECTUS_URL: '  ' }), /DIRECTUS_URL/);
+  assert.throws(() => loadConfig({ ...base, DIRECTUS_SERVICE_TOKEN: '\t' }), /DIRECTUS_SERVICE_TOKEN/);
+});
+test('ALLOWED_ORIGINS rút gọn thành rỗng cũng coi là thiếu', () => {
+  assert.throws(() => loadConfig({ ...base, ALLOWED_ORIGINS: ' , ,' }), /ALLOWED_ORIGINS/);
+});
+test('CLAUDE_MODEL rỗng hoặc chỉ khoảng trắng thì dùng mặc định', () => {
+  assert.equal(loadConfig({ ...base, CLAUDE_MODEL: '' }).model, 'claude-opus-5');
+  assert.equal(loadConfig({ ...base, CLAUDE_MODEL: '   ' }).model, 'claude-opus-5');
+});
+test('PORT phải là số nguyên 1–65535', () => {
+  for (const bad of ['9000abc', '0', '65536', '-1', '3.5', ' ']) {
+    assert.throws(() => loadConfig({ ...base, PORT: bad }), /PORT/);
+  }
+  assert.equal(loadConfig({ ...base, PORT: '65535' }).port, 65535);
+  assert.equal(loadConfig({ ...base, PORT: '1' }).port, 1);
+});

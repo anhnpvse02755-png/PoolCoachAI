@@ -26,7 +26,7 @@ void main() {
     final prompt = File('server/coach-chat/src/prompt.mjs').readAsStringSync();
     final names = <String>{
       ...allKeys(fullCoachContext().toFacts()),
-      for (final values in <List<Enum>>[SkillCategory.values, Rank.values, CoachTopic.values, StepKind.values,
+      for (final values in <List<Enum>>[SkillCategory.values, CoachTopic.values, StepKind.values,
           StepStatus.values, PickReason.values, MatchShotType.values, MatchShotOutcome.values, PositionOutcome.values,
           SkillTrend.values, CoachAttemptOutcome.values, CoachFaultGroup.values, PoolGameType.values])
         for (final v in values) v.name,
@@ -34,6 +34,19 @@ void main() {
     for (final n in names) {
       expect(RegExp('(?<![A-Za-z])${RegExp.escape(n)}(?![A-Za-z])').hasMatch(prompt), isTrue, reason: '$n chưa có trong lời dặn');
     }
+
+    // Rank dùng tên một chữ (k, i, h, g, ...), lẫn vào chữ Việt có dấu nên
+    // kiểm tra "cả từ" ở trên luôn đúng dù lời dặn không hề nhắc tới nó
+    // (ví dụ "a" khớp cuối "bi-a", "d" khớp đầu "dữ"). Kiểm tra thẳng là
+    // lời dặn liệt kê đủ danh sách hạng, phân cách bằng dấu phẩy.
+    final rankNames = Rank.values.map((r) => r.name).toList();
+    expect(
+      prompt,
+      contains(rankNames.sublist(0, rankNames.length - 1).join(', ')),
+      reason: 'danh sách hạng chưa có trong lời dặn',
+    );
+    expect(prompt, contains(rankNames.last), reason: '${rankNames.last} chưa có trong lời dặn');
+
     for (final c in SkillCategory.values) {
       expect(prompt, contains(Vi.skill(c)));
     }
