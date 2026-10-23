@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/data/remote/coach_chat_client.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/data/seed/seed_knowledge.dart';
 import 'package:poolcoachai/domain/coach/answer.dart';
@@ -26,7 +28,10 @@ import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/domain/table_geometry/vec2.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_lines.dart';
 
+import '../../support/coach_chat_fixtures.dart' show fullCoachContext;
 import '../../support/coach_fixtures.dart';
+import '../../support/fake_auth.dart';
+import '../../support/fake_coach_chat_server.dart';
 import '../../support/planner_tables.dart';
 import 'coach_recommendation_test.dart' show playerWeakAt, todayFor;
 
@@ -221,5 +226,25 @@ void main() {
     final la = revealLines(buildReveal(a, const []), searchingSafety: false);
     final lb = revealLines(buildReveal(b, const []), searchingSafety: false);
     expect(la.first, isNot(lb.first));
+  });
+
+  test('8. chat: câu nào tới màn hình cũng đã qua bộ lọc', () async {
+    var raw = '';
+    final server = FakeCoachChatServer();
+    server.routes['POST /v1/coach-chat'] = (_) => FakeCoachChatServer.json(200, {
+          'text': raw,
+          'model': 'm',
+          'remainingToday': 1,
+          'usage': {'input': 0, 'output': 0, 'cacheRead': 0},
+        });
+    server.routes['POST /v1/coach-chat/blocked'] = (_) => http.Response('', 204);
+    final chat = RemoteCoachChat(client: server.client, baseUrl: FakeCoachChatServer.baseUrl, auth: FakeAuthRepository.signedIn());
+    final ctx = fullCoachContext();
+    for (final bad in ['Ngắm lệch nửa bi.', 'Góc 30° là được.', 'Cách tối ưu là đánh trô bi.', 'Dùng 70% BHE.', 'Bạn thắng 97 trận.']) {
+      raw = bad;
+      expect((await chat.reply(ctx, const [], 'Hỏi')).reply, (text: '', insufficient: true), reason: bad);
+    }
+    raw = 'Hôm nay nên tập Phòng thủ.';
+    expect((await chat.reply(ctx, const [], 'Hỏi')).reply, (text: raw, insufficient: false));
   });
 }

@@ -29,6 +29,7 @@ Lần build Gradle đầu tiên rất lâu (khoảng 16 phút, tải phụ thu�
 |---|---|---|
 | `--dart-define=API_URL=…` | `https://poolcoachai-api.kjdybl.easypanel.host` | Directus |
 | `--dart-define=WEB_URL=…` | `https://poolcoachai.kjdybl.easypanel.host` | Link đặt lại mật khẩu trong email (app native không có địa chỉ web riêng, người dùng bấm link rồi đặt mật khẩu trên trang web) |
+| `--dart-define=COACH_CHAT_URL=…` | `https://poolcoachai-coach.kjdybl.easypanel.host` | Dịch vụ coach-chat (Hỏi huấn luyện viên) |
 
 `WEB_URL` + `/reset-password` phải nằm trong `PASSWORD_RESET_URL_ALLOW_LIST` của Directus
 (bản live đã có).

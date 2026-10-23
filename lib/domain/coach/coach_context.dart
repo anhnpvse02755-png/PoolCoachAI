@@ -193,7 +193,38 @@ typedef CoachChatTurn = ({bool fromPlayer, String text});
 /// màn hình nói "chưa đủ dữ liệu".
 typedef CoachChatReply = ({String text, bool insufficient});
 
+/// Câu trả lời cùng số lượt hỏi còn lại trong ngày (Task 6: trường
+/// `remainingToday` của wire contract).
+typedef CoachChatAnswer = ({CoachChatReply reply, int remainingToday});
+
+/// Hết lượt hỏi trong ngày (HTTP 429). [resetAt] là lúc lượt được cấp lại.
+final class CoachChatQuotaExceeded implements Exception {
+  const CoachChatQuotaExceeded(this.resetAt);
+
+  final DateTime resetAt;
+
+  @override
+  String toString() => 'CoachChatQuotaExceeded($resetAt)';
+}
+
+/// Không gọi được dịch vụ coach-chat: mất mạng, hết giờ, hay máy chủ lỗi
+/// (401, 4xx khác 429, 502 upstream, 503, 500, hay phản hồi hỏng). Tách khỏi
+/// [CoachChatQuotaExceeded] và phiên hết hạn vì hai việc đó có hành vi riêng
+/// (R4, luật của controller: 401 là vấn đề của lớp auth, không phải quota).
+final class CoachChatUnavailable implements Exception {
+  const CoachChatUnavailable(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'CoachChatUnavailable($cause)';
+}
+
 /// Giao diện của Coach Chat. Giai đoạn A chưa có bản cài nào.
 abstract interface class CoachChatBackend {
-  Future<CoachChatReply> reply(CoachContext context, List<CoachChatTurn> history, String question);
+  Future<CoachChatAnswer> reply(CoachContext context, List<CoachChatTurn> history, String question);
+
+  /// Số lượt hỏi còn lại hôm nay, không phải lúc gửi câu hỏi (ví dụ để hiện
+  /// ngay khi mở màn Coach Chat).
+  Future<int> remainingToday();
 }

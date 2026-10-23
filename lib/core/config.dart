@@ -25,6 +25,13 @@ const webBaseUrl = String.fromEnvironment(
   defaultValue: 'https://poolcoachai.kjdybl.easypanel.host',
 );
 
+/// Địa chỉ dịch vụ coach-chat (Giai đoạn B, spec mục 9).
+/// Đổi khi build: `--dart-define=COACH_CHAT_URL=…`.
+const coachChatUrl = String.fromEnvironment(
+  'COACH_CHAT_URL',
+  defaultValue: 'https://poolcoachai-coach.kjdybl.easypanel.host',
+);
+
 Uri resetPasswordUrlFor({
   required bool isWeb,
   required Uri base,
