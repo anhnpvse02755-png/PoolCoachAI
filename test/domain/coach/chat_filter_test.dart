@@ -75,4 +75,47 @@ void main() {
     expect(coachBannedRule('lực 45 độ'), CoachBlockRule.degree);
     expect(coachBannedRule('Đánh đứng bi, lực vừa.'), isNull);
   });
+
+  group('sửa vòng 1 (review)', () {
+    test('1. ký hiệu độ giả º và ˚ cũng bị chặn như °', () {
+      expect(coachReplyBlock('Góc nghiêng 4º.', facts), CoachBlockRule.degree);
+      expect(coachReplyBlock('Góc nghiêng 4˚.', facts), CoachBlockRule.degree);
+    });
+
+    test('1. số viết bằng chữ trước "độ" cũng bị chặn (degree)', () {
+      expect(coachReplyBlock('Đánh góc ba mươi độ là được.', facts), CoachBlockRule.degree);
+    });
+
+    test('1. số viết bằng chữ không mơ hồ bị chặn dù không đứng trước "độ"', () {
+      expect(coachReplyBlock('Bạn đã tập mười lăm buổi tuần này.', facts), CoachBlockRule.unknownNumber);
+    });
+
+    test('2. chỉ xoá "N bi" khi có ngữ cảnh ván đấu đứng trước, không ẩn số bịa', () {
+      // Có ngữ cảnh ("Luật" ... "và"): vẫn cho qua như cũ.
+      expect(coachReplyBlock('Luật 9 bi và 10 bi khác nhau.', facts), isNull);
+      // Không có ngữ cảnh: số phải qua kiểm tra như mọi số khác.
+      expect(coachReplyBlock('Bạn từng ăn 10 bi liên tiếp.', facts), CoachBlockRule.unknownNumber);
+      // "110 bi" không được mất chữ số "10" khi không bị xoá.
+      expect(coachReplyBlock('Bạn đang có 110 bi trên bàn.', facts), CoachBlockRule.unknownNumber);
+      // 8 không nằm trong facts rút gọn này và không có ngữ cảnh đứng trước "8 bi".
+      expect(coachReplyBlock('Còn 8 bi trên bàn.', const <String, Object?>{}), CoachBlockRule.unknownNumber);
+    });
+
+    test('3. chữ Unicode tổ hợp sẵn (NFD) bị chặn thẳng, không lách được luật ngắm/tối ưu', () {
+      // "Ngắm lệch một chút." với "ắ" ở dạng NFD (a + trăng U+0306 + sắc U+0301).
+      const decomposedNgam = 'Ngắm lệch một chút.';
+      // "Tối ưu." với "ố" ở dạng NFD (o + mũ U+0302 + sắc U+0301).
+      const decomposedToiUu = 'Tối ưu.';
+      expect(coachReplyBlock(decomposedNgam, facts), CoachBlockRule.decomposed);
+      expect(coachReplyBlock(decomposedToiUu, facts), CoachBlockRule.decomposed);
+    });
+
+    test('4. số khổng lồ không làm vỡ bộ lọc (không ném lỗi), chỉ bị chặn', () {
+      final huge = List.filled(310, '9').join();
+      expect(() => coachReplyBlock('Có 1.000.000.000.000.000.000.000 bi.', facts), returnsNormally);
+      expect(coachReplyBlock('Có 1.000.000.000.000.000.000.000 bi.', facts), CoachBlockRule.unknownNumber);
+      expect(() => coachReplyBlock('Có $huge buổi.', facts), returnsNormally);
+      expect(coachReplyBlock('Có $huge buổi.', facts), CoachBlockRule.unknownNumber);
+    });
+  });
 }
