@@ -342,10 +342,6 @@ abstract final class Vi {
   static String equipmentDiameterValue(double millimeters) =>
       '${millimeters.toStringAsFixed(1)} mm';
 
-  static const coachComing =
-      'Hỏi huấn luyện viên hôm nay nên tập gì, '
-      'hoặc vì sao trận vừa rồi thua.';
-
   // Thông báo — nội dung do bộ lập lịch (lib/domain/notifications) điền
   // từ dữ liệu thật của người chơi.
   static String notificationKind(NotificationKind kind) => switch (kind) {
@@ -1739,7 +1735,6 @@ abstract final class Vi {
   static String coachLibraryCaption(String id, int k, int n) => 'Tình huống $k/$n · $id';
   static String coachLibrarySource(String source) => 'Nguồn: $source';
   static const coachLibraryEnd = 'Hết thư viện.';
-  static const coachChatSoonTitle = 'Trò chuyện với huấn luyện viên (sắp có)';
 
   // Hỏi huấn luyện viên — chat tự do, Giai đoạn B (spec mục 3, Task 10).
   static const coachChatTitle = 'Hỏi huấn luyện viên';

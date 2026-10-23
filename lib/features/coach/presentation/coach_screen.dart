@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/coach_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
@@ -16,7 +19,8 @@ import 'package:poolcoachai/domain/coach/difficulty.dart';
 import 'package:poolcoachai/domain/coach/rng.dart';
 
 /// Màn Huấn luyện viên, mở đè lên shell từ nút tròn ở mọi tab (spec Coach
-/// mục 4.1): thẻ "Nên luyện gì", thẻ "Tình huống", ô Trò chuyện (sắp có).
+/// mục 4.1): thẻ "Nên luyện gì", thẻ "Tình huống", thẻ "Hỏi huấn luyện viên"
+/// (chat tự do, Giai đoạn B Task 11).
 ///
 /// Có Scaffold và AppBar riêng vì nó nằm ngoài shell 5 tab.
 class CoachScreen extends ConsumerStatefulWidget {
@@ -26,8 +30,10 @@ class CoachScreen extends ConsumerStatefulWidget {
   static const libraryKey = Key('coach-library-link');
   static const practiceKey = Key('coach-rec-practice');
   static const toolKey = Key('coach-rec-tool');
+  static const chatOpenKey = Key('coach-chat-open');
   static Key topicKey(CoachTopic t) => Key('coach-topic-${t.name}');
   static Key difficultyKey(CoachDifficulty d) => Key('coach-difficulty-${d.name}');
+  static Key chatSampleKey(int i) => Key('coach-chat-card-sample-$i');
 
   @override
   ConsumerState<CoachScreen> createState() => _CoachScreenState();
@@ -46,10 +52,18 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
     context.push(Routes.coachGenerated(topic.name, d.name, seed));
   }
 
+  /// Gửi câu hỏi mẫu [question] rồi mở ngay màn chat — không chờ phản hồi
+  /// (R20): câu hỏi vẫn tới và được lưu dù người chơi đã rời thẻ này.
+  void _askSample(String question) {
+    unawaited(ref.read(coachChatControllerProvider.notifier).send(question));
+    context.push(Routes.coachChat);
+  }
+
   @override
   Widget build(BuildContext context) {
     final rec = ref.watch(coachRecommendationProvider);
     ref.watch(playerIntelligenceProvider);
+    final chatContextReady = ref.watch(coachContextProvider).hasValue;
     final topic = _topic ?? rec?.topic ?? CoachTopic.aiming;
     final difficulty = _difficulty ?? _defaultDifficulty(topic);
     final theme = Theme.of(context).textTheme;
@@ -121,9 +135,25 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(Vi.coachChatSoonTitle, style: theme.titleMedium),
+                Text(Vi.coachChatTitle, style: theme.titleMedium),
                 const SizedBox(height: AppSpacing.xs),
-                Text(Vi.coachComing, style: theme.bodySmall),
+                Text(Vi.coachChatSubtitle, style: theme.bodySmall),
+                const SizedBox(height: AppSpacing.md),
+                for (var i = 0; i < Vi.coachChatSamples.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: OutlinedButton(
+                      key: CoachScreen.chatSampleKey(i),
+                      style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                      onPressed: chatContextReady ? () => _askSample(Vi.coachChatSamples[i]) : null,
+                      child: Text(Vi.coachChatSamples[i], textAlign: TextAlign.center),
+                    ),
+                  ),
+                FilledButton.tonal(
+                  key: CoachScreen.chatOpenKey,
+                  onPressed: () => context.push(Routes.coachChat),
+                  child: const Text(Vi.coachChatOpen),
+                ),
               ],
             ),
           ),

@@ -1,7 +1,11 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
@@ -10,9 +14,12 @@ import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/features/coach/presentation/coach_chat_screen.dart';
 import 'package:poolcoachai/features/coach/presentation/coach_screen.dart';
 
 import '../../support/coach_fixtures.dart';
+import '../../support/fake_coach_chat.dart';
+import '../../support/route_cases.dart';
 import '../../support/test_data.dart';
 
 /// Người chơi yếu đúng nhóm [weak] trên bộ bài tập seed (cùng cách dựng với
@@ -83,13 +90,59 @@ void main() {
     }
   });
 
-  testWidgets('chip độ khó và nhóm chọn được; có lối vào thư viện và ô Trò chuyện sắp có', (tester) async {
+  testWidgets('chip độ khó và nhóm chọn được; có lối vào thư viện', (tester) async {
     await open(tester);
     await tester.tap(find.byKey(CoachScreen.topicKey(CoachTopic.kick)));
     await tester.pumpAndSettle();
     expect(selected(tester, CoachScreen.topicKey(CoachTopic.kick)), isTrue);
     expect(find.text(Vi.coachLibraryLink), findsOneWidget);
-    expect(find.text(Vi.coachChatSoonTitle), findsOneWidget);
-    expect(find.text(Vi.coachComing), findsOneWidget);
+  });
+
+  testWidgets('thẻ Hỏi huấn luyện viên thay thẻ sắp có', (tester) async {
+    await open(tester);
+    expect(find.text(Vi.coachChatTitle), findsOneWidget);
+    expect(find.text(Vi.coachChatSubtitle), findsOneWidget);
+    for (var i = 0; i < 3; i++) {
+      expect(find.byKey(CoachScreen.chatSampleKey(i)), findsOneWidget);
+    }
+    expect(find.byKey(CoachScreen.chatOpenKey), findsOneWidget);
+  });
+
+  testWidgets('bấm câu hỏi mẫu: mở màn chat và gửi đúng câu đó', (tester) async {
+    tester.view.physicalSize = const Size(900, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final chat = FakeCoachChat();
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final router = await pumpRoutedApp(
+      tester,
+      container: testContainer(
+        coachChat: chat,
+        coachChatRepo: CoachChatRepository(db, userId: 'u1'),
+      ),
+    );
+    router.go(Routes.coach);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(CoachScreen.chatSampleKey(1)));
+    await tester.tap(find.byKey(CoachScreen.chatSampleKey(1)));
+    await tester.pumpAndSettle();
+    expect(find.byType(CoachChatScreen), findsOneWidget);
+    expect(chat.asked.single.question, Vi.coachChatSamples[1]);
+  });
+
+  testWidgets('Mở trò chuyện: mở màn chat, không gửi gì', (tester) async {
+    tester.view.physicalSize = const Size(900, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final chat = FakeCoachChat();
+    final router = await pumpRoutedApp(tester, container: testContainer(coachChat: chat));
+    router.go(Routes.coach);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(CoachScreen.chatOpenKey));
+    await tester.tap(find.byKey(CoachScreen.chatOpenKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(CoachChatScreen), findsOneWidget);
+    expect(chat.asked, isEmpty);
   });
 }
