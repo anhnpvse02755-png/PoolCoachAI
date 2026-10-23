@@ -38,28 +38,37 @@ export function createQuota({ directus, limit, now }) {
 
   /// Chạy [fn] sau khi tác vụ trước đó của [userId] (nếu có) đã xong,
   /// thành công hay lỗi đều được, để các lệnh trên cùng người dùng không
-  /// chồng lên nhau.
+  /// chồng lên nhau. Khi [fn] xong, bỏ đuôi khoá của [userId] nếu không có
+  /// tác vụ mới nào xếp sau nó, để map không phình ra khi hệ thống rảnh.
   function withLock(userId, fn) {
     const prev = locks.get(userId) ?? Promise.resolve();
     const run = prev.then(fn, fn);
     locks.set(userId, run);
+    run.then(
+      () => { if (locks.get(userId) === run) locks.delete(userId); },
+      () => { if (locks.get(userId) === run) locks.delete(userId); },
+    );
     return run;
   }
 
   /// Hạn mức, số đã dùng, còn lại và giờ đặt lại của ngày hôm nay (giờ VN).
   async function status(userId) {
-    const day = vnDay(now());
+    const nowValue = now();
+    const day = vnDay(nowValue);
     const row = await directus.readUsage(usageId(userId, day));
     const used = row?.questions ?? 0;
-    return { limit, used, remainingToday: Math.max(limit - used, 0), resetAt: nextResetAt(now()).toISOString() };
+    return { limit, used, remainingToday: Math.max(limit - used, 0), resetAt: nextResetAt(nowValue).toISOString() };
   }
 
   /// Trừ một lượt câu hỏi của ngày hôm nay (giờ VN). Tạo dòng nếu chưa có;
   /// nếu Directus báo dòng đã được nơi khác tạo (`RECORD_NOT_UNIQUE`), đọc
-  /// lại dòng đó rồi tăng tiếp, thay vì ghi đè.
+  /// lại dòng đó rồi tăng tiếp, thay vì ghi đè. Nếu đọc lại vẫn không thấy
+  /// dòng (không nên xảy ra, nhưng Directus đã nói có), đó là một lỗi
+  /// Directus, không phải lỗi hạn mức của người chơi.
   async function take(userId) {
     return withLock(userId, async () => {
-      const day = vnDay(now());
+      const nowValue = now();
+      const day = vnDay(nowValue);
       const id = usageId(userId, day);
       let row = await directus.readUsage(id);
 
@@ -72,11 +81,12 @@ export function createQuota({ directus, limit, now }) {
         } catch (e) {
           if (!(e instanceof DirectusError) || e.code !== 'RECORD_NOT_UNIQUE') throw e;
           row = await directus.readUsage(id);
+          if (row === null) throw new DirectusError(409, 'RECORD_NOT_UNIQUE');
         }
       }
 
       if (row.questions >= limit) {
-        return { ok: false, limit, resetAt: nextResetAt(now()).toISOString() };
+        return { ok: false, limit, resetAt: nextResetAt(nowValue).toISOString() };
       }
       const questions = row.questions + 1;
       await directus.updateUsage(id, { questions });

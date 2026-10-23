@@ -21,6 +21,18 @@ async function errorCodeOf(response) {
   }
 }
 
+/// Đọc thân JSON của một phản hồi 200. Mất kết nối giữa chừng (hết giờ
+/// chờ, bị abort) thành `DirectusError(0, 'unreachable')`; thân không phải
+/// JSON hợp lệ thành `DirectusError(502, 'BAD_BODY')`.
+async function readJsonBody(response) {
+  try {
+    return await response.json();
+  } catch (e) {
+    if (e?.name === 'AbortError' || e?.name === 'TimeoutError') throw new DirectusError(0, 'unreachable');
+    throw new DirectusError(502, 'BAD_BODY');
+  }
+}
+
 /// Tạo client Directus. [fetch] được tiêm vào để test không gọi Directus
 /// thật (global-constraints: tests offline).
 export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000 }) {
@@ -48,7 +60,7 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000 })
     const response = await request('/users/me?fields=id', { token });
     if (response.status === 401 || response.status === 403) return null;
     if (!response.ok) throw new DirectusError(response.status, await errorCodeOf(response));
-    const { data } = await response.json();
+    const { data } = await readJsonBody(response);
     return data?.id ?? null;
   }
 
@@ -59,7 +71,7 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000 })
       token: serviceToken,
     });
     if (!response.ok) throw new DirectusError(response.status, await errorCodeOf(response));
-    const { data } = await response.json();
+    const { data } = await readJsonBody(response);
     return data?.[0] ?? null;
   }
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuota, vnDay, nextResetAt } from '../src/quota.mjs';
-import { createDirectus } from '../src/directus.mjs';
+import { createDirectus, DirectusError } from '../src/directus.mjs';
 import { DIRECTUS, SERVICE_TOKEN, fakeDirectus, fakeFetch } from './fakes.mjs';
 
 function setup({ limit = 2, at = '2026-10-22T03:00:00Z', raceOnCreate = false } = {}) {
@@ -47,14 +47,34 @@ test('cộng token vào dòng của ngày đó', async () => {
   assert.deepEqual([row.input_tokens, row.output_tokens, row.cache_read_tokens], [1000, 150, 3600]);
 });
 test('hai lượt cùng lúc ở lượt cuối: đúng một lượt qua', async () => {
-  const { quota } = setup({ limit: 1 });
+  // Trần 2: sau một lượt đã trừ sẵn, chỉ còn đúng 1 chỗ. Khác bài test
+  // RECORD_NOT_UNIQUE (vốn tự serialize qua việc đọc lại), ở đây nếu không
+  // có khoá theo người dùng (R10) thì cả hai lượt đọc dòng (questions: 1)
+  // cùng lúc, cả hai đều thấy 1 < 2 nên cả hai đều tăng lên 2 — qua cả hai,
+  // sai hạn mức. Có khoá: lượt thứ hai đợi lượt đầu ghi xong, đọc lại thấy
+  // 2 >= 2 nên bị từ chối.
+  const { quota, d } = setup({ limit: 2 });
+  await quota.take('user-a');
   const results = await Promise.all([quota.take('user-a'), quota.take('user-a')]);
   assert.equal(results.filter((r) => r.ok).length, 1);
+  assert.equal(d.rows.get('user-a_2026-10-22').questions, 2);
 });
 test('dòng vừa được nơi khác tạo (RECORD_NOT_UNIQUE): đọc lại rồi tăng', async () => {
   const { quota, d } = setup({ limit: 5, raceOnCreate: true });
   assert.equal((await quota.take('user-a')).ok, true);
   assert.equal(d.rows.get('user-a_2026-10-22').questions, 2);
+});
+test('RECORD_NOT_UNIQUE nhưng đọc lại vẫn không thấy dòng: ném DirectusError', async () => {
+  const directus = {
+    readUsage: async () => null,
+    createUsage: async () => { throw new DirectusError(400, 'RECORD_NOT_UNIQUE'); },
+    updateUsage: async () => {},
+  };
+  const quota = createQuota({ directus, limit: 2, now: () => new Date('2026-10-22T03:00:00Z') });
+  await assert.rejects(
+    quota.take('user-a'),
+    (e) => e instanceof DirectusError && e.status === 409 && e.code === 'RECORD_NOT_UNIQUE',
+  );
 });
 test('status: hạn mức, đã dùng, còn lại, giờ đặt lại', async () => {
   const { quota } = setup({ limit: 30 });
