@@ -7,10 +7,13 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/coach_providers.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/data/repositories/coach_attempt_repository.dart';
+import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
+import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
@@ -34,6 +37,7 @@ import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 
 import 'coach_fixtures.dart';
+import 'fake_coach_chat.dart';
 import 'planner_tables.dart';
 import 'fake_auth.dart';
 
@@ -96,6 +100,10 @@ ProviderContainer testContainer({
   List<CoachAttempt>? coachAttempts,
   CoachAttemptRepository? coachRepo,
   CoachEngine? coachEngine,
+  CoachChatBackend? coachChat,
+  CoachChatRepository? coachChatRepo,
+  List<CoachChatEntry>? coachChatTurns,
+  AsyncValue<CoachContext>? coachContext,
 }) {
   return ProviderContainer(
     overrides: [
@@ -104,6 +112,12 @@ ProviderContainer testContainer({
       ),
       coachAttemptRepositoryProvider.overrideWithValue(coachRepo),
       coachEngineProvider.overrideWithValue(coachEngine ?? fastCoachEngine),
+      // Không widget test nào được chạm mạng: luôn thay backend thật.
+      coachChatBackendProvider.overrideWithValue(coachChat ?? FakeCoachChat()),
+      coachChatRepositoryProvider.overrideWithValue(coachChatRepo),
+      if (coachChatTurns != null)
+        coachChatTurnsProvider.overrideWith((ref) => Stream.value(coachChatTurns)),
+      if (coachContext != null) coachContextProvider.overrideWithValue(coachContext),
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith(
@@ -201,6 +215,8 @@ ProviderContainer dbContainer(
           });
         }),
       appDatabaseProvider.overrideWithValue(db),
+      // Không widget test nào được chạm mạng: luôn thay backend thật.
+      coachChatBackendProvider.overrideWithValue(FakeCoachChat()),
       nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(testDrills)),
       knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),

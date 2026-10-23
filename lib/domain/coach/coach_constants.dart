@@ -46,3 +46,18 @@ const coachScoringVersion = 1;
 
 /// Số trận đã xong gần nhất đưa vào ngữ cảnh Coach Chat (spec Giai đoạn B).
 const coachChatRecentMatches = 10;
+
+/// Số lượt gần nhất gửi lên dịch vụ Coach Chat làm lịch sử hội thoại.
+const coachChatHistoryTurns = 10;
+
+/// Số lượt giữ lại trên máy mỗi tài khoản — cũ hơn thì xoá (Task 9).
+const coachChatKeptTurns = 200;
+
+/// Độ dài câu hỏi tối đa người chơi được gửi.
+const coachChatMaxQuestion = 500;
+
+/// Số ký tự tối đa (UTF-16 code unit) của một lượt gửi lên dịch vụ Coach
+/// Chat trong lịch sử — khớp luật kiểm 400 phía máy chủ, để một câu trả
+/// lời dài của Claude không làm hỏng mọi câu hỏi sau (ruling controller,
+/// Task 9).
+const coachChatMaxTurnChars = 1000;

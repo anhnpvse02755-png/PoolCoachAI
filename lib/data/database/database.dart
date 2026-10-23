@@ -319,6 +319,19 @@ class CoachAttemptRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// ─── Coach Chat (spec Giai đoạn B 2026-10-22 mục 8) ────────────────────────
+
+/// Một lượt chat với huấn luyện viên (spec 2026-10-22 mục 8) — chỉ trên máy
+/// này, không đồng bộ.
+class CoachChatTurnRows extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get userId => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  BoolColumn get fromPlayer => boolean()();
+  TextColumn get message => text()();
+  BoolColumn get insufficient => boolean().withDefault(const Constant(false))();
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(
@@ -337,6 +350,7 @@ class CoachAttemptRows extends Table {
     AchievementRows,
     PoolMatchRows,
     CoachAttemptRows,
+    CoachChatTurnRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -346,7 +360,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -414,6 +428,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 11) {
         // Chỉ thêm bảng (spec Coach mục 11.2): không đụng dữ liệu cũ.
         await m.createTable(coachAttemptRows);
+      }
+      if (from < 12) {
+        // Chỉ thêm bảng (spec Giai đoạn B mục 8): không đụng dữ liệu cũ.
+        await m.createTable(coachChatTurnRows);
       }
     },
   );

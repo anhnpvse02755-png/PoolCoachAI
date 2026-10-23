@@ -1,5 +1,6 @@
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/chat_facts.dart';
+import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
@@ -229,3 +230,30 @@ abstract interface class CoachChatBackend {
   /// ngay khi mở màn Coach Chat).
   Future<int> remainingToday();
 }
+
+/// Một lượt chat đã lưu trên máy — [id] là khoá Drift, dùng để sắp thứ tự
+/// ổn định khi hai lượt cùng thời điểm (câu hỏi và câu trả lời ghi cùng
+/// lúc).
+typedef CoachChatEntry = ({int id, DateTime at, bool fromPlayer, String text, bool insufficient});
+
+/// [coachChatHistoryTurns] lượt cuối, cũ trước; lượt bị chặn gửi
+/// [insufficientText] thay cho message rỗng (R19) — đúng câu người chơi đã
+/// thấy trên màn hình. Mỗi lượt bị clip tới [coachChatMaxTurnChars] ký tự
+/// (UTF-16 code unit, khớp luật kiểm phía máy chủ): một câu trả lời dài của
+/// Claude không được làm hỏng việc gửi mọi câu hỏi sau (ruling controller,
+/// Task 9).
+List<CoachChatTurn> coachChatHistory(List<CoachChatEntry> entries, {required String insufficientText}) {
+  final recent = entries.length <= coachChatHistoryTurns
+      ? entries
+      : entries.sublist(entries.length - coachChatHistoryTurns);
+  return [
+    for (final entry in recent)
+      (
+        fromPlayer: entry.fromPlayer,
+        text: _clipTurnText(entry.insufficient ? insufficientText : entry.text),
+      ),
+  ];
+}
+
+String _clipTurnText(String text) =>
+    text.length <= coachChatMaxTurnChars ? text : text.substring(0, coachChatMaxTurnChars);

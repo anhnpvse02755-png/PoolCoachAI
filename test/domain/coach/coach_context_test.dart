@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
+import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
@@ -130,5 +131,29 @@ void main() {
     expect(a, isNot(contains(samplePlayerName)));
     expect(a, isNot(contains(sampleOpponentName)));
     expect(jsonEncode(fullCoachContext().toFacts()), a);
+  });
+
+  test('lịch sử gửi lên: 10 lượt cuối, lượt bị chặn gửi đúng câu người chơi đã thấy', () {
+    final entries = [
+      for (var i = 0; i < 12; i++)
+        (id: i + 1, at: DateTime(2026, 10, 22), fromPlayer: i.isEven, text: i == 11 ? '' : 't$i', insufficient: i == 11),
+    ];
+    final h = coachChatHistory(entries, insufficientText: 'CHƯA ĐỦ');
+    expect(h, hasLength(10));
+    expect(h.first, (fromPlayer: true, text: 't2'));
+    expect(h.last, (fromPlayer: false, text: 'CHƯA ĐỦ'));
+  });
+
+  test('lịch sử gửi lên: mỗi lượt bị clip tới coachChatMaxTurnChars ký tự UTF-16 (ruling controller)', () {
+    final longText = List.filled(coachChatMaxTurnChars + 200, 'a').join();
+    final longInsufficient = List.filled(coachChatMaxTurnChars + 200, 'x').join();
+    final entries = [
+      (id: 1, at: DateTime(2026, 10, 22), fromPlayer: true, text: longText, insufficient: false),
+      (id: 2, at: DateTime(2026, 10, 22), fromPlayer: false, text: '', insufficient: true),
+    ];
+    final h = coachChatHistory(entries, insufficientText: longInsufficient);
+    expect(h[0].text.length, coachChatMaxTurnChars);
+    expect(h[0].text, longText.substring(0, coachChatMaxTurnChars));
+    expect(h[1].text.length, coachChatMaxTurnChars);
   });
 }
