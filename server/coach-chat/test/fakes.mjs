@@ -100,8 +100,40 @@ export function fakeFetch({ directus, claude } = {}) {
   const directusOrigin = new URL(DIRECTUS).origin;
   return async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.url);
-    if (url.origin === directusOrigin) return directus.handle(url, init ?? {});
+    if (directus && url.origin === directusOrigin) return directus.handle(url, init ?? {});
     if (claude) return claude(input, init);
     throw new Error(`fakeFetch: không có bộ xử lý cho ${url}`);
   };
+}
+
+/// Luồng SSE giả của Claude theo đúng khuôn dạng ở `typescript/claude-api/streaming.md`,
+/// Raw SSE Format. Mô phỏng được khối thinking, khối fallback (đổi model giữa
+/// luồng) và khối text, theo đúng thứ tự message_start → content_block_* → message_delta → message_stop.
+export function claudeStream({ text = 'Hôm nay tập Phòng thủ.', stopReason = 'end_turn', model = 'claude-opus-5',
+  thinking = false, fallbackTo = null,
+  usage = { input_tokens: 900, output_tokens: 120, cache_creation_input_tokens: 0, cache_read_input_tokens: 1800 } } = {}) {
+  const blocks = [];
+  if (thinking) blocks.push({ start: { type: 'thinking', thinking: '', signature: 'sig' } });
+  if (fallbackTo) blocks.push({ start: { type: 'fallback', from: { model }, to: { model: fallbackTo } } });
+  if (text) blocks.push({ start: { type: 'text', text: '' }, delta: { type: 'text_delta', text } });
+  const events = [
+    ['message_start', { type: 'message_start', message: { id: 'msg_test', type: 'message', role: 'assistant',
+      model: fallbackTo ?? model, content: [], stop_reason: null, stop_sequence: null, usage: { ...usage, output_tokens: 1 } } }],
+    ...blocks.flatMap((b, index) => [
+      ['content_block_start', { type: 'content_block_start', index, content_block: b.start }],
+      ...(b.delta ? [['content_block_delta', { type: 'content_block_delta', index, delta: b.delta }]] : []),
+      ['content_block_stop', { type: 'content_block_stop', index }],
+    ]),
+    ['message_delta', { type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: usage.output_tokens } }],
+    ['message_stop', { type: 'message_stop' }],
+  ];
+  const body = events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join('');
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
+/// Phản hồi lỗi giả của Claude: thân JSON `{type: 'error', error: {...}}` với
+/// mã trạng thái HTTP [status] và kiểu lỗi Anthropic [type].
+export function claudeError(status, type) {
+  return new Response(JSON.stringify({ type: 'error', error: { type, message: type } }),
+    { status, headers: { 'content-type': 'application/json' } });
 }
