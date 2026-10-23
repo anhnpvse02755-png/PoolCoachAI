@@ -32,8 +32,10 @@ giờ tự tính số mới. Bốn endpoint:
   sai; `401` token sai/hết hạn; `413 {error: "invalid", field: "body"}` thân
   yêu cầu vượt quá 64 KB; `429 {error: "quota", limit, resetAt}`;
   `502 {error: "refused"|"truncated"|"upstream"}` Claude từ chối, bị cắt,
-  hoặc lỗi khác; `503 {error: "busy"|"unavailable"}` Claude quá tải HOẶC
-  Directus không trả lời được — hai nguyên nhân khác hẳn nhau, xem mục 11.
+  hoặc lỗi khác; `503 {error: "busy"}` Claude quá tải; `503 {error:
+  "unavailable"}` Directus không trả lời được HOẶC máy chủ coach-chat không
+  kết nối được tới Claude — hai nguyên nhân khác hẳn nhau cho cùng một mã,
+  xem mục 11.
 - `POST /v1/coach-chat/blocked` body `{rule}` — app báo một câu trả lời đã
   bị bộ lọc phía app (`chat_filter.dart`) chặn → `204`; `400` rule sai;
   `401` token sai; `413` thân yêu cầu vượt quá 64 KB; `503 {error:
@@ -87,9 +89,10 @@ mục dưới không chạy được nếu còn thiếu:
    dễ khoá riêng nếu lộ.
 2. Đặt **hạn mức chi tiêu theo tháng** (spending limit) cho đúng workspace đó
    — **bắt buộc**, không phải tuỳ chọn (spec issue S5). Đăng ký Directus mở
-   công khai (mục 4), nên hạn mức 30 câu/ngày trong app chỉ chặn MỖI NGƯỜI,
-   không chặn TỔNG chi phí — hạn mức chi tiêu ở đây mới là lớp chặn thật duy
-   nhất trên tổng tiền chi mỗi tháng (chi tiết ở mục 12).
+   công khai, nên hạn mức 30 câu/ngày trong app chỉ chặn MỖI NGƯỜI, không
+   chặn TỔNG chi phí — hạn mức chi tiêu ở đây mới là lớp chặn thật duy nhất
+   trên tổng tiền chi mỗi tháng (mục 12 giải thích cả hai điều này, và có
+   cách đo thật).
 3. Quyết giữa `claude-opus-5` (≈ 2 xu Mỹ/câu) và `claude-sonnet-5`
    (≈ 1 xu Mỹ/câu) — mục 12 có ước tính chi phí đầy đủ — và xác nhận hạn mức
    30 câu/người/ngày có hợp không (đổi được sau qua `DAILY_QUESTION_LIMIT`).
@@ -141,8 +144,14 @@ mục 6.
    lùi lại dễ như một worktree.
 2. Gộp `feat/coach-chat` vào `main` theo quy ước hiện tại của repo, đẩy
    `main` lên GitHub thật.
-3. Xác nhận `main` đã có `server/coach-chat` (ví dụ `git log --oneline -1
-   main -- server/coach-chat` ra một dòng) — mục 6 dựa vào đúng điều này.
+3. Xác nhận GitHub đã có `server/coach-chat` trên `main`. Easypanel (mục 6)
+   build từ `main` CỦA GITHUB, không phải nhánh `main` cục bộ của máy đang
+   gõ lệnh, nên phải lấy về mới nhất rồi kiểm đúng `origin/main`:
+   ```bash
+   git fetch origin main
+   git log --oneline -1 origin/main -- server/coach-chat
+   ```
+   ra một dòng — mục 6 dựa vào đúng điều này.
 
 ## 6. Easypanel — service `coach-chat` trong project `test-va`
 
@@ -258,14 +267,34 @@ service `coach-chat`; trường `rule` trong mỗi dòng nói rõ luật nào �
   - log Easypanel của service có đúng dòng `"error":"unavailable"` ở đúng
     thời điểm lỗi không — log trống hẳn quanh đó thì service có thể đang
     không khởi động được (thiếu/sai biến môi trường, mục 2) chứ không phải
-    Directus.
+    Directus. Phân biệt rõ hai trường hợp: dịch vụ coach-chat còn sống nhưng
+    Directus (hoặc Claude) không trả lời được thì CÓ trả `503
+    {"error":"unavailable"}` (thân JSON thật, log có dòng tương ứng); dịch vụ
+    coach-chat chết hẳn (crash-loop, ví dụ thiếu biến môi trường bắt buộc ở
+    mục 2) thì KHÔNG CÓ CÁCH NÀO trả JSON đó — không có gì đang chạy để trả
+    lời — lớp reverse proxy của Easypanel tự trả một mã 502/503 riêng của
+    nó, KHÔNG có trường `error` nào trong thân trả lời, và log của service
+    trống hẳn vì chính service không chạy để ghi log.
 - `502 {error: "refused"}`: Claude từ chối trả lời câu đó.
 - `502 {error: "truncated"}`: câu trả lời bị cắt trước khi xong (ví dụ chạm
   trần token).
-- `502 {error: "upstream"}`: Claude API lỗi không thuộc hai dạng trên — log
-  chỉ ghi đúng `"error":"upstream"`, KHÔNG có lý do cụ thể hơn (không phải
-  SDK báo "refused", "truncated" hay một thông báo lỗi riêng — log không giữ
-  thông báo đó). Lặp lại nhiều lần thì thử đổi model hay effort (mục 9).
+- `502 {error: "upstream"}`: lỗi Claude API không thuộc hai dạng trên — mã dễ
+  gặp nhất, vì `classifyClaudeError` (`claude.mjs:58-59`) gom MỌI lỗi
+  `APIError` khác `529`/`overloaded_error` (hai mã đó mới là `busy`) vào đây,
+  bất kể nguyên nhân thật: `ANTHROPIC_API_KEY` sai hoặc đã bị thu hồi (HTTP
+  401), `CLAUDE_MODEL` viết sai tên model (HTTP 404), hay vấn đề thanh toán,
+  kể cả đã chạm hạn mức chi tiêu theo tháng ở mục 3 bước 2 (HTTP 402
+  `billing_error` — nhiều khả năng đây là CÁCH chạm hạn mức đó sẽ hiện ra với
+  chủ sản phẩm, không phải một mã lỗi riêng biệt). Log chỉ ghi đúng
+  `"error":"upstream"`, KHÔNG giữ mã HTTP gốc hay thông báo của SDK (không
+  phải SDK báo "refused", "truncated" hay một thông báo lỗi riêng), nên
+  KHÔNG phân biệt được ba nguyên nhân trên chỉ từ log. Lặp lại nhiều lần thì
+  kiểm theo thứ tự sau TRƯỚC, đừng đổi model hay effort trước: (1) trên
+  Anthropic Console — khoá API còn hợp lệ, và hạn mức chi tiêu theo tháng
+  (mục 3 bước 2) chưa chạm; (2) biến `CLAUDE_MODEL` đặt trên Easypanel (mục
+  2) có đúng tên model không. Đổi model hay đặt `CLAUDE_FALLBACKS=off` chỉ là
+  cách xử lý riêng cho trường hợp đổi sang `claude-sonnet-5` ở mục 9, KHÔNG
+  phải cách xử lý chung cho mọi `502 upstream`.
 - `401`: vấn đề ở token của người chơi (hết phiên), không phải lỗi hạn mức —
   app đã có đường xử lý hết phiên riêng.
 - Hạn mức đặt lại lúc **00:00 giờ Việt Nam** (UTC+7), không phải giờ UTC hay

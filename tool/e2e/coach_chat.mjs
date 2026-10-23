@@ -1,6 +1,6 @@
 // Kiểm sống dịch vụ Coach Chat (Giai đoạn B, Task 13): gọi Claude thật qua
 // máy chủ server/coach-chat và Directus thật — KHÔNG PHẢI coach_chat_stub.mjs.
-// Bài này tốn tiền (khoảng 4 xu Mỹ, xem docs/coach-chat.md mục 11), nên mặc
+// Bài này tốn tiền (khoảng 4 xu Mỹ, xem docs/coach-chat.md mục 12), nên mặc
 // định bỏ qua; chỉ chạy khi chủ sản phẩm đã đồng ý cho từng lượt.
 //   COACH_CHAT_LIVE=1 COACH_CHAT_URL=… DIRECTUS_URL=… \
 //     DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… node tool/e2e/coach_chat.mjs
@@ -43,17 +43,26 @@ const QUESTION_2 = 'Tôi đang yếu kỹ năng nào?';
 // bị liệt yếu nhất, điều app thật không bao giờ tạo ra, vì categoryMastery
 // trả null khi sessions < minSessions (player_intelligence.dart:28) — không
 // thể vừa null vừa "yếu nhất" (controller review, fix round 1 #M9).
-// trend='notEnoughData' vì 3 buổi chưa đủ 4 buổi tối thiểu để tính xu hướng
-// (categoryTrend, player_intelligence.dart:49); CategoryInsight.trend không
-// bao giờ là JSON null trong toFacts() thật (coach_context.dart:76).
+// Cả sáu nhóm đều `trend: 'notEnoughData'`, KHÔNG nhóm nào `trend: null`
+// (controller review, fix round 2 #M9 — round 1 mới sửa đúng safety):
+// computePlayerIntelligence lặp qua SkillCategory.values nên nhóm nào cũng
+// có một CategoryInsight, kể cả nhóm 0 buổi (player_intelligence.dart:106,
+// 161-169: "Mọi nhóm kỹ năng đều có mặt, kể cả nhóm chưa tập buổi nào.");
+// categoryTrend trả notEnoughData khi buổi < 4 — gồm cả 0 buổi, không chỉ
+// "có buổi nhưng chưa tới 4" (player_intelligence.dart:49), nên đúng cho cả
+// năm nhóm 0 buổi dưới đây và nhóm safety 3 buổi. CategoryInsight.trend là
+// enum non-null, đúng bốn giá trị up/down/flat/notEnoughData (prompt.mjs:28
+// dặn Claude đọc đúng bốn chữ này), nên `trend` trong toFacts() thật không
+// bao giờ là JSON null (coach_context.dart:76) — `trend: null` ở bản trước
+// round này là hình dạng app thật không bao giờ tạo ra.
 const FACTS = {
   skills: {
-    aiming: { mastery: null, trend: null, sessions: 0 },
-    position: { mastery: null, trend: null, sessions: 0 },
-    breakShot: { mastery: null, trend: null, sessions: 0 },
+    aiming: { mastery: null, trend: 'notEnoughData', sessions: 0 },
+    position: { mastery: null, trend: 'notEnoughData', sessions: 0 },
+    breakShot: { mastery: null, trend: 'notEnoughData', sessions: 0 },
     safety: { mastery: 35, trend: 'notEnoughData', sessions: 3 },
-    kick: { mastery: null, trend: null, sessions: 0 },
-    bank: { mastery: null, trend: null, sessions: 0 },
+    kick: { mastery: null, trend: 'notEnoughData', sessions: 0 },
+    bank: { mastery: null, trend: 'notEnoughData', sessions: 0 },
   },
   rank: null,
   currentStep: null,
