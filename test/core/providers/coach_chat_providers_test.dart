@@ -20,11 +20,14 @@ import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_context.dart';
+import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
+import 'package:poolcoachai/domain/schedule_slot.dart';
+import 'package:poolcoachai/domain/timer_session.dart';
 
 import '../../support/coach_chat_fixtures.dart';
 import '../../support/fake_auth.dart';
@@ -46,7 +49,17 @@ void main() {
 
   // Mọi nguồn khác rank: "sẵn sàng" (không lỗi, không đang tải), dùng chung
   // cho hai test dưới để chỉ một nguồn khác trạng thái mỗi lần.
-  readySourcesExcept({AsyncValue<PlayerRank?>? rank}) => [
+  //
+  // `timerSessions`/`schedule`/`drillLogs` (I2, review Task 11 fix round 1):
+  // `coachContextProvider` canh trực tiếp ba nguồn này (không chỉ qua
+  // `todayRecommendationProvider`, vốn đã bị ghi đè thẳng ở trên) — mặc định
+  // "sẵn sàng" (rỗng), cho từng test dưới ghi đè MỘT nguồn thành giá trị cũ.
+  readySourcesExcept({
+    AsyncValue<PlayerRank?>? rank,
+    AsyncValue<List<TimerSession>>? timerSessions,
+    AsyncValue<List<ScheduleSlot>>? schedule,
+    AsyncValue<List<DrillLog>>? drillLogs,
+  }) => [
         playerIntelligenceProvider.overrideWithValue(computePlayerIntelligence(drills: seedDrills, logs: const [])),
         playerRankProvider.overrideWithValue(
           rank ??
@@ -58,6 +71,9 @@ void main() {
         coachAttemptsProvider.overrideWithValue(const AsyncData<List<CoachAttempt>>([])),
         todayRecommendationProvider.overrideWithValue(AsyncData<TodayRecommendation>(sampleToday())),
         matchesProvider.overrideWithValue(const AsyncData<List<PoolMatch>>([])),
+        timerSessionsProvider.overrideWithValue(timerSessions ?? const AsyncData<List<TimerSession>>([])),
+        scheduleProvider.overrideWithValue(schedule ?? const AsyncData<List<ScheduleSlot>>([])),
+        drillLogsProvider.overrideWithValue(drillLogs ?? const AsyncData<List<DrillLog>>([])),
       ];
 
   test(
@@ -101,6 +117,68 @@ void main() {
     expect(result.hasError, isTrue);
     expect(result.error, error);
   });
+
+  test(
+    'buổi tập hẹn giờ (timerSessionsProvider) đang tải lại với giá trị cũ '
+    '(đổi tài khoản): context vẫn đang tải (I2, review Task 11 fix round 1, '
+    'probe F2)',
+    () async {
+      // ignore: invalid_use_of_internal_member
+      final staleTimer = const AsyncLoading<List<TimerSession>>().copyWithPrevious(
+        const AsyncData<List<TimerSession>>(<TimerSession>[]),
+      );
+      expect(staleTimer.hasValue, isTrue);
+      expect(staleTimer.isLoading, isTrue);
+
+      final container = ProviderContainer(overrides: readySourcesExcept(timerSessions: staleTimer));
+      addTearDown(container.dispose);
+      container.listen(coachContextProvider, (_, _) {});
+      await pumpEventQueue();
+
+      expect(container.read(coachContextProvider).isLoading, isTrue);
+    },
+  );
+
+  test(
+    'lịch tập (scheduleProvider) đang tải lại với giá trị cũ (đổi tài '
+    'khoản): context vẫn đang tải (I2, review Task 11 fix round 1, probe F2)',
+    () async {
+      // ignore: invalid_use_of_internal_member
+      final staleSchedule = const AsyncLoading<List<ScheduleSlot>>().copyWithPrevious(
+        const AsyncData<List<ScheduleSlot>>(<ScheduleSlot>[]),
+      );
+      expect(staleSchedule.hasValue, isTrue);
+      expect(staleSchedule.isLoading, isTrue);
+
+      final container = ProviderContainer(overrides: readySourcesExcept(schedule: staleSchedule));
+      addTearDown(container.dispose);
+      container.listen(coachContextProvider, (_, _) {});
+      await pumpEventQueue();
+
+      expect(container.read(coachContextProvider).isLoading, isTrue);
+    },
+  );
+
+  test(
+    'nhật ký bài tập (drillLogsProvider) đang tải lại với giá trị cũ (đổi '
+    'tài khoản): context vẫn đang tải, không chỉ được canh gián tiếp qua '
+    'roadmapProvider (I2, review Task 11 fix round 1, probe F2)',
+    () async {
+      // ignore: invalid_use_of_internal_member
+      final staleLogs = const AsyncLoading<List<DrillLog>>().copyWithPrevious(
+        const AsyncData<List<DrillLog>>(<DrillLog>[]),
+      );
+      expect(staleLogs.hasValue, isTrue);
+      expect(staleLogs.isLoading, isTrue);
+
+      final container = ProviderContainer(overrides: readySourcesExcept(drillLogs: staleLogs));
+      addTearDown(container.dispose);
+      container.listen(coachContextProvider, (_, _) {});
+      await pumpEventQueue();
+
+      expect(container.read(coachContextProvider).isLoading, isTrue);
+    },
+  );
 
   test(
     'gửi hai lần liên tiếp không chờ lần đầu xong: chỉ một yêu cầu tới backend (ruling)',

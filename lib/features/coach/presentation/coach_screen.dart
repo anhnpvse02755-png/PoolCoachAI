@@ -139,16 +139,27 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 Text(Vi.coachChatSubtitle, style: theme.bodySmall),
                 const SizedBox(height: AppSpacing.md),
-                for (var i = 0; i < Vi.coachChatSamples.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: OutlinedButton(
-                      key: CoachScreen.chatSampleKey(i),
-                      style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                      onPressed: chatContextReady ? () => _askSample(Vi.coachChatSamples[i]) : null,
-                      child: Text(Vi.coachChatSamples[i], textAlign: TextAlign.center),
-                    ),
-                  ),
+                // `stretch` cho RIÊNG các nút mẫu — Column ngoài vẫn `start`
+                // nên tiêu đề/phụ đề và "Mở trò chuyện" không bị kéo rộng
+                // theo. Không có nó, mỗi nút chỉ rộng bằng nhãn của nó (vd.
+                // 372/471/400 px trong thẻ 708 px ở màn hình rộng) — khác
+                // mẫu đã dùng ở coach_chat_screen.dart's _samplesRow, vốn đã
+                // `stretch` (I1, review Task 11 fix round 1, probe R23).
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < Vi.coachChatSamples.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: OutlinedButton(
+                          key: CoachScreen.chatSampleKey(i),
+                          style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                          onPressed: chatContextReady ? () => _askSample(Vi.coachChatSamples[i]) : null,
+                          child: Text(Vi.coachChatSamples[i], textAlign: TextAlign.center),
+                        ),
+                      ),
+                  ],
+                ),
                 FilledButton.tonal(
                   key: CoachScreen.chatOpenKey,
                   onPressed: () => context.push(Routes.coachChat),

@@ -36,6 +36,18 @@ bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 
 /// Ngữ cảnh gửi cho Coach Chat (R21): gộp sáu nguồn, mọi số đã tính sẵn
 /// (spec Giai đoạn B mục 7 — LLM chỉ diễn giải, không tính lại).
+///
+/// `timerSessionsProvider`/`scheduleProvider`/`drillLogsProvider` được canh
+/// TRỰC TIẾP ở đây (không chỉ qua `todayRecommendationProvider`, vốn chỉ
+/// kiểm `hasValue` cho ba nguồn này — xem `recommendation_provider.dart` —
+/// nên có thể lọt giá trị cũ của tài khoản trước trong lúc đổi tài khoản).
+/// `drillLogsProvider` trước đây chỉ được canh GIÁN TIẾP qua `_ready
+/// (roadmapAsync)` (vì `roadmapProvider` tự canh nó nội bộ) — không đủ tin
+/// cậy vì đó là tác dụng phụ của logic khác, không phải một ràng buộc cục
+/// bộ của provider này (I2, review Task 11 fix round 1, probe F2: hạng mục
+/// tiêu đang tải lại 100 ms khi đổi tài khoản vẫn lọt qua `_ready(todayAsync)`
+/// vì `todayRecommendationProvider` không phân biệt "sẵn sàng" với "còn giá
+/// trị cũ, đang tải lại" cho ba nguồn này).
 final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final pi = ref.watch(playerIntelligenceProvider);
   final rankAsync = ref.watch(playerRankProvider);
@@ -43,19 +55,28 @@ final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final attemptsAsync = ref.watch(coachAttemptsProvider);
   final todayAsync = ref.watch(todayRecommendationProvider);
   final matchesAsync = ref.watch(matchesProvider);
+  final timerSessionsAsync = ref.watch(timerSessionsProvider);
+  final scheduleAsync = ref.watch(scheduleProvider);
+  final drillLogsAsync = ref.watch(drillLogsProvider);
 
   if (rankAsync.hasError) return AsyncError(rankAsync.error!, rankAsync.stackTrace!);
   if (roadmapAsync.hasError) return AsyncError(roadmapAsync.error!, roadmapAsync.stackTrace!);
   if (attemptsAsync.hasError) return AsyncError(attemptsAsync.error!, attemptsAsync.stackTrace!);
   if (todayAsync.hasError) return AsyncError(todayAsync.error!, todayAsync.stackTrace!);
   if (matchesAsync.hasError) return AsyncError(matchesAsync.error!, matchesAsync.stackTrace!);
+  if (timerSessionsAsync.hasError) return AsyncError(timerSessionsAsync.error!, timerSessionsAsync.stackTrace!);
+  if (scheduleAsync.hasError) return AsyncError(scheduleAsync.error!, scheduleAsync.stackTrace!);
+  if (drillLogsAsync.hasError) return AsyncError(drillLogsAsync.error!, drillLogsAsync.stackTrace!);
 
   if (pi == null ||
       !_ready(rankAsync) ||
       !_ready(roadmapAsync) ||
       !_ready(attemptsAsync) ||
       !_ready(todayAsync) ||
-      !_ready(matchesAsync)) {
+      !_ready(matchesAsync) ||
+      !_ready(timerSessionsAsync) ||
+      !_ready(scheduleAsync) ||
+      !_ready(drillLogsAsync)) {
     return const AsyncLoading();
   }
 

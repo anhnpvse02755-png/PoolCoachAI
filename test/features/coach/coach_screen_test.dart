@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
+import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
@@ -44,11 +47,22 @@ List<DrillLog> weakAt(SkillCategory weak) {
 }
 
 void main() {
-  Future<void> open(WidgetTester tester, {List<DrillLog>? logs, List<CoachAttempt>? attempts}) async {
-    tester.view.physicalSize = const Size(900, 2000);
+  Future<void> open(
+    WidgetTester tester, {
+    List<DrillLog>? logs,
+    List<CoachAttempt>? attempts,
+    Size viewportSize = const Size(900, 2000),
+    AsyncValue<CoachContext>? coachContext,
+  }) async {
+    tester.view.physicalSize = viewportSize;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final container = testContainer(drills: seedDrills, logs: logs, coachAttempts: attempts);
+    final container = testContainer(
+      drills: seedDrills,
+      logs: logs,
+      coachAttempts: attempts,
+      coachContext: coachContext,
+    );
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
@@ -108,10 +122,69 @@ void main() {
     expect(find.byKey(CoachScreen.chatOpenKey), findsOneWidget);
   });
 
+  testWidgets(
+    'ba nút câu hỏi mẫu rộng bằng khung nội dung của thẻ ở màn hình rộng, '
+    'như mẫu đã dùng ở màn chat (I1, review Task 11 fix round 1, probe R23)',
+    (tester) async {
+      // Màn hình rộng, thấp (kiểu điện thoại ngang) — đúng kích thước
+      // reviewer đo được 372/471/400 px lệch nhau trong thẻ 708 px. Thấp
+      // nên thẻ chat nằm ngoài khung nhìn ban đầu — cuộn tới bằng
+      // scrollUntilVisible (M2 cùng kỹ thuật) thay vì phồng viewport lên.
+      await open(tester, viewportSize: const Size(740, 360));
+      await tester.scrollUntilVisible(
+        find.byKey(CoachScreen.chatSampleKey(0)),
+        50,
+        scrollable: find.descendant(of: find.byType(CoachScreen), matching: find.byType(Scrollable)),
+      );
+
+      final cardFinder = find.ancestor(
+        of: find.byKey(CoachScreen.chatSampleKey(0)),
+        matching: find.byType(PcCard),
+      );
+      final cardWidth = tester.getSize(cardFinder).width;
+      final expectedWidth = cardWidth - 2 * AppSpacing.md;
+
+      for (var i = 0; i < 3; i++) {
+        final sampleWidth = tester.getSize(find.byKey(CoachScreen.chatSampleKey(i))).width;
+        expect(sampleWidth, closeTo(expectedWidth, 0.5), reason: 'sample $i phải rộng bằng khung nội dung của thẻ');
+      }
+    },
+  );
+
+  testWidgets(
+    'ngữ cảnh đang tải (coachContextProvider = AsyncLoading): ba nút câu hỏi '
+    'mẫu bị khoá (M3, review Task 11 fix round 1)',
+    (tester) async {
+      await open(tester, coachContext: const AsyncLoading());
+      for (var i = 0; i < 3; i++) {
+        expect(
+          tester.widget<OutlinedButton>(find.byKey(CoachScreen.chatSampleKey(i))).onPressed,
+          isNull,
+          reason: 'sample $i phải bị khoá khi ngữ cảnh chưa sẵn sàng',
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'ngữ cảnh lỗi (coachContextProvider = AsyncError): ba nút câu hỏi mẫu bị '
+    'khoá (M3, review Task 11 fix round 1)',
+    (tester) async {
+      await open(
+        tester,
+        coachContext: AsyncError(Exception('ngữ cảnh lỗi giả (M3)'), StackTrace.empty),
+      );
+      for (var i = 0; i < 3; i++) {
+        expect(
+          tester.widget<OutlinedButton>(find.byKey(CoachScreen.chatSampleKey(i))).onPressed,
+          isNull,
+          reason: 'sample $i phải bị khoá khi ngữ cảnh lỗi',
+        );
+      }
+    },
+  );
+
   testWidgets('bấm câu hỏi mẫu: mở màn chat và gửi đúng câu đó', (tester) async {
-    tester.view.physicalSize = const Size(900, 3000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
     final chat = FakeCoachChat();
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -124,7 +197,25 @@ void main() {
     );
     router.go(Routes.coach);
     await tester.pumpAndSettle();
+    // Viewport mặc định (800×600): thẻ chat ĐÃ được xây (không phải chưa
+    // tồn tại), nhưng nằm ngoài khung nhìn của ListView nên bị
+    // `skipOffstage` (mặc định của mọi Finder) loại khỏi `evaluate()` —
+    // `ensureVisible` gọi `element()` → `.single` nên ném "Bad state: No
+    // element" nếu gọi MỘT MÌNH. `scrollUntilVisible` tự cuộn `Scrollable`
+    // của chính CoachScreen tới khi phần tử không còn offstage (M2, review
+    // Task 11 fix round 1, probe A) — nhưng Sliver xây trước cả các mục còn
+    // nằm trong `cacheExtent` (~250px NGOÀI khung nhìn thật), nên "không
+    // offstage" chưa chắc đã nằm trong khung nhìn thật để `tap()` chạm
+    // trúng (tâm tính ra từng rơi ở (400, 699), ngoài Size(800, 600)). Gọi
+    // tiếp `ensureVisible` sau đó để cuộn CHÍNH XÁC tới khung nhìn — an
+    // toàn vì phần tử đã tồn tại (không còn offstage) sau bước trên.
+    await tester.scrollUntilVisible(
+      find.byKey(CoachScreen.chatSampleKey(1)),
+      50,
+      scrollable: find.descendant(of: find.byType(CoachScreen), matching: find.byType(Scrollable)),
+    );
     await tester.ensureVisible(find.byKey(CoachScreen.chatSampleKey(1)));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(CoachScreen.chatSampleKey(1)));
     await tester.pumpAndSettle();
     expect(find.byType(CoachChatScreen), findsOneWidget);
@@ -132,14 +223,19 @@ void main() {
   });
 
   testWidgets('Mở trò chuyện: mở màn chat, không gửi gì', (tester) async {
-    tester.view.physicalSize = const Size(900, 3000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
     final chat = FakeCoachChat();
     final router = await pumpRoutedApp(tester, container: testContainer(coachChat: chat));
     router.go(Routes.coach);
     await tester.pumpAndSettle();
+    // Xem giải thích ở test "bấm câu hỏi mẫu" ngay trên (M2, review Task 11
+    // fix round 1, probe A) — cùng kỹ thuật, viewport mặc định.
+    await tester.scrollUntilVisible(
+      find.byKey(CoachScreen.chatOpenKey),
+      50,
+      scrollable: find.descendant(of: find.byType(CoachScreen), matching: find.byType(Scrollable)),
+    );
     await tester.ensureVisible(find.byKey(CoachScreen.chatOpenKey));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(CoachScreen.chatOpenKey));
     await tester.pumpAndSettle();
     expect(find.byType(CoachChatScreen), findsOneWidget);
