@@ -65,7 +65,7 @@ class RemoteCoachChat implements CoachChatBackend {
 
     if (response.statusCode == 429) {
       final body = _decode(response);
-      throw CoachChatQuotaExceeded(DateTime.parse(body['resetAt']! as String));
+      throw CoachChatQuotaExceeded(_requireDateTime(body, 'resetAt'));
     }
     if (response.statusCode == 502) {
       final body = _decode(response);
@@ -73,16 +73,16 @@ class RemoteCoachChat implements CoachChatBackend {
       if (error == 'refused' || error == 'truncated') {
         return (
           reply: (text: '', insufficient: true),
-          remainingToday: body['remainingToday']! as int,
+          remainingToday: _require<int>(body, 'remainingToday'),
         );
       }
-      throw CoachChatUnavailable(body);
+      throw CoachChatUnavailable(response.statusCode);
     }
     if (response.statusCode != 200) throw CoachChatUnavailable(response.statusCode);
 
     final body = _decode(response);
-    final raw = body['text']! as String;
-    final remainingToday = body['remainingToday']! as int;
+    final raw = _require<String>(body, 'text');
+    final remainingToday = _require<int>(body, 'remainingToday');
     final rule = coachReplyBlock(raw, facts);
     if (rule != null) unawaited(_reportBlocked(token, rule.name));
     return (reply: filterCoachReply(raw, facts), remainingToday: remainingToday);
@@ -93,7 +93,7 @@ class RemoteCoachChat implements CoachChatBackend {
     final token = await _token();
     final response = await _send('GET', '/v1/coach-chat/quota', token: token, timeout: timeout);
     if (response.statusCode != 200) throw CoachChatUnavailable(response.statusCode);
-    return _decode(response)['remainingToday']! as int;
+    return _require<int>(_decode(response), 'remainingToday');
   }
 
   /// Báo máy chủ tên luật đã chặn — nuốt mọi lỗi (spec S2): câu trả lời đã
@@ -141,8 +141,29 @@ class RemoteCoachChat implements CoachChatBackend {
   Map<String, Object?> _decode(http.Response response) {
     try {
       return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, Object?>;
-    } on Object catch (e) {
-      throw CoachChatUnavailable(e);
+    } on Object {
+      // Không dùng lại FormatException nguyên văn: lỗi của jsonDecode kèm
+      // theo một đoạn thân phản hồi gốc (R5 vòng 2, review Task 8).
+      throw const CoachChatUnavailable('unreadable body');
+    }
+  }
+
+  /// Đọc một trường bắt buộc khỏi thân JSON đã giải mã, đúng kiểu [T].
+  /// Thiếu trường, `null`, hay sai kiểu đều là thân phản hồi không đọc
+  /// được (brief: "any unreadable body → CoachChatUnavailable") — không
+  /// để lộ nguyên văn thân phản hồi ra ngoài (R5 vòng 2).
+  T _require<T>(Map<String, Object?> body, String key) {
+    final value = body[key];
+    if (value is T) return value;
+    throw const CoachChatUnavailable('unreadable body');
+  }
+
+  DateTime _requireDateTime(Map<String, Object?> body, String key) {
+    final raw = _require<String>(body, key);
+    try {
+      return DateTime.parse(raw);
+    } on FormatException {
+      throw const CoachChatUnavailable('unreadable body');
     }
   }
 }

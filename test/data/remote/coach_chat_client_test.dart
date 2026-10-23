@@ -74,10 +74,11 @@ void main() {
     );
   });
 
-  test('401, 400, 502 upstream, 503, 500 và phản hồi hỏng: CoachChatUnavailable', () async {
+  test('401, 400, 413, 502 upstream, 503, 500 và phản hồi hỏng: CoachChatUnavailable', () async {
     for (final r in [
       FakeCoachChatServer.json(401, {'error': 'unauthorized'}),
       FakeCoachChatServer.json(400, {'error': 'invalid', 'field': 'facts'}),
+      FakeCoachChatServer.json(413, {'error': 'invalid', 'field': 'body'}),
       FakeCoachChatServer.json(502, {'error': 'upstream'}),
       FakeCoachChatServer.json(503, {'error': 'busy'}),
       FakeCoachChatServer.json(500, {'error': 'internal'}),
@@ -86,6 +87,48 @@ void main() {
       server.routes['POST /v1/coach-chat'] = (_) => r;
       await expectLater(chat.reply(ctx, const [], 'Hỏi'), throwsA(isA<CoachChatUnavailable>()));
     }
+  });
+
+  test('phản hồi thiếu trường bắt buộc: CoachChatUnavailable, không ném lỗi thô (R1 vòng 2)', () async {
+    for (final r in [
+      FakeCoachChatServer.json(200, {}),
+      FakeCoachChatServer.json(429, {'error': 'quota'}),
+      FakeCoachChatServer.json(502, {'error': 'refused'}),
+    ]) {
+      server.routes['POST /v1/coach-chat'] = (_) => r;
+      await expectLater(chat.reply(ctx, const [], 'Hỏi'), throwsA(isA<CoachChatUnavailable>()));
+    }
+  });
+
+  test('CoachChatUnavailable không mang nguyên văn thân phản hồi (R5)', () async {
+    // 502 không phải refused/truncated: nhánh phải ném lỗi mà không mang
+    // nguyên map đã giải mã (brief cũ dùng throw CoachChatUnavailable(body)).
+    server.routes['POST /v1/coach-chat'] =
+        (_) => FakeCoachChatServer.json(502, {'error': 'DAU-HIEU-KHONG-DUOC-LO-RA', 'detail': 'bí mật nội bộ'});
+    try {
+      await chat.reply(ctx, const [], 'Hỏi');
+      fail('phải ném CoachChatUnavailable');
+    } on CoachChatUnavailable catch (e) {
+      expect(e.cause.toString(), isNot(contains('DAU-HIEU-KHONG-DUOC-LO-RA')));
+      expect(e.cause.toString(), isNot(contains('bí mật nội bộ')));
+    }
+
+    // Phản hồi hỏng (không parse được JSON) cũng không được mang nguyên văn.
+    server.routes['POST /v1/coach-chat'] = (_) => http.Response('DAU-HIEU-KHONG-DUOC-LO-RA-2', 200);
+    try {
+      await chat.reply(ctx, const [], 'Hỏi');
+      fail('phải ném CoachChatUnavailable');
+    } on CoachChatUnavailable catch (e) {
+      expect(e.cause.toString(), isNot(contains('DAU-HIEU-KHONG-DUOC-LO-RA-2')));
+    }
+  });
+
+  test('báo luật chặn lỗi (mất mạng hoặc 500): vẫn trả câu đã lọc, không ném ra ngoài', () async {
+    server.routes['POST /v1/coach-chat'] = (_) => answer('Ngắm lệch 5° nhé.');
+    server.routes['POST /v1/coach-chat/blocked'] = (_) => FakeCoachChatServer.json(500, {'error': 'internal'});
+    final a = await chat.reply(ctx, const [], 'Hỏi');
+    expect(a.reply, (text: '', insufficient: true));
+    await pumpEventQueue();
   });
 
   test('mất mạng: CoachChatUnavailable', () async {
@@ -109,5 +152,11 @@ void main() {
         (_) => FakeCoachChatServer.json(200, {'limit': 30, 'used': 4, 'remainingToday': 26, 'resetAt': '2026-10-22T17:00:00.000Z'});
     expect(await chat.remainingToday(), 26);
     expect(server.requests.single.headers['Authorization'], 'Bearer access-u1');
+  });
+
+  test('remainingToday(): phản hồi thiếu remainingToday là CoachChatUnavailable (R1 vòng 2)', () async {
+    server.routes['GET /v1/coach-chat/quota'] =
+        (_) => FakeCoachChatServer.json(200, {'limit': 30, 'used': 4, 'remainingToday': null, 'resetAt': '2026-10-22T17:00:00.000Z'});
+    await expectLater(chat.remainingToday(), throwsA(isA<CoachChatUnavailable>()));
   });
 }

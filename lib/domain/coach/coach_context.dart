@@ -220,7 +220,8 @@ final class CoachChatUnavailable implements Exception {
   String toString() => 'CoachChatUnavailable($cause)';
 }
 
-/// Giao diện của Coach Chat. Giai đoạn A chưa có bản cài nào.
+/// Giao diện của Coach Chat. Giai đoạn B: [RemoteCoachChat] trong
+/// `lib/data/remote/coach_chat_client.dart`.
 abstract interface class CoachChatBackend {
   Future<CoachChatAnswer> reply(CoachContext context, List<CoachChatTurn> history, String question);
 
