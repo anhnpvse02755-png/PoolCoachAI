@@ -45,6 +45,12 @@ Future<void> discardUnsyncableLogs(AppDatabase db, String userId) async {
 /// Đăng xuất do **người chơi bấm**: xoá dữ liệu luyện tập của họ khỏi máy,
 /// để người dùng sau trên cùng máy không thấy.
 ///
+/// [forgetChatInFlight] chạy **đầu tiên**, trước cả đăng xuất: báo Coach
+/// Chat bỏ mọi câu hỏi của [userId] còn đang chờ, để câu trả lời tới muộn
+/// không dựng lại lịch sử chat vừa xoá (I1, review cuối). Bắt buộc, để nơi
+/// gọi nào cũng phải nghĩ tới câu đang chờ; ProfileScreen truyền
+/// `CoachChatController.forgetInFlight`.
+///
 /// Đăng xuất **trước** rồi mới xoá: lượt đồng bộ đang chạy thấy người
 /// dùng đổi thì bỏ kết quả kéo về, nên không dựng lại những dòng vừa xoá.
 ///
@@ -53,7 +59,9 @@ Future<void> signOutAndForget({
   required AppDatabase db,
   required AuthRepository auth,
   required String userId,
+  required void Function(String userId) forgetChatInFlight,
 }) async {
+  forgetChatInFlight(userId);
   await auth.signOut();
   await (db.delete(
     db.drillLogRows,
@@ -91,6 +99,11 @@ Future<void> signOutAndForget({
   // Lần làm tình huống Coach cũng là dữ liệu riêng của người này.
   await (db.delete(
     db.coachAttemptRows,
+  )..where((t) => t.userId.equals(userId))).go();
+  // Lịch sử Coach Chat chỉ nằm trên máy này (không đồng bộ), nên xoá ở đây
+  // là mất hẳn — đúng ý "đăng xuất và quên" (I1, review cuối).
+  await (db.delete(
+    db.coachChatTurnRows,
   )..where((t) => t.userId.equals(userId))).go();
 }
 

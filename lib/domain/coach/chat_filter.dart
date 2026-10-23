@@ -35,8 +35,10 @@ final _numeralDegreePattern = RegExp(
 
 /// Từ chỉ số không mơ hồ (chỉ dùng để đọc số, không có nghĩa khác) — fix
 /// round 1, mục 1. một/hai/ba/năm… vẫn được phép vì còn nghĩa khác.
+/// "triệu chứng" (dấu hiệu) không phải số (M8, review cuối); "hàng chục"
+/// thì vẫn là số, vẫn chặn.
 final _numeralWordPattern = RegExp(
-  r'(?<!\p{L})(?:mười|mươi|trăm|nghìn|ngàn|triệu|chục|lăm)(?!\p{L})',
+  r'(?<!\p{L})(?:mười|mươi|trăm|nghìn|ngàn|triệu(?!\s+chứng)|chục|lăm)(?!\p{L})',
   unicode: true,
   caseSensitive: false,
 );
@@ -48,6 +50,33 @@ final _percentWordPattern = RegExp(r'phần\s+trăm');
 
 final _aimShiftPattern = RegExp(r'ngắm\s+(lệch|dày hơn|mỏng hơn)');
 final _spinRatioPattern = RegExp(r'\b(BHE|FHE)\b', caseSensitive: false);
+
+/// Lượng áp phê nói bằng số đầu cơ ("1 đầu cơ", "0,5 đầu gậy"): Coach Chat
+/// không bao giờ nói lượng áp phê, kể cả khi con số có trong facts — chỉ Mô
+/// phỏng và tình huống Coach nói (M2, review cuối). So trên chữ thường.
+final _spinAmountPattern = RegExp(r'\d+(?:[.,]\d+)?\s*đầu\s+(?:cơ|gậy)');
+
+/// Khoảng trắng không ngắt dòng (U+00A0, U+202F, U+2007): đọc như dấu cách.
+final _noBreakSpacePattern = RegExp(r'[\u00A0\u202F\u2007]');
+
+/// Ký tự vô hình (U+200B–U+200D, U+2060, U+FEFF, gạch nối mềm U+00AD) — có
+/// thể chen vào để lách luật chữ (M1, review cuối).
+final _invisiblePattern = RegExp(r'[\u200B-\u200D\u2060\uFEFF\u00AD]');
+
+/// Ký tự số không phải 0–9 (toàn chiều rộng, Ả Rập, toán học, số trong vòng
+/// tròn, phân số…): luật số chỉ đọc được 0–9, nên gặp là chặn thẳng (fail
+/// closed, M1 review cuối).
+final _nonAsciiNumberPattern = RegExp(r'(?![0-9])\p{N}', unicode: true);
+
+/// Độ dày chạm bi viết bằng phân số ("Ăn ½ bi") — chữ của chính app
+/// (`Vi.safetyThickness`), nên không tính là số lạ ở luật trên. Phân số ở
+/// chỗ khác ("½ độ", "½ đầu cơ") vẫn bị chặn.
+final _ballFractionPattern = RegExp(r'[¼½¾⅛]\s*bi(?!\p{L})', unicode: true);
+
+/// Dấu đầu dòng của danh sách đánh số ("1. ", "2) " … "10. "): không phải
+/// con số cần kiểm với facts (I2b, review cuối). Chỉ ở đầu dòng và có khoảng
+/// trắng theo sau, nên "thứ 1." giữa câu hay "1.5 giờ" vẫn bị kiểm.
+final _listMarkerPattern = RegExp(r'^\s*(?:[1-9]|10)[.)](?=\s)', multiLine: true);
 
 /// Chữ Unicode tổ hợp sẵn (NFD, các dấu tổ hợp U+0300–U+036F) — fix round 1,
 /// mục 3. Dart không có bộ chuẩn hoá NFC nên chặn thẳng thay vì cố so khớp
@@ -63,11 +92,12 @@ final _separatorPattern = RegExp('[.,]');
 
 /// Chỉ xoá "N bi" khi có ngữ cảnh ván đấu đứng trước (trực tiếp hoặc qua một
 /// chuỗi "N bi và/hay/, N bi") — fix round 1, mục 2; dấu phẩy trong chuỗi
-/// thêm ở fix round 2, mục 3 ("Luật 8 bi, 9 bi và 10 bi"). Không có ngữ cảnh
-/// thì số phải qua kiểm tra như mọi số khác, để không ẩn số bịa (ví dụ
-/// "ăn 10 bi").
+/// thêm ở fix round 2, mục 3 ("Luật 8 bi, 9 bi và 10 bi"); "bi-a" thêm ở
+/// review cuối, I2b ("bi-a 9 bi"). Không có ngữ cảnh thì số phải qua kiểm
+/// tra như mọi số khác, để không ẩn số bịa (ví dụ "ăn 10 bi"). Không thêm
+/// "trong": "ăn 3 trong 9 bi" sẽ giấu mất một mẫu số bịa.
 final _gameContextChainPattern = RegExp(
-  r'(?:luật|pool|ván|trận|giải|chơi|kiểu|môn|loại|bàn)\s+'
+  r'(?:luật|pool|ván|trận|giải|chơi|kiểu|môn|loại|bàn|bi-a)\s+'
   r'(?:(?<![\d.,])(?:8|9|10) bi(?!\p{L})(?:,\s+|\s+(?:và|hay)\s+))*'
   r'(?<![\d.,])(?:8|9|10) bi(?!\p{L})',
   unicode: true,
@@ -170,6 +200,7 @@ bool _passesCountException(String rest, int scaled) {
 CoachBlockRule? _unknownNumberRule(String raw, Map<String, Object?> facts) {
   final cleaned = raw
       .toLowerCase()
+      .replaceAll(_listMarkerPattern, '')
       .replaceAll(_gameContextChainPattern, '')
       .replaceAll(_percentWordPattern, '%');
   if (_numeralWordPattern.hasMatch(cleaned)) return CoachBlockRule.unknownNumber;
@@ -184,15 +215,35 @@ CoachBlockRule? _unknownNumberRule(String raw, Map<String, Object?> facts) {
   return null;
 }
 
-/// Lý do chặn một câu trả lời Coach Chat, hoặc `null` nếu cho qua. Chữ tổ
-/// hợp sẵn (NFD) bị chặn trước cả mẫu cấm chung — fix round 1, mục 3.
+/// Lý do chặn một câu trả lời Coach Chat, hoặc `null` nếu cho qua.
+///
+/// Trước mọi luật: khoảng trắng không ngắt dòng thành dấu cách, rồi đọc câu
+/// theo hai cách — xoá ký tự vô hình (bắt kiểu chen giữa chữ: "tối ư\u00ADu")
+/// và thay chúng bằng dấu cách (bắt kiểu thay dấu cách: "tối\u200Bưu"). Chặn
+/// nếu một trong hai cách đọc bị chặn (M1, review cuối).
 CoachBlockRule? coachReplyBlock(String raw, Map<String, Object?> facts) {
-  if (raw.trim().isEmpty) return CoachBlockRule.empty;
-  if (_decomposedPattern.hasMatch(raw)) return CoachBlockRule.decomposed;
-  final banned = coachBannedRule(raw);
+  final spaced = raw.replaceAll(_noBreakSpacePattern, ' ');
+  final joined = spaced.replaceAll(_invisiblePattern, '');
+  final rule = _replyBlock(joined, facts);
+  if (rule != null) return rule;
+  final split = spaced.replaceAll(_invisiblePattern, ' ');
+  return split == joined ? null : _replyBlock(split, facts);
+}
+
+/// Các luật theo thứ tự: rỗng; chữ tổ hợp sẵn (NFD) — fix round 1, mục 3;
+/// mẫu cấm chung (độ, rồi ngắm lệch, rồi "tối ưu" — F11); BHE/FHE và lượng
+/// áp phê bằng đầu cơ; ký tự số không phải 0–9; số không có trong facts.
+CoachBlockRule? _replyBlock(String text, Map<String, Object?> facts) {
+  if (text.trim().isEmpty) return CoachBlockRule.empty;
+  if (_decomposedPattern.hasMatch(text)) return CoachBlockRule.decomposed;
+  final banned = coachBannedRule(text);
   if (banned != null) return banned;
-  if (_spinRatioPattern.hasMatch(raw)) return CoachBlockRule.spinRatio;
-  return _unknownNumberRule(raw, facts);
+  final lower = text.toLowerCase();
+  if (_spinRatioPattern.hasMatch(text) || _spinAmountPattern.hasMatch(lower)) return CoachBlockRule.spinRatio;
+  if (_nonAsciiNumberPattern.hasMatch(lower.replaceAll(_ballFractionPattern, ''))) {
+    return CoachBlockRule.unknownNumber;
+  }
+  return _unknownNumberRule(text, facts);
 }
 
 /// Lọc câu trả lời Coach Chat: bị chặn thì trả rỗng và `insufficient: true`

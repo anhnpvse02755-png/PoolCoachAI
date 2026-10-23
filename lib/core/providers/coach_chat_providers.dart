@@ -44,10 +44,11 @@ bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 /// `drillLogsProvider` trước đây chỉ được canh GIÁN TIẾP qua `_ready
 /// (roadmapAsync)` (vì `roadmapProvider` tự canh nó nội bộ) — không đủ tin
 /// cậy vì đó là tác dụng phụ của logic khác, không phải một ràng buộc cục
-/// bộ của provider này (I2, review Task 11 fix round 1, probe F2: hạng mục
-/// tiêu đang tải lại 100 ms khi đổi tài khoản vẫn lọt qua `_ready(todayAsync)`
-/// vì `todayRecommendationProvider` không phân biệt "sẵn sàng" với "còn giá
-/// trị cũ, đang tải lại" cho ba nguồn này).
+/// bộ của provider này (I2, review Task 11 fix round 1, probe F2: buổi tập
+/// hẹn giờ — `timerSessionsProvider` — tải lại chậm 100 ms khi đổi tài
+/// khoản vẫn lọt qua `_ready(todayAsync)`, vì `todayRecommendationProvider`
+/// không phân biệt "sẵn sàng" với "còn giá trị cũ, đang tải lại" cho ba
+/// nguồn này).
 final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final pi = ref.watch(playerIntelligenceProvider);
   final rankAsync = ref.watch(playerRankProvider);
@@ -136,6 +137,16 @@ class CoachChatController extends Notifier<CoachChatState> {
   /// Task 10 fix round 1, I1).
   late _Gen _gen;
 
+  /// Số thứ tự của lần gửi gần nhất — chỉ tăng. Là field của instance nên
+  /// còn nguyên qua mọi lần `build()` chạy lại (Riverpod tái dùng instance,
+  /// xem [_gen]): so được lần gửi của BẤT KỲ generation nào (ruling I1,
+  /// review cuối).
+  int _sendSeq = 0;
+
+  /// Mốc "đã quên" theo tài khoản, do [forgetInFlight] đặt: lần gửi của tài
+  /// khoản đó có số thứ tự không lớn hơn mốc thì bị bỏ khi câu trả lời tới.
+  final _forgottenUpTo = <String, int>{};
+
   @override
   CoachChatState build() {
     // Đổi tài khoản thì watch này đổi giá trị, build() chạy lại, trạng thái
@@ -198,6 +209,11 @@ class CoachChatController extends Notifier<CoachChatState> {
     final gen = _gen;
     final backend = ref.read(coachChatBackendProvider);
     final now = ref.read(nowProvider);
+    // Lần gửi này là lần thứ mấy, của tài khoản nào — đúng tài khoản mà
+    // `repo` lưu vào (repo dựng từ `currentUserIdProvider`), để
+    // [forgetInFlight] nhận ra nó dù generation đã đổi.
+    final seq = ++_sendSeq;
+    final userId = repo.userId;
 
     final context = contextAsync.value;
     state = (status: CoachChatStatus.sending, pending: q, remaining: state.remaining);
@@ -213,15 +229,18 @@ class CoachChatController extends Notifier<CoachChatState> {
       final askedAt = now();
       final answer = await backend.reply(context, history, q);
       gen.epoch++;
+      if (_droppedAsForgotten(userId, seq, gen)) return;
       // Lưu trước, bất kể generation này đã qua hay chưa (R19, R20) — câu
       // trả lời không được mất chỉ vì người chơi đã sang màn khác hay đổi
-      // tài khoản; luôn lưu vào đúng repo đã chụp lúc bấm Gửi.
+      // tài khoản; luôn lưu vào đúng repo đã chụp lúc bấm Gửi. Ngoại lệ duy
+      // nhất là người chơi đã bấm đăng xuất và quên tài khoản này (ở trên).
       final answeredAt = now();
       await repo.addExchange(question: q, askedAt: askedAt, reply: answer.reply, answeredAt: answeredAt);
       if (gen.disposed) return;
       state = (status: CoachChatStatus.idle, pending: null, remaining: answer.remainingToday);
     } on Object catch (e) {
       gen.epoch++;
+      if (_droppedAsForgotten(userId, seq, gen)) return;
       if (gen.disposed) return;
       state = switch (e) {
         CoachChatQuotaExceeded() => (status: CoachChatStatus.idle, pending: null, remaining: 0),
@@ -230,11 +249,37 @@ class CoachChatController extends Notifier<CoachChatState> {
             pending: null,
             remaining: state.remaining,
           ),
-        // Lỗi khác (mất mạng, "truncated", 5xx...) — màn hình chỉ hiện câu
-        // chung `Vi.coachChatError`, không bao giờ in nguyên văn lỗi.
+        // Lỗi khác (mất mạng, hết giờ chờ, 5xx...) — màn hình chỉ hiện câu
+        // chung `Vi.coachChatError`, không bao giờ in nguyên văn lỗi. 502
+        // "refused"/"truncated" không tới đây: client trả về câu "chưa đủ
+        // dữ liệu" như một câu trả lời bình thường (coach_chat_client.dart).
         _ => (status: CoachChatStatus.failed, pending: q, remaining: state.remaining),
       };
     }
+  }
+
+  /// Người chơi bấm đăng xuất (xoá dữ liệu trên máy) cho [userId] —
+  /// `signOutAndForget` gọi hàm này đầu tiên, trước khi đăng xuất và xoá.
+  /// Mọi câu hỏi của [userId] đã gửi tới lúc này, ở bất kỳ generation nào,
+  /// bị bỏ khi câu trả lời tới: không lưu (không dựng lại lịch sử vừa xoá),
+  /// không ghi state của generation đã qua. Câu gửi SAU lúc này (đăng nhập
+  /// lại) vẫn lưu bình thường. Tự động đăng xuất (hết phiên) không gọi hàm
+  /// này, nên câu đang chờ vẫn lưu vào tài khoản cũ như R19 (ruling I1,
+  /// review cuối).
+  void forgetInFlight(String userId) {
+    _forgottenUpTo[userId] = _sendSeq;
+  }
+
+  /// `true` nếu lần gửi [seq] của [userId] đã bị [forgetInFlight] bỏ — khi
+  /// đó không được lưu gì. Generation [gen] còn sống (đăng xuất ném lỗi sau
+  /// khi đã đánh dấu) thì đưa màn về idle: bỏ câu chờ, không đổi lượt còn
+  /// lại — để không kẹt mãi ở "đang gửi".
+  bool _droppedAsForgotten(String userId, int seq, _Gen gen) {
+    if (seq > (_forgottenUpTo[userId] ?? 0)) return false;
+    if (!gen.disposed) {
+      state = (status: CoachChatStatus.idle, pending: null, remaining: state.remaining);
+    }
+    return true;
   }
 
   /// Gửi lại câu đang chờ sau khi gửi hỏng.

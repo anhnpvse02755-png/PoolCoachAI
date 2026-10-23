@@ -430,11 +430,9 @@ void main() {
     // nhãn vùng loa mặc định của `_bubble` không được nối thêm "Huấn luyện
     // viên" một lần nữa phía trước, nếu không trình đọc màn hình đọc "Huấn
     // luyện viên, Huấn luyện viên đang trả lời…" (sửa lại, review Task 10
-    // fix round 2).
-    expect(
-      RegExp(RegExp.escape(Vi.coachChatFromCoach)).allMatches(thinking.label).length,
-      1,
-    );
+    // fix round 2). Ghim đúng nguyên nhãn: thừa một tiền tố khác hay mất chữ
+    // "đang trả lời" đều phải đỏ (M11, review cuối).
+    expect(thinking.label, Vi.coachChatThinking);
 
     chat.hold!.complete();
     await tester.pumpAndSettle();

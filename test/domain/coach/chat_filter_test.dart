@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/coach/chat_filter.dart';
+import 'package:poolcoachai/domain/planner/safety_shot.dart' show ThicknessSide;
 
 const facts = <String, Object?>{
   'skills': {
@@ -140,6 +142,150 @@ void main() {
 
     test('3. chuỗi ngữ cảnh ván đấu cho phép dấu phẩy, không chỉ "và"/"hay"', () {
       expect(coachReplyBlock('Luật 8 bi, 9 bi và 10 bi khác nhau.', const <String, Object?>{}), isNull);
+    });
+  });
+
+  group('review cuối', () {
+    // Facts của người chơi mới: mọi con số chỉ là 0, 3, 35, 55 và 75.
+    const newPlayerFacts = <String, Object?>{
+      'skills': {
+        'aiming': {'mastery': null, 'trend': 'notEnoughData', 'sessions': 0},
+      },
+      'skillLevels': {'weak': <String>[], 'strong': <String>[], 'weakBelow': 55, 'strongFrom': 75, 'minSessions': 3},
+      'today': {'category': 'aiming', 'reason': 'newcomer', 'streak': 0, 'practiceMinutesThisWeek': 35},
+    };
+
+    test('facts người mới cho phép đúng 0, 3, 35, 55, 75', () {
+      expect(coachAllowedNumbers(newPlayerFacts), {0, 3000, 35000, 55000, 75000});
+    });
+
+    group('I2b. danh sách đánh số và "bi-a"', () {
+      test('danh sách đánh số đầu dòng cho qua với facts người mới', () {
+        expect(
+          coachReplyBlock(
+            'Bạn mới bắt đầu, nên:\n'
+            '1. Ghi vài buổi Ngắm bi.\n'
+            '2. Chơi một trận rồi ghi lại.\n'
+            '3. Làm một tình huống Coach.',
+            newPlayerFacts,
+          ),
+          isNull,
+        );
+        expect(coachReplyBlock('Gợi ý:\n  1) Tập Ngắm bi.\n  2) Tập Phòng thủ.', newPlayerFacts), isNull);
+        expect(coachReplyBlock('9. Tập Ngắm bi.\n10. Tập Phòng thủ.', newPlayerFacts), isNull);
+      });
+
+      test('"1." giữa câu không phải dấu đầu dòng: vẫn bị kiểm tra', () {
+        expect(coachReplyBlock('Bạn đang đứng thứ 1. Cố giữ nhé.', newPlayerFacts), CoachBlockRule.unknownNumber);
+        expect(coachReplyBlock('Nên tập:\n1.5 giờ mỗi buổi.', newPlayerFacts), CoachBlockRule.unknownNumber);
+      });
+
+      test('số bịa trong một mục của danh sách vẫn bị chặn', () {
+        expect(
+          coachReplyBlock('Kế hoạch:\n1. Tập 5 buổi Ngắm bi.\n2. Chơi một trận.', newPlayerFacts),
+          CoachBlockRule.unknownNumber,
+        );
+      });
+
+      test('"bi-a" là ngữ cảnh ván đấu: "bi-a 9 bi" cho qua', () {
+        expect(coachReplyBlock('Bạn đang tập bi-a 9 bi.', newPlayerFacts), isNull);
+        expect(coachReplyBlock('Bi-a 9 bi cần Phòng thủ tốt.', newPlayerFacts), isNull);
+      });
+
+      test('"trong" không phải ngữ cảnh ván đấu: mẫu số bịa vẫn bị chặn', () {
+        expect(coachReplyBlock('Bạn ăn 3 trong 9 bi.', newPlayerFacts), CoachBlockRule.unknownNumber);
+      });
+    });
+
+    group('M1. chữ số không phải ASCII và ký tự vô hình', () {
+      for (final (name, text) in [
+        ('"３０ độ" (chữ số toàn chiều rộng)', 'Cắt góc \uFF13\uFF10 độ.'),
+        ('"٣٠ độ" (chữ số Ả Rập)', '\u0663\u0660 độ'),
+        ('"𝟑𝟎 độ" (chữ số toán học đậm)', '\u{1D7D1}\u{1D7CE} độ'),
+        ('"１００ cú" (toàn chiều rộng, không có "độ")', '\uFF11\uFF10\uFF10 cú'),
+        ('"③ buổi" (số trong vòng tròn)', 'Tập \u2462 buổi mỗi tuần.'),
+        ('"½ độ" (phân số ngoài "N bi")', 'Cắt góc ½ độ.'),
+      ]) {
+        test('$name bị chặn (fail closed)', () {
+          expect(coachReplyBlock(text, facts), CoachBlockRule.unknownNumber);
+        });
+      }
+
+      test('độ dày chạm bi "¾ / ½ / ¼ / ⅛ bi" (chữ của app) vẫn cho qua', () {
+        for (final f in ['¾', '½', '¼', '⅛']) {
+          expect(coachReplyBlock('Ăn $f bi, lệch bên phải.', facts), isNull, reason: f);
+        }
+      });
+
+      test('ký tự vô hình THAY dấu cách hay CHEN giữa chữ không lách được luật chữ', () {
+        expect(coachReplyBlock('Cách tối\u200Bưu là đánh trô bi.', facts), CoachBlockRule.optimal);
+        expect(coachReplyBlock('Cách tối ư\u00ADu là đánh trô bi.', facts), CoachBlockRule.optimal);
+        expect(coachReplyBlock('Ngắm l\u2060ệch một chút.', facts), CoachBlockRule.aimShift);
+        expect(coachReplyBlock('Dùng B\u200DHE.', facts), CoachBlockRule.spinRatio);
+        expect(coachReplyBlock('Góc 30\u200Bđộ.', facts), CoachBlockRule.degree);
+        // 4 và 7 có trong facts, 47 thì không.
+        expect(coachReplyBlock('Bạn đã thắng 4\u200C7 trận.', facts), CoachBlockRule.unknownNumber);
+        // Xoá ký tự vô hình thì "haimươi" lọt luật chữ số; đọc thêm bản thay
+        // bằng dấu cách ("hai mươi") mới chặn được.
+        expect(coachReplyBlock('Bạn đã tập hai\u200Bmươi buổi.', facts), CoachBlockRule.unknownNumber);
+      });
+
+      test('khoảng trắng không ngắt dòng (U+00A0, U+202F, U+2007) đọc như dấu cách', () {
+        expect(coachReplyBlock('Cách tối\u00A0ưu là đánh trô bi.', facts), CoachBlockRule.optimal);
+        expect(coachReplyBlock('Đừng lệch\u202Fđiểm ngắm.', facts), CoachBlockRule.aimShift);
+        expect(coachReplyBlock('Có 5\u2007nhóm cần xem.', facts), isNull);
+      });
+
+      test('câu chỉ có ký tự vô hình là câu rỗng', () {
+        expect(coachReplyBlock('\u200B\u200B', facts), CoachBlockRule.empty);
+        expect(filterCoachReply('\u200B\u2060', facts), (text: '', insufficient: true));
+      });
+    });
+
+    group('M2. lượng áp phê bằng đầu cơ', () {
+      test('"Áp phê phải 1 đầu cơ" bị chặn như spinRatio', () {
+        expect(coachReplyBlock('Áp phê phải 1 đầu cơ.', const <String, Object?>{}), CoachBlockRule.spinRatio);
+      });
+
+      test('vẫn bị chặn khi con số có trong facts', () {
+        // 2 có trong facts (sessions của safety).
+        expect(coachReplyBlock('Áp phê trái 2 đầu cơ là đủ.', facts), CoachBlockRule.spinRatio);
+        expect(coachReplyBlock('Lệch 0,62 đầu gậy.', facts), CoachBlockRule.spinRatio);
+      });
+
+      test('thứ tự luật F11: độ trước, rồi ngắm lệch, rồi mới tới đầu cơ', () {
+        expect(coachReplyBlock('Cắt 30 độ, áp phê 1 đầu cơ.', facts), CoachBlockRule.degree);
+        expect(coachReplyBlock('Ngắm lệch 1 đầu cơ.', facts), CoachBlockRule.aimShift);
+      });
+
+      test('"đầu cơ" không kèm số vẫn cho qua', () {
+        expect(coachReplyBlock('Nhớ bảo dưỡng đầu cơ trước giải.', facts), isNull);
+      });
+    });
+
+    test('M8. "triệu chứng" không phải số; "hàng chục", "hàng triệu" vẫn bị chặn', () {
+      expect(coachReplyBlock('Triệu chứng: bi cái hay bị trôi sau cú đánh.', facts), isNull);
+      expect(coachReplyBlock('Bạn đã tập hàng chục buổi.', facts), CoachBlockRule.unknownNumber);
+      expect(coachReplyBlock('Có hàng triệu cách tập.', facts), CoachBlockRule.unknownNumber);
+    });
+
+    test('chuỗi Vi của huấn luyện viên vẫn cho qua bộ lọc chat', () {
+      final lines = [
+        ...Vi.coachChatSamples,
+        Vi.coachChatInsufficient,
+        Vi.coachChatInsufficientHint,
+        Vi.coachChatDisclaimer,
+        Vi.coachChatQuotaOut,
+        Vi.coachChatRemaining(5),
+        Vi.coachChatThinking,
+        Vi.safetyThickness(1, ThicknessSide.full),
+        for (final t in [0.75, 0.5, 0.25, 0.125])
+          for (final side in [ThicknessSide.left, ThicknessSide.right]) Vi.safetyThickness(t, side),
+      ];
+      for (final line in lines) {
+        // facts mang chính các số của câu: chỉ còn luật chữ và luật ký tự được thử.
+        expect(coachReplyBlock(line, {'line': line}), isNull, reason: line);
+      }
     });
   });
 }

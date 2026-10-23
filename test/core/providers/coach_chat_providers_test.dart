@@ -16,6 +16,7 @@ import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
+import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
@@ -392,6 +393,266 @@ void main() {
       expect(chat.asked, isEmpty); // chưa từng tới được backend
     },
   );
+
+  group('đăng xuất và quên khi câu hỏi còn đang chờ (I1, review cuối)', () {
+    // Dựng thật như app: repository theo `currentUserIdProvider`, auth giả
+    // đổi trạng thái được — để build() chạy lại đúng như khi đăng xuất.
+    ProviderContainer chatContainer(AppDatabase db, FakeAuthRepository auth, FakeCoachChat chat) {
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(auth),
+          appDatabaseProvider.overrideWithValue(db),
+          coachChatBackendProvider.overrideWithValue(chat),
+          coachContextProvider.overrideWithValue(AsyncData(fullCoachContext())),
+          nowProvider.overrideWithValue(() => testToday),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    AppDatabase memoryDb() {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      return db;
+    }
+
+    // Như ProfileScreen: đọc notifier ngay lúc đăng xuất, không giữ sẵn.
+    Future<void> forget(ProviderContainer container, AppDatabase db, FakeAuthRepository auth) => signOutAndForget(
+          db: db,
+          auth: auth,
+          userId: 'u1',
+          forgetChatInFlight: container.read(coachChatControllerProvider.notifier).forgetInFlight,
+        );
+
+    Future<List<String>> savedTexts(AppDatabase db, String userId) async =>
+        (await CoachChatRepository(db, userId: userId).recentTurns(10)).map((e) => e.text).toList();
+
+    test('1. câu trả lời muộn không được lưu lại sau khi xoá, và không ghi gì vào state', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      final states = <CoachChatState>[];
+      container.listen(coachChatControllerProvider, (_, next) => states.add(next));
+      await pumpEventQueue();
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      final send = container.read(coachChatControllerProvider.notifier).send('Câu hỏi riêng tư của u1');
+      await pumpEventQueue();
+      expect(chat.asked, hasLength(1));
+
+      await forget(container, db, auth);
+      await pumpEventQueue();
+      expect(await savedTexts(db, 'u1'), isEmpty);
+
+      // Người sau đăng nhập và đang gửi câu của mình. Riverpod bỏ qua lần
+      // ghi state bằng đúng giá trị cũ, nên chỉ khi state hiện tại KHÁC
+      // "idle" thì một lần ghi lạc từ câu cũ (dù chỉ là "về idle") mới lộ ra.
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      final hold2 = Completer<void>();
+      chat.hold = hold2;
+      final send2 = container.read(coachChatControllerProvider.notifier).send('Câu hỏi của u2');
+      await pumpEventQueue();
+      final before = container.read(coachChatControllerProvider);
+      expect(before, (status: CoachChatStatus.sending, pending: 'Câu hỏi của u2', remaining: null));
+      final writesBefore = states.length;
+
+      hold.complete();
+      await send;
+      await pumpEventQueue();
+
+      expect(await savedTexts(db, 'u1'), isEmpty);
+      expect(states, hasLength(writesBefore));
+      expect(container.read(coachChatControllerProvider), before);
+
+      hold2.complete();
+      await send2;
+    });
+
+    test('2. tự động đăng xuất (hết phiên) khi đang chờ: vẫn lưu vào u1 như R19', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      final send = container.read(coachChatControllerProvider.notifier).send('Câu hỏi của u1');
+      await pumpEventQueue();
+
+      auth.emit(const SignedOut(expired: true));
+      await pumpEventQueue();
+      hold.complete();
+      await send;
+      await pumpEventQueue();
+
+      expect(await savedTexts(db, 'u1'), ['Câu hỏi của u1', chat.replyText]);
+    });
+
+    test(
+      '3. qua nhiều generation: gửi, hết phiên, đăng nhập lại u1, rồi đăng xuất '
+      'và quên — câu trả lời cũ tới sau không được lưu',
+      () async {
+        final db = memoryDb();
+        final auth = FakeAuthRepository.signedIn(userId: 'u1');
+        final chat = FakeCoachChat();
+        final container = chatContainer(db, auth, chat);
+        container.listen(coachChatControllerProvider, (_, _) {});
+        await pumpEventQueue();
+
+        final hold = Completer<void>();
+        chat.hold = hold;
+        final send = container.read(coachChatControllerProvider.notifier).send('Câu hỏi riêng tư của u1');
+        await pumpEventQueue();
+
+        auth.emit(const SignedOut(expired: true));
+        await pumpEventQueue();
+        auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
+        await pumpEventQueue();
+        await forget(container, db, auth);
+        await pumpEventQueue();
+
+        hold.complete();
+        await send;
+        await pumpEventQueue();
+
+        expect(await savedTexts(db, 'u1'), isEmpty);
+      },
+    );
+
+    test('4. đăng xuất ném lỗi sau khi đã đánh dấu: state về idle, không lưu gì', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+      final controller = container.read(coachChatControllerProvider.notifier);
+      await controller.loadQuota();
+      expect(container.read(coachChatControllerProvider).remaining, 30);
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      final send = controller.send('Câu hỏi riêng tư của u1');
+      await pumpEventQueue();
+
+      auth.nextFailure = AuthFailure.unknown;
+      await expectLater(forget(container, db, auth), throwsA(AuthFailure.unknown));
+      await pumpEventQueue();
+      expect(auth.current, const SignedIn(userId: 'u1', displayName: 'An'));
+
+      hold.complete();
+      await send;
+      await pumpEventQueue();
+
+      // Không kẹt ở "đang gửi", không giữ câu hỏi để Thử lại, không đổi lượt còn lại.
+      expect(
+        container.read(coachChatControllerProvider),
+        (status: CoachChatStatus.idle, pending: null, remaining: 30),
+      );
+      expect(await savedTexts(db, 'u1'), isEmpty);
+    });
+
+    test('4b. như 4 nhưng câu trả lời muộn là lỗi: về idle, không giữ câu đã quên để Thử lại', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+      final controller = container.read(coachChatControllerProvider.notifier);
+      await controller.loadQuota();
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      chat.nextError = const CoachChatUnavailable('lỗi mạng');
+      final send = controller.send('Câu hỏi riêng tư của u1');
+      await pumpEventQueue();
+
+      auth.nextFailure = AuthFailure.unknown;
+      await expectLater(forget(container, db, auth), throwsA(AuthFailure.unknown));
+      hold.complete();
+      await send;
+      await pumpEventQueue();
+
+      expect(
+        container.read(coachChatControllerProvider),
+        (status: CoachChatStatus.idle, pending: null, remaining: 30),
+      );
+      await controller.retry();
+      expect(chat.asked, hasLength(1));
+    });
+
+    test('5. câu gửi SAU khi quên (đăng nhập lại) vẫn được lưu bình thường', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      final oldSend = container.read(coachChatControllerProvider.notifier).send('Câu hỏi cũ của u1');
+      await pumpEventQueue();
+      await forget(container, db, auth);
+      await pumpEventQueue();
+
+      auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
+      await pumpEventQueue();
+      chat.hold = null;
+      await container.read(coachChatControllerProvider.notifier).send('Câu hỏi mới sau khi đăng nhập lại');
+      await pumpEventQueue();
+      expect(await savedTexts(db, 'u1'), ['Câu hỏi mới sau khi đăng nhập lại', chat.replyText]);
+
+      // Câu cũ (gửi trước lúc quên) tới sau cùng: vẫn bị bỏ, câu mới còn nguyên.
+      hold.complete();
+      await oldSend;
+      await pumpEventQueue();
+      expect(await savedTexts(db, 'u1'), ['Câu hỏi mới sau khi đăng nhập lại', chat.replyText]);
+      expect(
+        container.read(coachChatControllerProvider),
+        (status: CoachChatStatus.idle, pending: null, remaining: 29),
+      );
+    });
+
+    test('6. quên tài khoản khác không bỏ câu đang chờ của u1 (mốc theo từng tài khoản)', () async {
+      final db = memoryDb();
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      final chat = FakeCoachChat();
+      final container = chatContainer(db, auth, chat);
+      container.listen(coachChatControllerProvider, (_, _) {});
+      await pumpEventQueue();
+
+      final hold = Completer<void>();
+      chat.hold = hold;
+      final send = container.read(coachChatControllerProvider.notifier).send('Câu hỏi của u1');
+      await pumpEventQueue();
+
+      auth.emit(const SignedOut(expired: true));
+      await pumpEventQueue();
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      await signOutAndForget(
+        db: db,
+        auth: auth,
+        userId: 'u2',
+        forgetChatInFlight: container.read(coachChatControllerProvider.notifier).forgetInFlight,
+      );
+      await pumpEventQueue();
+
+      hold.complete();
+      await send;
+      await pumpEventQueue();
+
+      expect(await savedTexts(db, 'u1'), ['Câu hỏi của u1', chat.replyText]);
+    });
+  });
 }
 
 /// `recentTurns` luôn ném — dựng lỗi đọc lịch sử có kiểm soát cho test M1,

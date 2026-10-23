@@ -197,24 +197,20 @@ void main() {
     );
     router.go(Routes.coach);
     await tester.pumpAndSettle();
-    // Viewport mặc định (800×600): thẻ chat ĐÃ được xây (không phải chưa
-    // tồn tại), nhưng nằm ngoài khung nhìn của ListView nên bị
-    // `skipOffstage` (mặc định của mọi Finder) loại khỏi `evaluate()` —
-    // `ensureVisible` gọi `element()` → `.single` nên ném "Bad state: No
-    // element" nếu gọi MỘT MÌNH. `scrollUntilVisible` tự cuộn `Scrollable`
-    // của chính CoachScreen tới khi phần tử không còn offstage (M2, review
-    // Task 11 fix round 1, probe A) — nhưng Sliver xây trước cả các mục còn
-    // nằm trong `cacheExtent` (~250px NGOÀI khung nhìn thật), nên "không
-    // offstage" chưa chắc đã nằm trong khung nhìn thật để `tap()` chạm
-    // trúng (tâm tính ra từng rơi ở (400, 699), ngoài Size(800, 600)). Gọi
-    // tiếp `ensureVisible` sau đó để cuộn CHÍNH XÁC tới khung nhìn — an
-    // toàn vì phần tử đã tồn tại (không còn offstage) sau bước trên.
+    // Viewport mặc định (800×600): thẻ chat nằm dưới khung nhìn của
+    // CoachScreen, nên `skipOffstage` (mặc định của mọi Finder) chưa thấy
+    // nó. `scrollUntilVisible` kéo `Scrollable` của CoachScreen tới khi thẻ
+    // lộ ra, rồi tự gọi `Scrollable.ensureVisible` để nhảy thẻ vào hẳn khung
+    // nhìn — nhưng sau cú nhảy cuối đó nó KHÔNG pump frame nào: bố cục vẫn
+    // là bố cục cũ, `tap()` tính tâm thẻ ở (400, 699), ngoài Size(800, 600),
+    // và chạm hụt. `pumpAndSettle` dựng frame sau cú nhảy, nên `tap()` chạm
+    // đúng chỗ thẻ đang nằm. Gọi thêm `ensureVisible` không giúp gì: nó cũng
+    // chỉ nhảy, không pump (M2, review Task 11 fix round 1; M9, review cuối).
     await tester.scrollUntilVisible(
       find.byKey(CoachScreen.chatSampleKey(1)),
       50,
       scrollable: find.descendant(of: find.byType(CoachScreen), matching: find.byType(Scrollable)),
     );
-    await tester.ensureVisible(find.byKey(CoachScreen.chatSampleKey(1)));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(CoachScreen.chatSampleKey(1)));
     await tester.pumpAndSettle();

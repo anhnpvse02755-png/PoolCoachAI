@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
@@ -11,6 +12,7 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
@@ -30,8 +32,11 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/auth/presentation/login_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
+import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 
+import '../../support/coach_chat_fixtures.dart';
 import '../../support/fake_auth.dart';
+import '../../support/fake_coach_chat.dart';
 import '../../support/fake_directus.dart';
 
 void main() {
@@ -43,6 +48,7 @@ void main() {
     int unsyncable = 0,
     bool pendingRoadmap = false,
     bool pendingPractice = false,
+    FakeCoachChat? coachChat,
   }) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
@@ -197,6 +203,10 @@ void main() {
         assessmentSyncProvider.overrideWithValue(assessmentSync),
         roadmapSyncProvider.overrideWithValue(roadmapSync),
         coachSyncProvider.overrideWithValue(coachSync),
+        if (coachChat != null) ...[
+          coachChatBackendProvider.overrideWithValue(coachChat),
+          coachContextProvider.overrideWithValue(AsyncData(fullCoachContext())),
+        ],
       ],
     );
     addTearDown(container.dispose);
@@ -245,6 +255,32 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
     expect(find.byType(LoginScreen), findsOneWidget);
   });
+
+  testWidgets(
+    'đăng xuất khi câu hỏi Coach Chat còn đang chờ: câu trả lời tới sau '
+    'không dựng lại lịch sử chat vừa xoá (I1, review cuối)',
+    (tester) async {
+      final chat = FakeCoachChat()..hold = Completer<void>();
+      final (db, _, _) = await openProfile(tester, coachChat: chat);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ProfileScreen)),
+      );
+      final send = container
+          .read(coachChatControllerProvider.notifier)
+          .send('Câu hỏi riêng tư của An');
+      await tester.pump();
+      expect(chat.asked, hasLength(1));
+
+      await tester.tap(find.text(Vi.profileSignOut));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+
+      chat.hold!.complete();
+      await send;
+      await tester.pumpAndSettle();
+      expect(await db.select(db.coachChatTurnRows).get(), isEmpty);
+    },
+  );
 
   testWidgets('còn buổi chờ thì cảnh báo trước, bấm Vẫn đăng xuất thì mất', (
     tester,
