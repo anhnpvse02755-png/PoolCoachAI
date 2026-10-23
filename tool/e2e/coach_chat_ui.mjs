@@ -8,7 +8,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { launch } from './cdp.mjs';
+import { launch, sleep } from './cdp.mjs';
 import { registerThrowaway, deleteUserByEmail } from './throwaway_user.mjs';
 
 // Bài này luôn tạo user thật trên Directus, nên phải có quyền xoá nó. Địa chỉ
@@ -36,6 +36,36 @@ function check(ok, what) {
   if (!ok) failed++;
 }
 
+/// Chờ tới [timeoutMs] cho nút semantics khớp [label] hết aria-disabled.
+///
+/// Nút câu hỏi mẫu chỉ bật khi chatContextReady true, tức coachContextProvider
+/// đã có đủ dữ liệu (coach_screen.dart:66, :157) — trước đó cdp.mjs's click()
+/// vẫn "bấm" được vì nó không kiểm disabled, nhưng Flutter lờ đi, nên phải tự
+/// chờ ở đây trước khi bấm. Dò đúng node mà click() sẽ chọn (ưu tiên role
+/// button, rồi nhãn ngắn nhất) để không chờ nhầm node khác trùng chữ.
+/// Engine Flutter web set aria-disabled="true" lúc khoá và XOÁ HẲN thuộc tính
+/// lúc bật (không set "false") — xác nhận bằng cách tìm "aria-disabled" trong
+/// build/web/main.dart.js đã build (lớp role tương ứng gọi setAttribute khi
+/// khoá, removeAttribute khi bật).
+async function waitForEnabled(tab, label, timeoutMs) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    await tab.semantics();
+    const disabled = await tab.eval(`(() => {
+      const hits = [...document.querySelectorAll('flt-semantics')]
+        .map((e) => ({ e, t: (e.getAttribute('aria-label') || e.textContent || '').trim() }))
+        .filter((x) => x.t.includes(${JSON.stringify(label)}))
+        .sort((a, b) => (a.e.getAttribute('role') === 'button' ? 0 : 1) - (b.e.getAttribute('role') === 'button' ? 0 : 1)
+          || a.t.length - b.t.length);
+      if (!hits.length) return null;
+      return hits[0].e.getAttribute('aria-disabled') === 'true';
+    })()`);
+    if (disabled === false) return true;
+    await sleep(1000);
+  }
+  return false;
+}
+
 const tab = await launch({ port: 9343, name: 'coach-chat' });
 
 try {
@@ -43,6 +73,12 @@ try {
 
   await tab.goto(`${APP}/coach`);
   await tab.waitForText('Hỏi huấn luyện viên');
+
+  // Tiêu đề thẻ hiện ngay, nhưng nút câu hỏi mẫu chỉ bật khi coachContextProvider
+  // xong — chờ ở đây để không bấm hụt rồi ngồi chờ oan 120 s coi như lỗi backend.
+  if (!(await waitForEnabled(tab, SAMPLE_QUESTION, 30000))) {
+    throw new Error('nút câu hỏi mẫu vẫn bị khoá (dữ liệu Coach chưa sẵn sàng) sau 30 s');
+  }
   await tab.click(SAMPLE_QUESTION);
 
   // `_askSample` gửi câu hỏi nền rồi chuyển ngay sang /coach/chat — hạn mức

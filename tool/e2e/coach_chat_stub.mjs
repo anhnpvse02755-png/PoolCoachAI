@@ -61,11 +61,14 @@ function sendNoBody(res, status, headers = {}) {
 
 /// Đọc hết thân yêu cầu rồi bỏ: bài này không cần nội dung, nhưng vẫn phải
 /// đọc hết luồng tới `end` để phía khách không bị đứt kết nối (như
-/// readRawBody của server.mjs thật).
+/// readRawBody của server.mjs thật). Phải bắt cả 'error' — khách bỏ giữa
+/// chừng (đóng kết nối sớm) thì luồng không bao giờ bắn 'end', và không có
+/// nhánh này thì request treo mãi.
 function drain(req) {
   return new Promise((resolve) => {
     req.on('data', () => {});
     req.on('end', resolve);
+    req.on('error', resolve);
   });
 }
 
