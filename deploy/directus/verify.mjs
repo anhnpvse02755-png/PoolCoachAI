@@ -493,6 +493,106 @@ try {
     fail('thiếu id của A hoặc B, bỏ qua phần Coach');
   }
 
+  // ─── Coach chat usage: role CoachChatService, user dịch vụ, quyền ───────
+  const serviceRole = (await call('GET', '/roles?filter[name][_eq]=CoachChatService', undefined, admin.access_token)).data?.[0];
+  serviceRole?.id ? ok('tìm thấy role CoachChatService') : fail('không tìm thấy role CoachChatService');
+
+  if (serviceRole?.id && aId) {
+    const svcEmail = `verify-${tag}-svc@poolcoachai.example.com`;
+    const svcToken = randomBytes(24).toString('hex');
+    const svcCreated = await call('POST', '/users', {
+      email: svcEmail,
+      role: serviceRole.id,
+      status: 'active',
+      token: svcToken,
+    }, admin.access_token);
+    svcCreated.status === 200 || svcCreated.status === 201
+      ? ok('admin tạo được user dịch vụ tạm để kiểm thử')
+      : fail(`tạo user dịch vụ tạm → ${svcCreated.status} ${svcCreated.code}`);
+
+    const usageRow = {
+      id: `${aId}_2000-01-01`,
+      user: aId,
+      day: '2000-01-01',
+      questions: 1,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+    };
+    const uMade = await call('POST', '/items/coach_chat_usage', usageRow, svcToken);
+    uMade.status === 200
+      ? ok('dịch vụ tạo được dòng coach_chat_usage')
+      : fail(`dịch vụ tạo dòng coach_chat_usage → ${uMade.status} ${uMade.code}`);
+
+    const uAgain = await call('POST', '/items/coach_chat_usage', usageRow, svcToken);
+    uAgain.code === 'RECORD_NOT_UNIQUE'
+      ? ok('dịch vụ gửi lại cùng id → RECORD_NOT_UNIQUE')
+      : fail(`dịch vụ gửi lại cùng id → ${uAgain.status} ${uAgain.code}`);
+
+    const uList = await call(
+      'GET',
+      `/items/coach_chat_usage?filter[id][_eq]=${encodeURIComponent(usageRow.id)}`,
+      undefined,
+      svcToken,
+    );
+    uList.data?.length === 1
+      ? ok('dịch vụ đọc được đúng một dòng coach_chat_usage')
+      : fail(`dịch vụ đọc được ${uList.data?.length} dòng coach_chat_usage`);
+
+    const uPatch = await call('PATCH', `/items/coach_chat_usage/${usageRow.id}`, { questions: 2 }, svcToken);
+    uPatch.status === 200
+      ? ok('dịch vụ sửa được dòng coach_chat_usage')
+      : fail(`dịch vụ sửa dòng coach_chat_usage → ${uPatch.status} ${uPatch.code}`);
+
+    const uDelete = await call('DELETE', `/items/coach_chat_usage/${usageRow.id}`, undefined, svcToken);
+    uDelete.status === 403
+      ? ok('dịch vụ không xoá được dòng coach_chat_usage')
+      : fail(`dịch vụ xoá dòng coach_chat_usage → ${uDelete.status}`);
+
+    const uDrill = await call('GET', '/items/drill_logs', undefined, svcToken);
+    uDrill.status === 403
+      ? ok('dịch vụ không đọc được drill_logs')
+      : fail(`dịch vụ đọc drill_logs → ${uDrill.status}`);
+
+    // Player A không có quyền gì trên coach_chat_usage.
+    const aUsageGet = await call('GET', '/items/coach_chat_usage', undefined, a.access_token);
+    aUsageGet.status === 403
+      ? ok('A không đọc được coach_chat_usage')
+      : fail(`A đọc coach_chat_usage → ${aUsageGet.status}`);
+    const aUsagePost = await call(
+      'POST',
+      '/items/coach_chat_usage',
+      { ...usageRow, id: `${aId}_2000-01-02` },
+      a.access_token,
+    );
+    aUsagePost.status === 403
+      ? ok('A không tạo được dòng coach_chat_usage')
+      : fail(`A tạo dòng coach_chat_usage → ${aUsagePost.status}`);
+    const aUsagePatch = await call(
+      'PATCH',
+      `/items/coach_chat_usage/${usageRow.id}`,
+      { questions: 9 },
+      a.access_token,
+    );
+    aUsagePatch.status === 403
+      ? ok('A không sửa được coach_chat_usage')
+      : fail(`A sửa coach_chat_usage → ${aUsagePatch.status}`);
+  } else {
+    fail('thiếu role CoachChatService hoặc id của A, bỏ qua phần coach_chat_usage');
+  }
+
+  // User dịch vụ coach-chat thật (không phải user tạm ở trên) phải có role
+  // CoachChatService và một token tĩnh (không log giá trị token).
+  const realService = (await call(
+    'GET',
+    `/users?filter[email][_eq]=${encodeURIComponent('coach-chat-service@poolcoachai.example.com')}&fields=token,role.name`,
+    undefined,
+    admin.access_token,
+  )).data?.[0];
+  realService?.role?.name === 'CoachChatService' && realService?.token
+    ? ok('user dịch vụ coach-chat thật có role CoachChatService và có token')
+    : fail(`user dịch vụ coach-chat thật: role=${realService?.role?.name ?? '(không có)'}, token=${realService?.token ? 'có' : 'không có'}`);
+
   const adminRole = (await call('GET', '/roles?filter[name][_eq]=Administrator', undefined, admin.access_token)).data?.[0]?.id;
   await call('PATCH', '/users/me', { role: adminRole }, a.access_token);
   const roleAfter = await roleOf(users[0].email);
@@ -539,9 +639,15 @@ try {
     relogin?.access_token ? ok('đăng nhập bằng mật khẩu mới') : fail('không đăng nhập được bằng mật khẩu mới');
   }
 } finally {
-  // Dọn user thử; CASCADE xoá luôn buổi tập của họ.
+  // Dọn user thử; CASCADE xoá luôn buổi tập của họ (và user dịch vụ tạm, nếu có).
   const ids = (await call('GET', `/users?filter[email][_starts_with]=verify-${tag}&fields=id`, undefined, admin.access_token)).data.map((u) => u.id);
   if (ids.length) await call('DELETE', '/users', ids, admin.access_token);
+
+  // Xoá user A (chủ dòng coach_chat_usage) phải CASCADE xoá luôn dòng đó.
+  const usageAfter = await call('GET', '/items/coach_chat_usage?filter[day][_eq]=2000-01-01', undefined, admin.access_token);
+  (usageAfter.data ?? []).length === 0
+    ? ok('xoá user kéo theo xoá dòng coach_chat_usage (CASCADE theo trường user)')
+    : fail(`còn ${usageAfter.data?.length} dòng coach_chat_usage sau khi xoá user — CASCADE chưa đúng`);
 }
 
 console.log(failures ? `\n${failures} kiểm tra hỏng` : '\nTất cả kiểm tra đều qua');
