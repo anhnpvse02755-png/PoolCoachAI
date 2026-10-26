@@ -173,8 +173,21 @@ const withMeta = (name, f) => ({
   meta: { ...(f.meta ?? {}), collection: name, field: f.field },
 });
 
-async function ensureCollection(name, note, fields) {
-  const all = [...fields, ...ownerFields].map((f) => withMeta(name, f));
+async function ensureUserRelation(collection, field) {
+  if (!(await exists(`/relations/${collection}/${field}`))) {
+    // Xoá người dùng thì xoá luôn dữ liệu của họ (CASCADE).
+    await api('POST', '/relations', {
+      collection,
+      field,
+      related_collection: 'directus_users',
+      schema: { on_delete: 'CASCADE' },
+    }, token);
+    console.log(`Tạo quan hệ ${collection}.${field} → directus_users`);
+  }
+}
+
+async function ensureCollection(name, note, fields, { owned = true } = {}) {
+  const all = (owned ? [...fields, ...ownerFields] : fields).map((f) => withMeta(name, f));
   if (!(await exists(`/collections/${name}`))) {
     await api('POST', '/collections', {
       collection: name,
@@ -193,15 +206,10 @@ async function ensureCollection(name, note, fields) {
       }
     }
   }
-  if (!(await exists(`/relations/${name}/user_created`))) {
-    // Xoá người dùng thì xoá luôn hạng và bài kiểm tra của họ.
-    await api('POST', '/relations', {
-      collection: name,
-      field: 'user_created',
-      related_collection: 'directus_users',
-      schema: { on_delete: 'CASCADE' },
-    }, token);
-    console.log(`Tạo quan hệ ${name}.user_created → directus_users`);
+  // owned = false: collection không có user_created (vd. coach_chat_usage,
+  // nơi quan hệ tới người dùng là trường `user` do ensureUserRelation riêng lo).
+  if (owned) {
+    await ensureUserRelation(name, 'user_created');
   }
 }
 
@@ -280,6 +288,23 @@ await ensureCollection('coach_attempts', 'Lần làm tình huống Coach — ch�
   required('started_at', 'timestamp'),
   required('finished_at', 'timestamp'),
 ]);
+
+// ─── 1e. Coach chat usage (spec 2026-10-22, Coach Phase B) ─────────────────
+// coach_chat_usage: đếm lượt hỏi và token mỗi người mỗi ngày, id = `${user}_${day}`.
+// Chỉ dịch vụ coach-chat (role CoachChatService) đọc/ghi; Player không có quyền
+// gì trên collection này — owned: false vì chủ bản ghi không phải người tạo ra
+// nó (dịch vụ tạo thay người chơi), nên không có user_created/CASCADE theo kiểu
+// thường mà có quan hệ CASCADE riêng theo trường `user`.
+await ensureCollection('coach_chat_usage', 'Lượt hỏi Coach Chat mỗi ngày — chỉ dịch vụ coach-chat ghi', [
+  { field: 'id', type: 'string', schema: { is_primary_key: true, is_nullable: false, max_length: 64 } },
+  required('user', 'uuid'),
+  required('day', 'string'),
+  required('questions', 'integer'),
+  required('input_tokens', 'integer'),
+  required('output_tokens', 'integer'),
+  required('cache_read_tokens', 'integer'),
+], { owned: false });
+await ensureUserRelation('coach_chat_usage', 'user');
 
 // Equipment dùng updated_at/is_deleted để đồng bộ và xóa mềm đa thiết bị.
 await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng của người chơi', [
@@ -363,10 +388,20 @@ const links = await api(
 );
 if (!links.length) await api('POST', '/access', { role: role.id, policy: policy.id }, token);
 
-// ─── 3. Quyền Player policy (spec §3.3) ──────────────────────────────────────
 // An toàn: tạo quyền mới trước, xoá cũ sau — nếu tạo thất bại thì quyền cũ vẫn còn.
 // Batch POST trả về toàn bộ permissions (không chỉ permission vừa tạo), nên dùng
 // oldPermissions.length làm số lượng cũ.
+async function replacePermissions(policyId, desired) {
+  const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policyId}&limit=-1`, undefined, token);
+  const newPerms = desired.map((p) => ({ ...p, policy: policyId }));
+  await api('POST', '/permissions', newPerms, token);
+  if (oldPermissions.length > 0) {
+    await api('DELETE', '/permissions', oldPermissions.map((p) => p.id), token);
+  }
+  return { newCount: newPerms.length, oldCount: oldPermissions.length };
+}
+
+// ─── 3. Quyền Player policy (spec §3.3) ──────────────────────────────────────
 const self = { id: { _eq: '$CURRENT_USER' } };
 const desiredPermissions = [
   {
@@ -541,19 +576,87 @@ const desiredPermissions = [
   },
 ];
 
-const oldPermissions = await api('GET', `/permissions?filter[policy][_eq]=${policy.id}&limit=-1`, undefined, token);
-const oldCount = oldPermissions.length;
-const newPerms = desiredPermissions.map((p) => ({ ...p, policy: policy.id }));
-
-// Tạo tất cả quyền mới trước (batch)
-await api('POST', '/permissions', newPerms, token);
-
-// Xoá quyền cũ
-if (oldCount > 0) {
-  await api('DELETE', '/permissions', oldPermissions.map((p) => p.id), token);
+{
+  const { newCount, oldCount } = await replacePermissions(policy.id, desiredPermissions);
+  console.log(`Đặt ${newCount} quyền cho Player policy (xoá ${oldCount} quyền cũ)`);
 }
 
-console.log(`Đặt ${newPerms.length} quyền cho Player policy (xoá ${oldCount} quyền cũ)`);
+// ─── 3b. Role CoachChatService và quyền trên coach_chat_usage ─────────────
+// server/coach-chat (Node) ghi/đọc coach_chat_usage bằng token tĩnh của một
+// user riêng, không phải token người chơi. Player không có quyền gì trên
+// collection này (kiểm ở verify.mjs: Player → 403 trên GET/POST/PATCH).
+const serviceRole = await findOrCreate('/roles', 'CoachChatService', {
+  name: 'CoachChatService',
+  icon: 'smart_toy',
+  description: 'Dịch vụ coach-chat (server/coach-chat) — chỉ đọc/ghi coach_chat_usage',
+});
+const servicePolicy = await findOrCreate('/policies', 'CoachChatService', {
+  name: 'CoachChatService',
+  icon: 'smart_toy',
+  admin_access: false,
+  app_access: false,
+  description: 'Quyền của dịch vụ coach-chat trên coach_chat_usage',
+});
+const serviceLinks = await api(
+  'GET',
+  `/access?filter[role][_eq]=${serviceRole.id}&filter[policy][_eq]=${servicePolicy.id}`,
+  undefined,
+  token,
+);
+if (!serviceLinks.length) {
+  await api('POST', '/access', { role: serviceRole.id, policy: servicePolicy.id }, token);
+}
+
+{
+  const { newCount, oldCount } = await replacePermissions(servicePolicy.id, [
+    {
+      collection: 'coach_chat_usage',
+      action: 'create',
+      fields: ['id', 'user', 'day', 'questions', 'input_tokens', 'output_tokens', 'cache_read_tokens'],
+      permissions: {},
+      validation: {},
+    },
+    { collection: 'coach_chat_usage', action: 'read', fields: ['*'], permissions: {} },
+    {
+      collection: 'coach_chat_usage',
+      action: 'update',
+      fields: ['questions', 'input_tokens', 'output_tokens', 'cache_read_tokens'],
+      permissions: {},
+      validation: {},
+    },
+  ]);
+  console.log(`Đặt ${newCount} quyền cho CoachChatService policy (xoá ${oldCount} quyền cũ)`);
+}
+
+// Người dùng dịch vụ coach-chat: email cố định, token tĩnh đặt qua
+// COACH_CHAT_SERVICE_TOKEN (tuỳ chọn — R9). Không bao giờ in token ra log.
+const serviceEmail = 'coach-chat-service@poolcoachai.example.com';
+const serviceToken = process.env.COACH_CHAT_SERVICE_TOKEN;
+const existingServiceUsers = await api(
+  'GET',
+  `/users?filter[email][_eq]=${encodeURIComponent(serviceEmail)}&fields=id`,
+  undefined,
+  token,
+);
+const existingServiceUser = existingServiceUsers[0] ?? null;
+if (!existingServiceUser) {
+  await api('POST', '/users', {
+    email: serviceEmail,
+    role: serviceRole.id,
+    status: 'active',
+    first_name: 'coach-chat',
+    ...(serviceToken ? { token: serviceToken } : {}),
+  }, token);
+  console.log(`Tạo người dùng dịch vụ ${serviceEmail}`);
+} else if (serviceToken) {
+  await api('PATCH', `/users/${existingServiceUser.id}`, { token: serviceToken, role: serviceRole.id }, token);
+  console.log(`Cập nhật token và role người dùng dịch vụ ${serviceEmail}`);
+} else {
+  console.log(`Người dùng dịch vụ ${serviceEmail} đã có (bỏ qua — không đặt COACH_CHAT_SERVICE_TOKEN)`);
+}
+if (!serviceToken) {
+  console.log('NOTE người dùng dịch vụ coach-chat chưa có token — chạy lại với COACH_CHAT_SERVICE_TOKEN');
+}
 
 // ─── 4. Đăng ký công khai ───────────────────────────────────────────────────
 await api('PATCH', '/settings', {

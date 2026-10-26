@@ -342,10 +342,6 @@ abstract final class Vi {
   static String equipmentDiameterValue(double millimeters) =>
       '${millimeters.toStringAsFixed(1)} mm';
 
-  static const coachComing =
-      'Hỏi huấn luyện viên hôm nay nên tập gì, '
-      'hoặc vì sao trận vừa rồi thua.';
-
   // Thông báo — nội dung do bộ lập lịch (lib/domain/notifications) điền
   // từ dữ liệu thật của người chơi.
   static String notificationKind(NotificationKind kind) => switch (kind) {
@@ -1739,7 +1735,34 @@ abstract final class Vi {
   static String coachLibraryCaption(String id, int k, int n) => 'Tình huống $k/$n · $id';
   static String coachLibrarySource(String source) => 'Nguồn: $source';
   static const coachLibraryEnd = 'Hết thư viện.';
-  static const coachChatSoonTitle = 'Trò chuyện với huấn luyện viên (sắp có)';
+
+  // Hỏi huấn luyện viên — chat tự do, Giai đoạn B (spec mục 3, Task 10).
+  static const coachChatTitle = 'Hỏi huấn luyện viên';
+  static const coachChatSubtitle = 'Trả lời dựa trên số liệu tập luyện của bạn';
+  static const coachChatSamples = <String>[
+    'Hôm nay tôi nên tập gì?',
+    'Tại sao tôi thua trận vừa rồi?',
+    'Tôi đang yếu kỹ năng nào?',
+  ];
+  static const coachChatOpen = 'Mở trò chuyện';
+  static const coachChatClear = 'Xoá cuộc trò chuyện';
+  static const coachChatThinking = 'Huấn luyện viên đang trả lời…';
+  static const coachChatInsufficient = 'Chưa đủ dữ liệu để trả lời câu này.';
+  static String coachChatRemaining(int n) => 'Còn $n lượt hỏi hôm nay';
+  static const coachChatQuotaOut = 'Hết lượt hỏi hôm nay, mai hỏi tiếp.';
+  static const coachChatRetry = 'Thử lại';
+  static const coachChatDisclaimer = 'Huấn luyện viên AI chỉ diễn giải số liệu của bạn và có thể sai.';
+
+  static const coachChatClearBody = 'Xoá mọi tin nhắn với huấn luyện viên trên máy này? Không lấy lại được.';
+  static const coachChatClearYes = 'Xoá';
+  static const coachChatInputHint = 'Hỏi về việc tập của bạn';
+  static const coachChatSend = 'Gửi';
+  static const coachChatInsufficientHint = 'Ghi thêm buổi tập, trận đấu hoặc tình huống Coach rồi hỏi lại.';
+  static const coachChatError = 'Chưa gửi được câu hỏi.';
+  static const coachChatContextError = 'Chưa đọc được số liệu tập luyện của bạn, nên chưa hỏi được.';
+  static const coachChatFromPlayer = 'Bạn';
+  static const coachChatFromCoach = 'Huấn luyện viên';
+
   static const coachRecTitle = 'Nên luyện gì';
 
   static String coachRecReason(CoachTopicReason reason, CoachTopic topic) => switch (reason) {

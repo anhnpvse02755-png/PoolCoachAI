@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
@@ -120,6 +121,9 @@ class ProfileScreen extends ConsumerWidget {
       db: db,
       auth: ref.read(authRepositoryProvider),
       userId: userId,
+      forgetChatInFlight: ref
+          .read(coachChatControllerProvider.notifier)
+          .forgetInFlight,
     );
   }
 

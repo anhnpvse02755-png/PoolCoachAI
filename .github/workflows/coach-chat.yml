@@ -1,0 +1,30 @@
+name: coach-chat / test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/coach-chat/**'
+      - '.github/workflows/coach-chat.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/coach-chat/**'
+      - '.github/workflows/coach-chat.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/coach-chat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/coach-chat/package-lock.json
+      - run: npm ci
+      - run: npm test

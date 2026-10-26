@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
+import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -239,7 +240,7 @@ void main() {
           ),
         );
 
-    await signOutAndForget(db: db, auth: auth, userId: 'u1');
+    await signOutAndForget(db: db, auth: auth, userId: 'u1', forgetChatInFlight: (_) {});
 
     final left = await db.select(db.drillLogRows).get();
     expect(left.map((r) => r.id), ['c']);
@@ -301,7 +302,7 @@ void main() {
       await pumpEventQueue();
       expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
 
-      final signingOut = signOutAndForget(db: db, auth: auth, userId: 'u1');
+      final signingOut = signOutAndForget(db: db, auth: auth, userId: 'u1', forgetChatInFlight: (_) {});
       await pumpEventQueue();
       pullGate.complete(); // server trả dữ liệu của người vừa đăng xuất
       await pass;
@@ -386,6 +387,7 @@ void main() {
       db: db,
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
+      forgetChatInFlight: (_) {},
     );
 
     expect((await db.select(db.playerRankRows).get()).map((r) => r.userId), [
@@ -464,11 +466,26 @@ void main() {
       db: db,
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
+      forgetChatInFlight: (_) {},
     );
 
     expect((await db.select(db.playerGoalRows).get()).map((r) => r.userId), [
       'u2',
     ]);
     expect(await db.select(db.achievementRows).get(), isEmpty);
+  });
+
+  test('đăng xuất và quên: xoá lịch sử Coach Chat của người này, giữ của người khác (I1, review cuối)', () async {
+    final at = DateTime(2026, 10, 22, 9);
+    for (final user in ['u1', 'u2']) {
+      await CoachChatRepository(db, userId: user).addExchange(
+        question: 'Câu hỏi của $user',
+        askedAt: at,
+        reply: (text: 'Câu trả lời cho $user', insufficient: false),
+        answeredAt: at,
+      );
+    }
+    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
+    expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), ['u2', 'u2']);
   });
 }

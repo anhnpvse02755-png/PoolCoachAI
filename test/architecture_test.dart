@@ -291,6 +291,28 @@ void main() {
     );
   });
 
+  test('app không gọi thẳng Claude và không chứa khoá Anthropic', () {
+    final files = dartFilesIn('lib');
+    expect(
+      files.any((f) => f.path.replaceAll(r'\', '/').endsWith('lib/data/remote/coach_chat_client.dart')),
+      isTrue,
+      reason: 'bài test này chỉ có nghĩa khi nó thực sự quét '
+          'coach_chat_client.dart — file đó mất khỏi lib/ thì test này '
+          'xanh một cách vô nghĩa',
+    );
+
+    final offenders = [
+      for (final f in files)
+        if (RegExp(
+          r'anthropic\.com|sk-ant-|ANTHROPIC_API_KEY|x-api-key',
+          caseSensitive: false,
+        ).hasMatch(f.readAsStringSync()))
+          f.path.replaceAll(r'\', '/'),
+    ];
+    expect(offenders, isEmpty,
+        reason: 'spec 2026-10-22 mục 9: khoá chỉ nằm ở dịch vụ coach-chat, app chỉ gọi dịch vụ đó');
+  });
+
   test('thành tích chỉ sinh ra từ newAchievements', () {
     // Thành tích tạo tay là thành tích "ảo" (spec 2026-10-15 mục 2.7). Ngoài
     // lõi và tầng dữ liệu, không nơi nào được dựng Achievement(.

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/coach/chat_filter.dart';
 import 'package:poolcoachai/domain/coach/coach_recommendation.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
@@ -118,6 +119,73 @@ void main() {
       expect(line.toLowerCase(), isNot(contains('bi ma')), reason: line);
       expect(line.toLowerCase(), isNot(contains('lọt bi cái')), reason: line);
       expect(line.toLowerCase(), isNot(contains('đầu gậy')), reason: line);
+    }
+  });
+
+  test('chuỗi Hỏi huấn luyện viên đúng từng chữ (Task 10)', () {
+    expect(Vi.coachChatTitle, 'Hỏi huấn luyện viên');
+    expect(Vi.coachChatSubtitle, 'Trả lời dựa trên số liệu tập luyện của bạn');
+    expect(Vi.coachChatSamples, const <String>[
+      'Hôm nay tôi nên tập gì?',
+      'Tại sao tôi thua trận vừa rồi?',
+      'Tôi đang yếu kỹ năng nào?',
+    ]);
+    expect(Vi.coachChatOpen, 'Mở trò chuyện');
+    expect(Vi.coachChatClear, 'Xoá cuộc trò chuyện');
+    expect(Vi.coachChatThinking, 'Huấn luyện viên đang trả lời…');
+    expect(Vi.coachChatInsufficient, 'Chưa đủ dữ liệu để trả lời câu này.');
+    expect(Vi.coachChatRemaining(5), 'Còn 5 lượt hỏi hôm nay');
+    expect(Vi.coachChatQuotaOut, 'Hết lượt hỏi hôm nay, mai hỏi tiếp.');
+    expect(Vi.coachChatRetry, 'Thử lại');
+    expect(
+      Vi.coachChatDisclaimer,
+      'Huấn luyện viên AI chỉ diễn giải số liệu của bạn và có thể sai.',
+    );
+    expect(
+      Vi.coachChatClearBody,
+      'Xoá mọi tin nhắn với huấn luyện viên trên máy này? Không lấy lại được.',
+    );
+    expect(Vi.coachChatClearYes, 'Xoá');
+    expect(Vi.coachChatInputHint, 'Hỏi về việc tập của bạn');
+    expect(Vi.coachChatSend, 'Gửi');
+    expect(
+      Vi.coachChatInsufficientHint,
+      'Ghi thêm buổi tập, trận đấu hoặc tình huống Coach rồi hỏi lại.',
+    );
+    expect(Vi.coachChatError, 'Chưa gửi được câu hỏi.');
+    expect(
+      Vi.coachChatContextError,
+      'Chưa đọc được số liệu tập luyện của bạn, nên chưa hỏi được.',
+    );
+    expect(Vi.coachChatFromPlayer, 'Bạn');
+    expect(Vi.coachChatFromCoach, 'Huấn luyện viên');
+  });
+
+  test('chuỗi Hỏi huấn luyện viên không dính mẫu cấm chung của Coach', () {
+    final lines = [
+      ...Vi.coachChatSamples,
+      Vi.coachChatTitle,
+      Vi.coachChatSubtitle,
+      Vi.coachChatOpen,
+      Vi.coachChatClear,
+      Vi.coachChatThinking,
+      Vi.coachChatInsufficient,
+      Vi.coachChatRemaining(5),
+      Vi.coachChatQuotaOut,
+      Vi.coachChatRetry,
+      Vi.coachChatDisclaimer,
+      Vi.coachChatClearBody,
+      Vi.coachChatClearYes,
+      Vi.coachChatInputHint,
+      Vi.coachChatSend,
+      Vi.coachChatInsufficientHint,
+      Vi.coachChatError,
+      Vi.coachChatContextError,
+      Vi.coachChatFromPlayer,
+      Vi.coachChatFromCoach,
+    ];
+    for (final line in lines) {
+      expect(coachBannedRule(line), isNull, reason: line);
     }
   });
 }

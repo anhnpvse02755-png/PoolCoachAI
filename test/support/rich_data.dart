@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -17,6 +18,33 @@ import 'test_data.dart';
 
 const _longPlayer = 'Nguyễn Văn Trường Giang';
 const _longOpponent = 'Trần Thị Bích Ngọc Hạnh';
+
+/// Câu hỏi khoảng 200 ký tự, câu trả lời khoảng 600 ký tự — quét chiều
+/// rộng và chữ lớn phải gặp bong bóng thật, không chỉ chuỗi ngắn.
+const _longQuestion =
+    'Tuần này tôi tập Ngắm bi và Vị trí đều đặn mỗi tối, nhưng trận vừa rồi '
+    'vẫn thua liên tiếp ba rack vì hỏng bi cắt mỏng và không giữ được vị trí '
+    'cho cú kế tiếp, vậy tôi nên đổi cách tập thế nào cho tuần sau?';
+const _longAnswer =
+    'Theo số liệu bạn ghi lại, nhóm Ngắm bi của bạn đạt 7 trên 10 lần gần '
+    'nhất còn nhóm Vị trí chỉ đạt 4 trên 10, nên phần hỏng vị trí đang kéo '
+    'điểm xuống nhiều hơn phần ngắm bi. Trận vừa rồi cả ba rack thua đều có '
+    'ít nhất một cú hỏng vị trí ngay trước cú hỏng bi cuối cùng, nên hai '
+    'việc này có liên quan tới nhau: giữ bi cái đúng chỗ thì cú cắt mỏng '
+    'tiếp theo mới dễ hơn. Tuần sau nên ưu tiên bài tập Vị trí thêm hai '
+    'buổi, giữ nguyên lịch Ngắm bi đang có, và ghi lại từng buổi để tuần '
+    'sau nữa so sánh được số liệu thật, không phải cảm giác. Khi nào hai '
+    'nhóm cùng đạt trên bảy trên mười lần gần nhất thì mới nên tăng độ khó '
+    'của bài tập Vị trí lên mức tiếp theo.';
+
+/// Lượt chat dài cho quét chiều rộng và chữ lớn: một câu hỏi ~200 ký tự,
+/// một câu trả lời ~600 ký tự, và một lượt bị chặn (chưa đủ dữ liệu).
+final coachChatTurnsRich = <CoachChatEntry>[
+  (id: 1, at: DateTime(2026, 10, 20, 9), fromPlayer: true, text: _longQuestion, insufficient: false),
+  (id: 2, at: DateTime(2026, 10, 20, 9, 1), fromPlayer: false, text: _longAnswer, insufficient: false),
+  (id: 3, at: DateTime(2026, 10, 21, 9), fromPlayer: true, text: 'Tôi hợp cơ nào nhất?', insufficient: false),
+  (id: 4, at: DateTime(2026, 10, 21, 9, 1), fromPlayer: false, text: '', insufficient: true),
+];
 
 /// Dữ liệu đầy, tên dài: quét tràn phải gặp hàng thật, không chỉ màn trống.
 ProviderContainer richContainer() => testContainer(
@@ -156,4 +184,5 @@ ProviderContainer richContainer() => testContainer(
     total: 137,
     lost: const {'F1': 5, 'F3': 4, 'S5': 6},
   ),
+  coachChatTurns: coachChatTurnsRich,
 );

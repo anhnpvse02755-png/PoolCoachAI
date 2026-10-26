@@ -20,6 +20,7 @@ void main() {
         Routes.coach,
         Routes.coachSituation,
         Routes.coachLibrary,
+        Routes.coachChat,
         Routes.notifications,
         Routes.drillPattern,
         Routes.drillSessionPattern,

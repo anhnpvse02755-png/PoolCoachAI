@@ -168,7 +168,7 @@ void main() {
   test('đăng xuất và quên: xoá lần làm Coach của người này, giữ của người khác', () async {
     await CoachAttemptRepository(db, userId: 'u1').record(sample('a'));
     await CoachAttemptRepository(db, userId: 'u2').record(sample('b', userId: 'u2'));
-    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1');
+    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
     expect((await db.select(db.coachAttemptRows).get()).map((r) => r.id), ['b']);
   });
 }

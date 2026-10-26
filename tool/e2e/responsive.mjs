@@ -18,6 +18,7 @@ import { registerThrowaway, deleteUserByEmail } from './throwaway_user.mjs';
 // app bắt buộc và không có mặc định: không bao giờ lỡ tạo user trên bản thật.
 const need = (n) => process.env[n] ?? (() => { throw new Error(`Thiếu ${n}`); })();
 need('DIRECTUS_URL');
+need('DIRECTUS_ADMIN_EMAIL');
 need('DIRECTUS_ADMIN_PASSWORD');
 if (!process.argv[2]) throw new Error('Thiếu địa chỉ app: node tool/e2e/responsive.mjs <appUrl>');
 
@@ -48,6 +49,7 @@ const ROUTES = [
   { name: 'rank', path: '/rank', title: 'Hạng của bạn' },
   { name: 'coach', path: '/coach', title: 'Huấn luyện viên AI' },
   { name: 'coach-library', path: '/coach/library', title: 'Thư viện tình huống' },
+  { name: 'coach-chat', path: '/coach/chat', title: 'Hỏi huấn luyện viên' },
 ];
 
 let failed = 0;

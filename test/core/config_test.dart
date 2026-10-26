@@ -39,5 +39,9 @@ void main() {
     test('the default web url is the live site', () {
       expect(webBaseUrl, 'https://poolcoachai.kjdybl.easypanel.host');
     });
+
+    test('the default coach-chat url is the planned Easypanel domain', () {
+      expect(coachChatUrl, 'https://poolcoachai-coach.kjdybl.easypanel.host');
+    });
   });
 }
