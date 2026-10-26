@@ -328,20 +328,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Họ font chưa nạp thì chữ vẽ bằng font dự phòng của test (mỗi chữ rộng
-      // 1 em). Giờ font thật tới: Roboto hẹp hơn nhiều.
-      final root =
-          Platform.environment['FLUTTER_ROOT'] ??
-          File(Platform.resolvedExecutable)
-              .parent
-              .parent
-              .parent
-              .parent
-              .parent
-              .parent
-              .path;
-      final roboto = File(
-        '$root/bin/cache/artifacts/material_fonts/roboto-regular.ttf',
-      );
+      // 1 em). Giờ font thật tới: Roboto hẹp hơn nhiều. Font này nằm trong
+      // repo (test/fixtures/fonts), không đọc từ cache của Flutter SDK, vì
+      // bản cache SDK trên CI có thể thiếu material_fonts/roboto-regular.ttf
+      // dù máy local luôn có.
+      final roboto = File('test/fixtures/fonts/roboto-regular.ttf');
       expect(roboto.existsSync(), isTrue, reason: 'không thấy ${roboto.path}');
       final bytes = roboto.readAsBytesSync();
       await tester.runAsync(

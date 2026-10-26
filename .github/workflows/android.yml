@@ -31,10 +31,6 @@ jobs:
           channel: stable
           cache: true
 
-      # Cache của subosito/flutter-action có thể thiếu material_fonts (vd. roboto-regular.ttf)
-      # mà stats_screen_test.dart đọc trực tiếp từ $FLUTTER_ROOT/bin/cache/artifacts.
-      - run: flutter precache --universal --no-android --no-ios --no-web --no-linux --no-windows --no-macos --no-fuchsia
-
       - run: flutter pub get
 
       # database.g.dart không được commit.
