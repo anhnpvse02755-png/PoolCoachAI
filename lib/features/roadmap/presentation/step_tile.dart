@@ -28,7 +28,10 @@ class StepTile extends StatelessWidget {
           child: const Text(Vi.stepTrain),
         );
       case StepKind.lamBaiBu:
-        final from = (step.reason as RetestFrom).from;
+        final reason = step.reason;
+        // Mốc hạng không có ngày mở riêng: nút làm bài nằm ở bước BU cuối.
+        if (reason is! RetestFrom) return null;
+        final from = reason.from;
         if (from != null && today.isBefore(from)) return null;
         return FilledButton(
           onPressed: () => context.push(Routes.rankTest),

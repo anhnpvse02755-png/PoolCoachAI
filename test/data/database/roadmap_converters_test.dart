@@ -72,4 +72,17 @@ void main() {
     ))..remove('target_rank');
     expect(goalFromRemote(json).goal!.targetRank, isNull);
   });
+
+  test('target_rank thừa ở dòng không phải Lên hạng bị bỏ qua', () {
+    final json = toRemoteGoal(toGoalRow(
+      GoalRecord(
+        updatedAt: at,
+        goal: PlayerGoal(goalId: 'g5', kind: GoalKind.thuanThucKyNang, category: SkillCategory.aiming, createdAt: at),
+      ),
+      userId: 'u1',
+    ))..['target_rank'] = 'd';
+    final goal = goalFromRemote(json).goal!;
+    expect(goal.kind, GoalKind.thuanThucKyNang);
+    expect(goal.targetRank, isNull);
+  });
 }

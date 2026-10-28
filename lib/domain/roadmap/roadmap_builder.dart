@@ -6,6 +6,7 @@ import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/pace.dart';
@@ -48,15 +49,23 @@ Roadmap _lenHang(
       RoadmapStep(kind: StepKind.xacDinhHang, status: StepStatus.dangLam, reason: NeedRank()),
     ]);
   }
-  final target = nextRank(from);
+  final target = effectiveTarget(goal, from);
   if (target == null) {
     return Roadmap(goal: goal, blocked: LenHangBlock.topRank, from: from, steps: const []);
   }
 
   final retestFrom = retestAvailableFrom(tests);
   final needed = result == null ? null : buFloor(target) - result.total;
+  final milestones = [
+    for (var i = from.index + 1; i < target.index; i++) Rank.values[i],
+  ];
   final steps = <RoadmapStep>[
-    if (result != null) ..._untilEnough(facts, result, needed!) else ..._weakGroups(facts),
+    if (result != null)
+      ..._untilEnough(facts, result, needed!, milestones: milestones)
+    else ...[
+      ..._weakGroups(facts),
+      for (final r in milestones) _milestone(r),
+    ],
     RoadmapStep(kind: StepKind.lamBaiBu, status: StepStatus.chuaToi, reason: RetestFrom(retestFrom)),
   ];
   return Roadmap(
@@ -67,6 +76,9 @@ Roadmap _lenHang(
     steps: placeSteps(facts, steps, retestFrom: retestFrom),
   );
 }
+
+RoadmapStep _milestone(Rank r) =>
+    RoadmapStep(kind: StepKind.lamBaiBu, status: StepStatus.chuaToi, reason: RankMilestone(r));
 
 /// Nhóm dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
 List<RoadmapStep> _weakGroups(PracticeFacts facts) {
@@ -101,8 +113,15 @@ RoadmapStep _lostStep(PracticeFacts facts, BuResult result, _Lost e) {
 }
 
 /// Lấy dần nhóm theo điểm mất cho tới khi tổng điểm mất đã lấy ≥ điểm cần
-/// thêm (mục 4.1 bước 4).
-List<RoadmapStep> _untilEnough(PracticeFacts facts, BuResult result, int needed) {
+/// thêm (mục 4.1 bước 4). Mốc hạng trung gian đứng ngay sau bước làm tổng
+/// điểm đã lấy đủ cho mốc đó; mốc đã đủ điểm đứng đầu; mốc chưa xếp khi hết
+/// bước thì đứng cuối.
+List<RoadmapStep> _untilEnough(
+  PracticeFacts facts,
+  BuResult result,
+  int needed, {
+  List<Rank> milestones = const [],
+}) {
   final lost = lostByCategory(result);
   final entries = <_Lost>[
     for (final MapEntry(key: cat, value: points) in lost.byCategory.entries) (cat: cat, points: points),
@@ -110,11 +129,23 @@ List<RoadmapStep> _untilEnough(PracticeFacts facts, BuResult result, int needed)
   ]..sort((a, b) => _byPointsThenWeakness(facts, a, b));
 
   final picked = <RoadmapStep>[];
+  final waiting = [...milestones];
+  void placeReached(int sum) {
+    while (waiting.isNotEmpty && buFloor(waiting.first) - result.total <= sum) {
+      picked.add(_milestone(waiting.removeAt(0)));
+    }
+  }
+
   var sum = 0;
+  placeReached(sum);
   for (final e in entries) {
     if (sum >= needed) break;
     picked.add(_lostStep(facts, result, e));
     sum += e.points;
+    placeReached(sum);
+  }
+  for (final r in waiting) {
+    picked.add(_milestone(r));
   }
   return picked;
 }

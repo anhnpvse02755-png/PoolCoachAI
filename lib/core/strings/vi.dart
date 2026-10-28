@@ -1761,7 +1761,7 @@ abstract final class Vi {
 
   static String goalKindBody(GoalKind kind) => switch (kind) {
     GoalKind.lenHang =>
-      'Nhắm hạng ngay trên hạng hiện tại, theo điểm BU còn thiếu.',
+      'Chọn hạng đích, từ hạng ngay trên tới hạng A, theo điểm BU còn thiếu.',
     GoalKind.thuanThucKyNang =>
       'Chọn một nhóm kỹ năng, tập tới khi đạt ${PracticeConstants.strongCutoff} '
           'và ${PracticeConstants.readyStreak} buổi đạt liên tiếp.',
@@ -1771,6 +1771,7 @@ abstract final class Vi {
 
   static const goalPickTitle = 'Chọn mục tiêu';
   static const goalPickDate = 'Chọn ngày giải';
+  static const goalTargetRankTitle = 'Lên tới hạng';
 
   static String goalBlocked(LenHangBlock block) => switch (block) {
     LenHangBlock.noRank => 'Cần có hạng trước khi đặt mục tiêu lên hạng.',
@@ -1829,7 +1830,10 @@ abstract final class Vi {
               : '${skill(step.category!)} · $drillName',
         StepKind.buLe => 'Tập lại ${step.buDrillIds.join('/')} trên bàn BU',
         StepKind.baiTap => drillName ?? step.drillId!,
-        StepKind.lamBaiBu => 'Làm bài BU',
+        StepKind.lamBaiBu => switch (step.reason) {
+          RankMilestone(:final rank) => 'Làm lại bài BU — mốc hạng ${rank.label}',
+          _ => 'Làm bài BU',
+        },
         StepKind.dauTap => () {
           final r = step.reason as NotEnoughMatches;
           return 'Đấu tập: ghi ít nhất ${r.need - r.have} trận có ghi cú';
@@ -1857,6 +1861,8 @@ abstract final class Vi {
     DrillLevel(:final level) => 'Bài cấp $level của nhóm.',
     RetestFrom(:final from) =>
       from == null ? 'Làm được ngay.' : 'Mở từ ngày ${shortDate(from)}.',
+    RankMilestone(:final rank) =>
+      'Đạt ${buFloor(rank)} điểm BU là lên hạng ${rank.label}.',
     NeedRank() => 'Làm bộ câu hỏi hoặc bài BU để có hạng.',
     MatchWeakness(:final failures, :final attempts) =>
       'Hỏng $failures/$attempts lần trong các trận gần đây.',

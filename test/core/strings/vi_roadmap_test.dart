@@ -78,6 +78,27 @@ void main() {
     );
   });
 
+  test('mốc hạng: tên bước và lý do mang hạng và sàn điểm BU', () {
+    expect(
+      Vi.stepTitle(step(StepKind.lamBaiBu, const RankMilestone(Rank.g))),
+      'Làm lại bài BU — mốc hạng G',
+    );
+    expect(Vi.stepReason(const RankMilestone(Rank.g)), 'Đạt 70 điểm BU là lên hạng G.');
+    expect(Vi.goalTargetRankTitle, 'Lên tới hạng');
+    expect(
+      Vi.goalKindBody(GoalKind.lenHang),
+      'Chọn hạng đích, từ hạng ngay trên tới hạng A, theo điểm BU còn thiếu.',
+    );
+    final roadmap = Roadmap(
+      goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.f),
+      steps: const [],
+      from: Rank.h,
+      target: Rank.f,
+      pointsNeeded: 45,
+    );
+    expect(Vi.roadmapHeadline(roadmap), 'Lên hạng: H → F');
+  });
+
   test('ngày dự kiến: có ngày hoặc nói thẳng chưa đủ dữ liệu', () {
     expect(
       Vi.estimateLine(Estimate.on(DateTime(2026, 11, 2))),

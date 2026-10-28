@@ -89,6 +89,7 @@ ProviderContainer testContainer({
   List<ScheduleSlot>? schedule,
   List<CueEquipment>? equipment,
   List<PoolMatch>? matches,
+  Stream<List<PoolMatch>>? matchesStream,
   DateTime? now,
   AuthRepository? auth,
   PlayerRank? rank,
@@ -142,7 +143,7 @@ ProviderContainer testContainer({
         (ref) => Stream.value(equipment ?? const <CueEquipment>[]),
       ),
       matchesProvider.overrideWith(
-        (ref) => Stream.value(matches ?? const <PoolMatch>[]),
+        (ref) => matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
       ),
       authRepositoryProvider.overrideWithValue(
         auth ?? FakeAuthRepository.signedIn(),

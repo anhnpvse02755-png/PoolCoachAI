@@ -90,6 +90,24 @@ Rank? nextRank(Rank rank) => switch (rank) {
       _ => Rank.values[rank.index + 1],
     };
 
+/// Hạng đích thật của mục tiêu Lên hạng từ hạng [from]: hạng đích đã chọn khi
+/// nó còn cao hơn [from] (tối đa hạng A), không thì hạng kế tiếp. Null khi
+/// [from] không có hạng kế tiếp.
+Rank? effectiveTarget(PlayerGoal goal, Rank from) {
+  final chosen = goal.targetRank;
+  if (chosen != null && chosen.index > from.index && chosen.index <= Rank.a.index) {
+    return chosen;
+  }
+  return nextRank(from);
+}
+
+/// Các hạng đích chọn được từ hạng [from]: hạng ngay trên tới hạng A.
+List<Rank> targetRankChoices(Rank from) {
+  final next = nextRank(from);
+  if (next == null) return const [];
+  return [for (var i = next.index; i <= Rank.a.index; i++) Rank.values[i]];
+}
+
 /// Vì sao chưa đặt được mục tiêu Lên hạng.
 enum LenHangBlock { noRank, topRank }
 

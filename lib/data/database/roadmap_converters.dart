@@ -58,7 +58,10 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
               category: j['category'] == null ? null : SkillCategory.values.byName(j['category']! as String),
               eventDate: _local(j['event_date']),
               createdAt: _local(j['created_at'])!,
-              targetRank: j['target_rank'] == null ? null : Rank.values.byName(j['target_rank']! as String),
+              // Máy cũ có thể để target_rank thừa ở dòng không phải Lên hạng.
+              targetRank: j['kind'] == GoalKind.lenHang.name && j['target_rank'] != null
+                  ? Rank.values.byName(j['target_rank']! as String)
+                  : null,
             ),
     );
 

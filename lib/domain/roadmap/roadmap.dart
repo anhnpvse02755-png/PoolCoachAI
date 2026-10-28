@@ -62,6 +62,13 @@ final class RetestFrom extends StepReason {
   final DateTime? from;
 }
 
+/// Mốc hạng [rank] trên đường lên hạng đích xa hơn một bậc: làm lại bài BU
+/// khi điểm đã đủ để lên hạng này.
+final class RankMilestone extends StepReason {
+  const RankMilestone(this.rank);
+  final Rank rank;
+}
+
 /// Nhóm hỏng [failures]/[attempts] lần trong các trận gần đây.
 final class MatchWeakness extends StepReason {
   const MatchWeakness(this.failures, this.attempts);

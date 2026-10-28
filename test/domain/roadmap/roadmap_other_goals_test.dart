@@ -96,6 +96,21 @@ void main() {
       expect(r.steps.any((s) => s.kind == StepKind.lamBaiBu), isFalse);
     });
 
+    test('đủ trận: bước chưa đủ dữ liệu vẫn ở lại và thành đang làm', () {
+      final matches = [
+        for (var i = 0; i < MatchAnalysisConstants.tournamentMinMatches; i++)
+          completedMatch('m$i', const [RackWinner.player],
+              [shotAt(1, 1, RackWinner.player, MatchShotType.normal, MatchShotOutcome.made)],
+              at: roadmapToday),
+      ];
+      final r = build(tournament(DateTime(2026, 10, 16)), logs: slowAiming, matches: matches);
+      expect(r.steps.any((s) => s.kind == StepKind.dauTap), isFalse);
+      expect(r.steps.first.category, SkillCategory.aiming);
+      expect(r.steps.first.status, StepStatus.khongKip);
+      expect(r.steps[1].estimate!.date, isNull);
+      expect(r.steps[1].status, StepStatus.dangLam);
+    });
+
     test('ngày giải xa thì bước đó vẫn kịp', () {
       final r = build(tournament(DateTime(2027, 6, 1)), logs: slowAiming);
       expect(r.steps.first.kind, StepKind.dauTap);
