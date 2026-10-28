@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/retest_gate.dart';
@@ -55,16 +57,16 @@ Roadmap _lenHang(
   }
 
   final retestFrom = retestAvailableFrom(tests);
-  final needed = result == null ? null : buFloor(target) - result.total;
+  final needed = result == null ? null : math.max(0, buFloor(target) - result.total);
   final milestones = [
     for (var i = from.index + 1; i < target.index; i++) Rank.values[i],
   ];
   final steps = <RoadmapStep>[
     if (result != null)
-      ..._untilEnough(facts, result, needed!, milestones: milestones)
+      ..._untilEnough(facts, result, needed!, milestones: milestones, retestFrom: retestFrom)
     else ...[
       ..._weakGroups(facts),
-      for (final r in milestones) _milestone(r),
+      for (final r in milestones) _milestone(r, retestFrom, retake: false),
     ],
     RoadmapStep(kind: StepKind.lamBaiBu, status: StepStatus.chuaToi, reason: RetestFrom(retestFrom)),
   ];
@@ -77,8 +79,11 @@ Roadmap _lenHang(
   );
 }
 
-RoadmapStep _milestone(Rank r) =>
-    RoadmapStep(kind: StepKind.lamBaiBu, status: StepStatus.chuaToi, reason: RankMilestone(r));
+RoadmapStep _milestone(Rank r, DateTime? retestFrom, {required bool retake}) => RoadmapStep(
+      kind: StepKind.lamBaiBu,
+      status: StepStatus.chuaToi,
+      reason: RankMilestone(r, from: retestFrom, retake: retake),
+    );
 
 /// Nhóm dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
 List<RoadmapStep> _weakGroups(PracticeFacts facts) {
@@ -121,6 +126,7 @@ List<RoadmapStep> _untilEnough(
   BuResult result,
   int needed, {
   List<Rank> milestones = const [],
+  DateTime? retestFrom,
 }) {
   final lost = lostByCategory(result);
   final entries = <_Lost>[
@@ -132,7 +138,7 @@ List<RoadmapStep> _untilEnough(
   final waiting = [...milestones];
   void placeReached(int sum) {
     while (waiting.isNotEmpty && buFloor(waiting.first) - result.total <= sum) {
-      picked.add(_milestone(waiting.removeAt(0)));
+      picked.add(_milestone(waiting.removeAt(0), retestFrom, retake: true));
     }
   }
 
@@ -145,7 +151,7 @@ List<RoadmapStep> _untilEnough(
     placeReached(sum);
   }
   for (final r in waiting) {
-    picked.add(_milestone(r));
+    picked.add(_milestone(r, retestFrom, retake: true));
   }
   return picked;
 }

@@ -64,9 +64,14 @@ final class RetestFrom extends StepReason {
 
 /// Mốc hạng [rank] trên đường lên hạng đích xa hơn một bậc: làm lại bài BU
 /// khi điểm đã đủ để lên hạng này.
+///
+/// [from] là ngày được làm bài BU tiếp (null là làm được ngay), cùng cổng với
+/// bước BU cuối. [retake] đúng khi người chơi đã có kết quả BU để làm lại.
 final class RankMilestone extends StepReason {
-  const RankMilestone(this.rank);
+  const RankMilestone(this.rank, {this.from, this.retake = true});
   final Rank rank;
+  final DateTime? from;
+  final bool retake;
 }
 
 /// Nhóm hỏng [failures]/[attempts] lần trong các trận gần đây.

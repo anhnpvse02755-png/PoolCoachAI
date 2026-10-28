@@ -138,7 +138,7 @@ void main() {
     );
     expect(find.text('Lên hạng: H → F'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('Làm lại bài BU — mốc hạng G'),
+      find.text('Làm bài BU — mốc hạng G'),
       200,
       scrollable: roadmapList,
     );

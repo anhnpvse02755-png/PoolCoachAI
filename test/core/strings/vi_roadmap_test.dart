@@ -83,6 +83,10 @@ void main() {
       Vi.stepTitle(step(StepKind.lamBaiBu, const RankMilestone(Rank.g))),
       'Làm lại bài BU — mốc hạng G',
     );
+    expect(
+      Vi.stepTitle(step(StepKind.lamBaiBu, const RankMilestone(Rank.g, retake: false))),
+      'Làm bài BU — mốc hạng G',
+    );
     expect(Vi.stepReason(const RankMilestone(Rank.g)), 'Đạt 70 điểm BU là lên hạng G.');
     expect(Vi.goalTargetRankTitle, 'Lên tới hạng');
     expect(

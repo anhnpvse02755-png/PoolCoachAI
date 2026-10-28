@@ -1831,7 +1831,8 @@ abstract final class Vi {
         StepKind.buLe => 'Tập lại ${step.buDrillIds.join('/')} trên bàn BU',
         StepKind.baiTap => drillName ?? step.drillId!,
         StepKind.lamBaiBu => switch (step.reason) {
-          RankMilestone(:final rank) => 'Làm lại bài BU — mốc hạng ${rank.label}',
+          RankMilestone(:final rank, :final retake) =>
+            '${retake ? 'Làm lại' : 'Làm'} bài BU — mốc hạng ${rank.label}',
           _ => 'Làm bài BU',
         },
         StepKind.dauTap => () {

@@ -259,6 +259,41 @@ void main() {
       expect(r.pointsNeeded, isNull);
     });
 
+    test('mốc mang cổng làm lại BU; có BU thì làm lại, chưa có BU thì làm', () {
+      final gate = DateTime(2026, 11, 3);
+      final tests = [
+        BuTest(
+          id: 't1',
+          startedAt: DateTime(2026, 10, 20, 8),
+          tableSize: TableSize.nineFootPlus,
+          completedAt: DateTime(2026, 10, 20, 9),
+        ),
+      ];
+      final withBu = build(
+        r: rank(Rank.h, source: RankSource.verified),
+        target: to(Rank.f),
+        result: result(50, const {'F7': 20}),
+        tests: tests,
+      );
+      final m1 = withBu.steps.firstWhere((s) => s.reason is RankMilestone).reason as RankMilestone;
+      expect([m1.rank, m1.retake, m1.from], [Rank.g, true, gate]);
+      final noBu = build(r: rank(Rank.h), target: to(Rank.f));
+      final m2 = noBu.steps.firstWhere((s) => s.reason is RankMilestone).reason as RankMilestone;
+      expect([m2.rank, m2.retake, m2.from], [Rank.g, false, null]);
+    });
+
+    test('BU gần nhất đã vượt sàn hạng đích: điểm còn thiếu là 0, không âm', () {
+      final r = build(
+        r: rank(Rank.h),
+        target: to(Rank.f),
+        result: result(100, const {'F7': 5}),
+      );
+      expect(r.target, Rank.f);
+      expect(r.pointsNeeded, 0);
+      expect(r.steps.map(shape).first, (StepKind.lamBaiBu, null, Rank.g));
+      expect(r.steps.last.reason, isA<RetestFrom>());
+    });
+
     test('mốc đã đủ điểm đứng đầu danh sách', () {
       final r = build(
         r: rank(Rank.h, source: RankSource.verified),
