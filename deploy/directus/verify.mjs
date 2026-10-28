@@ -235,6 +235,8 @@ try {
       event_date: null,
       // POST (quyền create) cũng phải nhận tournament_id, không chỉ PATCH.
       tournament_id: tour.id,
+      // Nhóm nâng cao: quyền create cũng phải nhận category_ext.
+      category_ext: 'nhayBi',
       created_at: '2026-10-15T03:00:00.000Z',
       updated_at: '2026-10-15T03:00:00.000Z',
     };
@@ -594,6 +596,162 @@ try {
     (bSlots.data ?? []).length === 0
       ? ok('B không thấy lịch tập của A')
       : fail(`B thấy ${bSlots.data.length} khung lịch`);
+
+    // ─── Nhóm nâng cao: trường _ext (spec 2026-10-29 mục 6) ──────────────
+    // Bản đã phát hành không xin và không gửi các trường này; PATCH kiểu bản cũ
+    // (không có khoá _ext) phải giữ nguyên giá trị.
+    const extTimer = {
+      id: randomUUID(),
+      date: '2026-10-21T07:30:00.000Z',
+      duration_sec: 600,
+      cat: null,
+      cat_ext: 'dungCo',
+      cue_id: null,
+    };
+    const extTimerMade = await call('POST', '/items/timer_sessions', extTimer, a.access_token);
+    extTimerMade.status === 200 || extTimerMade.status === 201
+      ? ok('POST buổi tập mang cat_ext được nhận (quyền create có trường mới)')
+      : fail(`POST buổi tập mang cat_ext → ${extTimerMade.status} ${extTimerMade.code}`);
+    const extTimerBack = await call(
+      'GET',
+      `/items/timer_sessions/${extTimer.id}?fields=cat,cat_ext`,
+      undefined,
+      a.access_token,
+    );
+    extTimerBack.data?.cat === null && extTimerBack.data?.cat_ext === 'dungCo'
+      ? ok('buổi tập: cat null, cat_ext dungCo đọc lại đúng')
+      : fail(`buổi tập đọc lại: ${JSON.stringify(extTimerBack.data)}`);
+
+    const extSlot = {
+      id: randomUUID(),
+      day: 3,
+      time: '20:00',
+      label: 'Tập dựng cơ',
+      cat: null,
+      cat_ext: 'dungCo',
+      cat_ext_at: '2026-10-21T08:00:00.000Z',
+      updated_at: '2026-10-21T08:00:00.000Z',
+      is_deleted: false,
+    };
+    const extSlotMade = await call('POST', '/items/schedule_slots', extSlot, a.access_token);
+    extSlotMade.status === 200 || extSlotMade.status === 201
+      ? ok('POST lịch mang cat_ext và cat_ext_at được nhận (quyền create có trường mới)')
+      : fail(`POST lịch mang cat_ext → ${extSlotMade.status} ${extSlotMade.code}`);
+    const extSlotOld = await call(
+      'PATCH',
+      `/items/schedule_slots/${extSlot.id}`,
+      { label: 'Đổi tên kiểu bản cũ', updated_at: '2026-10-21T09:00:00.000Z' },
+      a.access_token,
+    );
+    extSlotOld.status === 200
+      ? ok('PATCH lịch kiểu bản cũ (không có cat_ext) được nhận')
+      : fail(`PATCH lịch kiểu bản cũ → ${extSlotOld.status} ${extSlotOld.code}`);
+    const extSlotBack = await call(
+      'GET',
+      `/items/schedule_slots/${extSlot.id}?fields=cat_ext,cat_ext_at,updated_at`,
+      undefined,
+      a.access_token,
+    );
+    extSlotBack.data?.cat_ext === 'dungCo' &&
+    new Date(extSlotBack.data?.cat_ext_at).getTime() !== new Date(extSlotBack.data?.updated_at).getTime()
+      ? ok('cat_ext của lịch còn nguyên sau PATCH kiểu bản cũ; cat_ext_at lệch updated_at (bản mới sẽ bỏ qua)')
+      : fail(`lịch sau PATCH kiểu bản cũ: ${JSON.stringify(extSlotBack.data)}`);
+    const extSlotNew = await call(
+      'PATCH',
+      `/items/schedule_slots/${extSlot.id}`,
+      { cat_ext: 'nhayBi', cat_ext_at: '2026-10-21T10:00:00.000Z', updated_at: '2026-10-21T10:00:00.000Z' },
+      a.access_token,
+    );
+    extSlotNew.status === 200
+      ? ok('PATCH lịch mang cat_ext và cat_ext_at được nhận (quyền update có trường mới)')
+      : fail(`PATCH lịch mang cat_ext → ${extSlotNew.status} ${extSlotNew.code}`);
+
+    const extCueId = randomUUID();
+    const extCue = {
+      id: extCueId,
+      name: 'Cơ nhóm nâng cao',
+      type: 'playing',
+      weight_grams: null,
+      shaft_brand: null,
+      tip_diameter_mm: null,
+      tip_brand: null,
+      tip_hardness: null,
+      butt_brand: null,
+      skill_categories: ['aiming'],
+      skill_categories_ext: ['nhayBi'],
+      last_tip_maintenance: null,
+      tip_maintenance_due_date: null,
+      updated_at: '2026-10-21T08:00:00.000Z',
+      is_deleted: false,
+    };
+    const extCueMade = await call('POST', '/items/cue_equipment', extCue, a.access_token);
+    extCueMade.status === 200 || extCueMade.status === 201
+      ? ok('POST hồ sơ cơ mang skill_categories_ext được nhận')
+      : fail(`POST hồ sơ cơ mang skill_categories_ext → ${extCueMade.status} ${extCueMade.code}`);
+    const extCueBack = await call(
+      'GET',
+      `/items/cue_equipment/${extCueId}?fields=skill_categories,skill_categories_ext`,
+      undefined,
+      a.access_token,
+    );
+    JSON.stringify(extCueBack.data?.skill_categories_ext) === '["nhayBi"]'
+      ? ok('skill_categories_ext của cơ đọc lại đúng')
+      : fail(`cơ đọc lại: ${JSON.stringify(extCueBack.data)}`);
+    const extCueOld = await call(
+      'PATCH',
+      `/items/cue_equipment/${extCueId}`,
+      { skill_categories: ['position'], updated_at: '2026-10-21T09:00:00.000Z' },
+      a.access_token,
+    );
+    extCueOld.status === 200
+      ? ok('PATCH cơ kiểu bản cũ (không có skill_categories_ext) được nhận')
+      : fail(`PATCH cơ kiểu bản cũ → ${extCueOld.status} ${extCueOld.code}`);
+    const extCueOldBack = await call(
+      'GET',
+      `/items/cue_equipment/${extCueId}?fields=skill_categories_ext`,
+      undefined,
+      a.access_token,
+    );
+    JSON.stringify(extCueOldBack.data?.skill_categories_ext) === '["nhayBi"]'
+      ? ok('skill_categories_ext của cơ còn nguyên sau PATCH kiểu bản cũ')
+      : fail(`cơ sau PATCH kiểu bản cũ: ${JSON.stringify(extCueOldBack.data)}`);
+
+    const extGoalBack = await call(
+      'GET',
+      `/items/player_goals/${aId}?fields=category_ext`,
+      undefined,
+      a.access_token,
+    );
+    extGoalBack.data?.category_ext === 'nhayBi'
+      ? ok('POST mục tiêu mang category_ext được lưu (quyền create có trường mới)')
+      : fail(`category_ext sau POST mục tiêu: ${JSON.stringify(extGoalBack.data)}`);
+    const extGoalOld = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      { kind: 'thuanThucKyNang', category: 'aiming', updated_at: '2026-10-28T03:00:00.000Z' },
+      a.access_token,
+    );
+    extGoalOld.status === 200
+      ? ok('PATCH mục tiêu kiểu bản cũ (không có category_ext) được nhận')
+      : fail(`PATCH mục tiêu kiểu bản cũ → ${extGoalOld.status} ${extGoalOld.code}`);
+    const extGoalOldBack = await call(
+      'GET',
+      `/items/player_goals/${aId}?fields=category_ext`,
+      undefined,
+      a.access_token,
+    );
+    extGoalOldBack.data?.category_ext === 'nhayBi'
+      ? ok('category_ext của mục tiêu còn nguyên sau PATCH kiểu bản cũ')
+      : fail(`mục tiêu sau PATCH kiểu bản cũ: ${JSON.stringify(extGoalOldBack.data)}`);
+    const extGoalNew = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      { kind: null, category: null, category_ext: 'matXe', updated_at: '2026-10-28T04:00:00.000Z' },
+      a.access_token,
+    );
+    extGoalNew.status === 200
+      ? ok('PATCH mục tiêu mang category_ext được nhận (quyền update có trường mới)')
+      : fail(`PATCH mục tiêu mang category_ext → ${extGoalNew.status} ${extGoalNew.code}`);
 
     const ach = {
       id: randomUUID(),

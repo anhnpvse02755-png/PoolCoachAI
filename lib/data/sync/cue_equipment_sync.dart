@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:poolcoachai/data/database/category_compat.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
@@ -13,7 +14,7 @@ import 'package:poolcoachai/domain/skill_category.dart';
 
 const cueEquipmentRemoteFields =
     'id,user_created,name,type,weight_grams,shaft_brand,tip_diameter_mm,'
-    'tip_brand,tip_hardness,butt_brand,skill_categories,last_tip_maintenance,tip_maintenance_due_date,'
+    'tip_brand,tip_hardness,butt_brand,skill_categories,skill_categories_ext,last_tip_maintenance,tip_maintenance_due_date,'
     'updated_at,is_deleted';
 
 Stream<List<CueEquipmentRow>> watchPendingCueEquipment(AppDatabase db) =>
@@ -284,6 +285,9 @@ class CueEquipmentSyncService {
     });
   }
 
+  ({List<String> legacy, List<String> ext}) _split(CueEquipmentRow row) =>
+      splitCategoryNames((jsonDecode(row.skillCategories) as List).cast<String>());
+
   Map<String, Object?> _toRemote(
     CueEquipmentRow row, {
     required DateTime updatedAt,
@@ -298,7 +302,10 @@ class CueEquipmentSyncService {
     'tip_brand': row.tipBrand,
     'tip_hardness': row.tipHardness,
     'butt_brand': row.buttBrand,
-    'skill_categories': jsonDecode(row.skillCategories),
+    // Nhóm nâng cao chỉ đi trong skill_categories_ext; bản đã phát hành ném
+    // khi gặp tên lạ ở skill_categories.
+    'skill_categories': _split(row).legacy,
+    'skill_categories_ext': _split(row).ext,
     'last_tip_maintenance': _formatDateOnly(row.lastTipMaintenance),
     'tip_maintenance_due_date': _formatDateOnly(row.tipMaintenanceDueDate),
     'updated_at': updatedAt.toUtc().toIso8601String(),
@@ -328,17 +335,23 @@ class CueEquipmentSyncService {
         categories.any((category) => category is! String)) {
       throw const FormatException('Nhóm kỹ năng từ server không hợp lệ');
     }
-    final skills = categories
-        .map((category) {
-          final name = category! as String;
-          return SkillCategory.values.firstWhere(
-            (value) => value.name == name,
-            orElse: () => throw const FormatException(
-              'Nhóm kỹ năng từ server không hợp lệ',
-            ),
-          );
-        })
-        .toList(growable: false);
+    // Trường cũ vẫn parse nghiêm: tên lạ ở đây là dữ liệu hỏng, không phải
+    // nhóm của bản sau (nhóm của bản sau chỉ đi trong skill_categories_ext).
+    final legacyNames = [
+      for (final category in categories)
+        SkillCategory.values
+            .firstWhere(
+              (value) => value.name == category! as String,
+              orElse: () => throw const FormatException(
+                'Nhóm kỹ năng từ server không hợp lệ',
+              ),
+            )
+            .name,
+    ];
+    final skills = joinCategoryNames(
+      legacyNames,
+      item['skill_categories_ext'],
+    ).map(SkillCategory.values.byName).toList(growable: false);
     final weight = item['weight_grams'];
     final diameter = item['tip_diameter_mm'];
     if (weight != null && (weight is! int || weight <= 0)) {

@@ -371,7 +371,10 @@ void main() {
       },
     );
 
-    test('đường an toàn: trường cũ hợp lệ, trường _ext lạ bị bỏ qua', () async {
+    // Bản đã phát hành không xin _ext nên không bao giờ thấy nó (test danh sách
+    // trường ở đầu file). Test này chứng minh phía bản này: tên _ext mà chính
+    // nó chưa biết (nhóm của bản sau) bị bỏ qua, không ném.
+    test('tên _ext lạ (nhóm của bản sau) bị bỏ qua, không ném; trường cũ hợp lệ vẫn đọc', () async {
       server.routes['GET /items/timer_sessions'] = (_) => FakeDirectus.ok([
         timerJson(cat: null, extra: {'cat_ext': unknownCategory}),
       ]);
@@ -407,6 +410,107 @@ void main() {
         isNull,
       );
     });
+
+    test(
+      'máy mới gửi gì thì trường cũ cũng chỉ chứa tên bản cũ đọc được',
+      () async {
+        server.routes['POST /items/timer_sessions'] = (req) =>
+            FakeDirectus.ok(jsonDecode(req.body));
+        server.routes['POST /items/schedule_slots'] = (req) =>
+            FakeDirectus.ok(jsonDecode(req.body));
+        server.routes['POST /items/cue_equipment'] = (req) =>
+            FakeDirectus.ok(jsonDecode(req.body));
+        server.routes['POST /items/player_goals'] = (req) =>
+            FakeDirectus.ok(jsonDecode(req.body));
+        server.routes['GET /items/player_goals'] = (_) => FakeDirectus.ok([]);
+        var n = 0;
+        for (final c in SkillCategory.values) {
+          n++;
+          await db.into(db.timerSessionRows).insert(
+            TimerSessionRowsCompanion.insert(
+              id: 't$n',
+              userId: const Value('u1'),
+              date: DateTime.utc(2026, 10, 20, n),
+              durationSec: 60,
+              cat: Value(c.name),
+            ),
+          );
+          await db.into(db.scheduleSlotRows).insert(
+            ScheduleSlotRowsCompanion.insert(
+              id: 's$n',
+              userId: const Value('u1'),
+              day: 1,
+              time: '10:00',
+              label: 'Chờ',
+              cat: Value(c.name),
+            ),
+          );
+          await db.into(db.cueEquipmentRows).insert(
+            CueEquipmentRowsCompanion.insert(
+              id: 'c$n',
+              userId: 'u1',
+              name: 'Cơ $n',
+              type: 'playing',
+              skillCategories: jsonEncode([c.name]),
+            ),
+          );
+          await db.delete(db.playerGoalRows).go();
+          await db.into(db.playerGoalRows).insert(
+            toGoalRow(
+              GoalRecord(
+                updatedAt: now.add(Duration(seconds: n)),
+                goal: PlayerGoal(
+                  goalId: 'g$n',
+                  kind: GoalKind.thuanThucKyNang,
+                  category: c,
+                  createdAt: now,
+                ),
+              ),
+              userId: 'u1',
+            ),
+          );
+          await roadmapService().syncNow();
+        }
+        expect(await service().syncNow(), SyncOutcome.done);
+        expect(await cueService().syncNow(), SyncOutcome.done);
+
+        final legacy = SkillCategory.values.take(6).map((c) => c.name).toSet();
+        final timers = server.sent('POST', '/items/timer_sessions');
+        final slots = server.sent('POST', '/items/schedule_slots');
+        final cues = server.sent('POST', '/items/cue_equipment');
+        final goals = [
+          ...server.sent('POST', '/items/player_goals'),
+          ...server.sent('PATCH', '/items/player_goals/u1'),
+        ];
+        expect([timers.length, slots.length, cues.length], [9, 9, 9]);
+        expect(goals, isNotEmpty);
+        for (final r in [...timers, ...slots]) {
+          final body = FakeDirectus.body(r);
+          expect(body['cat'] == null || legacy.contains(body['cat']), isTrue,
+              reason: '${body['cat']}');
+        }
+        for (final r in cues) {
+          final body = FakeDirectus.body(r);
+          expect(
+            (body['skill_categories'] as List).every(legacy.contains),
+            isTrue,
+          );
+        }
+        for (final r in goals) {
+          final body = FakeDirectus.body(r);
+          expect(body['category'] == null || legacy.contains(body['category']),
+              isTrue);
+          if (body['category_ext'] != null) {
+            expect(body['kind'], isNull);
+          }
+        }
+        // chín nhóm: mỗi nhóm nâng cao đi đúng một trường _ext
+        expect(
+          timers.map((r) => FakeDirectus.body(r)['cat_ext']).whereType<String>(),
+          unorderedEquals(['dungCo', 'nhayBi', 'matXe']),
+        );
+      },
+    );
 
     test('buổi tập của bài lạ: được lưu, Intelligence bỏ qua', () async {
       server.routes['GET /items/drill_logs'] = (_) => FakeDirectus.ok([

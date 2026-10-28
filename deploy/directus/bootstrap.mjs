@@ -296,6 +296,7 @@ await ensureCollection(
     nullable('goal_id', 'uuid'),
     nullable('kind', 'string'),
     nullable('category', 'string'),
+    nullable('category_ext', 'string'),
     nullable('event_date', 'timestamp'),
     nullable('target_rank', 'string'),
     nullable('created_at', 'timestamp'),
@@ -357,6 +358,7 @@ await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng 
   nullable('tip_hardness', 'string'),
   nullable('butt_brand', 'string'),
   required('skill_categories', 'json'),
+  nullable('skill_categories_ext', 'json'),
   nullable('last_tip_maintenance', 'date'),
   nullable('tip_maintenance_due_date', 'date'),
   required('updated_at', 'timestamp'),
@@ -391,6 +393,9 @@ await ensureCollection('timer_sessions', 'Buổi tập tự do đo bằng đồn
   required('date', 'timestamp'),
   required('duration_sec', 'integer'),
   nullable('cat', 'string'),
+  // Nhóm nâng cao (Dựng cơ, Nhảy bi, Mát xê): bản đã phát hành ném khi gặp tên lạ ở `cat`,
+  // nên tên mới chỉ đi trong trường _ext mà bản cũ không bao giờ xin.
+  nullable('cat_ext', 'string'),
   nullable('cue_id', 'string'),
 ]);
 await ensureCollection('schedule_slots', 'Khung giờ trong lịch tập hằng tuần', [
@@ -399,6 +404,12 @@ await ensureCollection('schedule_slots', 'Khung giờ trong lịch tập hằng 
   required('time', 'string'),
   required('label', 'string'),
   nullable('cat', 'string'),
+  // Nhóm nâng cao (Dựng cơ, Nhảy bi, Mát xê): bản đã phát hành ném khi gặp tên lạ ở `cat`,
+  // nên tên mới chỉ đi trong trường _ext mà bản cũ không bao giờ xin.
+  nullable('cat_ext', 'string'),
+  // Bằng updated_at khi bản mới ghi cat_ext; bản cũ sửa dòng thì updated_at đổi mà
+  // trường này đứng yên, bản mới biết cat_ext đã cũ và bỏ qua.
+  nullable('cat_ext_at', 'timestamp'),
   required('updated_at', 'timestamp'),
   required('is_deleted', 'boolean'),
 ]);
@@ -540,7 +551,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'create',
-    fields: ['id', 'goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
+    fields: ['id', 'goal_id', 'kind', 'category', 'category_ext', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
     permissions: {},
     validation: { id: { _eq: '$CURRENT_USER' } },
   },
@@ -548,7 +559,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'update',
-    fields: ['goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
+    fields: ['goal_id', 'kind', 'category', 'category_ext', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
     permissions: { user_created: self },
     validation: {},
   },
@@ -578,7 +589,7 @@ const desiredPermissions = [
     fields: [
       'id', 'name', 'type', 'weight_grams', 'shaft_brand', 'tip_diameter_mm',
       'tip_brand', 'tip_hardness', 'butt_brand',
-      'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
+      'skill_categories', 'skill_categories_ext', 'last_tip_maintenance', 'tip_maintenance_due_date',
       'updated_at', 'is_deleted',
     ],
     permissions: {},
@@ -596,7 +607,7 @@ const desiredPermissions = [
     fields: [
       'name', 'type', 'weight_grams', 'shaft_brand', 'tip_diameter_mm',
       'tip_brand', 'tip_hardness', 'butt_brand',
-      'skill_categories', 'last_tip_maintenance', 'tip_maintenance_due_date',
+      'skill_categories', 'skill_categories_ext', 'last_tip_maintenance', 'tip_maintenance_due_date',
       'updated_at', 'is_deleted',
     ],
     permissions: { user_created: self },
@@ -624,7 +635,7 @@ const desiredPermissions = [
   {
     collection: 'timer_sessions',
     action: 'create',
-    fields: ['id', 'date', 'duration_sec', 'cat', 'cue_id'],
+    fields: ['id', 'date', 'duration_sec', 'cat', 'cat_ext', 'cue_id'],
     permissions: {},
     validation: {},
   },
@@ -633,7 +644,7 @@ const desiredPermissions = [
   {
     collection: 'schedule_slots',
     action: 'create',
-    fields: ['id', 'day', 'time', 'label', 'cat', 'updated_at', 'is_deleted'],
+    fields: ['id', 'day', 'time', 'label', 'cat', 'cat_ext', 'cat_ext_at', 'updated_at', 'is_deleted'],
     permissions: {},
     validation: {},
   },
@@ -641,7 +652,7 @@ const desiredPermissions = [
   {
     collection: 'schedule_slots',
     action: 'update',
-    fields: ['day', 'time', 'label', 'cat', 'updated_at', 'is_deleted'],
+    fields: ['day', 'time', 'label', 'cat', 'cat_ext', 'cat_ext_at', 'updated_at', 'is_deleted'],
     permissions: { user_created: self },
     validation: {},
   },

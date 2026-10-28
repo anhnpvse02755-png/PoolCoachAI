@@ -48,6 +48,88 @@ void main() {
     );
   });
 
+  group('nhóm nâng cao: kind, category chỉ chở tên bản cũ đọc được', () {
+    final nhayBi = GoalRecord(
+      updatedAt: at,
+      goal: PlayerGoal(
+        goalId: 'g3',
+        kind: GoalKind.thuanThucKyNang,
+        category: SkillCategory.nhayBi,
+        createdAt: at,
+      ),
+    );
+
+    test(
+      'mục tiêu Thuần thục Nhảy bi: kind, category rỗng; category_ext nhayBi; đọc lại đúng mục tiêu',
+      () {
+        final json = toRemoteGoal(toGoalRow(nhayBi, userId: 'u1'));
+        expect(json['kind'], isNull);
+        expect(json['category'], isNull);
+        expect(json['category_ext'], 'nhayBi');
+        expect(json['goal_id'], 'g3');
+        expect(goalFromRemote(json), nhayBi);
+        expect(remoteGoalFields.split(','), contains('category_ext'));
+      },
+    );
+
+    test('mục tiêu kiểu khác vẫn gửi kind như cũ, category_ext null', () {
+      for (final g in [
+        goal,
+        GoalRecord(
+          updatedAt: at,
+          goal: PlayerGoal(
+            goalId: 'g4',
+            kind: GoalKind.thuanThucKyNang,
+            category: SkillCategory.aiming,
+            createdAt: at,
+          ),
+        ),
+      ]) {
+        final json = toRemoteGoal(toGoalRow(g, userId: 'u1'));
+        expect(json['kind'], g.goal!.kind.name);
+        expect(json['category_ext'], isNull);
+        expect(goalFromRemote(json), g);
+      }
+    });
+
+    final base = toRemoteGoal(toGoalRow(nhayBi, userId: 'u1'));
+
+    test('bản cũ đặt Lên hạng sau đó (category_ext còn sót): đọc ra Lên hạng, không nhóm', () {
+      final r = goalFromRemote({
+        ...base,
+        'goal_id': 'g5',
+        'kind': 'lenHang',
+        'category': null,
+        'target_rank': null,
+      });
+      expect(r.goal!.kind, GoalKind.lenHang);
+      expect(r.goal!.category, isNull);
+    });
+
+    test('bản cũ bỏ mục tiêu (kind, goal_id rỗng, category_ext còn sót): không có mục tiêu', () {
+      final r = goalFromRemote({...base, 'goal_id': null, 'kind': null});
+      expect(r.goal, isNull);
+    });
+
+    test('bản cũ chọn Thuần thục Ngắm bi (category_ext còn sót): đọc ra Ngắm bi', () {
+      final r = goalFromRemote({
+        ...base,
+        'goal_id': 'g6',
+        'kind': 'thuanThucKyNang',
+        'category': 'aiming',
+      });
+      expect(r.goal!.category, SkillCategory.aiming);
+    });
+
+    test('category_ext là tên lạ của bản sau: không có mục tiêu, không ném', () {
+      expect(goalFromRemote({...base, 'category_ext': 'nhomTuongLai'}).goal, isNull);
+    });
+
+    test('category_ext sai kiểu: ném', () {
+      expect(() => goalFromRemote({...base, 'category_ext': 3}), throwsFormatException);
+    });
+  });
+
   test('hai máy cùng người cùng thành tích ra cùng id', () {
     final a = Achievement(
       kind: AchievementKind.chuoiNgay,
