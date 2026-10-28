@@ -68,13 +68,14 @@ Nếu `consecutivePassCount` của bài đã chứng nhận về 0 trong 5 buổ
   - `score?`, `attempts?`, `passed?`, `notes?`
   - `synced_at?`
   - ảnh chụp tiêu chí lúc kiểm tra: `pass_threshold?` / `target?` (đúng một trong hai). Bổ sung 28/10 theo yêu cầu "lưu điều kiện đo": tiêu chí của bài có thể đổi về sau, chứng nhận vẫn phải nói đã đạt theo tiêu chí nào.
-- **Chứng nhận:** thêm `AchievementKind.chungNhan` với `refId = drillId`. Bảng `achievements` có sẵn dùng id tất định, nên đồng bộ nhiều máy là idempotent.
+- **Chứng nhận:** thêm `AchievementKind.chungNhan` với `refId = drillId`, id tất định.
   - Ghi khi một bài kiểm tra hoàn tất và đạt.
   - Tính lại được từ `skill_test_rows`. Hai nguồn phải khớp, có test.
+  - **Không đẩy lên Directus** (sửa 28/10 sau review cuối). Bản app cũ chưa biết `chungNhan` sẽ lỗi khi kéo về một thành tích lạ. Chứng nhận tính lại được hoàn toàn từ `skill_tests` đã đồng bộ, nên mỗi máy tự ghi. Dòng `chungNhan` được đánh dấu đã đồng bộ ngay khi ghi, nên không tính vào số dữ liệu chờ đồng bộ.
 - **Directus:**
   - Collection mới `skill_tests` (create/read của chính người chơi, không update/delete).
   - `verify.mjs` kiểm tra: tạo được, không đọc được của người khác, không sửa được.
-  - `achievements` không đổi schema, vì `kind` là chuỗi tự do. Bên kéo về phải nhận `chungNhan`.
+  - `achievements` không đổi schema và không nhận dòng `chungNhan`. Bên kéo về vẫn bỏ qua kind lạ thay vì lỗi (Ruling S1).
   - Chạy bootstrap trên prod trước khi publish web.
 - **Sync:** đẩy và kéo `skill_tests`, theo mẫu `timer_sessions`/`achievements`: chỉ thêm, gặp `RECORD_NOT_UNIQUE` thì coi là đã đồng bộ.
 
@@ -91,7 +92,7 @@ Nếu `consecutivePassCount` của bài đã chứng nhận về 0 trong 5 buổ
 - **Kiến trúc:** domain không chứa tiếng Việt, không import Flutter; domain skill test không tạo `PlayerRank`.
 - **Repository/migration:** 14→15; dựng mới ở v15; đồng bộ đẩy/kéo; chứng nhận idempotent.
 - **Widget:** nút kiểm tra (mở / khóa với lý do); luồng kiểm tra đạt/trượt/hủy; mục Profile; huy hiệu; 360x640 chữ lớn.
-- **E2E live:** `tool/e2e/skill_test.mjs`. Tài khoản tạm ghi 3 buổi đạt cho d1, làm bài kiểm tra đạt, rồi thấy chứng nhận ở Profile và trên Directus.
+- **E2E live:** `tool/e2e/skill_test.mjs`. Tài khoản tạm ghi 3 buổi đạt cho d1, làm bài kiểm tra đạt, rồi thấy chứng nhận ở Profile và dòng `skill_tests` trên Directus.
 
 ## 9. Ngoài phạm vi
 
