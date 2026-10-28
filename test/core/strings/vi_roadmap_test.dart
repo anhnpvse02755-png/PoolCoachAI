@@ -122,6 +122,23 @@ void main() {
     expect(Vi.roadmapHeadline(roadmap), 'Lên hạng: H → F');
   });
 
+  test('tiêu đề chuẩn bị giải có tên khi nối giải hợp lệ', () {
+    final r = Roadmap(
+      goal: PlayerGoal(
+        goalId: 'g',
+        kind: GoalKind.chuanBiGiai,
+        eventDate: DateTime(2026, 11, 2),
+        createdAt: at,
+      ),
+      steps: const [],
+    );
+    expect(Vi.roadmapHeadline(r), 'Chuẩn bị giải ngày 02/11/2026');
+    expect(
+      Vi.roadmapHeadline(r, tournamentName: 'Cúp Mùa Đông'),
+      'Chuẩn bị giải Cúp Mùa Đông — ngày 02/11/2026',
+    );
+  });
+
   test('ngày dự kiến: có ngày hoặc nói thẳng chưa đủ dữ liệu', () {
     expect(
       Vi.estimateLine(Estimate.on(DateTime(2026, 11, 2))),

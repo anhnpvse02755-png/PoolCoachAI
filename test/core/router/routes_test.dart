@@ -18,6 +18,7 @@ void main() {
         ...Routes.tabs,
         Routes.equipment,
         Routes.tournaments,
+        Routes.tournamentPattern,
         Routes.coach,
         Routes.coachSituation,
         Routes.coachLibrary,

@@ -118,6 +118,7 @@ abstract final class Routes {
     ...tabs,
     equipment,
     tournaments,
+    tournamentPattern,
     coach,
     coachSituation,
     coachLibrary,

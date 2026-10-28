@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
@@ -100,7 +101,13 @@ class RoadmapView extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                Vi.roadmapHeadline(roadmap),
+                Vi.roadmapHeadline(
+                  roadmap,
+                  tournamentName: ref
+                      .watch(linkedTournamentProvider)
+                      .value
+                      ?.name,
+                ),
                 style: theme.textTheme.titleMedium,
               ),
               if (need != null) Text(need),

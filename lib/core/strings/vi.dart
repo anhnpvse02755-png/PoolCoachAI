@@ -321,6 +321,41 @@ abstract final class Vi {
       'Trận thường: thắng $regularPercent% số ván ($regularMatches trận)';
   static const tournamentCompareNotEnough =
       'Cần ít nhất ${MatchAnalysisConstants.minMatches} trận hoàn tất ở mỗi bên để so sánh';
+  static const tournamentEdit = 'Sửa giải';
+  static const tournamentDelete = 'Xóa giải';
+  static const tournamentDeleteTitle = 'Xóa giải đấu?';
+  static const tournamentDeleteBody =
+      'Giải sẽ bị xóa. Các trận đã ghi vẫn còn và hiện như trận thường.';
+  static const tournamentDeleteConfirm = 'Xóa giải';
+  static const tournamentDeleteFailed =
+      'Không xóa được giải. Vui lòng thử lại.';
+  static const tournamentSummaryTitle = 'Tổng kết';
+  static const tournamentSummaryEmpty =
+      'Chưa có trận hoàn tất nào trong giải này.';
+  static String tournamentRacks(int won, int lost) =>
+      'Thắng $won – thua $lost ván';
+  static String tournamentRackRate(int percent) => 'Tỷ lệ ván thắng: $percent%';
+  static const tournamentMatchesTitle = 'Các trận';
+  static const tournamentMatchesEmpty = 'Chưa có trận nào trong giải này.';
+  static String tournamentMatchTitle(String? round, String opponent) =>
+      round == null ? 'Gặp $opponent' : '$round · gặp $opponent';
+  static const tournamentMatchWon = 'Thắng';
+  static const tournamentMatchLost = 'Thua';
+  static const tournamentAnalysisTitle = 'Phân tích các trận trong giải';
+  static const tournamentStartMatch = 'Bắt đầu trận trong giải';
+  static const tournamentPrepare = 'Chuẩn bị cho giải này';
+  static const tournamentPreparing = 'Đang chuẩn bị cho giải này';
+  static const tournamentOpenRoadmap = 'Mở Lộ trình';
+  static const tournamentReplaceGoalTitle = 'Thay mục tiêu hiện tại?';
+  static String tournamentReplaceGoalBody(String currentGoal) =>
+      'Mục tiêu đang chạy: $currentGoal. Đặt mục tiêu chuẩn bị cho giải này '
+      'thì mục tiêu cũ sẽ được thay.';
+  static const tournamentGoalFailed =
+      'Không đặt được mục tiêu. Vui lòng thử lại.';
+  static const tournamentNotFoundTitle = 'Không tìm thấy giải';
+  static const tournamentNotFoundBody =
+      'Giải này không còn hoặc không thuộc tài khoản của bạn.';
+  static const tournamentBackToList = 'Về danh sách giải';
   static String matchRaceTo(int target) => 'Chạm $target ván thắng';
   static String matchRackProgress(int count) => '$count ván đã ghi';
   static String matchRackLabel(int number) => 'Ván $number';
@@ -1989,15 +2024,20 @@ abstract final class Vi {
   static const goalClear = 'Bỏ mục tiêu';
   static const goalCancelChange = 'Giữ mục tiêu cũ';
 
-  static String roadmapHeadline(Roadmap roadmap) => switch (roadmap.goal.kind) {
-    GoalKind.lenHang =>
-      roadmap.from == null || roadmap.target == null
-          ? goalKind(GoalKind.lenHang)
-          : 'Lên hạng: ${roadmap.from!.label} → ${roadmap.target!.label}',
-    GoalKind.thuanThucKyNang => 'Thuần thục: ${skill(roadmap.goal.category!)}',
-    GoalKind.chuanBiGiai =>
-      'Chuẩn bị giải ngày ${shortDate(roadmap.goal.eventDate!)}',
-  };
+  static String roadmapHeadline(Roadmap roadmap, {String? tournamentName}) =>
+      switch (roadmap.goal.kind) {
+        GoalKind.lenHang =>
+          roadmap.from == null || roadmap.target == null
+              ? goalKind(GoalKind.lenHang)
+              : 'Lên hạng: ${roadmap.from!.label} → ${roadmap.target!.label}',
+        GoalKind.thuanThucKyNang =>
+          'Thuần thục: ${skill(roadmap.goal.category!)}',
+        GoalKind.chuanBiGiai =>
+          tournamentName == null
+              ? 'Chuẩn bị giải ngày ${shortDate(roadmap.goal.eventDate!)}'
+              : 'Chuẩn bị giải $tournamentName — ngày '
+                    '${shortDate(roadmap.goal.eventDate!)}',
+      };
 
   /// Dòng phụ của mục tiêu Lên hạng; null với hai mục tiêu kia.
   static String? roadmapNeed(Roadmap roadmap) {

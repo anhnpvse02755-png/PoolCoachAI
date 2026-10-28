@@ -19,6 +19,7 @@ import 'package:poolcoachai/features/knowledge/presentation/knowledge_library_sc
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_detail_screen.dart';
 import 'package:poolcoachai/features/play/presentation/tournament_list_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
@@ -59,6 +60,10 @@ const signedInRouteCases = <String, RouteCase>{
   Routes.profile: (path: Routes.profile, screen: ProfileScreen),
   Routes.equipment: (path: Routes.equipment, screen: EquipmentScreen),
   Routes.tournaments: (path: Routes.tournaments, screen: TournamentListScreen),
+  Routes.tournamentPattern: (
+    path: '/play/tournaments/t1',
+    screen: TournamentDetailScreen,
+  ),
   Routes.coach: (path: Routes.coach, screen: CoachScreen),
   Routes.coachSituation: (
     path: '/coach/situation?lib=pos-rail-1',
