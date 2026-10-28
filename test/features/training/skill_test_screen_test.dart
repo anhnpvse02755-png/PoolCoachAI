@@ -361,7 +361,7 @@ void main() {
       ),
   ];
 
-  testWidgets('bài BU: gợi ý điểm là số cú, không phải "VD: 22.5"', (
+  testWidgets('bài BU: gợi ý điểm là khoảng số cú, không phải "VD: 22.5"', (
     tester,
   ) async {
     await open(
@@ -371,7 +371,7 @@ void main() {
       logs: buLogs(),
     );
     await start(tester);
-    expect(find.text(Vi.sessionScoreHintShots(buShots)), findsOneWidget);
+    expect(find.text(Vi.sessionScoreHintRange(buShots)), findsOneWidget);
     expect(find.text(Vi.sessionScoreHintTarget), findsNothing);
   });
 

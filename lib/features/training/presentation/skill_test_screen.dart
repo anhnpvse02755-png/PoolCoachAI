@@ -7,12 +7,12 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/features/training/presentation/score_hint.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
-import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/skill_test/certification.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
@@ -287,7 +287,6 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
 
   Widget _entryView(BuildContext context, SkillTestDrillState state) {
     final drill = state.drill;
-    final provenance = drillProvenanceOf(drill.id);
     return Form(
       key: _formKey,
       child: Column(
@@ -301,11 +300,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
               labelText: drill.usesAttempts
                   ? Vi.sessionScoreLabelAttempts
                   : Vi.sessionScoreLabelTarget,
-              hintText: drill.usesAttempts
-                  ? Vi.sessionScoreHintAttempts
-                  : provenance != null
-                  ? Vi.sessionScoreHintShots(provenance.shots)
-                  : Vi.sessionScoreHintTarget,
+              hintText: scoreHintFor(drill),
               suffixText: drill.unit,
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),

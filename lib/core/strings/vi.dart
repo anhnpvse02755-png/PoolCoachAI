@@ -838,9 +838,6 @@ abstract final class Vi {
   static const sessionScoreLabelTarget = 'Kết quả';
   static const sessionScoreHintAttempts = 'VD: 7';
   static const sessionScoreHintTarget = 'VD: 22.5';
-
-  /// Gợi ý điểm của bài BU: lấy số cú của chính bài.
-  static String sessionScoreHintShots(int shots) => 'VD: $shots';
   static const sessionAttemptsLabel = 'Số lần thử';
   static const sessionAttemptsHint = 'VD: 10';
   static const sessionNotesLabel = 'Ghi chú (tùy chọn)';
