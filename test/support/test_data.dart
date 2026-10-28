@@ -17,6 +17,7 @@ import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
+import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -32,6 +33,7 @@ import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -107,6 +109,8 @@ ProviderContainer testContainer({
   List<CoachChatEntry>? coachChatTurns,
   AsyncValue<List<CoachChatEntry>>? coachChatTurnsAsync,
   AsyncValue<CoachContext>? coachContext,
+  List<SkillTest>? skillTests,
+  AsyncValue<List<SkillTest>>? skillTestsAsync,
 }) {
   return ProviderContainer(
     overrides: [
@@ -124,8 +128,11 @@ ProviderContainer testContainer({
       if (coachChatTurnsAsync != null)
         coachChatTurnsProvider.overrideWithValue(coachChatTurnsAsync)
       else if (coachChatTurns != null)
-        coachChatTurnsProvider.overrideWith((ref) => Stream.value(coachChatTurns)),
-      if (coachContext != null) coachContextProvider.overrideWithValue(coachContext),
+        coachChatTurnsProvider.overrideWith(
+          (ref) => Stream.value(coachChatTurns),
+        ),
+      if (coachContext != null)
+        coachContextProvider.overrideWithValue(coachContext),
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith(
@@ -158,6 +165,13 @@ ProviderContainer testContainer({
       achievementsProvider.overrideWith(
         (ref) => Stream.value(achievements ?? const <Achievement>[]),
       ),
+      // `skillTestsAsync` thắng `skillTests`, như `coachChatTurnsAsync`.
+      if (skillTestsAsync != null)
+        skillTestsProvider.overrideWithValue(skillTestsAsync)
+      else
+        skillTestsProvider.overrideWith(
+          (ref) => Stream.value(skillTests ?? const <SkillTest>[]),
+        ),
       if (buResult != null)
         latestBuResultProvider.overrideWithValue(
           AsyncData<BuResult?>(buResult),
@@ -210,6 +224,7 @@ ProviderContainer dbContainer(
   DateTime Function()? clock,
   Duration? rankLag,
   List<DrillLog>? logs,
+  List<Drill>? drills,
 }) {
   return ProviderContainer(
     overrides: [
@@ -226,7 +241,7 @@ ProviderContainer dbContainer(
       // Không widget test nào được chạm mạng: luôn thay backend thật.
       coachChatBackendProvider.overrideWithValue(FakeCoachChat()),
       nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
-      drillsProvider.overrideWith((ref) => Stream.value(testDrills)),
+      drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),
       drillLogsProvider.overrideWith(
         (ref) => Stream.value(logs ?? const <DrillLog>[]),

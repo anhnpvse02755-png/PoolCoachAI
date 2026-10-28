@@ -8,7 +8,10 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/skill_test_converters.dart';
+import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/drill_attempts.dart';
@@ -23,24 +26,26 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/certification.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/roadmap_fixtures.dart';
+import '../../support/skill_test_fixtures.dart';
 import '../../support/test_data.dart';
 
 void main() {
   final at = DateTime(2026, 9, 20, 9);
 
   List<DrillLog> passes(String drillId) => [
-        for (var i = 0; i < 3; i++)
-          DrillLog(
-            id: '$drillId-$i',
-            drillId: drillId,
-            date: DateTime(2026, 9, 19 + i, 9),
-            score: 9,
-            attempts: 10,
-          ),
-      ];
+    for (var i = 0; i < 3; i++)
+      DrillLog(
+        id: '$drillId-$i',
+        drillId: drillId,
+        date: DateTime(2026, 9, 19 + i, 9),
+        score: 9,
+        attempts: 10,
+      ),
+  ];
 
   Future<void> settle() async {
     for (var i = 0; i < 5; i++) {
@@ -78,33 +83,36 @@ void main() {
   });
 
   GoalRecord lenHangGoal() => GoalRecord(
-        updatedAt: at,
-        goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at),
-      );
+    updatedAt: at,
+    goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at),
+  );
   PlayerRank rankH() => PlayerRank(
-        rank: Rank.h,
-        source: RankSource.estimated,
-        onboardingState: OnboardingState.done,
-        updatedAt: at,
-      );
+    rank: Rank.h,
+    source: RankSource.estimated,
+    onboardingState: OnboardingState.done,
+    updatedAt: at,
+  );
 
-  test('lộ trình còn đang tải khi danh sách trận chưa về, có dữ liệu khi về', () async {
-    final matches = StreamController<List<PoolMatch>>();
-    addTearDown(matches.close);
-    final container = testContainer(
-      goal: lenHangGoal(),
-      rank: rankH(),
-      matchesStream: matches.stream,
-    );
-    addTearDown(container.dispose);
-    container.listen(roadmapProvider, (_, _) {});
-    await settle();
-    expect(container.read(roadmapProvider).isLoading, isTrue);
-    expect(container.read(roadmapProvider).hasValue, isFalse);
-    matches.add(const <PoolMatch>[]);
-    await settle();
-    expect(container.read(roadmapProvider).value!.target, Rank.g);
-  });
+  test(
+    'lộ trình còn đang tải khi danh sách trận chưa về, có dữ liệu khi về',
+    () async {
+      final matches = StreamController<List<PoolMatch>>();
+      addTearDown(matches.close);
+      final container = testContainer(
+        goal: lenHangGoal(),
+        rank: rankH(),
+        matchesStream: matches.stream,
+      );
+      addTearDown(container.dispose);
+      container.listen(roadmapProvider, (_, _) {});
+      await settle();
+      expect(container.read(roadmapProvider).isLoading, isTrue);
+      expect(container.read(roadmapProvider).hasValue, isFalse);
+      matches.add(const <PoolMatch>[]);
+      await settle();
+      expect(container.read(roadmapProvider).value!.target, Rank.g);
+    },
+  );
 
   test('danh sách trận rỗng vẫn cho ra lộ trình', () async {
     final container = testContainer(
@@ -124,11 +132,7 @@ void main() {
     final container = testContainer(
       goal: GoalRecord(
         updatedAt: at,
-        goal: PlayerGoal(
-          goalId: 'g',
-          kind: GoalKind.lenHang,
-          createdAt: at,
-        ),
+        goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at),
       ),
       rank: PlayerRank(
         rank: Rank.h,
@@ -143,20 +147,23 @@ void main() {
     expect(container.read(roadmapProvider).value!.target, Rank.g);
   });
 
-  test('bộ ghi thành tích ghi sự kiện thật theo ngày buổi đạt thứ ba', () async {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    final container = dbContainer(db, logs: passes('d1'));
-    addTearDown(container.dispose);
-    container.listen(achievementRecorderProvider, (_, _) {});
-    await settle();
-    final rows = await db.select(db.achievementRows).get();
-    final ready = rows
-        .where((row) => row.kind == AchievementKind.duDieuKienLenCap.name)
-        .single;
-    expect(ready.refId, 'd1');
-    expect(ready.achievedAt, DateTime(2026, 9, 21, 9));
-  });
+  test(
+    'bộ ghi thành tích ghi sự kiện thật theo ngày buổi đạt thứ ba',
+    () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final container = dbContainer(db, logs: passes('d1'));
+      addTearDown(container.dispose);
+      container.listen(achievementRecorderProvider, (_, _) {});
+      await settle();
+      final rows = await db.select(db.achievementRows).get();
+      final ready = rows
+          .where((row) => row.kind == AchievementKind.duDieuKienLenCap.name)
+          .single;
+      expect(ready.refId, 'd1');
+      expect(ready.achievedAt, DateTime(2026, 9, 21, 9));
+    },
+  );
 
   test('đang đổi người: bộ ghi thành tích không ghi gì', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -181,7 +188,9 @@ void main() {
       onboardingState: OnboardingState.done,
       updatedAt: at,
     );
-    final oldBu = buResultGraded(completedAt: at.subtract(const Duration(days: 30)));
+    final oldBu = buResultGraded(
+      completedAt: at.subtract(const Duration(days: 30)),
+    );
 
     test('đủ nguồn: có gợi ý kiểm tra hạng hiện tại', () async {
       final container = testContainer(
@@ -199,55 +208,68 @@ void main() {
       expect(signal.rank, Rank.d);
     });
 
-    test('trận đang tải lại với giá trị cũ: rankCheckSignalProvider là null', () async {
-      final container = testContainer(
-        rank: verifiedD,
-        buResult: oldBu,
-        drills: roadmapDrills,
-        logs: decliningLogs(at.subtract(const Duration(days: 10))),
-        now: at,
-      );
-      addTearDown(container.dispose);
-      container.listen(rankCheckSignalProvider, (_, _) {});
-      await settle();
-      expect(container.read(rankCheckSignalProvider), isNotNull);
+    test(
+      'trận đang tải lại với giá trị cũ: rankCheckSignalProvider là null',
+      () async {
+        final container = testContainer(
+          rank: verifiedD,
+          buResult: oldBu,
+          drills: roadmapDrills,
+          logs: decliningLogs(at.subtract(const Duration(days: 10))),
+          now: at,
+        );
+        addTearDown(container.dispose);
+        container.listen(rankCheckSignalProvider, (_, _) {});
+        await settle();
+        expect(container.read(rankCheckSignalProvider), isNotNull);
 
-      final stale = ProviderContainer(
-        overrides: [
-          drillsProvider.overrideWith((ref) => Stream.value(roadmapDrills)),
-          drillLogsProvider.overrideWith(
-            (ref) => Stream.value(decliningLogs(at.subtract(const Duration(days: 10)))),
-          ),
-          // copyWithPrevious là API nội bộ của riverpod; chỉ dùng trong test.
-          matchesProvider.overrideWithValue(
-            // ignore: invalid_use_of_internal_member
-            const AsyncLoading<List<PoolMatch>>().copyWithPrevious(
-              const AsyncData<List<PoolMatch>>([]),
+        final stale = ProviderContainer(
+          overrides: [
+            drillsProvider.overrideWith((ref) => Stream.value(roadmapDrills)),
+            drillLogsProvider.overrideWith(
+              (ref) => Stream.value(
+                decliningLogs(at.subtract(const Duration(days: 10))),
+              ),
             ),
-          ),
-          latestBuResultProvider.overrideWithValue(AsyncData<BuResult?>(oldBu)),
-          playerRankProvider.overrideWith((ref) => Stream.value(verifiedD)),
-          nowProvider.overrideWithValue(() => at),
-        ],
-      );
-      addTearDown(stale.dispose);
-      stale.listen(rankCheckSignalProvider, (_, _) {});
-      await settle();
-      expect(stale.read(rankCheckSignalProvider), isNull);
-    });
+            // copyWithPrevious là API nội bộ của riverpod; chỉ dùng trong test.
+            matchesProvider.overrideWithValue(
+              // ignore: invalid_use_of_internal_member
+              const AsyncLoading<List<PoolMatch>>().copyWithPrevious(
+                const AsyncData<List<PoolMatch>>([]),
+              ),
+            ),
+            latestBuResultProvider.overrideWithValue(
+              AsyncData<BuResult?>(oldBu),
+            ),
+            playerRankProvider.overrideWith((ref) => Stream.value(verifiedD)),
+            nowProvider.overrideWithValue(() => at),
+          ],
+        );
+        addTearDown(stale.dispose);
+        stale.listen(rankCheckSignalProvider, (_, _) {});
+        await settle();
+        expect(stale.read(rankCheckSignalProvider), isNull);
+      },
+    );
 
     test('hạng đang tải lại với giá trị cũ: null', () async {
       final container = ProviderContainer(
         overrides: [
           drillsProvider.overrideWith((ref) => Stream.value(roadmapDrills)),
           drillLogsProvider.overrideWith(
-            (ref) => Stream.value(decliningLogs(at.subtract(const Duration(days: 10)))),
+            (ref) => Stream.value(
+              decliningLogs(at.subtract(const Duration(days: 10))),
+            ),
           ),
-          matchesProvider.overrideWith((ref) => Stream.value(const <PoolMatch>[])),
+          matchesProvider.overrideWith(
+            (ref) => Stream.value(const <PoolMatch>[]),
+          ),
           latestBuResultProvider.overrideWithValue(AsyncData<BuResult?>(oldBu)),
           playerRankProvider.overrideWithValue(
             // ignore: invalid_use_of_internal_member
-            const AsyncLoading<PlayerRank?>().copyWithPrevious(AsyncData<PlayerRank?>(verifiedD)),
+            const AsyncLoading<PlayerRank?>().copyWithPrevious(
+              AsyncData<PlayerRank?>(verifiedD),
+            ),
           ),
           nowProvider.overrideWithValue(() => at),
         ],
@@ -263,24 +285,44 @@ void main() {
     test('hoàn tất nhưng thiếu bản Đề II: không có kết quả dùng được, không ném lỗi', () async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-          id: 'hong', userId: 'u1', startedAt: at, tableSize: 'nineFootPlus',
-          completedAt: Value(at), totalScore: const Value(80), resultRank: const Value('g')));
+      await db
+          .into(db.buTestRows)
+          .insert(
+            BuTestRowsCompanion.insert(
+              id: 'hong',
+              userId: 'u1',
+              startedAt: at,
+              tableSize: 'nineFootPlus',
+              completedAt: Value(at),
+              totalScore: const Value(80),
+              resultRank: const Value('g'),
+            ),
+          );
       final container = dbContainer(db);
       addTearDown(container.dispose);
       container.listen(latestBuResultProvider, (_, _) {});
       await settle();
-      expect(container.read(latestBuResultProvider), const AsyncData<BuResult?>(null));
+      expect(
+        container.read(latestBuResultProvider),
+        const AsyncData<BuResult?>(null),
+      );
     });
 
     test('lỗi khác khi chấm: thành AsyncError, không ném ra ngoài', () async {
       final bad = TestSnapshot(
         test: BuTest(
-          id: 'sai', startedAt: at, tableSize: TableSize.nineFootPlus, completedAt: at,
-          examIScore: 60, examIIVersion: ExamIIVersion.masters, totalScore: 80,
+          id: 'sai',
+          startedAt: at,
+          tableSize: TableSize.nineFootPlus,
+          completedAt: at,
+          examIScore: 60,
+          examIIVersion: ExamIIVersion.masters,
+          totalScore: 80,
         ),
         // F1 chấm theo cú; đưa kết quả kiểu số bi để buộc chấm điểm ném lỗi.
-        attempts: {'F1': CountAttempts(const [1])},
+        attempts: {
+          'F1': CountAttempts(const [1]),
+        },
       );
       final container = ProviderContainer(
         overrides: [
@@ -296,7 +338,11 @@ void main() {
 
     test('buTests lỗi: latestBu là AsyncError, không quay vòng mãi', () async {
       final container = ProviderContainer(
-        overrides: [buTestsProvider.overrideWith((ref) => Stream.error(StateError('bu tests offline')))],
+        overrides: [
+          buTestsProvider.overrideWith(
+            (ref) => Stream.error(StateError('bu tests offline')),
+          ),
+        ],
       );
       addTearDown(container.dispose);
       container.listen(latestBuResultProvider, (_, _) {});
@@ -308,13 +354,20 @@ void main() {
 
     test('snapshot lỗi: latestBu là AsyncError', () async {
       final done = BuTest(
-        id: 'ok', startedAt: at, tableSize: TableSize.nineFootPlus, completedAt: at,
-        examIScore: 60, examIIVersion: ExamIIVersion.masters, totalScore: 80,
+        id: 'ok',
+        startedAt: at,
+        tableSize: TableSize.nineFootPlus,
+        completedAt: at,
+        examIScore: 60,
+        examIIVersion: ExamIIVersion.masters,
+        totalScore: 80,
       );
       final container = ProviderContainer(
         overrides: [
           buTestsProvider.overrideWith((ref) => Stream.value([done])),
-          testSnapshotProvider.overrideWith((ref, id) => Stream.error(StateError('snapshot offline'))),
+          testSnapshotProvider.overrideWith(
+            (ref, id) => Stream.error(StateError('snapshot offline')),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -338,5 +391,123 @@ void main() {
     final state = container.read(roadmapProvider);
     expect(state.hasError, isTrue);
     expect(state.error, isA<StateError>());
+  });
+
+  group('bộ ghi thành tích với lần kiểm tra kỹ năng (db thật)', () {
+    late AppDatabase db;
+    late SkillTestRepository repo;
+    var n = 0;
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      n = 0;
+      repo = SkillTestRepository(
+        db,
+        userId: 'u1',
+        now: () => stToday,
+        newId: () => 'st${++n}',
+      );
+    });
+    tearDown(() => db.close());
+
+    Future<void> seedLogs(String drillId) async {
+      for (final l in threePasses(drillId)) {
+        await db
+            .into(db.drillLogRows)
+            .insertOnConflictUpdate(toDrillLogRow(l, userId: 'u1'));
+      }
+    }
+
+    Future<void> submit(String drillId, num score) async {
+      await repo.completeTest(
+        drill: stById(drillId),
+        drills: stDrills,
+        tableSize: TableSize.nineFootPlus,
+        startedAt: stToday.subtract(const Duration(minutes: 20)),
+        score: score,
+        attempts: 10,
+      );
+    }
+
+    Future<List<AchievementRow>> chungNhan() async => [
+      for (final r in await db.select(db.achievementRows).get())
+        if (r.kind == AchievementKind.chungNhan.name) r,
+    ];
+
+    test(
+      'lần kiểm tra đạt qua repository: chứng nhận lưu khớp certificationsOf '
+      'của skill_test_rows, ngày là ngày đạt sớm nhất',
+      () async {
+        await seedLogs('a1');
+        final container = dbContainer(db);
+        addTearDown(container.dispose);
+        container.listen(achievementRecorderProvider, (_, _) {});
+        await settle();
+        expect(await chungNhan(), isEmpty);
+
+        await submit('a1', 9);
+        await settle();
+
+        final stored = [
+          for (final r in await db.select(db.skillTestRows).get())
+            ?toSkillTest(r),
+        ];
+        final certs = certificationsOf(stored);
+        final rows = await chungNhan();
+        expect(
+          rows.map((r) => r.refId).toList()..sort(),
+          certs.keys.toList()..sort(),
+        );
+        expect(rows.map((r) => r.refId), ['a1']);
+        expect(rows.single.achievedAt, certs['a1']!.certifiedAt);
+        expect(rows.single.achievedAt, stToday);
+      },
+    );
+
+    test('lần kiểm tra trượt không ra chứng nhận', () async {
+      await seedLogs('a1');
+      final container = dbContainer(db);
+      addTearDown(container.dispose);
+      container.listen(achievementRecorderProvider, (_, _) {});
+      await settle();
+
+      await submit('a1', 5);
+      await settle();
+
+      expect(await db.select(db.skillTestRows).get(), hasLength(1));
+      expect(await chungNhan(), isEmpty);
+    });
+
+    test(
+      'lần đạt thứ hai của cùng bài không thêm bản trùng, ngày giữ sớm nhất',
+      () async {
+        await seedLogs('a1');
+        final container = dbContainer(db);
+        addTearDown(container.dispose);
+        container.listen(achievementRecorderProvider, (_, _) {});
+        await settle();
+        await submit('a1', 9);
+        await settle();
+
+        // Lần đạt thứ hai tới từ đồng bộ (cổng cục bộ không cho nộp hai lần).
+        await db
+            .into(db.skillTestRows)
+            .insert(
+              toSkillTestRow(
+                passedTest(
+                  'a1',
+                  1,
+                  stToday.add(const Duration(days: 3)),
+                  id: 'remote-2',
+                ),
+                userId: 'u1',
+              ),
+            );
+        await settle();
+
+        final rows = await chungNhan();
+        expect(rows, hasLength(1));
+        expect([rows.single.refId, rows.single.achievedAt], ['a1', stToday]);
+      },
+    );
   });
 }

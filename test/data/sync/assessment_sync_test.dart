@@ -5,15 +5,18 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/assessment_converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/skill_test_converters.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/assessment_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/assessment/onboarding_check.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
+import '../../support/skill_test_fixtures.dart';
 
 void main() {
   late AppDatabase db;
@@ -40,42 +43,66 @@ void main() {
     List<Map<String, Object?>> ranks = const [],
     List<Map<String, Object?>> tests = const [],
     List<Map<String, Object?>> results = const [],
+    List<Map<String, Object?>> skillTests = const [],
   }) {
     server.routes['GET /items/player_ranks'] = (_) => FakeDirectus.ok(ranks);
-    server.routes['POST /items/player_ranks'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
-    server.routes['PATCH /items/player_ranks/u1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['POST /items/player_ranks'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['PATCH /items/player_ranks/u1'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
     server.routes['GET /items/bu_tests'] = (_) => FakeDirectus.ok(tests);
-    server.routes['GET /items/bu_drill_results'] = (_) => FakeDirectus.ok(results);
-    server.routes['POST /items/bu_tests'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
-    server.routes['POST /items/bu_drill_results'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['GET /items/bu_drill_results'] = (_) =>
+        FakeDirectus.ok(results);
+    server.routes['GET /items/skill_tests'] = (_) =>
+        FakeDirectus.ok(skillTests);
+    server.routes['POST /items/skill_tests'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['POST /items/bu_tests'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['POST /items/bu_drill_results'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
   }
 
-  Map<String, Object?> remoteRank(Rank? rank, RankSource? source, DateTime at) => {
-        'id': 'u1',
-        'rank': rank?.name,
-        'source': source?.name,
-        'bu_score': source == RankSource.verified ? 130 : null,
-        'test_id': source == RankSource.verified ? 'tv' : null,
-        'warning_rank': null,
-        'warning_test_id': null,
-        'questionnaire_answers': [0, 0, 0, 0, 2, 4, 0, 0],
-        'onboarding_state': rank == null ? 'skipped' : 'done',
-        'updated_at': at.toUtc().toIso8601String(),
-      };
+  Map<String, Object?> remoteRank(
+    Rank? rank,
+    RankSource? source,
+    DateTime at,
+  ) => {
+    'id': 'u1',
+    'rank': rank?.name,
+    'source': source?.name,
+    'bu_score': source == RankSource.verified ? 130 : null,
+    'test_id': source == RankSource.verified ? 'tv' : null,
+    'warning_rank': null,
+    'warning_test_id': null,
+    'questionnaire_answers': [0, 0, 0, 0, 2, 4, 0, 0],
+    'onboarding_state': rank == null ? 'skipped' : 'done',
+    'updated_at': at.toUtc().toIso8601String(),
+  };
 
-  Future<void> localRank(Rank? rank, RankSource? source, DateTime at, {DateTime? syncedAt}) =>
-      db.into(db.playerRankRows).insertOnConflictUpdate(toPlayerRankRow(
-            PlayerRank(
-              rank: rank,
-              source: source,
-              buScore: source == RankSource.verified ? 100 : null,
-              testId: source == RankSource.verified ? 'tl' : null,
-              onboardingState: rank == null ? OnboardingState.skipped : OnboardingState.done,
-              updatedAt: at,
-            ),
-            userId: 'u1',
-            syncedAt: syncedAt,
-          ));
+  Future<void> localRank(
+    Rank? rank,
+    RankSource? source,
+    DateTime at, {
+    DateTime? syncedAt,
+  }) => db
+      .into(db.playerRankRows)
+      .insertOnConflictUpdate(
+        toPlayerRankRow(
+          PlayerRank(
+            rank: rank,
+            source: source,
+            buScore: source == RankSource.verified ? 100 : null,
+            testId: source == RankSource.verified ? 'tl' : null,
+            onboardingState: rank == null
+                ? OnboardingState.skipped
+                : OnboardingState.done,
+            updatedAt: at,
+          ),
+          userId: 'u1',
+          syncedAt: syncedAt,
+        ),
+      );
 
   Future<PlayerRankRow> rankRow() => db.select(db.playerRankRows).getSingle();
 
@@ -95,19 +122,23 @@ void main() {
     expect(await db.select(db.playerRankRows).get(), isEmpty);
   });
 
-  test('máy có hạng chưa đồng bộ, máy chủ chưa có: POST rồi đánh dấu', () async {
-    serve();
-    await localRank(Rank.h, RankSource.estimated, older);
-    await build().syncNow();
-    final body = FakeDirectus.body(server.sent('POST', '/items/player_ranks').single);
-    expect(body['id'], 'u1');
-    expect(body['rank'], 'h');
-    expect(body.containsKey('user_created'), isFalse);
-    expect((await rankRow()).syncedAt, now);
-  });
+  test(
+    'máy có hạng chưa đồng bộ, máy chủ chưa có: POST rồi đánh dấu',
+    () async {
+      serve();
+      await localRank(Rank.h, RankSource.estimated, older);
+      await build().syncNow();
+      final body = FakeDirectus.body(
+        server.sent('POST', '/items/player_ranks').single,
+      );
+      expect(body['id'], 'u1');
+      expect(body['rank'], 'h');
+      expect(body.containsKey('user_created'), isFalse);
+      expect((await rankRow()).syncedAt, now);
+    },
+  );
 
-  test('máy chủ có hạng đã kiểm chứng, máy này tự khai mới hơn: máy chủ thắng, không gửi PATCH',
-      () async {
+  test('máy chủ có hạng đã kiểm chứng, máy này tự khai mới hơn: máy chủ thắng, không gửi PATCH', () async {
     serve(ranks: [remoteRank(Rank.e, RankSource.verified, older)]);
     await localRank(Rank.pro, RankSource.selfDeclared, newer);
     await build().syncNow();
@@ -123,77 +154,119 @@ void main() {
     serve(ranks: [remoteRank(Rank.c, RankSource.estimated, newer)]);
     await localRank(Rank.f, RankSource.verified, older);
     await build().syncNow();
-    final body = FakeDirectus.body(server.sent('PATCH', '/items/player_ranks/u1').single);
+    final body = FakeDirectus.body(
+      server.sent('PATCH', '/items/player_ranks/u1').single,
+    );
     expect(body['rank'], 'f');
     expect(body.containsKey('id'), isFalse, reason: 'không sửa khoá chính');
     expect((await rankRow()).rank, 'f');
     expect((await rankRow()).syncedAt, now);
   });
 
-  test('Để sau trên máy mới (mất mạng lúc đó) không xoá hạng của máy chủ', () async {
-    serve(ranks: [remoteRank(Rank.h, RankSource.estimated, older)]);
-    await localRank(null, null, newer);
-    await build().syncNow();
-    expect(server.sent('PATCH', '/items/player_ranks/u1'), isEmpty);
-    expect((await rankRow()).rank, 'h');
-  });
+  test(
+    'Để sau trên máy mới (mất mạng lúc đó) không xoá hạng của máy chủ',
+    () async {
+      serve(ranks: [remoteRank(Rank.h, RankSource.estimated, older)]);
+      await localRank(null, null, newer);
+      await build().syncNow();
+      expect(server.sent('PATCH', '/items/player_ranks/u1'), isEmpty);
+      expect((await rankRow()).rank, 'h');
+    },
+  );
 
   test('chỉ đẩy lần đã xong cùng kết quả; lần đang dở nằm yên', () async {
     serve();
     for (final (id, done) in [('xong', true), ('do', false)]) {
-      await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-            id: id,
-            userId: 'u1',
-            startedAt: older,
-            tableSize: 'nineFootPlus',
-            completedAt: Value(done ? newer : null),
-            totalScore: Value(done ? 137 : null),
-            resultRank: Value(done ? 'd' : null),
-          ));
-      await db.into(db.buDrillResultRows).insert(BuDrillResultRowsCompanion.insert(
-            id: 'r-$id',
-            testId: id,
-            drillId: 'F1',
-            attempts: '{"shots":[true,true,true,true,true,true,true,true]}',
-            score: const Value(10),
-            recordedAt: older,
-          ));
+      await db
+          .into(db.buTestRows)
+          .insert(
+            BuTestRowsCompanion.insert(
+              id: id,
+              userId: 'u1',
+              startedAt: older,
+              tableSize: 'nineFootPlus',
+              completedAt: Value(done ? newer : null),
+              totalScore: Value(done ? 137 : null),
+              resultRank: Value(done ? 'd' : null),
+            ),
+          );
+      await db
+          .into(db.buDrillResultRows)
+          .insert(
+            BuDrillResultRowsCompanion.insert(
+              id: 'r-$id',
+              testId: id,
+              drillId: 'F1',
+              attempts: '{"shots":[true,true,true,true,true,true,true,true]}',
+              score: const Value(10),
+              recordedAt: older,
+            ),
+          );
     }
     await build().syncNow();
 
-    final tests = server.sent('POST', '/items/bu_tests').map(FakeDirectus.body).toList();
+    final tests = server
+        .sent('POST', '/items/bu_tests')
+        .map(FakeDirectus.body)
+        .toList();
     expect(tests.map((b) => b['id']), ['xong']);
-    final results = server.sent('POST', '/items/bu_drill_results').map(FakeDirectus.body).toList();
+    final results = server
+        .sent('POST', '/items/bu_drill_results')
+        .map(FakeDirectus.body)
+        .toList();
     expect(results.map((b) => b['id']), ['r-xong']);
-    expect(results.single['attempts'], isA<Map<String, Object?>>(),
-        reason: 'gửi JSON thật, không gửi chuỗi');
+    expect(
+      results.single['attempts'],
+      isA<Map<String, Object?>>(),
+      reason: 'gửi JSON thật, không gửi chuỗi',
+    );
     final rows = await db.select(db.buTestRows).get();
     expect(rows.firstWhere((r) => r.id == 'xong').syncedAt, now);
     expect(rows.firstWhere((r) => r.id == 'do').syncedAt, isNull);
   });
 
   test('kéo lần kiểm tra và kết quả từ máy chủ về', () async {
-    serve(tests: [
-      {
-        'id': 't9', 'started_at': older.toUtc().toIso8601String(),
-        'completed_at': newer.toUtc().toIso8601String(), 'cancelled_at': null,
-        'table_size': 'eightFoot', 'exam_i_score': 100, 'exam_ii_version': 'masters',
-        'exam_ii_score': 77, 'total_score': 177, 'result_rank': 'a',
-      },
-    ], results: [
-      {
-        'id': 'r9', 'test_id': 't9', 'drill_id': 'S10',
-        'attempts': {'breaks': [[true, true, true, true, true]]}, 'score': null,
-        'recorded_at': newer.toUtc().toIso8601String(),
-      },
-    ]);
+    serve(
+      tests: [
+        {
+          'id': 't9',
+          'started_at': older.toUtc().toIso8601String(),
+          'completed_at': newer.toUtc().toIso8601String(),
+          'cancelled_at': null,
+          'table_size': 'eightFoot',
+          'exam_i_score': 100,
+          'exam_ii_version': 'masters',
+          'exam_ii_score': 77,
+          'total_score': 177,
+          'result_rank': 'a',
+        },
+      ],
+      results: [
+        {
+          'id': 'r9',
+          'test_id': 't9',
+          'drill_id': 'S10',
+          'attempts': {
+            'breaks': [
+              [true, true, true, true, true],
+            ],
+          },
+          'score': null,
+          'recorded_at': newer.toUtc().toIso8601String(),
+        },
+      ],
+    );
     await build().syncNow();
     final t = await db.select(db.buTestRows).getSingle();
     expect(t.userId, 'u1');
     expect(t.totalScore, 177);
     expect(t.syncedAt, now);
     final r = await db.select(db.buDrillResultRows).getSingle();
-    expect(jsonDecode(r.attempts), {'breaks': [[true, true, true, true, true]]});
+    expect(jsonDecode(r.attempts), {
+      'breaks': [
+        [true, true, true, true, true],
+      ],
+    });
   });
 
   test('mất mạng thì báo RankFetch.failed', () async {
@@ -216,15 +289,22 @@ void main() {
     build().start();
     await pumpEventQueue();
     server.requests.clear();
-    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-          id: 'moi', userId: 'u1', startedAt: older, tableSize: 'nineFootPlus',
-          cancelledAt: Value(newer)));
+    await db
+        .into(db.buTestRows)
+        .insert(
+          BuTestRowsCompanion.insert(
+            id: 'moi',
+            userId: 'u1',
+            startedAt: older,
+            tableSize: 'nineFootPlus',
+            cancelledAt: Value(newer),
+          ),
+        );
     await pumpEventQueue(times: 50);
     expect(server.sent('POST', '/items/bu_tests'), hasLength(1));
   });
 
-  test('hai máy cùng kiểm chứng khác hạng: hạng cao hơn giữ, lần thấp hơn mới hơn thành cảnh báo (D4)',
-      () async {
+  test('hai máy cùng kiểm chứng khác hạng: hạng cao hơn giữ, lần thấp hơn mới hơn thành cảnh báo (D4)', () async {
     // Máy chủ: B đã kiểm chứng lúc older (lần 'tv'). Máy này, mất mạng, vừa
     // kiểm chứng D lúc newer (lần 'tl').
     serve(ranks: [remoteRank(Rank.b, RankSource.verified, older)]);
@@ -237,14 +317,15 @@ void main() {
     expect(row.warningRank, 'd');
     expect(row.warningTestId, 'tl');
     expect(row.syncedAt, now);
-    final body = FakeDirectus.body(server.sent('PATCH', '/items/player_ranks/u1').single);
+    final body = FakeDirectus.body(
+      server.sent('PATCH', '/items/player_ranks/u1').single,
+    );
     expect(body['rank'], 'b');
     expect(body['warning_rank'], 'd');
     expect(body['warning_test_id'], 'tl');
   });
 
-  test('máy này kiểm chứng cao hơn, máy chủ thấp hơn mới hơn: máy giữ hạng, nhận cảnh báo (D4)',
-      () async {
+  test('máy này kiểm chứng cao hơn, máy chủ thấp hơn mới hơn: máy giữ hạng, nhận cảnh báo (D4)', () async {
     serve(ranks: [remoteRank(Rank.d, RankSource.verified, newer)]);
     await localRank(Rank.b, RankSource.verified, older, syncedAt: older);
     await build().syncNow();
@@ -254,7 +335,9 @@ void main() {
     expect(row.testId, 'tl');
     expect(row.warningRank, 'd');
     expect(row.warningTestId, 'tv');
-    final body = FakeDirectus.body(server.sent('PATCH', '/items/player_ranks/u1').single);
+    final body = FakeDirectus.body(
+      server.sent('PATCH', '/items/player_ranks/u1').single,
+    );
     expect(body['rank'], 'b');
     expect(body['warning_test_id'], 'tv');
   });
@@ -262,17 +345,208 @@ void main() {
   test('máy chủ đã có lần kiểm tra và kết quả (RECORD_NOT_UNIQUE): coi như đã đồng bộ', () async {
     // Directus thật trả 400 RECORD_NOT_UNIQUE khi gửi lại cùng id (verify.mjs, 14/10/2026).
     serve();
-    server.routes['POST /items/bu_tests'] = (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
-    server.routes['POST /items/bu_drill_results'] =
-        (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
-    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-          id: 'xong', userId: 'u1', startedAt: older, tableSize: 'nineFootPlus',
-          completedAt: Value(newer), totalScore: const Value(137), resultRank: const Value('d')));
-    await db.into(db.buDrillResultRows).insert(BuDrillResultRowsCompanion.insert(
-          id: 'r-xong', testId: 'xong', drillId: 'F1', attempts: '{"shots":[]}', recordedAt: older));
+    server.routes['POST /items/bu_tests'] = (_) =>
+        FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+    server.routes['POST /items/bu_drill_results'] = (_) =>
+        FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+    await db
+        .into(db.buTestRows)
+        .insert(
+          BuTestRowsCompanion.insert(
+            id: 'xong',
+            userId: 'u1',
+            startedAt: older,
+            tableSize: 'nineFootPlus',
+            completedAt: Value(newer),
+            totalScore: const Value(137),
+            resultRank: const Value('d'),
+          ),
+        );
+    await db
+        .into(db.buDrillResultRows)
+        .insert(
+          BuDrillResultRowsCompanion.insert(
+            id: 'r-xong',
+            testId: 'xong',
+            drillId: 'F1',
+            attempts: '{"shots":[]}',
+            recordedAt: older,
+          ),
+        );
 
     expect(await build().syncNow(), SyncOutcome.done);
     expect((await db.select(db.buTestRows).getSingle()).syncedAt, now);
     expect((await db.select(db.buDrillResultRows).getSingle()).syncedAt, now);
+  });
+
+  group('Skill Test', () {
+    Future<void> local(SkillTest t, {String user = 'u1'}) =>
+        db.into(db.skillTestRows).insert(toSkillTestRow(t, userId: user));
+    Map<String, Object?> remote(SkillTest t) =>
+        toRemoteSkillTest(toSkillTestRow(t, userId: 'u1'));
+
+    test('chưa đồng bộ: POST đủ trường (cả ảnh chụp tiêu chí), không gửi chủ, rồi đánh dấu', () async {
+      serve();
+      await local(passedTest('a1', 1, older));
+      expect(await build().syncNow(), SyncOutcome.done);
+      final body = FakeDirectus.body(
+        server.sent('POST', '/items/skill_tests').single,
+      );
+      expect(
+        [
+          body['drill_id'],
+          body['drill_level'],
+          body['table_size'],
+          body['score'],
+          body['attempts'],
+          body['passed'],
+          body['pass_threshold'],
+          body['target'],
+        ],
+        ['a1', 1, 'nineFootPlus', 9.0, 10, true, 0.8, null],
+      );
+      expect(body.containsKey('user_created'), isFalse);
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, now);
+    });
+
+    test('lần huỷ cũng được đẩy lên và đánh dấu', () async {
+      serve();
+      await local(cancelledTest('a1', 1, older));
+      await build().syncNow();
+      final body = FakeDirectus.body(
+        server.sent('POST', '/items/skill_tests').single,
+      );
+      expect(
+        [body['cancelled_at'] != null, body['completed_at'], body['passed']],
+        [true, null, null],
+      );
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, now);
+    });
+
+    test('chỉ đẩy dòng của người đang đăng nhập', () async {
+      serve();
+      await local(passedTest('a1', 1, older, id: 'mine'));
+      await local(passedTest('a1', 1, older, id: 'theirs'), user: 'u2');
+      await build().syncNow();
+      expect(server.sent('POST', '/items/skill_tests'), hasLength(1));
+      final rows = {
+        for (final r in await db.select(db.skillTestRows).get()) r.id: r,
+      };
+      expect([rows['mine']!.syncedAt, rows['theirs']!.syncedAt], [now, null]);
+    });
+
+    test('máy chủ báo RECORD_NOT_UNIQUE: coi là đã đồng bộ', () async {
+      serve();
+      server.routes['POST /items/skill_tests'] = (_) =>
+          FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+      await local(passedTest('a1', 1, older));
+      await build().syncNow();
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, now);
+    });
+
+    test('đẩy bài kiểm tra bị 5xx vẫn không chặn việc lấy hạng', () async {
+      serve(ranks: [remoteRank(Rank.d, RankSource.verified, newer)]);
+      server.routes['POST /items/skill_tests'] = (_) =>
+          FakeDirectus.error(503, 'SERVICE_UNAVAILABLE');
+      await local(passedTest('a1', 1, older));
+      expect(await build().syncNow(), SyncOutcome.failed);
+      expect(fetches, [('u1', RankFetch.found)]);
+      expect((await rankRow()).rank, 'd');
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, isNull);
+    });
+
+    test('máy chủ từ chối (403): nằm chờ, không gửi lại trong cùng dịch vụ, hạng vẫn đồng bộ', () async {
+      serve();
+      server.routes['POST /items/skill_tests'] = (_) =>
+          FakeDirectus.error(403, 'FORBIDDEN');
+      await local(passedTest('a1', 1, older));
+      final s = build();
+      expect(await s.syncNow(), SyncOutcome.done);
+      await s.syncNow();
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, isNull);
+      expect(server.sent('POST', '/items/skill_tests'), hasLength(1));
+      expect(fetches.first, ('u1', RankFetch.foundNone));
+    });
+
+    test(
+      'kéo về; dòng cùng id đã có trên máy giữ nguyên (chỉ thêm, máy thắng)',
+      () async {
+        serve(
+          skillTests: [
+            remote(passedTest('a1', 1, older, id: 'st-x')),
+            remote(passedTest('a1', 1, older, id: 'st-remote')),
+          ],
+        );
+        await local(failedTest('a1', 1, newer, id: 'st-x'));
+        await build().syncNow();
+        final rows = {
+          for (final r in await db.select(db.skillTestRows).get()) r.id: r,
+        };
+        expect(rows['st-x']!.passed, isFalse);
+        expect(
+          [
+            rows['st-remote']!.passed,
+            rows['st-remote']!.syncedAt,
+            rows['st-remote']!.userId,
+            rows['st-remote']!.passThreshold,
+          ],
+          [true, now, 'u1', 0.8],
+        );
+      },
+    );
+
+    test('dòng máy chủ hỏng lẫn dòng tốt: bỏ dòng hỏng, các dòng tốt vẫn vào, lượt vẫn xong', () async {
+      final bad1 = {
+        ...remote(passedTest('a1', 1, older, id: 'bad1')),
+        'table_size': 'zzz',
+      };
+      final bad2 = {
+        ...remote(passedTest('a1', 1, older, id: 'bad2')),
+        'drill_level': 'một',
+      };
+      serve(
+        skillTests: [
+          remote(passedTest('a1', 1, older, id: 'good1')),
+          bad1,
+          remote(passedTest('p2a', 2, newer, id: 'good2')),
+          bad2,
+        ],
+      );
+      expect(await build().syncNow(), SyncOutcome.done);
+      final ids = {
+        for (final r in await db.select(db.skillTestRows).get()) r.id,
+      };
+      expect(ids, {'good1', 'good2'});
+    });
+
+    test(
+      'đếm dòng chờ gồm lần kiểm tra kỹ năng và giảm khi đã đồng bộ',
+      () async {
+        expect(await watchPendingAssessment(db).first, 0);
+        await local(passedTest('a1', 1, older));
+        expect(await watchPendingAssessment(db).first, 1);
+        await db
+            .update(db.skillTestRows)
+            .write(SkillTestRowsCompanion(syncedAt: Value(now)));
+        expect(await watchPendingAssessment(db).first, 0);
+      },
+    );
+
+    test('dòng mới chưa đồng bộ đánh thức vòng đồng bộ', () async {
+      serve();
+      final s = build()..start();
+      await pumpEventQueue();
+      expect(server.sent('POST', '/items/skill_tests'), isEmpty);
+      await local(passedTest('a1', 1, older));
+      for (
+        var i = 0;
+        i < 20 && server.sent('POST', '/items/skill_tests').isEmpty;
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(server.sent('POST', '/items/skill_tests'), hasLength(1));
+      s.dispose();
+    });
   });
 }

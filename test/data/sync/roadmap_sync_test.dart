@@ -33,23 +33,37 @@ void main() {
     return s;
   }
 
-  void serve({List<Map<String, Object?>> goals = const [], List<Map<String, Object?>> achievements = const []}) {
+  void serve({
+    List<Map<String, Object?>> goals = const [],
+    List<Map<String, Object?>> achievements = const [],
+  }) {
     server.routes['GET /items/player_goals'] = (_) => FakeDirectus.ok(goals);
-    server.routes['POST /items/player_goals'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
-    server.routes['PATCH /items/player_goals/u1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
-    server.routes['GET /items/achievements'] = (_) => FakeDirectus.ok(achievements);
-    server.routes['POST /items/achievements'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['POST /items/player_goals'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['PATCH /items/player_goals/u1'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['GET /items/achievements'] = (_) =>
+        FakeDirectus.ok(achievements);
+    server.routes['POST /items/achievements'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
   }
 
   GoalRecord skill(SkillCategory c, DateTime at) => GoalRecord(
-      updatedAt: at,
-      goal: PlayerGoal(goalId: 'g-${c.name}', kind: GoalKind.thuanThucKyNang, category: c, createdAt: at));
+    updatedAt: at,
+    goal: PlayerGoal(
+      goalId: 'g-${c.name}',
+      kind: GoalKind.thuanThucKyNang,
+      category: c,
+      createdAt: at,
+    ),
+  );
 
   Future<void> local(GoalRecord g, {DateTime? syncedAt}) => db
       .into(db.playerGoalRows)
       .insertOnConflictUpdate(toGoalRow(g, userId: 'u1', syncedAt: syncedAt));
 
-  Map<String, Object?> remote(GoalRecord g) => toRemoteGoal(toGoalRow(g, userId: 'u1'));
+  Map<String, Object?> remote(GoalRecord g) =>
+      toRemoteGoal(toGoalRow(g, userId: 'u1'));
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -61,7 +75,9 @@ void main() {
     serve();
     await local(skill(SkillCategory.kick, newer));
     expect(await build().syncNow(), SyncOutcome.done);
-    final body = FakeDirectus.body(server.sent('POST', '/items/player_goals').single);
+    final body = FakeDirectus.body(
+      server.sent('POST', '/items/player_goals').single,
+    );
     expect(body['id'], 'u1');
     expect(body['kind'], 'thuanThucKyNang');
     expect((await db.select(db.playerGoalRows).getSingle()).syncedAt, now);
@@ -93,7 +109,9 @@ void main() {
     serve(goals: [remote(skill(SkillCategory.bank, older))]);
     await local(GoalRecord(updatedAt: newer));
     await build().syncNow();
-    final body = FakeDirectus.body(server.sent('PATCH', '/items/player_goals/u1').single);
+    final body = FakeDirectus.body(
+      server.sent('PATCH', '/items/player_goals/u1').single,
+    );
     expect(body.containsKey('id'), isFalse);
     expect(body['kind'], isNull);
     expect((await db.select(db.playerGoalRows).getSingle()).syncedAt, now);
@@ -110,33 +128,125 @@ void main() {
       return FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
     };
     for (final ref in ['7', '14']) {
-      await db.into(db.achievementRows).insert(toAchievementRow(
-          Achievement(kind: AchievementKind.chuoiNgay, refId: ref, achievedAt: newer),
-          userId: 'u1'));
+      await db
+          .into(db.achievementRows)
+          .insert(
+            toAchievementRow(
+              Achievement(
+                kind: AchievementKind.chuoiNgay,
+                refId: ref,
+                achievedAt: newer,
+              ),
+              userId: 'u1',
+            ),
+          );
     }
     await build().syncNow();
     expect(server.sent('POST', '/items/achievements'), hasLength(2));
-    expect((await db.select(db.achievementRows).get()).every((r) => r.syncedAt == now), isTrue);
+    expect(
+      (await db.select(db.achievementRows).get()).every(
+        (r) => r.syncedAt == now,
+      ),
+      isTrue,
+    );
   });
 
-  test('thành tích bị máy chủ từ chối (4xx khác) nằm chờ, không chặn mục tiêu', () async {
-    serve();
-    server.routes['POST /items/achievements'] = (_) => FakeDirectus.error(403, 'FORBIDDEN');
-    await db.into(db.achievementRows).insert(toAchievementRow(
-        Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: newer), userId: 'u1'));
-    await local(skill(SkillCategory.kick, newer));
-    expect(await build().syncNow(), SyncOutcome.done);
-    expect((await db.select(db.achievementRows).getSingle()).syncedAt, isNull);
-    expect((await db.select(db.playerGoalRows).getSingle()).syncedAt, now);
-  });
+  test(
+    'chứng nhận không bao giờ được gửi lên; loại khác vẫn gửi (S13)',
+    () async {
+      serve();
+      await db
+          .into(db.achievementRows)
+          .insert(
+            toAchievementRow(
+              Achievement(
+                kind: AchievementKind.chungNhan,
+                refId: 'd1',
+                achievedAt: newer,
+              ),
+              userId: 'u1',
+            ),
+          );
+      await db
+          .into(db.achievementRows)
+          .insert(
+            toAchievementRow(
+              Achievement(
+                kind: AchievementKind.chuoiNgay,
+                refId: '7',
+                achievedAt: newer,
+              ),
+              userId: 'u1',
+            ),
+          );
+      await build().syncNow();
+      final posts = server.sent('POST', '/items/achievements');
+      expect(posts, hasLength(1));
+      expect(jsonDecode(posts.single.body)['kind'], 'chuoiNgay');
+    },
+  );
+
+  test(
+    'thành tích bị máy chủ từ chối (4xx khác) nằm chờ, không chặn mục tiêu',
+    () async {
+      serve();
+      server.routes['POST /items/achievements'] = (_) =>
+          FakeDirectus.error(403, 'FORBIDDEN');
+      await db
+          .into(db.achievementRows)
+          .insert(
+            toAchievementRow(
+              Achievement(
+                kind: AchievementKind.chuoiNgay,
+                refId: '7',
+                achievedAt: newer,
+              ),
+              userId: 'u1',
+            ),
+          );
+      await local(skill(SkillCategory.kick, newer));
+      expect(await build().syncNow(), SyncOutcome.done);
+      expect(
+        (await db.select(db.achievementRows).getSingle()).syncedAt,
+        isNull,
+      );
+      expect((await db.select(db.playerGoalRows).getSingle()).syncedAt, now);
+    },
+  );
 
   test('kéo thành tích từ máy chủ về', () async {
-    final a = Achievement(kind: AchievementKind.duDieuKienLenCap, refId: 'd1', achievedAt: older);
-    serve(achievements: [toRemoteAchievement(toAchievementRow(a, userId: 'u1'))]);
+    final a = Achievement(
+      kind: AchievementKind.duDieuKienLenCap,
+      refId: 'd1',
+      achievedAt: older,
+    );
+    serve(
+      achievements: [toRemoteAchievement(toAchievementRow(a, userId: 'u1'))],
+    );
     await build().syncNow();
     final row = await db.select(db.achievementRows).getSingle();
     expect(toAchievement(row), a);
     expect(row.syncedAt, now);
+  });
+
+  test('kéo thành tích: loại lạ bị bỏ qua, các dòng còn lại vẫn về', () async {
+    final a = Achievement(
+      kind: AchievementKind.duDieuKienLenCap,
+      refId: 'd1',
+      achievedAt: older,
+    );
+    serve(
+      achievements: [
+        {
+          ...toRemoteAchievement(toAchievementRow(a, userId: 'u1')),
+          'id': 'unknown-1',
+          'kind': 'zzz',
+        },
+        toRemoteAchievement(toAchievementRow(a, userId: 'u1')),
+      ],
+    );
+    expect(await build().syncNow(), SyncOutcome.done);
+    expect(toAchievement(await db.select(db.achievementRows).getSingle()), a);
   });
 
   test('mất mạng: không ném, trả offline', () async {
@@ -154,26 +264,48 @@ void main() {
 
   test('mục tiêu có hạng đích: POST mang target_rank', () async {
     serve();
-    await local(GoalRecord(
+    await local(
+      GoalRecord(
         updatedAt: newer,
-        goal: PlayerGoal(goalId: 'g-rank', kind: GoalKind.lenHang, createdAt: newer, targetRank: Rank.d)));
+        goal: PlayerGoal(
+          goalId: 'g-rank',
+          kind: GoalKind.lenHang,
+          createdAt: newer,
+          targetRank: Rank.d,
+        ),
+      ),
+    );
     expect(await build().syncNow(), SyncOutcome.done);
-    final body = FakeDirectus.body(server.sent('POST', '/items/player_goals').single);
+    final body = FakeDirectus.body(
+      server.sent('POST', '/items/player_goals').single,
+    );
     expect(body['target_rank'], 'd');
   });
 
   test('kéo mục tiêu có hạng đích về; dòng máy chủ cũ không có target_rank vẫn đọc được', () async {
     final withRank = GoalRecord(
-        updatedAt: newer,
-        goal: PlayerGoal(goalId: 'g-rank', kind: GoalKind.lenHang, createdAt: newer, targetRank: Rank.c));
+      updatedAt: newer,
+      goal: PlayerGoal(
+        goalId: 'g-rank',
+        kind: GoalKind.lenHang,
+        createdAt: newer,
+        targetRank: Rank.c,
+      ),
+    );
     serve(goals: [remote(withRank)]);
     await build().syncNow();
     expect((await db.select(db.playerGoalRows).getSingle()).targetRank, 'c');
 
-    final legacy = remote(GoalRecord(
+    final legacy = remote(
+      GoalRecord(
         updatedAt: newer.add(const Duration(hours: 1)),
-        goal: PlayerGoal(goalId: 'g-old', kind: GoalKind.lenHang, createdAt: newer)))
-      ..remove('target_rank');
+        goal: PlayerGoal(
+          goalId: 'g-old',
+          kind: GoalKind.lenHang,
+          createdAt: newer,
+        ),
+      ),
+    )..remove('target_rank');
     serve(goals: [legacy]);
     await build().syncNow();
     expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);

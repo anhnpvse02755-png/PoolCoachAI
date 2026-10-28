@@ -14,22 +14,27 @@ void main() {
     StepReason reason, {
     SkillCategory? category,
     List<String> bu = const [],
-  }) =>
-      RoadmapStep(
-        kind: kind,
-        status: StepStatus.dangLam,
-        reason: reason,
-        category: category,
-        buDrillIds: bu,
-      );
+  }) => RoadmapStep(
+    kind: kind,
+    status: StepStatus.dangLam,
+    reason: reason,
+    category: category,
+    buDrillIds: bu,
+  );
 
   test('lý do mang đúng con số của hàm tính', () {
     expect(
       Vi.stepReason(const LostBuPoints(18, ['F3', 'F5'])),
       'Mất 18 điểm BU ở F3, F5.',
     );
-    expect(Vi.stepReason(const Unmeasured(1)), 'Tập đủ 3 buổi để đo (đã có 1).');
-    expect(Vi.stepReason(const BelowStrong(62)), 'Còn thiếu 13 điểm để đạt 75.');
+    expect(
+      Vi.stepReason(const Unmeasured(1)),
+      'Tập đủ 3 buổi để đo (đã có 1).',
+    );
+    expect(
+      Vi.stepReason(const BelowStrong(62)),
+      'Còn thiếu 13 điểm để đạt 75.',
+    );
     expect(
       Vi.stepReason(const NeedStreak()),
       'Đã đạt 75, cần 3 buổi đạt liên tiếp.',
@@ -43,10 +48,18 @@ void main() {
   });
 
   test('lý do và tên của bước dùng dữ liệu trận', () {
-    expect(Vi.stepReason(const MatchWeakness(7, 12)), 'Hỏng 7/12 lần trong các trận gần đây.');
-    expect(Vi.stepReason(const NotEnoughMatches(1, 3)), 'Có 1/3 trận có ghi cú trong 28 ngày qua.');
-    expect(Vi.stepTitle(step(StepKind.dauTap, const NotEnoughMatches(1, 3))),
-        'Đấu tập: ghi ít nhất 2 trận có ghi cú');
+    expect(
+      Vi.stepReason(const MatchWeakness(7, 12)),
+      'Hỏng 7/12 lần trong các trận gần đây.',
+    );
+    expect(
+      Vi.stepReason(const NotEnoughMatches(1, 3)),
+      'Có 1/3 trận có ghi cú trong 28 ngày qua.',
+    );
+    expect(
+      Vi.stepTitle(step(StepKind.dauTap, const NotEnoughMatches(1, 3))),
+      'Đấu tập: ghi ít nhất 2 trận có ghi cú',
+    );
     expect(Vi.stepRecordMatch, 'Ghi trận');
   });
 
@@ -63,11 +76,7 @@ void main() {
     );
     expect(
       Vi.stepTitle(
-        step(
-          StepKind.nhom,
-          const Unmeasured(0),
-          category: SkillCategory.kick,
-        ),
+        step(StepKind.nhom, const Unmeasured(0), category: SkillCategory.kick),
         drillName: 'Bài A',
       ),
       'A băng · Bài A',
@@ -84,17 +93,27 @@ void main() {
       'Làm lại bài BU — mốc hạng G',
     );
     expect(
-      Vi.stepTitle(step(StepKind.lamBaiBu, const RankMilestone(Rank.g, retake: false))),
+      Vi.stepTitle(
+        step(StepKind.lamBaiBu, const RankMilestone(Rank.g, retake: false)),
+      ),
       'Làm bài BU — mốc hạng G',
     );
-    expect(Vi.stepReason(const RankMilestone(Rank.g)), 'Đạt 70 điểm BU là lên hạng G.');
+    expect(
+      Vi.stepReason(const RankMilestone(Rank.g)),
+      'Đạt 70 điểm BU là lên hạng G.',
+    );
     expect(Vi.goalTargetRankTitle, 'Lên tới hạng');
     expect(
       Vi.goalKindBody(GoalKind.lenHang),
       'Chọn hạng đích, từ hạng ngay trên tới hạng A, theo điểm BU còn thiếu.',
     );
     final roadmap = Roadmap(
-      goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.f),
+      goal: PlayerGoal(
+        goalId: 'g',
+        kind: GoalKind.lenHang,
+        createdAt: at,
+        targetRank: Rank.f,
+      ),
       steps: const [],
       from: Rank.h,
       target: Rank.f,
@@ -120,24 +139,21 @@ void main() {
 
   test('đầu trang Lên hạng nói điểm còn thiếu và sàn của hạng đích', () {
     final roadmap = Roadmap(
-      goal: PlayerGoal(
-        goalId: 'g',
-        kind: GoalKind.lenHang,
-        createdAt: at,
-      ),
+      goal: PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at),
       steps: const [],
       from: Rank.d,
       target: Rank.c,
       pointsNeeded: 3,
     );
     expect(Vi.roadmapHeadline(roadmap), 'Lên hạng: D → C');
-    expect(
-      Vi.roadmapNeed(roadmap),
-      'Cần thêm 3 điểm BU (hạng C từ 140 điểm).',
-    );
+    expect(Vi.roadmapNeed(roadmap), 'Cần thêm 3 điểm BU (hạng C từ 140 điểm).');
   });
 
   test('thành tích', () {
+    expect(
+      Vi.achievement(AchievementKind.chungNhan, 'Bài A'),
+      'Chứng nhận: Bài A',
+    );
     expect(
       Vi.achievement(AchievementKind.chuoiNgay, '7'),
       'Chuỗi 7 ngày tập liên tiếp',

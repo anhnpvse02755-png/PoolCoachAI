@@ -13,6 +13,7 @@ import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/features/profile/presentation/certification_section.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 
 enum _SignOutChoice { syncFirst, anyway }
@@ -158,6 +159,8 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () => context.go(Routes.equipment),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                const CertificationSection(),
                 const SizedBox(height: AppSpacing.lg),
                 const TestHistoryList(),
               ],

@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
+import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
@@ -78,7 +79,15 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
   final tests = ref.watch(buTestsProvider);
   final result = ref.watch(latestBuResultProvider);
   final matches = ref.watch(matchesProvider);
-  final blocked = gate<Roadmap?>([goal, rank, drills, logs, tests, result, matches]);
+  final blocked = gate<Roadmap?>([
+    goal,
+    rank,
+    drills,
+    logs,
+    tests,
+    result,
+    matches,
+  ]);
   if (blocked != null) return blocked;
 
   final currentGoal = goal.value?.goal;
@@ -104,12 +113,17 @@ final achievementRecorderProvider = Provider<void>((ref) {
   final drills = ref.watch(drillsProvider);
   final logs = ref.watch(drillLogsProvider);
   final existing = ref.watch(achievementsProvider);
-  if (repo == null || ![goal, drills, logs, existing].every(_ready)) return;
+  final skillTests = ref.watch(skillTestsProvider);
+  if (repo == null ||
+      gate<void>([goal, drills, logs, existing, skillTests]) != null) {
+    return;
+  }
 
   final fresh = newAchievements(
     goal: goal.value?.goal,
     drills: drills.value!,
     logs: logs.value!,
+    skillTests: skillTests.value!,
     existing: {for (final achievement in existing.value!) achievement.key},
     today: ref.watch(nowProvider)(),
   );

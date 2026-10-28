@@ -2,10 +2,18 @@ import 'dart:ui' show Size;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart' show CircularProgressIndicator;
+import 'package:flutter/material.dart'
+    show
+        CircularProgressIndicator,
+        FilledButton,
+        ListTile,
+        ListView,
+        MaterialApp,
+        Scaffold;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -21,10 +29,15 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
+import 'package:poolcoachai/features/home/presentation/skill_test_home_line.dart';
+import 'package:poolcoachai/features/training/presentation/skill_test_screen.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/roadmap_fixtures.dart';
+import '../../support/skill_test_fixtures.dart';
 import '../../support/test_data.dart';
 
 /// AI Home — mục 6.1 của thiết kế.
@@ -40,6 +53,7 @@ void main() {
     PlayerRank? rank,
     BuResult? buResult,
     Stream<List<BuTest>>? buTestsStream,
+    List<SkillTest>? skillTests,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -53,6 +67,7 @@ void main() {
       rank: rank,
       buResult: buResult,
       buTestsStream: buTestsStream,
+      skillTests: skillTests,
     );
     addTearDown(container.dispose);
 
@@ -70,8 +85,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('bài BU đọc lỗi: Home vẫn hiện gợi ý, không báo lỗi', (tester) async {
-    await openHome(tester, buTestsStream: Stream.error(StateError('bu offline')));
+  testWidgets('bài BU đọc lỗi: Home vẫn hiện gợi ý, không báo lỗi', (
+    tester,
+  ) async {
+    await openHome(
+      tester,
+      buTestsStream: Stream.error(StateError('bu offline')),
+    );
 
     expect(find.text(Vi.dataErrorTitle), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -196,7 +216,9 @@ void main() {
     expect(find.textContaining('Bước hiện tại'), findsNothing);
   });
 
-  testWidgets('Trang chủ hiện gợi ý kiểm tra lại hạng dù chưa có mục tiêu', (tester) async {
+  testWidgets('Trang chủ hiện gợi ý kiểm tra lại hạng dù chưa có mục tiêu', (
+    tester,
+  ) async {
     await openHome(
       tester,
       drills: roadmapDrills,
@@ -209,7 +231,9 @@ void main() {
         onboardingState: OnboardingState.done,
         updatedAt: testToday,
       ),
-      buResult: buResultGraded(completedAt: testToday.subtract(const Duration(days: 30))),
+      buResult: buResultGraded(
+        completedAt: testToday.subtract(const Duration(days: 30)),
+      ),
     );
     const signal = RankCheckSignal(
       direction: RankCheckDirection.down,
@@ -221,25 +245,190 @@ void main() {
     expect(find.textContaining('Bước hiện tại'), findsNothing);
   });
 
-  testWidgets('bài BU hoàn tất thiếu bản Đề II (dữ liệu đồng bộ hỏng): Trang chủ vẫn dựng xong', (tester) async {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
-    addTearDown(db.close);
-    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
-        id: 'hong', userId: 'u1', startedAt: testToday, tableSize: 'nineFootPlus',
-        completedAt: Value(testToday.subtract(const Duration(days: 3))),
-        totalScore: const Value(80), resultRank: const Value('g')));
-    final container = dbContainer(db);
-    addTearDown(container.dispose);
+  testWidgets(
+    'bài BU hoàn tất thiếu bản Đề II (dữ liệu đồng bộ hỏng): Trang chủ vẫn dựng xong',
+    (tester) async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db
+          .into(db.buTestRows)
+          .insert(
+            BuTestRowsCompanion.insert(
+              id: 'hong',
+              userId: 'u1',
+              startedAt: testToday,
+              tableSize: 'nineFootPlus',
+              completedAt: Value(testToday.subtract(const Duration(days: 3))),
+              totalScore: const Value(80),
+              resultRank: const Value('g'),
+            ),
+          );
+      final container = dbContainer(db);
+      addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text(Vi.homeStreakUnit), findsOneWidget);
+      expect(find.text(Vi.homeDrillTitle), findsOneWidget);
+    },
+  );
+
+  testWidgets('360×640 chữ lớn: Trang chủ (chưa có hạng) không tràn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640), textScale: 2.0);
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
-    tester.view.physicalSize = const Size(800, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(UncontrolledProviderScope(
-        container: container, child: PoolCoachApp(router: router)));
+    final container = testContainer(logs: threePasses('d1', before: testToday));
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: PoolCoachApp(router: router),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text(Vi.homeStreakUnit), findsOneWidget);
-    expect(find.text(Vi.homeDrillTitle), findsOneWidget);
+    expect(find.text(Vi.homeRankCardTitle), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await scrollThroughAll(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets(
+      '${width.toInt()} px, chữ thường, chưa có hạng: nút một dòng, cột chữ không bị chia đôi',
+      (tester) async {
+        applyScreen(tester, Size(width, 640));
+        final router = createAppRouter(auth: signedInGate());
+        addTearDown(router.dispose);
+        final container = testContainer();
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: PoolCoachApp(router: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final button = find.widgetWithText(FilledButton, Vi.rankDetermine);
+        expect(tester.getSize(button).height, lessThan(50));
+        final label = tester.getSize(find.text(Vi.rankDetermine));
+        expect(label.height, lessThan(24));
+        // Cột chữ nhận phần còn lại của hàng, không phải một nửa.
+        final column = tester.getSize(find.text(Vi.homeRankCardBody)).width;
+        final row = tester.getSize(find.byType(PcCard).first).width;
+        expect(column, greaterThan((row - tester.getSize(button).width) * 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('có bài sẵn sàng kiểm tra: một dòng mở thẳng màn kiểm tra', (
+    tester,
+  ) async {
+    await openHome(tester, logs: threePasses('d1', before: testToday));
+    final line = find.text(Vi.homeSkillTestReady('Đường thẳng cơ bản', 0));
+    await tester.dragUntilVisible(
+      line,
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.tap(line);
+    await tester.pumpAndSettle();
+    expect(find.byType(SkillTestScreen), findsOneWidget);
+  });
+
+  Future<void> pumpLine(WidgetTester tester, ProviderContainer c) async {
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const MaterialApp(home: Scaffold(body: SkillTestHomeLine())),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('đã chứng nhận: không còn dòng sẵn sàng kiểm tra', (
+    tester,
+  ) async {
+    await pumpLine(
+      tester,
+      testContainer(
+        logs: threePasses('d1', before: testToday),
+        skillTests: [passedTest('d1', 1, testToday)],
+      ),
+    );
+    expect(find.byType(ListTile), findsNothing);
+  });
+
+  testWidgets('nhiều bài sẵn sàng: nêu bài cấp thấp nhất và số bài còn lại', (
+    tester,
+  ) async {
+    const d7 = Drill(
+      id: 'd7',
+      cat: SkillCategory.safety,
+      name: 'Đẩy sát băng',
+      level: 2,
+      unit: 'lần / 10',
+      passThreshold: 0.7,
+      goal: 'g',
+      steps: [],
+    );
+    await pumpLine(
+      tester,
+      testContainer(
+        drills: [...testDrills, d7],
+        logs: [
+          ...threePasses('d1', before: testToday),
+          ...threePasses('d7', before: testToday),
+        ],
+      ),
+    );
+    expect(
+      find.text(Vi.homeSkillTestReady('Đường thẳng cơ bản', 1)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('đọc lỗi: nói thẳng là chưa tải được, không im lặng', (
+    tester,
+  ) async {
+    await pumpLine(
+      tester,
+      testContainer(
+        skillTestsAsync: AsyncError<List<SkillTest>>(
+          StateError('x'),
+          StackTrace.empty,
+        ),
+      ),
+    );
+    expect(find.text(Vi.skillTestDataError), findsOneWidget);
+  });
+
+  testWidgets('đang tải: không hiện dòng nào', (tester) async {
+    final c = testContainer(
+      skillTestsAsync: const AsyncLoading<List<SkillTest>>(),
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const MaterialApp(home: Scaffold(body: SkillTestHomeLine())),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.text(Vi.skillTestDataError), findsNothing);
   });
 }

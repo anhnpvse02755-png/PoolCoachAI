@@ -5,15 +5,21 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/pace.dart';
 import 'package:poolcoachai/domain/roadmap/practice_facts.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/certification.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
-/// Ba loại thành tích — mỗi loại một sự kiện dữ liệu thật (spec mục 7).
-enum AchievementKind { xongBuoc, duDieuKienLenCap, chuoiNgay }
+/// Bốn loại thành tích — mỗi loại một sự kiện dữ liệu thật (spec mục 7).
+enum AchievementKind { xongBuoc, duDieuKienLenCap, chuoiNgay, chungNhan }
 
 /// Mốc chuỗi ngày tập liên tiếp (chủ sản phẩm chọn 15/10/2026).
 const streakMilestones = <int>[7, 14, 30, 60, 100];
 
 final class Achievement {
-  const Achievement({required this.kind, required this.refId, required this.achievedAt});
+  const Achievement({
+    required this.kind,
+    required this.refId,
+    required this.achievedAt,
+  });
 
   final AchievementKind kind;
   final String refId;
@@ -24,7 +30,10 @@ final class Achievement {
 
   @override
   bool operator ==(Object other) =>
-      other is Achievement && other.kind == kind && other.refId == refId && other.achievedAt == achievedAt;
+      other is Achievement &&
+      other.kind == kind &&
+      other.refId == refId &&
+      other.achievedAt == achievedAt;
 
   @override
   int get hashCode => Object.hash(kind, refId, achievedAt);
@@ -44,16 +53,21 @@ List<Achievement> newAchievements({
   required List<DrillLog> logs,
   required Set<String> existing,
   required DateTime today,
+  List<SkillTest> skillTests = const [],
 }) {
   final facts = PracticeFacts(drills: drills, logs: logs, today: today);
   final out = <Achievement>[];
   void add(AchievementKind kind, String refId, DateTime at) {
     final a = Achievement(kind: kind, refId: refId, achievedAt: at);
-    if (!existing.contains(a.key) && !out.any((o) => o.key == a.key)) out.add(a);
+    if (!existing.contains(a.key) && !out.any((o) => o.key == a.key)) {
+      out.add(a);
+    }
   }
 
   for (final d in drills) {
-    if (facts.drillReady(d)) add(AchievementKind.duDieuKienLenCap, d.id, facts.lastLogOf(d.id)!);
+    if (facts.drillReady(d)) {
+      add(AchievementKind.duDieuKienLenCap, d.id, facts.lastLogOf(d.id)!);
+    }
   }
 
   if (goal != null) {
@@ -84,6 +98,10 @@ List<Achievement> newAchievements({
   final streak = streakDays(logs: logs, timerSessions: const [], today: today);
   for (final m in streakMilestones) {
     if (streak >= m) add(AchievementKind.chuoiNgay, '$m', dateOnly(today));
+  }
+  // Chứng nhận: ngày là ngày hoàn tất lần đạt sớm nhất; trượt/huỷ/dòng lệch không tính.
+  for (final c in certificationsOf(skillTests).values) {
+    add(AchievementKind.chungNhan, c.drillId, c.certifiedAt);
   }
   return out;
 }

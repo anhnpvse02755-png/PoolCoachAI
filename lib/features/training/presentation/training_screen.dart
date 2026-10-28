@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -78,6 +79,13 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
   Widget build(BuildContext context) {
     final drillsAsync = ref.watch(drillsProvider);
     final logsAsync = ref.watch(drillLogsProvider);
+    // Chỉ tin nguồn đã qua cổng: đang tải hay lỗi thì không gắn huy hiệu nào.
+    final certifications = ref.watch(certificationsProvider);
+    final certifiedIds = switch (certifications) {
+      AsyncData(:final value) when !certifications.isLoading =>
+        value.keys.toSet(),
+      _ => const <String>{},
+    };
 
     return PcRootScaffold(
       title: Vi.trainingTitle,
@@ -211,7 +219,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                       final result = latest[drill.id] ?? const _NeverTrained();
                       final drillLogs =
                           logsByDrill[drill.id] ?? const <DrillLog>[];
-                      final passCount = logsAsync.hasValue && drillLogs.isNotEmpty
+                      final passCount =
+                          logsAsync.hasValue && drillLogs.isNotEmpty
                           ? consecutivePassCount(drill, drillLogs)
                           : null;
 
@@ -226,6 +235,15 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                               Text(drill.unit),
                               if (passCount != null)
                                 Text(Vi.drillReadinessProgress(passCount)),
+                              if (certifiedIds.contains(drill.id))
+                                const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.verified, size: 16),
+                                    SizedBox(width: 4),
+                                    Flexible(child: Text(Vi.certifiedBadge)),
+                                  ],
+                                ),
                             ],
                           ),
                           trailing: switch (result) {

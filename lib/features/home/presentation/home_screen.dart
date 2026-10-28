@@ -8,6 +8,7 @@ import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
+import 'package:poolcoachai/features/home/presentation/skill_test_home_line.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 import 'package:poolcoachai/features/roadmap/presentation/roadmap_home_line.dart';
 
@@ -128,6 +129,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const RoadmapHomeLine(),
+            const SkillTestHomeLine(),
 
             // Bài tập gợi ý. Hết bài thì nói hết bài, không mượn
             // bài của nhóm khác cho khối đỡ trống.

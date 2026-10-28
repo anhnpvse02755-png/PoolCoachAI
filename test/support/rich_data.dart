@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
 import 'roadmap_fixtures.dart';
+import 'skill_test_fixtures.dart';
 import 'test_data.dart';
 
 const _longPlayer = 'Nguyễn Văn Trường Giang';
@@ -40,10 +41,34 @@ const _longAnswer =
 /// Lượt chat dài cho quét chiều rộng và chữ lớn: một câu hỏi ~200 ký tự,
 /// một câu trả lời ~600 ký tự, và một lượt bị chặn (chưa đủ dữ liệu).
 final coachChatTurnsRich = <CoachChatEntry>[
-  (id: 1, at: DateTime(2026, 10, 20, 9), fromPlayer: true, text: _longQuestion, insufficient: false),
-  (id: 2, at: DateTime(2026, 10, 20, 9, 1), fromPlayer: false, text: _longAnswer, insufficient: false),
-  (id: 3, at: DateTime(2026, 10, 21, 9), fromPlayer: true, text: 'Tôi hợp cơ nào nhất?', insufficient: false),
-  (id: 4, at: DateTime(2026, 10, 21, 9, 1), fromPlayer: false, text: '', insufficient: true),
+  (
+    id: 1,
+    at: DateTime(2026, 10, 20, 9),
+    fromPlayer: true,
+    text: _longQuestion,
+    insufficient: false,
+  ),
+  (
+    id: 2,
+    at: DateTime(2026, 10, 20, 9, 1),
+    fromPlayer: false,
+    text: _longAnswer,
+    insufficient: false,
+  ),
+  (
+    id: 3,
+    at: DateTime(2026, 10, 21, 9),
+    fromPlayer: true,
+    text: 'Tôi hợp cơ nào nhất?',
+    insufficient: false,
+  ),
+  (
+    id: 4,
+    at: DateTime(2026, 10, 21, 9, 1),
+    fromPlayer: false,
+    text: '',
+    insufficient: true,
+  ),
 ];
 
 /// Dữ liệu đầy, tên dài: quét tràn phải gặp hàng thật, không chỉ màn trống.
@@ -185,4 +210,8 @@ ProviderContainer richContainer() => testContainer(
     lost: const {'F1': 5, 'F3': 4, 'S5': 6},
   ),
   coachChatTurns: coachChatTurnsRich,
+  // d1 vẫn còn ba buổi đạt sau lần trượt này: testable, Hồ sơ hiện "3/3".
+  skillTests: [
+    failedTest('d1', 1, testToday.subtract(const Duration(days: 3, hours: 12))),
+  ],
 );

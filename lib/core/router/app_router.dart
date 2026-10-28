@@ -31,6 +31,7 @@ import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 import 'package:poolcoachai/features/stats/presentation/stats_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
+import 'package:poolcoachai/features/training/presentation/skill_test_screen.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
@@ -125,6 +126,11 @@ GoRouter createAppRouter({
                       ),
                     ),
                   ],
+                ),
+                GoRoute(
+                  path: 'skill-test/:id',
+                  builder: (context, state) =>
+                      SkillTestScreen(drillId: state.pathParameters['id']!),
                 ),
               ],
             ),

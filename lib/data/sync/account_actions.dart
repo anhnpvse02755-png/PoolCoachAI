@@ -89,6 +89,9 @@ Future<void> signOutAndForget({
     db.buDrillResultRows,
   )..where((r) => r.testId.isInQuery(tests))).go();
   await (db.delete(db.buTestRows)..where((t) => t.userId.equals(userId))).go();
+  await (db.delete(
+    db.skillTestRows,
+  )..where((t) => t.userId.equals(userId))).go();
   // Mục tiêu và thành tích cũng là dữ liệu riêng của người này.
   await (db.delete(
     db.playerGoalRows,
@@ -121,7 +124,11 @@ Future<int> pendingAssessmentCount(AppDatabase db, String userId) async {
                 (t.completedAt.isNotNull() | t.cancelledAt.isNotNull()),
           ))
           .get();
-  return rank.length + tests.length;
+  // Mọi dòng skill_test_rows đều đã xong (hoàn tất hoặc huỷ): ghi một lần.
+  final skillTests = await (db.select(
+    db.skillTestRows,
+  )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
+  return rank.length + tests.length + skillTests.length;
 }
 
 /// Dòng mục tiêu và thành tích của [userId] chưa lên server.
@@ -144,10 +151,9 @@ Future<int> pendingCoachCount(AppDatabase db, String userId) async {
 }
 
 Future<int> pendingCueEquipmentCount(AppDatabase db, String userId) async {
-  final rows = await (db.select(db.cueEquipmentRows)..where(
-        (t) => t.userId.equals(userId) & t.syncedAt.isNull(),
-      ))
-      .get();
+  final rows = await (db.select(
+    db.cueEquipmentRows,
+  )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
   return rows.length;
 }
 

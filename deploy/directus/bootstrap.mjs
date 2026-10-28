@@ -268,6 +268,22 @@ await ensureCollection('bu_drill_results', 'Kết quả thô từng bài của m
   nullable('score', 'integer'),
   required('recorded_at', 'timestamp'),
 ]);
+await ensureCollection('skill_tests', 'Lần kiểm tra kỹ năng (Skill Test) đã xong hoặc đã huỷ — chỉ thêm', [
+  pk,
+  required('drill_id', 'string'),
+  required('drill_level', 'integer'),
+  required('table_size', 'string'),
+  required('started_at', 'timestamp'),
+  nullable('completed_at', 'timestamp'),
+  nullable('cancelled_at', 'timestamp'),
+  nullable('score', 'float'),
+  nullable('attempts', 'integer'),
+  nullable('passed', 'boolean'),
+  nullable('notes', 'text'),
+  // Ảnh chụp tiêu chí lúc làm bài: đúng một trong hai có giá trị.
+  nullable('pass_threshold', 'float'),
+  nullable('target', 'float'),
+]);
 
 // ─── 1c. Lộ trình (spec 2026-10-15 mục 6) ─────────────────────────────────
 // player_goals: mỗi tài khoản một dòng, id = id người dùng; bỏ mục tiêu thì
@@ -488,6 +504,18 @@ const desiredPermissions = [
     validation: {},
   },
   { collection: 'bu_drill_results', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  // Skill Test: chỉ thêm và đọc của mình; không update, không delete.
+  {
+    collection: 'skill_tests',
+    action: 'create',
+    fields: [
+      'id', 'drill_id', 'drill_level', 'table_size', 'started_at', 'completed_at',
+      'cancelled_at', 'score', 'attempts', 'passed', 'notes', 'pass_threshold', 'target',
+    ],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'skill_tests', action: 'read', fields: ['*'], permissions: { user_created: self } },
   // Mục tiêu: tạo đúng một dòng của chính mình, đọc và sửa dòng của mình.
   {
     collection: 'player_goals',

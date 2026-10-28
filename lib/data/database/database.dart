@@ -243,6 +243,40 @@ class BuDrillResultRows extends Table {
   ];
 }
 
+// ─── Skill Test ─────────────────────────────────────────────────────────────
+
+/// Lần kiểm tra kỹ năng — chỉ thêm, ghi một lần khi xong (hoàn tất hoặc huỷ).
+///
+/// Lần hoàn tất mang kết quả ([score], [passed]) và ảnh chụp tiêu chí đạt của
+/// bài lúc đó: đúng một trong [passThreshold] (bài đếm cú, kèm [attempts]) hoặc
+/// [target] (bài đo bằng đơn vị khác). Lần huỷ chỉ có [cancelledAt].
+class SkillTestRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+  TextColumn get drillId => text()();
+  IntColumn get drillLevel => integer()();
+
+  /// `TableSize.name`.
+  TextColumn get tableSize => text()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+  DateTimeColumn get cancelledAt => dateTime().nullable()();
+  RealColumn get score => real().nullable()();
+  IntColumn get attempts => integer().nullable()();
+  BoolColumn get passed => boolean().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  /// Ảnh chụp ngưỡng tỉ lệ của bài đếm cú lúc hoàn tất.
+  RealColumn get passThreshold => real().nullable()();
+
+  /// Ảnh chụp mục tiêu tuyệt đối của bài lúc hoàn tất.
+  RealColumn get target => real().nullable()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ─── Lộ trình (spec 2026-10-15 mục 6) ──────────────────────────────────────
 
 /// Mục tiêu của một tài khoản — mỗi tài khoản một dòng. Bỏ mục tiêu thì dòng
@@ -353,6 +387,7 @@ class CoachChatTurnRows extends Table {
     PlayerRankRows,
     BuTestRows,
     BuDrillResultRows,
+    SkillTestRows,
     PlayerGoalRows,
     AchievementRows,
     PoolMatchRows,
@@ -367,7 +402,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -450,6 +485,10 @@ class AppDatabase extends _$AppDatabase {
       if (from >= 4 && from < 14) {
         // Bảng mục tiêu có từ v4; bảng tạo mới ở các bước trên đã có cột này.
         await m.addColumn(playerGoalRows, playerGoalRows.targetRank);
+      }
+      if (from < 15) {
+        // Chỉ thêm bảng (spec Skill Test): không đụng dữ liệu cũ.
+        await m.createTable(skillTestRows);
       }
     },
   );

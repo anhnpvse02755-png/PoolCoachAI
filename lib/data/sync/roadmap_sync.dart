@@ -7,6 +7,8 @@ import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart'
+    show AchievementKind;
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 
 /// Số dòng mục tiêu và thành tích chưa lên server, của mọi người trên máy.
@@ -128,9 +130,9 @@ class RoadmapSyncService {
   }
 
   bool _stillSignedInAs(String userId) => switch (_auth.current) {
-        SignedIn(userId: final id) => id == userId,
-        SignedOut() => false,
-      };
+    SignedIn(userId: final id) => id == userId,
+    SignedOut() => false,
+  };
 
   Future<String> _tokenFor(String userId) async {
     final token = await _auth.accessToken();
@@ -142,7 +144,11 @@ class RoadmapSyncService {
     if (_disposed) throw const _Stopped();
   }
 
-  Future<void> _create(String path, Map<String, Object?> body, String userId) async {
+  Future<void> _create(
+    String path,
+    Map<String, Object?> body,
+    String userId,
+  ) async {
     final token = await _tokenFor(userId);
     try {
       await _api.post(path, token: token, body: body);
@@ -153,9 +159,16 @@ class RoadmapSyncService {
   }
 
   Future<void> _pushAchievements(String userId) async {
-    final rows = await (_db.select(_db.achievementRows)
-          ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
-        .get();
+    // Chứng nhận suy ra hoàn toàn từ skill_tests đã đồng bộ nên không đẩy lên:
+    // bản cũ đọc loại thành tích bằng byName sẽ ném khi gặp 'chungNhan' (S13).
+    final rows =
+        await (_db.select(_db.achievementRows)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.syncedAt.isNull() &
+                  t.kind.equals(AchievementKind.chungNhan.name).not(),
+            ))
+            .get();
     for (final r in rows) {
       if (_rejected.contains(r.id)) continue;
       _checkAlive();
@@ -177,14 +190,20 @@ class RoadmapSyncService {
   /// thắng về phía còn thiếu.
   Future<void> _syncGoal(String userId) async {
     final token = await _tokenFor(userId);
-    final items = await _api.get('/items/player_goals',
-        token: token, query: {'limit': '1', 'fields': remoteGoalFields}) as List<Object?>;
+    final items = await _api.get(
+      '/items/player_goals',
+      token: token,
+      query: {'limit': '1', 'fields': remoteGoalFields},
+    ) as List<Object?>;
     _checkAlive();
     if (!_stillSignedInAs(userId)) throw const _UserChanged();
-    final remote = items.isEmpty ? null : goalFromRemote(items.first! as Map<String, Object?>);
+    final remote = items.isEmpty
+        ? null
+        : goalFromRemote(items.first! as Map<String, Object?>);
 
-    final localRow = await (_db.select(_db.playerGoalRows)..where((t) => t.userId.equals(userId)))
-        .getSingleOrNull();
+    final localRow = await (_db.select(
+      _db.playerGoalRows,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
     final local = localRow == null ? null : toGoalRecord(localRow);
     final picked = mergeGoal(local, remote);
     if (picked == null) return;
@@ -193,14 +212,25 @@ class RoadmapSyncService {
       // Gộp lại trong transaction: người chơi vừa đổi mục tiêu trong lúc chờ
       // server thì bản mới đó được xét lại, không bị ghi đè mù.
       await _db.transaction(() async {
-        final fresh = await (_db.select(_db.playerGoalRows)..where((t) => t.userId.equals(userId)))
-            .getSingleOrNull();
-        final again = mergeGoal(fresh == null ? null : toGoalRecord(fresh), remote);
+        final fresh = await (_db.select(
+          _db.playerGoalRows,
+        )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+        final again = mergeGoal(
+          fresh == null ? null : toGoalRecord(fresh),
+          remote,
+        );
         if (identical(again, remote)) {
           // toCompanion(false): bản máy chủ có cột null (đã bỏ mục tiêu) phải
           // ghi đè được cột cũ — dòng dữ liệu thẳng thì Drift bỏ cột null.
-          await _db.into(_db.playerGoalRows).insertOnConflictUpdate(
-              toGoalRow(remote!, userId: userId, syncedAt: _now()).toCompanion(false));
+          await _db
+              .into(_db.playerGoalRows)
+              .insertOnConflictUpdate(
+                toGoalRow(
+                  remote!,
+                  userId: userId,
+                  syncedAt: _now(),
+                ).toCompanion(false),
+              );
         }
       });
       return;
@@ -213,29 +243,39 @@ class RoadmapSyncService {
       await _create('/items/player_goals', body, userId);
     } else {
       body.remove('id');
-      await _api.patch('/items/player_goals/$userId', token: await _tokenFor(userId), body: body);
+      await _api.patch(
+        '/items/player_goals/$userId',
+        token: await _tokenFor(userId),
+        body: body,
+      );
       _checkAlive();
     }
-    await (_db.update(_db.playerGoalRows)
-          ..where((t) => t.userId.equals(userId) & t.updatedAt.equals(row.updatedAt)))
+    await (_db.update(_db.playerGoalRows)..where(
+          (t) => t.userId.equals(userId) & t.updatedAt.equals(row.updatedAt),
+        ))
         .write(PlayerGoalRowsCompanion(syncedAt: Value(_now())));
   }
 
   /// Thành tích trên server không đổi nữa: thêm cái còn thiếu, bỏ qua cái đã có.
   Future<void> _pullAchievements(String userId) async {
     final token = await _tokenFor(userId);
-    final items = await _api.get('/items/achievements',
-        token: token, query: {'limit': '-1', 'fields': remoteAchievementFields}) as List<Object?>;
+    final items = await _api.get(
+      '/items/achievements',
+      token: token,
+      query: {'limit': '-1', 'fields': remoteAchievementFields},
+    ) as List<Object?>;
     _checkAlive();
     if (!_stillSignedInAs(userId)) throw const _UserChanged();
     final at = _now();
     await _db.batch((batch) {
       for (final item in items) {
-        batch.insert(
-          _db.achievementRows,
-          achievementFromRemote(item! as Map<String, Object?>, userId: userId, syncedAt: at),
-          mode: InsertMode.insertOrIgnore,
+        final row = achievementFromRemote(
+          item! as Map<String, Object?>,
+          userId: userId,
+          syncedAt: at,
         );
+        if (row == null) continue;
+        batch.insert(_db.achievementRows, row, mode: InsertMode.insertOrIgnore);
       }
     });
   }

@@ -80,18 +80,20 @@ void main() {
           );
     }
     if (pendingPractice) {
-      await db.into(db.poolMatchRows).insert(
-        PoolMatchRowsCompanion.insert(
-          id: 'match-pending',
-          userId: 'u1',
-          gameType: 'nineBall',
-          playerName: 'An',
-          opponentName: 'Bình',
-          targetRacks: 3,
-          rackWinners: '[]',
-          startedAt: today,
-        ),
-      );
+      await db
+          .into(db.poolMatchRows)
+          .insert(
+            PoolMatchRowsCompanion.insert(
+              id: 'match-pending',
+              userId: 'u1',
+              gameType: 'nineBall',
+              playerName: 'An',
+              opponentName: 'Bình',
+              targetRacks: 3,
+              rackWinners: '[]',
+              startedAt: today,
+            ),
+          );
     }
     if (pendingRoadmap) {
       final goal = GoalRecord(
@@ -133,6 +135,9 @@ void main() {
     server
       ..routes['GET /items/player_ranks'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/player_ranks'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/skill_tests'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/skill_tests'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/bu_tests'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/bu_drill_results'] = ((_) => FakeDirectus.ok([]))
@@ -319,10 +324,7 @@ void main() {
   testWidgets('còn trận chờ đồng bộ thì cảnh báo, Đồng bộ trước đẩy trận lên', (
     tester,
   ) async {
-    final (db, auth, server) = await openProfile(
-      tester,
-      pendingPractice: true,
-    );
+    final (db, auth, server) = await openProfile(tester, pendingPractice: true);
     server.routes['POST /items/pool_matches'] = (req) =>
         FakeDirectus.ok(jsonDecode(req.body));
 

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
@@ -11,7 +12,11 @@ void main() {
   final goal = GoalRecord(
     updatedAt: at,
     goal: PlayerGoal(
-        goalId: 'g1', kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2), createdAt: at),
+      goalId: 'g1',
+      kind: GoalKind.chuanBiGiai,
+      eventDate: DateTime(2026, 11, 2),
+      createdAt: at,
+    ),
   );
 
   test('mục tiêu qua dòng Drift rồi về nguyên vẹn', () {
@@ -23,39 +28,140 @@ void main() {
   test('mục tiêu qua Directus rồi về nguyên vẹn; id là id người dùng', () {
     final skill = GoalRecord(
       updatedAt: at,
-      goal: PlayerGoal(goalId: 'g2', kind: GoalKind.thuanThucKyNang, category: SkillCategory.bank, createdAt: at),
+      goal: PlayerGoal(
+        goalId: 'g2',
+        kind: GoalKind.thuanThucKyNang,
+        category: SkillCategory.bank,
+        createdAt: at,
+      ),
     );
     final json = toRemoteGoal(toGoalRow(skill, userId: 'u1'));
     expect(json['id'], 'u1');
     expect(json['kind'], 'thuanThucKyNang');
     expect(json['category'], 'bank');
     expect(goalFromRemote(json), skill);
-    expect(goalFromRemote(toRemoteGoal(toGoalRow(GoalRecord(updatedAt: at), userId: 'u1'))).goal, isNull);
+    expect(
+      goalFromRemote(
+        toRemoteGoal(toGoalRow(GoalRecord(updatedAt: at), userId: 'u1')),
+      ).goal,
+      isNull,
+    );
   });
 
   test('hai máy cùng người cùng thành tích ra cùng id', () {
-    final a = Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: at);
-    final b = Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: at.add(const Duration(days: 1)));
+    final a = Achievement(
+      kind: AchievementKind.chuoiNgay,
+      refId: '7',
+      achievedAt: at,
+    );
+    final b = Achievement(
+      kind: AchievementKind.chuoiNgay,
+      refId: '7',
+      achievedAt: at.add(const Duration(days: 1)),
+    );
     expect(achievementId('u1', a), achievementId('u1', b));
     expect(achievementId('u1', a), isNot(achievementId('u2', a)));
-    expect(achievementId('u1', a), isNot(achievementId('u1',
-        Achievement(kind: AchievementKind.chuoiNgay, refId: '14', achievedAt: at))));
+    expect(
+      achievementId('u1', a),
+      isNot(
+        achievementId(
+          'u1',
+          Achievement(
+            kind: AchievementKind.chuoiNgay,
+            refId: '14',
+            achievedAt: at,
+          ),
+        ),
+      ),
+    );
   });
 
   test('thành tích qua Drift và Directus rồi về nguyên vẹn', () {
-    final a = Achievement(kind: AchievementKind.xongBuoc, refId: 'g1:aiming', achievedAt: at);
+    final a = Achievement(
+      kind: AchievementKind.xongBuoc,
+      refId: 'g1:aiming',
+      achievedAt: at,
+    );
     final row = toAchievementRow(a, userId: 'u1');
     expect(toAchievement(row), a);
-    final back = achievementFromRemote(toRemoteAchievement(row), userId: 'u1', syncedAt: at);
+    final back = achievementFromRemote(
+      toRemoteAchievement(row),
+      userId: 'u1',
+      syncedAt: at,
+    )!;
     expect(toAchievement(back), a);
     expect(back.syncedAt, at);
     expect(back.id, row.id);
   });
 
+  test(
+    'chứng nhận: hai máy cùng người ra cùng id, qua Directus về nguyên vẹn',
+    () {
+      final a = Achievement(
+        kind: AchievementKind.chungNhan,
+        refId: 'd1',
+        achievedAt: at,
+      );
+      final b = Achievement(
+        kind: AchievementKind.chungNhan,
+        refId: 'd1',
+        achievedAt: at.add(const Duration(hours: 3)),
+      );
+      expect(achievementId('u1', a), achievementId('u1', b));
+      final row = toAchievementRow(a, userId: 'u1');
+      expect(
+        toAchievement(
+          achievementFromRemote(
+            toRemoteAchievement(row),
+            userId: 'u1',
+            syncedAt: at,
+          )!,
+        ),
+        a,
+      );
+    },
+  );
+
+  test('loại thành tích lạ (máy chủ mới hơn) bị bỏ qua, không ném', () {
+    final row = toAchievementRow(
+      Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: at),
+      userId: 'u1',
+    );
+    final unknown = AchievementRow(
+      id: 'x',
+      userId: 'u1',
+      kind: 'zzz',
+      refId: 'r',
+      achievedAt: at,
+    );
+    expect(toAchievement(unknown), isNull);
+    expect(
+      achievementFromRemote(
+        {...toRemoteAchievement(row), 'kind': 'zzz'},
+        userId: 'u1',
+        syncedAt: at,
+      ),
+      isNull,
+    );
+    expect(
+      achievementFromRemote(
+        toRemoteAchievement(row),
+        userId: 'u1',
+        syncedAt: at,
+      ),
+      isNotNull,
+    );
+  });
+
   test('mục tiêu có hạng đích qua Drift và Directus rồi về nguyên vẹn', () {
     final target = GoalRecord(
       updatedAt: at,
-      goal: PlayerGoal(goalId: 'g3', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.d),
+      goal: PlayerGoal(
+        goalId: 'g3',
+        kind: GoalKind.lenHang,
+        createdAt: at,
+        targetRank: Rank.d,
+      ),
     );
     final row = toGoalRow(target, userId: 'u1');
     expect(row.targetRank, 'd');
@@ -67,35 +173,55 @@ void main() {
   });
 
   test('máy chủ cũ không có target_rank thì coi là null', () {
-    final json = toRemoteGoal(toGoalRow(
-      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g4', kind: GoalKind.lenHang, createdAt: at)),
-      userId: 'u1',
-    ))..remove('target_rank');
+    final json = toRemoteGoal(
+      toGoalRow(
+        GoalRecord(
+          updatedAt: at,
+          goal: PlayerGoal(goalId: 'g4', kind: GoalKind.lenHang, createdAt: at),
+        ),
+        userId: 'u1',
+      ),
+    )..remove('target_rank');
     expect(goalFromRemote(json).goal!.targetRank, isNull);
   });
 
   test('target_rank thừa ở dòng không phải Lên hạng bị bỏ qua', () {
-    final json = toRemoteGoal(toGoalRow(
-      GoalRecord(
-        updatedAt: at,
-        goal: PlayerGoal(goalId: 'g5', kind: GoalKind.thuanThucKyNang, category: SkillCategory.aiming, createdAt: at),
+    final json = toRemoteGoal(
+      toGoalRow(
+        GoalRecord(
+          updatedAt: at,
+          goal: PlayerGoal(
+            goalId: 'g5',
+            kind: GoalKind.thuanThucKyNang,
+            category: SkillCategory.aiming,
+            createdAt: at,
+          ),
+        ),
+        userId: 'u1',
       ),
-      userId: 'u1',
-    ))..['target_rank'] = 'd';
+    )..['target_rank'] = 'd';
     final goal = goalFromRemote(json).goal!;
     expect(goal.kind, GoalKind.thuanThucKyNang);
     expect(goal.targetRank, isNull);
   });
 
   test('target_rank lạ (máy chủ mới hơn) coi là null, không ném', () {
-    final lenHang = toRemoteGoal(toGoalRow(
-      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g6', kind: GoalKind.lenHang, createdAt: at)),
-      userId: 'u1',
-    ))..['target_rank'] = 'xyz';
+    final lenHang = toRemoteGoal(
+      toGoalRow(
+        GoalRecord(
+          updatedAt: at,
+          goal: PlayerGoal(goalId: 'g6', kind: GoalKind.lenHang, createdAt: at),
+        ),
+        userId: 'u1',
+      ),
+    )..['target_rank'] = 'xyz';
     expect(goalFromRemote(lenHang).goal!.targetRank, isNull);
 
     final row = toGoalRow(
-      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g7', kind: GoalKind.lenHang, createdAt: at)),
+      GoalRecord(
+        updatedAt: at,
+        goal: PlayerGoal(goalId: 'g7', kind: GoalKind.lenHang, createdAt: at),
+      ),
       userId: 'u1',
     ).copyWith(targetRank: const Value('xyz'));
     expect(toGoalRecord(row).goal!.targetRank, isNull);
