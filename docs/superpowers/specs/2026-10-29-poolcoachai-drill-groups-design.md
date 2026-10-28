@@ -117,3 +117,46 @@ Mỗi nhóm có 3 cấp, ứng với 3 bậc BU: **cấp 1 = Bachelors, cấp 2 
   - Chi tiết bài hiện nguồn và cảnh báo.
   - 360x640 chữ lớn (giới hạn 1.5).
 - **E2E:** chạy lại bộ live hiện có. Thêm một bước vào `match_drill_stats.mjs` hoặc script mới: ghi một buổi Dựng cơ, thấy nhóm ở Thống kê và trên Directus.
+
+## 9. Bổ sung sau khi lập plan (29/10)
+
+Đây là các quyết định của Claude, chốt sau khi rà code lúc lập plan.
+
+**Tương thích bản cũ (sửa §6).** Bản app đang chạy **ném lỗi** khi kéo về một tên nhóm lạ:
+- `timer_sessions.cat` và `schedule_slots.cat`: hỏng lượt đồng bộ tập luyện.
+- `cue_equipment.skill_categories`: hỏng đồng bộ cơ.
+- `player_goals.category`: hỏng đồng bộ mục tiêu.
+
+Cách xử lý:
+- Các trường cũ chỉ chứa sáu tên nhóm cũ.
+- Ba nhóm mới đi trong trường riêng mà bản cũ không xin: `cat_ext`, `skill_categories_ext`, `category_ext`.
+- Bản mới đọc trường cũ trước, rồi mới tới trường `_ext`.
+- Mục tiêu "Thuần thục" của một nhóm nâng cao gửi `kind`/`category` cũ để trống cùng với `category_ext`. Bản cũ coi như chưa có mục tiêu.
+
+Bản cũ mất gì, và không có gì hỏng:
+- Buổi Timer và lịch tập của nhóm nâng cao hiện không có nhóm.
+- Cơ mất các kỹ năng nâng cao.
+- Mục tiêu nâng cao hiện như chưa có mục tiêu.
+- Thành tích hiện khóa thô.
+
+**Thứ tự phát hành.**
+- Chạy bootstrap và verify Directus trên prod **trước khi đẩy PR**.
+- Sau khi người chơi đã dùng nhóm mới, **không rollback web**, vì dữ liệu máy đã chứa tên nhóm mới. Chỉ sửa tiến.
+
+**Bảng nguồn.**
+- Nằm ở `lib/domain/drill_provenance.dart`, không nằm trong seed. Lý do: kiến trúc cấm màn hình đọc seed.
+- Bước 1 của bài mới tính từ `Vi.buDrillSetup`, không chép tay.
+
+**Chi tiết bài.**
+- Thêm nút "Xem sơ đồ BU", mở bộ sơ đồ của đúng bài và bậc. Lý do: vị trí bi cái của S8 chỉ có trên sơ đồ.
+- Điểm của bài mới phải là số nguyên từ 0 tới số cú, ở cả Luyện tập và Skill Test.
+
+**Mát xê.**
+- Được dùng một dòng cách ngắm **không có con số** từ Từ điển §18: "ngắm điểm chạm lệch tâm bi cái theo hướng muốn bi cong tới". Lý do: mẹo của Dr. Dave không nói cách ngắm.
+- Dòng nguồn ghi rõ "Từ điển kiến thức Billiard Pool, mục 17/18".
+
+**Phạm vi "trong tầm".**
+- Một nhóm được tính khi là nhóm cơ bản, hoặc đã có ít nhất một buổi có điểm.
+- Ở Lộ trình "Chuẩn bị giải", Dựng cơ vẫn được giữ khi BU S8 mất điểm.
+
+**Coach Chat.** `server/coach-chat/src/prompt.mjs` thêm ba tên nhóm. Test Dart đọc file này để đối chiếu với các nhóm trong app.
