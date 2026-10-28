@@ -23,9 +23,13 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/certification_summary.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
 
 import '../support/match_fixtures.dart';
 import '../support/roadmap_fixtures.dart';
+import '../support/skill_test_fixtures.dart';
 import '../support/test_data.dart';
 
 final _today = DateTime(2026, 9, 17);
@@ -422,6 +426,53 @@ void main() {
       expect(a.steps.first.category, SkillCategory.aiming);
       expect(p.steps.first.category, SkillCategory.position);
       expect(Vi.stepTitle(a.steps.first), isNot(Vi.stepTitle(p.steps.first)));
+    });
+  });
+
+  group('Skill Test bám dữ liệu, không viết cứng (spec 2026-10-28 skill test mục 8)', () {
+    String line(String id, List<DrillLog> logs, List<SkillTest> tests) =>
+        Vi.skillTestGateLine(
+          skillTestGate(drill: stById(id), drills: stDrills, logs: logs, tests: tests),
+          nameOf: (d) => stById(d).name,
+        );
+
+    test('lý do khoá hoặc mở bài kiểm tra đổi theo dữ liệu', () {
+      final lines = {
+        line('a1', const [], const []),
+        line('a1', threePasses('a1').skip(1).toList(), const []),
+        line('a1', threePasses('a1'), const []),
+        line('a1', threePasses('a1'), [failedTest('a1', 1, stToday.subtract(const Duration(hours: 2)))]),
+        line('a1', threePasses('a1'), [passedTest('a1', 1, stToday)]),
+      };
+      expect(lines, hasLength(5));
+      expect(line('a3', threePasses('a3'), const []), contains(stById('a1').name));
+      expect(line('p3', threePasses('p3'), [passedTest('p2a', 2, stToday)]), contains(stById('p2b').name));
+    });
+
+    test('gợi ý ở Hồ sơ và dòng ở Trang chủ đi theo nhật ký và bài kiểm tra', () {
+      CertificationSummary summary(List<DrillLog> logs, List<SkillTest> tests) =>
+          certificationSummary(drills: stDrills, logs: logs, tests: tests);
+      List<String> ready(List<DrillLog> logs, List<SkillTest> tests) =>
+          testableDrillIds(drills: stDrills, logs: logs, tests: tests);
+
+      expect(summary(const [], const []).closest, isNull);
+      expect(summary(const [], const []).groups, isEmpty);
+      expect(ready(const [], const []), isEmpty);
+
+      final two = summary(threePasses('a1').skip(1).toList(), const []).closest!;
+      expect((two.drill.id, two.passCount), ('a1', 2));
+      expect(ready(threePasses('a1').skip(1).toList(), const []), isEmpty);
+
+      expect(ready(threePasses('a1'), const []), ['a1']);
+      expect(summary(threePasses('a1'), const []).closest!.passCount, 3);
+
+      final certified = [passedTest('a1', 1, stToday)];
+      expect(ready(threePasses('a1'), certified), isEmpty);
+      expect(summary(threePasses('a1'), certified).groups.single.entries.single.drill.id, 'a1');
+      expect(
+        Vi.certificationEntry('Bai a1', 1, stToday),
+        contains(summary(threePasses('a1'), certified).groups.single.entries.single.drill.name),
+      );
     });
   });
 }
