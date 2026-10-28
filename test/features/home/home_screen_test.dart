@@ -1,9 +1,13 @@
 import 'dart:ui' show Size;
 
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/drill.dart';
@@ -204,5 +208,27 @@ void main() {
     );
     expect(find.text(Vi.rankCheck(signal)), findsOneWidget);
     expect(find.textContaining('Bước hiện tại'), findsNothing);
+  });
+
+  testWidgets('bài BU hoàn tất thiếu bản Đề II (dữ liệu đồng bộ hỏng): Trang chủ vẫn dựng xong', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 'hong', userId: 'u1', startedAt: testToday, tableSize: 'nineFootPlus',
+        completedAt: Value(testToday.subtract(const Duration(days: 3))),
+        totalScore: const Value(80), resultRank: const Value('g')));
+    final container = dbContainer(db);
+    addTearDown(container.dispose);
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container, child: PoolCoachApp(router: router)));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text(Vi.homeStreakUnit), findsOneWidget);
+    expect(find.text(Vi.homeDrillTitle), findsOneWidget);
   });
 }

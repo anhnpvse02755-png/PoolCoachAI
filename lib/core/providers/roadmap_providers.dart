@@ -42,6 +42,10 @@ final achievementsProvider = StreamProvider<List<Achievement>>((ref) {
 bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 
 /// Đã tải xong và không phải giá trị cũ của người trước (đang tải lại).
+///
+/// Bài hoàn tất mà thiếu bản Đề II (dữ liệu đồng bộ hỏng) không có điểm mất
+/// từng bài: coi như chưa có kết quả dùng được. Lỗi khác khi chấm thành
+/// [AsyncError] để màn hình báo lỗi thay vì Provider ném ra và treo vòng tải.
 final latestBuResultProvider = Provider<AsyncValue<BuResult?>>((ref) {
   final tests = ref.watch(buTestsProvider);
   if (!_ready(tests)) return const AsyncLoading();
@@ -50,9 +54,14 @@ final latestBuResultProvider = Provider<AsyncValue<BuResult?>>((ref) {
   final snapshot = ref.watch(testSnapshotProvider(id));
   if (!_ready(snapshot)) return const AsyncLoading();
   final value = snapshot.value;
-  return AsyncData(
-    value == null || !value.test.isCompleted ? null : buResultFrom(value),
-  );
+  if (value == null || !value.test.isCompleted || value.test.examIIVersion == null) {
+    return const AsyncData(null);
+  }
+  try {
+    return AsyncData(buResultFrom(value));
+  } catch (e, st) {
+    return AsyncError(e, st);
+  }
 });
 
 /// Tính lại khi mục tiêu, hạng, bài BU hoặc dữ liệu tập thay đổi.

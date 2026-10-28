@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,9 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/assessment/bu_test.dart';
+import 'package:poolcoachai/domain/assessment/drill_attempts.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
@@ -252,6 +256,42 @@ void main() {
       container.listen(rankCheckSignalProvider, (_, _) {});
       await settle();
       expect(container.read(rankCheckSignalProvider), isNull);
+    });
+  });
+
+  group('latestBuResultProvider với bài BU hỏng', () {
+    test('hoàn tất nhưng thiếu bản Đề II: không có kết quả dùng được, không ném lỗi', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+          id: 'hong', userId: 'u1', startedAt: at, tableSize: 'nineFootPlus',
+          completedAt: Value(at), totalScore: const Value(80), resultRank: const Value('g')));
+      final container = dbContainer(db);
+      addTearDown(container.dispose);
+      container.listen(latestBuResultProvider, (_, _) {});
+      await settle();
+      expect(container.read(latestBuResultProvider), const AsyncData<BuResult?>(null));
+    });
+
+    test('lỗi khác khi chấm: thành AsyncError, không ném ra ngoài', () async {
+      final bad = TestSnapshot(
+        test: BuTest(
+          id: 'sai', startedAt: at, tableSize: TableSize.nineFootPlus, completedAt: at,
+          examIScore: 60, examIIVersion: ExamIIVersion.masters, totalScore: 80,
+        ),
+        // F1 chấm theo cú; đưa kết quả kiểu số bi để buộc chấm điểm ném lỗi.
+        attempts: {'F1': CountAttempts(const [1])},
+      );
+      final container = ProviderContainer(
+        overrides: [
+          buTestsProvider.overrideWith((ref) => Stream.value([bad.test])),
+          testSnapshotProvider.overrideWith((ref, id) => Stream.value(bad)),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(latestBuResultProvider, (_, _) {});
+      await settle();
+      expect(container.read(latestBuResultProvider).hasError, isTrue);
     });
   });
 }

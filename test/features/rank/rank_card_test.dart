@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -33,7 +36,8 @@ void main() {
     examIScore: 60, examIIVersion: ExamIIVersion.masters, examIIScore: 77,
     totalScore: 137, resultRank: Rank.d,
   );
-  // Không ghi đè latestBuResultProvider thì nó đọc ảnh chụp bài thi từ CSDL thật và treo.
+  // Các test dưới đây ghi đè kết quả BU để khỏi dựng ảnh chụp bài thi. (Từng treo vì bài hoàn tất
+  // thiếu examIIVersion; nay bài như vậy được coi là không có kết quả, xem test CSDL thật cuối file.)
   final recentBu = buResultGraded(completedAt: testToday.subtract(const Duration(days: 3)));
   final cancelled = BuTest(
     id: 't0', startedAt: testToday.subtract(const Duration(days: 9)),
@@ -160,5 +164,31 @@ void main() {
       onboardingState: OnboardingState.done, updatedAt: testToday,
     ));
     expect(find.text(Vi.rankRetakeQuestionnaire), findsOneWidget);
+  });
+
+  testWidgets('Hồ sơ: bài BU hoàn tất thật trên CSDL, không ghi đè kết quả BU, vẫn dựng xong', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.playerRankRows).insert(PlayerRankRowsCompanion.insert(
+        userId: 'u1', onboardingState: 'done', updatedAt: testToday,
+        rank: const Value('d'), source: const Value('verified'),
+        buScore: const Value(137), testId: const Value('t1')));
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 't1', userId: 'u1', startedAt: testToday.subtract(const Duration(days: 4)),
+        tableSize: 'nineFootPlus',
+        completedAt: Value(testToday.subtract(const Duration(days: 3))),
+        examIScore: const Value(60), examIIVersion: const Value('masters'),
+        examIIScore: const Value(77), totalScore: const Value(137), resultRank: const Value('d')));
+    final container = dbContainer(db);
+    addTearDown(container.dispose);
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container, child: PoolCoachApp(router: router)));
+    await tester.pumpAndSettle();
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+    expect(find.text('HẠNG D'), findsOneWidget);
+    expect(find.text(Vi.rankLastTest(done.completedAt!, 137, Rank.d)), findsOneWidget);
   });
 }

@@ -114,7 +114,8 @@ void main() {
     await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
         id: 'may-khac', userId: 'u1', startedAt: testToday, tableSize: 'nineFootPlus',
         completedAt: Value(testToday.subtract(const Duration(days: 2))),
-        totalScore: const Value(80), resultRank: const Value('g')));
+        examIScore: const Value(50), examIIVersion: const Value('masters'),
+        examIIScore: const Value(30), totalScore: const Value(80), resultRank: const Value('g')));
     await open(tester);
     await tester.tap(find.text(Vi.buFinishAction));
     await tester.pumpAndSettle();
