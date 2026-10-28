@@ -78,6 +78,14 @@ void main() {
     expect(picked, 1);
   });
 
+  test('dòng S9 nói rõ là đổi mục tiêu sang Thuần thục Nhảy bi hoặc Mát xê', () {
+    expect(Vi.roadmapS9Hint, contains('đổi mục tiêu'));
+    expect(Vi.roadmapS9Hint, contains('Thuần thục'));
+    expect(Vi.roadmapS9Hint, contains('Nhảy bi'));
+    expect(Vi.roadmapS9Hint, contains('Mát xê'));
+    expect(Vi.roadmapS9Pick, contains('mục tiêu'));
+  });
+
   testWidgets('bước nhóm thường: không có dòng S9', (tester) async {
     await pumpTile(
       tester,

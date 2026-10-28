@@ -84,6 +84,12 @@ enum SkillCategory {
         SkillCategory.nhayBi ||
         SkillCategory.matXe =>
           true,
-        _ => false,
+        SkillCategory.aiming ||
+        SkillCategory.position ||
+        SkillCategory.breakShot ||
+        SkillCategory.safety ||
+        SkillCategory.kick ||
+        SkillCategory.bank =>
+          false,
       };
 }

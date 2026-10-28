@@ -570,7 +570,7 @@ testWidgets('drill hoặc bậc lạ: Hết sơ đồ.', …);                //
 **Interfaces:**
 - Produces:
   - `static const roadmapS9Hint = 'Bài S9 chấm nhảy bi hoặc mát xê: chọn nhóm Nhảy bi hoặc Mát xê để luyện';` (spec §5, verbatim)
-  - `static const roadmapS9Pick = 'Chọn nhóm để luyện';`
+  - `static const roadmapS9Pick = 'Đổi mục tiêu để luyện';`
   - `StepTile({…, VoidCallback? onPickSkill})`: when `step.kind == StepKind.buLe && step.buDrillIds.contains('S9')`, it shows `Text(Vi.roadmapS9Hint, style: bodySmall)` and, when `onPickSkill != null`, a `TextButton(Vi.roadmapS9Pick)` that calls it.
   - `RoadmapView({…, VoidCallback? onPickSkill})` passes it to every `StepTile`.
   - `GoalPicker({…, bool openSkills = false})`: `_pickingCategory` starts as `openSkills`.
@@ -583,7 +583,7 @@ testWidgets('drill hoặc bậc lạ: Hết sơ đồ.', …);                //
 testWidgets('bước Tập lại S9: có dòng hướng dẫn và nút chọn nhóm', …); // RoadmapStep(kind: buLe, buDrillIds: ['S9'], …), onPickSkill được gọi khi chạm
 testWidgets('bước nhóm thường: không có dòng S9', …);
 // roadmap_screen_test.dart
-testWidgets('Lên hạng mất điểm ở S9: chạm Chọn nhóm để luyện mở bộ chọn với các nhóm đã mở sẵn', (tester) async {
+testWidgets('Lên hạng mất điểm ở S9: chạm Đổi mục tiêu để luyện mở bộ chọn với các nhóm đã mở sẵn', (tester) async {
   // db: hạng verified D, BU hoàn tất chỉ mất ở S9 đủ để bước buLe được chọn, mục tiêu Lên hạng
   // cuộn tới Vi.roadmapS9Pick, chạm → find.text(Vi.goalPickTitle) và find.text(Vi.skill(SkillCategory.nhayBi)) đều findsOneWidget
   // chạm Nhảy bi → playerGoalRows.kind == 'thuanThucKyNang', category == 'nhayBi'

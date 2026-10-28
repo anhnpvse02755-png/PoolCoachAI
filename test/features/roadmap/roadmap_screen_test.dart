@@ -394,7 +394,7 @@ void main() {
   );
 
   testWidgets(
-    'Lên hạng mất điểm ở S9: chạm Chọn nhóm để luyện mở bộ chọn với các nhóm đã mở sẵn',
+    'Lên hạng mất điểm ở S9: chạm Đổi mục tiêu để luyện mở bộ chọn với các nhóm đã mở sẵn',
     (tester) async {
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
