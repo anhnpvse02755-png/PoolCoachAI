@@ -407,8 +407,9 @@ void main() {
       final path = file.path.replaceAll(r'\', '/');
       if (path.endsWith('lib/domain/roadmap/achievements.dart')) continue;
       if (path.endsWith('lib/data/database/roadmap_converters.dart')) continue;
-      if (constructor.hasMatch(codeOnly(file.readAsStringSync())))
+      if (constructor.hasMatch(codeOnly(file.readAsStringSync()))) {
         offenders.add(path);
+      }
     }
     expect(
       offenders,

@@ -28,8 +28,9 @@ class RankCard extends ConsumerWidget {
     BuTest? last;
     for (final t in tests) {
       if (t.isCompleted &&
-          (last == null || t.completedAt!.isAfter(last.completedAt!)))
+          (last == null || t.completedAt!.isAfter(last.completedAt!))) {
         last = t;
+      }
     }
     final from = retestAvailableFrom(tests);
     final hasRank = rank?.rank != null;
@@ -149,11 +150,11 @@ class HomeRankHeader extends ConsumerWidget {
         child: RankBadgeLine(rank: rank!),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+    return const Padding(
+      padding: EdgeInsets.only(bottom: AppSpacing.lg),
       // Gọn một hàng: Trang chủ là chỗ của buổi tập hôm nay, thẻ hạng không
       // được đẩy chúng xuống dưới màn hình.
-      child: const PcCard(child: _UnrankedCardBody()),
+      child: PcCard(child: _UnrankedCardBody()),
     );
   }
 }
@@ -243,6 +244,5 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
         );
       },
     );
-    ;
   }
 }

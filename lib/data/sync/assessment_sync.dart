@@ -116,8 +116,9 @@ class AssessmentSyncService {
     void failed() {
       // Đã lấy được hạng trong lượt này thì giữ kết quả đó: việc kéo bài
       // kiểm tra hỏng sau đó không làm onboarding đổi ý.
-      if (!rankFetched && _stillSignedInAs(userId))
+      if (!rankFetched && _stillSignedInAs(userId)) {
         _onRankFetch(userId, RankFetch.failed);
+      }
     }
 
     try {
