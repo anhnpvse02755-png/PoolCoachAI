@@ -528,7 +528,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 body: Vi.matchEmpty,
               )
             else
-              ...matches.map((match) => _matchCard(match, cueNames, tournamentsById)),
+              ...matches.map(
+                (match) => _matchCard(match, cueNames, tournamentsById),
+              ),
           ],
         ),
       ),

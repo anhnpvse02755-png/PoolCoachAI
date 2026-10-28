@@ -88,6 +88,13 @@ Widget _tournamentField({
     initialValue: value,
     isExpanded: true,
     decoration: const InputDecoration(labelText: Vi.matchTournament),
+    // Tên giải dài hiện tới hai dòng, cả ở ô đã chọn lẫn trong danh sách.
+    selectedItemBuilder: (_) => [
+      const Text(Vi.matchNoTournament),
+      ...tournaments.map(
+        (t) => Text(t.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ),
+    ],
     items: [
       const DropdownMenuItem<String?>(
         value: null,
@@ -96,7 +103,7 @@ Widget _tournamentField({
       ...tournaments.map(
         (t) => DropdownMenuItem<String?>(
           value: t.id,
-          child: Text(t.name, overflow: TextOverflow.ellipsis),
+          child: Text(t.name, maxLines: 2, overflow: TextOverflow.ellipsis),
         ),
       ),
     ],
@@ -186,6 +193,7 @@ class _StartMatchDialogState extends State<_StartMatchDialog> {
   void _pickTournament(String? id) {
     setState(() {
       _tournamentId = id;
+      if (id == null) _round.clear();
       final type = widget.tournaments
           .where((t) => t.id == id)
           .firstOrNull
@@ -428,6 +436,7 @@ class _EditMatchDialogState extends State<_EditMatchDialog> {
                   onChanged: (id) => setState(() {
                     _touched = true;
                     _tournamentId = id;
+                    if (id == null) _round.clear();
                   }),
                 ),
               if (_tournamentId != null)
