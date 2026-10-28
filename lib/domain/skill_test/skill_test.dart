@@ -72,11 +72,15 @@ final class SkillTest {
   bool get isCancelled => cancelledAt != null;
   bool get isCompleted => completedAt != null && !isCancelled;
 
-  /// Chỉ lần hoàn tất có `passed == true` mới chứng nhận.
-  bool get certifies => isCompleted && passed == true;
+  /// Chứng nhận khi hoàn tất, `passed == true` VÀ chấm lại theo ảnh chụp tiêu
+  /// chí cũng đạt. Đóng mặc định: `passed` mâu thuẫn hoặc thiếu ảnh chụp
+  /// thì không chứng nhận.
+  bool get certifies =>
+      isCompleted && passed == true && skillTestVerdict(this) == true;
 
-  /// Trượt phải là `passed == false` rõ ràng; thiếu `passed` không phải trượt.
-  bool get failed => isCompleted && passed == false;
+  /// Trượt phải là `passed == false` và chấm lại theo ảnh chụp cũng trượt.
+  bool get failed =>
+      isCompleted && passed == false && skillTestVerdict(this) == false;
 
   @override
   bool operator ==(Object other) =>

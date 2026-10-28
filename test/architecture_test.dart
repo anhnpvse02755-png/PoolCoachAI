@@ -319,7 +319,7 @@ void main() {
     final offenders = <String>[];
     for (final file in files) {
       final code = codeOnly(file.readAsStringSync());
-      final path = file.path.replaceAll(r'', '/');
+      final path = file.path.replaceAll(r'\', '/');
       for (final banned in [
         'package:flutter',
         'core/strings/vi.dart',

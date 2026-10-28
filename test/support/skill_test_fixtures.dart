@@ -73,7 +73,7 @@ SkillTest _finished(
     tableSize: tableSize,
     startedAt: at.subtract(const Duration(minutes: 20)),
     completedAt: at,
-    score: score,
+    score: drill.usesAttempts ? score : (passed ? drill.target! : drill.target! - 5),
     attempts: drill.usesAttempts ? 10 : null,
     passed: passed,
     passThreshold: drill.passThreshold,

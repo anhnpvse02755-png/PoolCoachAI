@@ -102,20 +102,87 @@ void main() {
   });
 
   group('ảnh chụp tiêu chí (S4)', () {
-    SkillTest completed({double? passThreshold, num? target, num? score = 9}) =>
-        SkillTest(
+    // `passed` đi theo kết quả chấm của chính ảnh chụp, không gán cứng.
+    SkillTest completed({
+      double? passThreshold,
+      num? target,
+      num? score = 9,
+      bool? passed,
+    }) {
+      final oneCriterion = (passThreshold == null) != (target == null);
+      final verdict = oneCriterion && score != null
+          ? skillTestPassed(
+              stDrill('x', SkillCategory.aiming, 1,
+                  passThreshold: passThreshold, target: target),
+              score: score,
+              attempts: target == null ? 10 : null)
+          : true;
+      return SkillTest(
+        id: 'x',
+        drillId: 'a1',
+        drillLevel: 1,
+        tableSize: TableSize.nineFootPlus,
+        startedAt: stToday,
+        completedAt: stToday,
+        score: score,
+        attempts: target == null ? 10 : null,
+        passed: passed ?? verdict,
+        passThreshold: passThreshold,
+        target: target,
+      );
+    }
+
+    test('passed mâu thuẫn với chấm lại thì không chứng nhận cũng không trượt',
+        () {
+      for (final t in [
+        completed(passThreshold: 0.8, score: 5, passed: true),
+        completed(target: 25, score: 9, passed: true),
+        completed(passThreshold: 0.8, score: 9, passed: false),
+        completed(target: 25, score: 25, passed: false),
+      ]) {
+        expect([t.certifies, t.failed], [false, false], reason: '$t');
+      }
+    });
+    test('passed true không có kết quả hoặc không có ảnh chụp thì không chứng nhận',
+        () {
+      final noScore = SkillTest(
           id: 'x',
           drillId: 'a1',
           drillLevel: 1,
           tableSize: TableSize.nineFootPlus,
           startedAt: stToday,
           completedAt: stToday,
-          score: score,
-          attempts: 10,
-          passed: true,
-          passThreshold: passThreshold,
-          target: target,
-        );
+          passed: true);
+      expect([noScore.certifies, noScore.failed], [false, false]);
+      expect(
+          [
+            passedTest('t2', 2, stToday).certifies,
+            failedTest('t2', 2, stToday).failed,
+            failedTest('t2', 2, stToday).certifies,
+            passedTest('t2', 2, stToday).failed,
+          ],
+          [true, true, false, false]);
+    });
+    test('đổi ngưỡng của bài sau đó không làm đổi kết luận của lần cũ', () {
+      final before = stDrill('x', SkillCategory.aiming, 1, passThreshold: 0.8);
+      final old = SkillTest(
+        id: 'x',
+        drillId: 'x',
+        drillLevel: 1,
+        tableSize: TableSize.nineFootPlus,
+        startedAt: stToday,
+        completedAt: stToday,
+        score: 8,
+        attempts: 10,
+        passed: skillTestPassed(before, score: 8, attempts: 10),
+        passThreshold: before.passThreshold,
+      );
+      final after = withThreshold(0.9);
+      expect(skillTestPassed(after, score: 8, attempts: 10), isFalse);
+      expect(skillTestVerdict(old), isTrue);
+      expect(old.certifies, isTrue);
+      expect(skillTestPassMark(old), 8);
+    });
 
     test('lần hoàn tất có kết quả phải có đúng một trường tiêu chí', () {
       expect(() => completed(), throwsA(isA<AssertionError>()));
