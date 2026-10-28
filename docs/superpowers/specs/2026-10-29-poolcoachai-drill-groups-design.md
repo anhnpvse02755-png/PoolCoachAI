@@ -77,7 +77,7 @@ Mỗi nhóm có 3 cấp, ứng với 3 bậc BU: **cấp 1 = Bachelors, cấp 2 
 **Nối BU.**
 - `bu_category_map.dart`: **S8 → `dungCo`**.
 - **S9 vẫn `null`.** Lý do: BU S9 cho phép nhảy bi **hoặc** mát xê, nên điểm S9 không cho biết người chơi yếu kỹ thuật nào. Gán vào một nhóm là đoán.
-  - Thay vào đó, khi S9 yếu, Lộ trình hiện một dòng: "Bài S9 chấm nhảy bi hoặc mát xê: chọn nhóm Nhảy bi hoặc Mát xê để luyện". Dòng này mở bộ chọn mục tiêu "Thuần thục".
+  - Thay vào đó, khi S9 yếu, Lộ trình hiện một dòng: "Bài S9 chấm nhảy bi hoặc mát xê: để luyện, đổi mục tiêu sang Thuần thục Nhảy bi hoặc Mát xê", kèm nút "Đổi mục tiêu để luyện" mở bộ chọn mục tiêu "Thuần thục" (sửa sau review cuối: nói rõ là đổi mục tiêu).
 - Đây là thay đổi so với quyết định cũ "S8, S9 không khớp nhóm nào". Quyết định cũ đúng khi chưa có nhóm. Nay S8 đã có nhóm đúng mục đích.
 
 ## 6. Những chỗ khác bị ảnh hưởng
