@@ -66,9 +66,15 @@ class RoadmapRepository {
       .map((rows) => rows.map(toAchievement).nonNulls.toList());
 
   /// Thành tích đã có (cùng id) thì bỏ qua — chỉ thêm, không sửa.
+  ///
+  /// Chứng nhận suy ra từ skill_tests nên không đẩy lên server (S13): đánh dấu
+  /// đã đồng bộ ngay, để không hiện cảnh báo "chưa đồng bộ" mãi mãi.
   Future<void> recordAchievements(List<Achievement> list) => _db.batch((b) {
         for (final a in list) {
-          b.insert(_db.achievementRows, toAchievementRow(a, userId: _userId),
+          final local = a.kind == AchievementKind.chungNhan;
+          b.insert(
+              _db.achievementRows,
+              toAchievementRow(a, userId: _userId, syncedAt: local ? _now() : null),
               mode: InsertMode.insertOrIgnore);
         }
       });

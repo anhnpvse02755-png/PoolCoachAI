@@ -119,6 +119,20 @@ void main() {
     expect((await db.select(db.achievementRows).get()).every((r) => r.syncedAt == now), isTrue);
   });
 
+  test('chứng nhận không bao giờ được gửi lên; loại khác vẫn gửi (S13)', () async {
+    serve();
+    await db.into(db.achievementRows).insert(toAchievementRow(
+        Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: newer),
+        userId: 'u1'));
+    await db.into(db.achievementRows).insert(toAchievementRow(
+        Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: newer),
+        userId: 'u1'));
+    await build().syncNow();
+    final posts = server.sent('POST', '/items/achievements');
+    expect(posts, hasLength(1));
+    expect(jsonDecode(posts.single.body)['kind'], 'chuoiNgay');
+  });
+
   test('thành tích bị máy chủ từ chối (4xx khác) nằm chờ, không chặn mục tiêu', () async {
     serve();
     server.routes['POST /items/achievements'] = (_) => FakeDirectus.error(403, 'FORBIDDEN');

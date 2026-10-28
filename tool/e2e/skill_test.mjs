@@ -104,20 +104,60 @@ async function directusUserId(token) {
   return id;
 }
 
-/** Đợi tối đa [timeoutMs] vì đồng bộ máy → Directus có độ trễ. */
-async function waitRows(token, userId, collection, fields, ready, timeoutMs = 60000) {
+/**
+ * Đợi đồng bộ máy → Directus: có dòng đầu tiên rồi còn đợi số dòng đứng yên
+ * [stableMs] (mặc định 5 s) để bắt được dòng gửi trùng, tối đa [timeoutMs].
+ */
+async function waitRows(token, userId, collection, fields, ready, timeoutMs = 60000, stableMs = 5000) {
   const end = Date.now() + timeoutMs;
   let rows = [];
+  let stableSince = null;
+  let lastCount = -1;
   while (Date.now() < end) {
     const res = await fetch(
       `${DIRECTUS}/items/${collection}?filter[user_created][_eq]=${encodeURIComponent(userId)}&fields=${fields}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     rows = (await res.json())?.data ?? [];
-    if (ready(rows)) return rows;
+    if (ready(rows)) {
+      if (rows.length !== lastCount) {
+        lastCount = rows.length;
+        stableSince = Date.now();
+      } else if (Date.now() - stableSince >= stableMs) {
+        return rows;
+      }
+    } else {
+      lastCount = -1;
+      stableSince = null;
+    }
     await sleep(1500);
   }
   return rows;
+}
+
+/**
+ * Xoá dòng của user thử bằng quyền admin trước khi xoá user: user_created chỉ
+ * là khoá tham chiếu, xoá user không chắc kéo theo dòng. Không bao giờ ném.
+ */
+async function deleteUserRows(email) {
+  try {
+    const token = await directusAdminToken();
+    const id = await directusUserId(token);
+    for (const collection of ['skill_tests', 'achievements', 'drill_logs', 'player_goals', 'player_ranks']) {
+      try {
+        const res = await fetch(`${DIRECTUS}/items/${collection}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: { filter: { user_created: { _eq: id } } } }),
+        });
+        if (!res.ok) console.warn(`Cảnh báo: xoá ${collection} → ${res.status}`);
+      } catch (e) {
+        console.warn(`Cảnh báo: không xoá được dòng ${collection}: ${e}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`Cảnh báo: không dọn được dòng của ${email}: ${e}`);
+  }
 }
 
 try {
@@ -137,6 +177,7 @@ try {
 
   step(3, 'Mở thẻ Làm bài kiểm tra, bắt đầu, nhập kết quả đạt, nộp');
   await tab.goto(`${APP}/training/drills/d1`);
+  await scrollUntilText('Làm bài kiểm tra'); // thẻ nằm dưới, ListView lười
   await tab.waitForText('Làm bài kiểm tra', 45000); // Vi.skillTestOpen
   await tab.click('Làm bài kiểm tra');
   await tab.waitForText('Kiểm tra: Đường thẳng cơ bản'); // Vi.skillTestTitle(drill.name)
@@ -165,7 +206,7 @@ try {
   const trainingText = await scrollUntilText('Đã chứng nhận');
   await check(trainingText.includes('Đã chứng nhận'), 'Tập luyện: có huy hiệu Đã chứng nhận'); // Vi.certifiedBadge
 
-  step(6, 'Directus (quyền admin): skill_tests và achievements của user thử');
+  step(6, 'Directus (quyền admin): skill_tests của user thử (chứng nhận suy ra từ đây, không đẩy lên achievements)');
   const adminToken = await directusAdminToken();
   const userId = await directusUserId(adminToken);
   const tests = await waitRows(
@@ -181,18 +222,9 @@ try {
     `Directus skill_tests: d1, cấp 1, eightFoot, passed=true, attempts=10 (thấy ${JSON.stringify(row)})`,
   );
   await check(
-    typeof row.pass_threshold === 'number' && row.pass_threshold > 0,
-    `Directus skill_tests: ảnh chụp tiêu chí pass_threshold có giá trị (thấy ${row.pass_threshold})`,
+    row.pass_threshold === 0.8,
+    `Directus skill_tests: ảnh chụp tiêu chí pass_threshold === 0.8 (thấy ${row.pass_threshold})`,
   );
-  const achievements = await waitRows(
-    adminToken, userId, 'achievements', 'kind,ref_id',
-    (rows) => rows.some((r) => r.kind === 'chungNhan'),
-  );
-  await check(
-    achievements.some((r) => r.kind === 'chungNhan' && r.ref_id === 'd1'),
-    `Directus achievements: có chungNhan / d1 (thấy ${JSON.stringify(achievements)})`,
-  );
-
   console.log(`\n${failed ? `HỎNG ${failed} kiểm tra.` : 'Xong, mọi kiểm tra đạt.'} Ảnh lỗi (nếu có) ở ${shots}`);
 } catch (error) {
   failed++;
@@ -206,6 +238,7 @@ try {
   try {
     if (tab) await tab.close();
   } finally {
+    await deleteUserRows(email);
     await deleteUserByEmail(email);
   }
 }

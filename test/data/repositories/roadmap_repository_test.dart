@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
+import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
@@ -63,6 +64,17 @@ void main() {
     await repo('u1').recordAchievements([a]);
     await repo('u1').recordAchievements([a, b]);
     expect(await repo('u1').watchAchievements().first, [b, a]);
+  });
+
+  test('chứng nhận ghi xuống đã đánh dấu đồng bộ; loại khác vẫn chờ (S13)', () async {
+    await repo('u1').recordAchievements([
+      Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: DateTime(2026, 10, 10)),
+    ]);
+    expect(await pendingRoadmapCount(db, 'u1'), 0);
+    await repo('u1').recordAchievements([
+      Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10)),
+    ]);
+    expect(await pendingRoadmapCount(db, 'u1'), 1);
   });
 
   test('dòng thành tích có loại lạ bị bỏ qua, các dòng khác vẫn ra', () async {

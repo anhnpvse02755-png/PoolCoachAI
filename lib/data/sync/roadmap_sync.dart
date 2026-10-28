@@ -7,6 +7,7 @@ import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/roadmap/achievements.dart' show AchievementKind;
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 
 /// Số dòng mục tiêu và thành tích chưa lên server, của mọi người trên máy.
@@ -153,8 +154,13 @@ class RoadmapSyncService {
   }
 
   Future<void> _pushAchievements(String userId) async {
+    // Chứng nhận suy ra hoàn toàn từ skill_tests đã đồng bộ nên không đẩy lên:
+    // bản cũ đọc loại thành tích bằng byName sẽ ném khi gặp 'chungNhan' (S13).
     final rows = await (_db.select(_db.achievementRows)
-          ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull()))
+          ..where((t) =>
+              t.userId.equals(userId) &
+              t.syncedAt.isNull() &
+              t.kind.equals(AchievementKind.chungNhan.name).not()))
         .get();
     for (final r in rows) {
       if (_rejected.contains(r.id)) continue;
