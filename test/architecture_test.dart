@@ -280,7 +280,7 @@ void main() {
     final offenders = [
       for (final file in files)
         if (codeOnly(file.readAsStringSync()).contains('package:flutter'))
-          file.path.replaceAll(r'', '/'),
+          file.path.replaceAll(r'\', '/'),
     ];
 
     expect(files, isNotEmpty);
@@ -297,7 +297,7 @@ void main() {
     final offenders = <String>[];
     for (final file in files) {
       final code = codeOnly(file.readAsStringSync());
-      final path = file.path.replaceAll(r'', '/');
+      final path = file.path.replaceAll(r'\', '/');
       if (code.contains('package:flutter')) offenders.add('$path: flutter');
       if (code.contains('core/strings/vi.dart')) offenders.add('$path: Vi');
       for (final m in vietnameseLiteral.allMatches(code)) {
