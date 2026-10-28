@@ -439,9 +439,23 @@ try {
   await tab.waitForText('Lên hạng: H → F'); // Vi.roadmapHeadline
   const roadmapText = await tab.text();
   await check(roadmapText.includes('Lên hạng: H → F'), 'Lộ trình: tiêu đề mục tiêu Lên hạng: H → F');
+  // Danh sách Lộ trình là ListView lười: bước mốc hạng G là mục thứ 8 trên màn
+  // 412x915 nên chưa được dựng, chưa có node semantics. Cuộn từng đoạn ngắn (không nhảy hẳn xuống cuối, kẻo mục bị gỡ) tới khi
+  // dựng ra rồi mới đọc chữ.
+  const milestone = 'Làm bài BU — mốc hạng G';
+  let scrolledText = roadmapText;
+  for (let i = 0; i < 12 && !scrolledText.includes(milestone); i++) {
+    await tab.eval(`(() => {
+      for (const e of document.querySelectorAll('flt-semantics')) {
+        if (e.scrollHeight > e.clientHeight + 1) e.scrollTop += Math.max(200, Math.floor(e.clientHeight * 0.6));
+      }
+    })()`);
+    await sleep(1000);
+    scrolledText = await tab.text();
+  }
   await check(
     // Chưa có kết quả BU nên là "Làm", không phải "Làm lại" (Vi.stepTitle, retake=false).
-    roadmapText.includes('Làm bài BU — mốc hạng G'),
+    scrolledText.includes(milestone),
     'Lộ trình: có bước mốc hạng G trung gian cho mục tiêu lên 2 hạng',
   );
 
