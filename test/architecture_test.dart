@@ -367,6 +367,33 @@ void main() {
     );
   });
 
+  test('lõi Giải đấu không phụ thuộc Flutter, không dùng Vi, không có chuỗi tiếng Việt, không đụng hạng', () {
+    final files = dartFilesIn('lib/domain/tournament');
+    final offenders = <String>[];
+    for (final file in files) {
+      final code = codeOnly(file.readAsStringSync());
+      final path = file.path.replaceAll(r'\', '/');
+      for (final banned in [
+        'package:flutter',
+        'core/strings/vi.dart',
+        'PlayerRank(',
+        'rank_rules.dart',
+      ]) {
+        if (code.contains(banned)) offenders.add('$path: $banned');
+      }
+      for (final m in vietnameseLiteral.allMatches(code)) {
+        offenders.add('$path: ${m[0]}');
+      }
+    }
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'giải đấu chỉ trả enum, số đếm và chữ người chơi tự ghi; câu chữ nằm ở Vi; giải không đổi hạng (spec giải đấu mục 3)',
+    );
+  });
+
   test('app không gọi thẳng Claude và không chứa khoá Anthropic', () {
     final files = dartFilesIn('lib');
     expect(
