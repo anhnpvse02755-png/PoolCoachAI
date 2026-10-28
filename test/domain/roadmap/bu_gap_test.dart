@@ -28,7 +28,7 @@ void main() {
         'S5': SkillCategory.safety,
         'S6': SkillCategory.kick,
         'S7': SkillCategory.bank,
-        'S8': null,
+        'S8': SkillCategory.dungCo,
         'S9': null,
         'S10': SkillCategory.breakShot,
       });
@@ -103,7 +103,7 @@ void main() {
       expect(r.max.length, 18);
     });
 
-    test('cộng dồn theo nhóm; S8, S9 tính riêng', () {
+    test('cộng dồn theo nhóm; S8 vào Dựng cơ, S9 tính riêng', () {
       final r = BuResult(
         testId: 't',
         completedAt: DateTime(2026, 10, 14),
@@ -115,14 +115,16 @@ void main() {
         SkillCategory.aiming: 5,
         SkillCategory.position: 7,
         SkillCategory.safety: 6,
+        SkillCategory.dungCo: 2,
       });
-      expect(lost.unmapped, 3);
-      expect(lost.unmappedIds, ['S8', 'S9']);
+      expect(lost.unmapped, 1);
+      expect(lost.unmappedIds, ['S9']);
+      expect(lostDrillsIn(r, SkillCategory.dungCo), ['S8']);
       expect(lostDrillsIn(r, SkillCategory.position), ['F3', 'F5']);
       expect(lostDrillsIn(r, SkillCategory.breakShot), isEmpty);
     });
 
-    test('tổng điểm theo nhóm cộng S8/S9 bằng tổng điểm mất', () {
+    test('tổng điểm theo nhóm cộng phần không nối nhóm bằng tổng điểm mất', () {
       final r = buResultFrom(snapshot);
       final lost = lostByCategory(r);
       final sum = lost.byCategory.values.fold(0, (s, v) => s + v) + lost.unmapped;
@@ -131,12 +133,12 @@ void main() {
   });
 
   group('điểm BU theo nhóm', () {
-    test('buCategoryPercent theo bản đã làm, S8/S9 không tính', () {
+    test('buCategoryPercent theo bản đã làm, S8 vào Dựng cơ, S9 không tính', () {
       final r = buResultGraded(
         completedAt: DateTime(2026, 10, 1),
         // aiming: F1 10 + F6 10 + F7 20 + S1 7 + S2 11 = 58; mất 30 -> 28
         // position: F2-F5 40 + F8 20 + S3 12 + S4 12 = 84; mất 21 -> 63
-        // safety: S5 10; mất 0 -> 100. S8/S9 mất hết nhưng bị bỏ qua.
+        // safety: S5 10; mất 0 -> 100. S8 mất hết -> Dựng cơ 0; S9 mất hết nhưng bị bỏ qua.
         lost: const {
           'F7': 20, 'F6': 10, 'F2': 10, 'F8': 11, 'S8': 5, 'S9': 5,
         },
@@ -148,6 +150,9 @@ void main() {
       expect(p[SkillCategory.kick], 100);
       expect(p[SkillCategory.bank], 100);
       expect(p[SkillCategory.breakShot], 100);
+      expect(p[SkillCategory.dungCo], 0);
+      expect(p.containsKey(SkillCategory.nhayBi), isFalse);
+      expect(p.containsKey(SkillCategory.matXe), isFalse);
     });
 
     test('kết quả không có max: không nhóm nào có phần trăm', () {

@@ -4,8 +4,9 @@ import 'package:poolcoachai/domain/skill_category.dart';
 /// duyệt 15/10/2026). Mỗi bài xếp theo cái BU chấm điểm: bi vào → Ngắm bi;
 /// chỗ bi cái dừng → Điều bi / Vị trí. F8 và S4 chấm cả hai, xếp Điều bi.
 ///
-/// S8 (Dựng cơ) và S9 (Nhảy bi / Mát xê) không khớp nhóm nào: tập ngắm không
-/// giúp dựng cơ hay nhảy bi, nên không giao bài sai mục đích.
+/// S8 (Dựng cơ) nối nhóm Dựng cơ (spec 2026-10-29 §5). S9 chấm nhảy bi
+/// **hoặc** mát xê nên không cho biết người chơi yếu kỹ thuật nào: không nối
+/// nhóm.
 ///
 /// Thứ tự khoá là thứ tự hiển thị F1…F8, S1…S10.
 const buDrillCategory = <String, SkillCategory?>{
@@ -24,7 +25,7 @@ const buDrillCategory = <String, SkillCategory?>{
   'S5': SkillCategory.safety,
   'S6': SkillCategory.kick,
   'S7': SkillCategory.bank,
-  'S8': null,
+  'S8': SkillCategory.dungCo,
   'S9': null,
   'S10': SkillCategory.breakShot,
 };

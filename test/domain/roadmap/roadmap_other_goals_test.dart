@@ -154,6 +154,27 @@ void main() {
       expect(r.steps.any((s) => s.category == SkillCategory.kick), isFalse);
     });
 
+    test('Chuẩn bị giải có BU mất ở S8, chưa tập Dựng cơ: có bước Dựng cơ theo điểm mất', () {
+      final r = build(
+        tournament(DateTime(2027, 6, 1)),
+        drills: [...roadmapDrills, ...advancedDrills],
+        result: BuResult(testId: 't', completedAt: on(10, 1), total: 120, lost: const {'S5': 6, 'S8': 3}),
+      );
+      final step = r.steps.singleWhere((s) => s.category == SkillCategory.dungCo);
+      expect(step.reason, isA<LostBuPoints>());
+      expect((step.reason as LostBuPoints).points, 3);
+      expect((step.reason as LostBuPoints).drillIds, ['S8']);
+    });
+
+    test('Chuẩn bị giải, S8 không mất điểm, chưa tập Dựng cơ: không có bước Dựng cơ', () {
+      final r = build(
+        tournament(DateTime(2027, 6, 1)),
+        drills: [...roadmapDrills, ...advancedDrills],
+        result: BuResult(testId: 't', completedAt: on(10, 1), total: 120, lost: const {'S5': 6, 'F3': 2}),
+      );
+      expect(r.steps.where((s) => s.category == SkillCategory.dungCo), isEmpty);
+    });
+
     test('mọi nhóm từ 75: không còn bước nào, mục tiêu đạt', () {
       final logs = [
         for (final id in ['a1', 'p1', 'b1', 's1', 'k1', 'n1'])

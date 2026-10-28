@@ -94,7 +94,7 @@ List<RoadmapStep> _weakGroups(PracticeFacts facts) {
   return [for (final c in weak) facts.groupStep(c, facts.groupReason(c))];
 }
 
-/// Điểm mất giảm dần; bằng nhau thì nhóm yếu hơn trước; S8/S9 sau các nhóm
+/// Điểm mất giảm dần; bằng nhau thì nhóm yếu hơn trước; S9 sau các nhóm
 /// cùng điểm (mục 4.1 bước 4–5).
 int _byPointsThenWeakness(PracticeFacts facts, _Lost a, _Lost b) {
   final byPoints = b.points.compareTo(a.points);
@@ -278,7 +278,7 @@ List<RoadmapStep> placeSteps(
   }
 
   // Trạng thái: bước còn làm đầu tiên là "đang làm"; mục tiêu giải thì bước
-  // có ngày sau ngày giải là "không kịp" (mục 4.3). S8/S9 luôn đang làm, không
+  // có ngày sau ngày giải là "không kịp" (mục 4.3). S9 luôn đang làm, không
   // phải bước hiện tại (R5).
   final event = eventDate == null ? null : dateOnly(eventDate);
   var hasCurrent = false;

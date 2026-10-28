@@ -132,6 +132,34 @@ void main() {
       expect(pi.weak, isEmpty);
     });
 
+    test('BU yếu S8, chưa có buổi Dựng cơ: không yếu; có một buổi: yếu theo BU', () {
+      final s8Lost = buResultGraded(
+        completedAt: DateTime(2026, 10, 10),
+        lost: const {'S8': 5},
+      );
+      final drills = [...roadmapDrills, ...advancedDrills];
+      final none = computePlayerIntelligence(drills: drills, logs: const [], latestBu: s8Lost);
+      expect(none.buPercent[SkillCategory.dungCo], 0);
+      expect(none.weak, isNot(contains(SkillCategory.dungCo)));
+      expect(none.weakSources.containsKey(SkillCategory.dungCo), isFalse);
+
+      final one = computePlayerIntelligence(
+          drills: drills, logs: sessions('c1', 5, [on(10, 1)]), latestBu: s8Lost);
+      expect(one.categories[SkillCategory.dungCo]!.mastery, isNull);
+      expect(one.weak, contains(SkillCategory.dungCo));
+      expect(one.weakSources[SkillCategory.dungCo], WeakSource.bu);
+    });
+
+    test('S8 không mất điểm: Dựng cơ có buổi vẫn không yếu theo BU', () {
+      final full = buResultGraded(completedAt: DateTime(2026, 10, 10));
+      final pi = computePlayerIntelligence(
+          drills: [...roadmapDrills, ...advancedDrills],
+          logs: sessions('c1', 5, [on(10, 1)]),
+          latestBu: full);
+      expect(pi.buPercent[SkillCategory.dungCo], 100);
+      expect(pi.weak, isNot(contains(SkillCategory.dungCo)));
+    });
+
     test('ba buổi Nhảy bi kém: Nhảy bi vào danh sách yếu như mọi nhóm', () {
       final pi = computePlayerIntelligence(
         drills: [...roadmapDrills, ...advancedDrills],
