@@ -584,6 +584,40 @@ void main() {
       expect((await db.select(db.tournamentRows).getSingle()).name, 'Mới');
     });
 
+    test('bản trên máy chờ đẩy nhưng cũ hơn bản máy chủ: không gửi gì, lấy bản máy chủ', () async {
+      await tournaments().create(TournamentDraft(name: 'Tên trên máy', startDate: DateTime(2026, 11, 2)));
+      server.routes['POST /items/tournaments'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['PATCH /items/tournaments/t1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', name: 'Máy khác sửa sau', updatedAt: now.add(const Duration(hours: 1)))]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect(server.sent('PATCH', '/items/tournaments/t1'), isEmpty);
+      expect(server.sent('POST', '/items/tournaments'), isEmpty);
+      final r = await db.select(db.tournamentRows).getSingle();
+      expect([r.name, r.syncedAt != null], ['Máy khác sửa sau', true]);
+    });
+
+    test('giải đã đồng bộ không được đẩy lại', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 11, 2)));
+      await (db.update(db.tournamentRows)).write(TournamentRowsCompanion(syncedAt: Value(now)));
+      server.routes['POST /items/tournaments'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['PATCH /items/tournaments/t1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', updatedAt: now.subtract(const Duration(hours: 1)))]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect(server.sent('POST', '/items/tournaments'), isEmpty);
+      expect(server.sent('PATCH', '/items/tournaments/t1'), isEmpty);
+      expect((await db.select(db.tournamentRows).getSingle()).name, 'Giải Q1');
+    });
+
+    test('tombstone từ máy khác được áp lên giải đã đồng bộ trên máy này', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 11, 2)));
+      await (db.update(db.tournamentRows)).write(TournamentRowsCompanion(syncedAt: Value(now)));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', isDeleted: true, updatedAt: now.add(const Duration(hours: 1)))]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      final r = await db.select(db.tournamentRows).getSingle();
+      expect([r.isDeleted, r.syncedAt != null], [true, true]);
+      expect(await tournaments().watchAll().first, isEmpty);
+    });
+
     test('giải của tài khoản khác bị từ chối; trận đã đồng bộ trước đó vẫn lên', () async {
       await matches().start(match('m1'));
       server.routes['POST /items/pool_matches'] = (req) => FakeDirectus.ok(jsonDecode(req.body));

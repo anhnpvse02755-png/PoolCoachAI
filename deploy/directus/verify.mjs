@@ -233,6 +233,8 @@ try {
       kind: 'thuanThucKyNang',
       category: 'safety',
       event_date: null,
+      // POST (quyền create) cũng phải nhận tournament_id, không chỉ PATCH.
+      tournament_id: tour.id,
       created_at: '2026-10-15T03:00:00.000Z',
       updated_at: '2026-10-15T03:00:00.000Z',
     };
@@ -240,6 +242,15 @@ try {
     gMade.status === 200
       ? ok('A tạo được mục tiêu của mình')
       : fail(`A tạo mục tiêu → ${gMade.status} ${gMade.code}`);
+    const gMadeBack = await call(
+      'GET',
+      `/items/player_goals/${aId}?fields=tournament_id`,
+      undefined,
+      a.access_token,
+    );
+    gMadeBack.data?.tournament_id === tour.id
+      ? ok('POST mục tiêu mang tournament_id được lưu (quyền create có trường mới)')
+      : fail(`tournament_id sau POST mục tiêu: ${JSON.stringify(gMadeBack.data)}`);
     const gForged = await call(
       'POST',
       '/items/player_goals',
