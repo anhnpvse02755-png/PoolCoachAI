@@ -351,4 +351,11 @@ void main() {
     expect(offenders, isEmpty,
         reason: 'thành tích phải đi từ một sự kiện dữ liệu thật qua newAchievements');
   });
+
+  test('gợi ý kiểm tra lại hạng không dựng PlayerRank và không đặt warningRank', () {
+    // Hạng chỉ đổi và cảnh báo hạng chỉ có qua một bài BU (rank spec Q15).
+    final source = codeOnly(File('lib/domain/roadmap/rank_check.dart').readAsStringSync());
+    expect(source, isNot(contains('PlayerRank(')));
+    expect(source, isNot(contains('warningRank')));
+  });
 }

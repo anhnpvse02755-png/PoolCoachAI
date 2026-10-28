@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/providers/assessment_providers.dart';
+import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
+import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -12,10 +15,13 @@ import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../../support/fake_auth.dart';
+import '../../support/roadmap_fixtures.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -160,5 +166,92 @@ void main() {
     container.listen(achievementRecorderProvider, (_, _) {});
     await settle();
     expect(await db.select(db.achievementRows).get(), isEmpty);
+  });
+
+  group('rankCheckSignalProvider', () {
+    final verifiedD = PlayerRank(
+      rank: Rank.d,
+      source: RankSource.verified,
+      buScore: 120,
+      testId: 't',
+      onboardingState: OnboardingState.done,
+      updatedAt: at,
+    );
+    final oldBu = buResultGraded(completedAt: at.subtract(const Duration(days: 30)));
+
+    test('đủ nguồn: có gợi ý kiểm tra hạng hiện tại', () async {
+      final container = testContainer(
+        rank: verifiedD,
+        buResult: oldBu,
+        drills: roadmapDrills,
+        logs: decliningLogs(at.subtract(const Duration(days: 10))),
+        now: at,
+      );
+      addTearDown(container.dispose);
+      container.listen(rankCheckSignalProvider, (_, _) {});
+      await settle();
+      final signal = container.read(rankCheckSignalProvider)!;
+      expect(signal.direction, RankCheckDirection.down);
+      expect(signal.rank, Rank.d);
+    });
+
+    test('trận đang tải lại với giá trị cũ: rankCheckSignalProvider là null', () async {
+      final container = testContainer(
+        rank: verifiedD,
+        buResult: oldBu,
+        drills: roadmapDrills,
+        logs: decliningLogs(at.subtract(const Duration(days: 10))),
+        now: at,
+      );
+      addTearDown(container.dispose);
+      container.listen(rankCheckSignalProvider, (_, _) {});
+      await settle();
+      expect(container.read(rankCheckSignalProvider), isNotNull);
+
+      final stale = ProviderContainer(
+        overrides: [
+          drillsProvider.overrideWith((ref) => Stream.value(roadmapDrills)),
+          drillLogsProvider.overrideWith(
+            (ref) => Stream.value(decliningLogs(at.subtract(const Duration(days: 10)))),
+          ),
+          // copyWithPrevious là API nội bộ của riverpod; chỉ dùng trong test.
+          matchesProvider.overrideWithValue(
+            // ignore: invalid_use_of_internal_member
+            const AsyncLoading<List<PoolMatch>>().copyWithPrevious(
+              const AsyncData<List<PoolMatch>>([]),
+            ),
+          ),
+          latestBuResultProvider.overrideWithValue(AsyncData<BuResult?>(oldBu)),
+          playerRankProvider.overrideWith((ref) => Stream.value(verifiedD)),
+          nowProvider.overrideWithValue(() => at),
+        ],
+      );
+      addTearDown(stale.dispose);
+      stale.listen(rankCheckSignalProvider, (_, _) {});
+      await settle();
+      expect(stale.read(rankCheckSignalProvider), isNull);
+    });
+
+    test('hạng đang tải lại với giá trị cũ: null', () async {
+      final container = ProviderContainer(
+        overrides: [
+          drillsProvider.overrideWith((ref) => Stream.value(roadmapDrills)),
+          drillLogsProvider.overrideWith(
+            (ref) => Stream.value(decliningLogs(at.subtract(const Duration(days: 10)))),
+          ),
+          matchesProvider.overrideWith((ref) => Stream.value(const <PoolMatch>[])),
+          latestBuResultProvider.overrideWithValue(AsyncData<BuResult?>(oldBu)),
+          playerRankProvider.overrideWithValue(
+            // ignore: invalid_use_of_internal_member
+            const AsyncLoading<PlayerRank?>().copyWithPrevious(AsyncData<PlayerRank?>(verifiedD)),
+          ),
+          nowProvider.overrideWithValue(() => at),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(rankCheckSignalProvider, (_, _) {});
+      await settle();
+      expect(container.read(rankCheckSignalProvider), isNull);
+    });
   });
 }

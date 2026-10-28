@@ -8,11 +8,16 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 
+import '../../support/roadmap_fixtures.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -28,14 +33,21 @@ void main() {
     examIScore: 60, examIIVersion: ExamIIVersion.masters, examIIScore: 77,
     totalScore: 137, resultRank: Rank.d,
   );
+  // Không ghi đè latestBuResultProvider thì nó đọc ảnh chụp bài thi từ CSDL thật và treo.
+  final recentBu = buResultGraded(completedAt: testToday.subtract(const Duration(days: 3)));
   final cancelled = BuTest(
     id: 't0', startedAt: testToday.subtract(const Duration(days: 9)),
     tableSize: TableSize.eightFoot, cancelledAt: testToday.subtract(const Duration(days: 9)),
   );
 
   Future<void> pump(WidgetTester tester, String location,
-      {PlayerRank? rank, List<BuTest> tests = const [], TestSnapshot? active}) async {
-    final container = testContainer(rank: rank, tests: tests, activeTest: active);
+      {PlayerRank? rank,
+      List<BuTest> tests = const [],
+      TestSnapshot? active,
+      BuResult? buResult,
+      List<DrillLog>? logs}) async {
+    final container = testContainer(
+        rank: rank, tests: tests, activeTest: active, buResult: buResult, logs: logs, drills: logs == null ? null : roadmapDrills);
     addTearDown(container.dispose);
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -47,7 +59,7 @@ void main() {
   }
 
   testWidgets('Hồ sơ: huy hiệu, nhãn nguồn, cảnh báo, lần gần nhất, ngày kiểm tra lại', (tester) async {
-    await pump(tester, Routes.profile, rank: verifiedD, tests: [done, cancelled]);
+    await pump(tester, Routes.profile, rank: verifiedD, tests: [done, cancelled], buResult: recentBu);
     expect(find.text('HẠNG D'), findsOneWidget);
     expect(find.text(Vi.rankSource(RankSource.verified)), findsOneWidget);
     expect(find.text(Vi.rankWarning(Rank.g)), findsOneWidget);
@@ -57,8 +69,35 @@ void main() {
     expect(find.text(Vi.rankTakeTest), findsOneWidget);
   });
 
+  testWidgets('thẻ hạng hiện gợi ý kiểm tra lại hạng', (tester) async {
+    final unwarned = PlayerRank(
+      rank: Rank.d, source: RankSource.verified, buScore: 137, testId: 't1',
+      onboardingState: OnboardingState.done, updatedAt: testToday,
+    );
+    await pump(tester, Routes.rank,
+        rank: unwarned,
+        tests: [done],
+        buResult: buResultGraded(completedAt: testToday.subtract(const Duration(days: 30))),
+        logs: decliningLogs(testToday.subtract(const Duration(days: 10))));
+    const signal = RankCheckSignal(
+      direction: RankCheckDirection.down,
+      basis: RankCheckBasis.drills,
+      categories: [SkillCategory.aiming, SkillCategory.position],
+      rank: Rank.d,
+    );
+    expect(find.text(Vi.rankCheck(signal)), findsOneWidget);
+    expect(find.text(Vi.rankWarning(Rank.g)), findsNothing);
+  });
+
+  testWidgets('chưa có tín hiệu: thẻ hạng không hiện gợi ý', (tester) async {
+    await pump(tester, Routes.rank, rank: PlayerRank(
+        rank: Rank.d, source: RankSource.verified, buScore: 137, testId: 't1',
+        onboardingState: OnboardingState.done, updatedAt: testToday), tests: [done], buResult: recentBu);
+    expect(find.textContaining('làm lại bài BU'), findsNothing);
+  });
+
   testWidgets('Hồ sơ: lịch sử có cả lần hoàn tất và lần đã hủy', (tester) async {
-    await pump(tester, Routes.profile, rank: verifiedD, tests: [done, cancelled]);
+    await pump(tester, Routes.profile, rank: verifiedD, tests: [done, cancelled], buResult: recentBu);
     // Thanh điều hướng bên cũng cuộn được: chỉ đúng danh sách của Hồ sơ.
     await tester.scrollUntilVisible(find.text(Vi.rankHistoryCancelled(cancelled.cancelledAt!)), 200,
         scrollable: find.descendant(of: find.byType(ProfileScreen), matching: find.byType(Scrollable)).first);

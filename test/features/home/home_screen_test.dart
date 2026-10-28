@@ -5,16 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
+import '../../support/roadmap_fixtures.dart';
 import '../../support/test_data.dart';
 
 /// AI Home — mục 6.1 của thiết kế.
@@ -27,6 +32,8 @@ void main() {
     List<TimerSession>? timerSessions,
     List<ScheduleSlot>? schedule,
     GoalRecord? goal,
+    PlayerRank? rank,
+    BuResult? buResult,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -37,6 +44,8 @@ void main() {
       timerSessions: timerSessions,
       schedule: schedule,
       goal: goal,
+      rank: rank,
+      buResult: buResult,
     );
     addTearDown(container.dispose);
 
@@ -169,6 +178,31 @@ void main() {
     tester,
   ) async {
     await openHome(tester);
+    expect(find.textContaining('Bước hiện tại'), findsNothing);
+  });
+
+  testWidgets('Trang chủ hiện gợi ý kiểm tra lại hạng dù chưa có mục tiêu', (tester) async {
+    await openHome(
+      tester,
+      drills: roadmapDrills,
+      logs: decliningLogs(testToday.subtract(const Duration(days: 10))),
+      rank: PlayerRank(
+        rank: Rank.d,
+        source: RankSource.verified,
+        buScore: 137,
+        testId: 't1',
+        onboardingState: OnboardingState.done,
+        updatedAt: testToday,
+      ),
+      buResult: buResultGraded(completedAt: testToday.subtract(const Duration(days: 30))),
+    );
+    const signal = RankCheckSignal(
+      direction: RankCheckDirection.down,
+      basis: RankCheckBasis.drills,
+      categories: [SkillCategory.aiming, SkillCategory.position],
+      rank: Rank.d,
+    );
+    expect(find.text(Vi.rankCheck(signal)), findsOneWidget);
     expect(find.textContaining('Bước hiện tại'), findsNothing);
   });
 }

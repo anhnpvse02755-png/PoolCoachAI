@@ -5,12 +5,14 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
 import 'package:uuid/uuid.dart';
@@ -111,4 +113,19 @@ final roadmapSyncProvider = Provider<RoadmapSyncService>((ref) {
   )..start();
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Gợi ý làm lại bài BU (spec 2026-10-28 mục 6.5). Null khi một nguồn chưa
+/// tải xong hoặc là giá trị cũ của người trước. Không bao giờ đổi hạng.
+final rankCheckSignalProvider = Provider<RankCheckSignal?>((ref) {
+  final rank = ref.watch(playerRankProvider);
+  final bu = ref.watch(latestBuResultProvider);
+  final pi = ref.watch(playerIntelligenceProvider);
+  if (!_ready(rank) || !_ready(bu) || pi == null) return null;
+  return rankCheckSignal(
+    rank: rank.value,
+    latestBu: bu.value,
+    pi: pi,
+    today: ref.watch(nowProvider)(),
+  );
 });

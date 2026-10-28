@@ -62,3 +62,17 @@ BuResult buResultGraded({
           d.id: d.maxScore,
       },
     );
+
+/// Hai nhóm Ngắm bi và Điều bi cùng đi xuống: 9, 9, 5, 5 trên bốn ngày liền
+/// từ [from] (hai bài `a1`, `p1` của [roadmapDrills]).
+List<DrillLog> decliningLogs(DateTime from) => [
+      for (final id in ['a1', 'p1'])
+        for (var i = 0; i < 4; i++)
+          DrillLog(
+            id: '$id-$i',
+            drillId: id,
+            date: from.add(Duration(days: i)),
+            score: i < 2 ? 9 : 5,
+            attempts: 10,
+          ),
+    ];

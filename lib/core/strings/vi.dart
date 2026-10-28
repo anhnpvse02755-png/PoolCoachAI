@@ -16,6 +16,7 @@ import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis.dart' show SkillSignal, percentOf;
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart' show RankCheckBasis, RankCheckDirection, RankCheckSignal;
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
@@ -1892,6 +1893,21 @@ abstract final class Vi {
       };
 
   static String homeCurrentStep(String step) => 'Bước hiện tại: $step';
+
+  /// Gợi ý làm lại bài BU (spec 2026-10-28 mục 6.5): nhóm và hạng do
+  /// rankCheckSignal điền, không có suy diễn nào ngoài dữ liệu.
+  static String rankCheck(RankCheckSignal s) {
+    final skills = s.categories.map(skill).join(', ');
+    final rank = s.rank.label;
+    return switch ((s.direction, s.basis)) {
+      (RankCheckDirection.down, RankCheckBasis.drills) =>
+        'Kết quả tập gần đây ở $skills đang đi xuống — làm lại bài BU để kiểm tra hạng $rank.',
+      (RankCheckDirection.down, RankCheckBasis.matches) =>
+        'Khi thi đấu gần đây, $skills đang yếu — làm lại bài BU để kiểm tra hạng $rank.',
+      (RankCheckDirection.up, _) =>
+        'Kết quả tập gần đây ở $skills đang đi lên — làm lại bài BU để thử hạng $rank.',
+    };
+  }
 
   // ─── Coach tình huống — docs/superpowers/specs/2026-10-21-poolcoachai-coach-design.md mục 15.
   // Mọi câu có tham số đều do hàm thuần của lib/domain/coach điền; ở đây chỉ
