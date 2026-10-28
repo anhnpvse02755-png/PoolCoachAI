@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/core/auth/auth_gate.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
@@ -219,6 +220,8 @@ GoRouter createAppRouter({
       path: Routes.rankLayouts,
       builder: (context, state) => LayoutGalleryScreen(
         index: int.tryParse(state.uri.queryParameters['i'] ?? ''),
+        drillId: state.uri.queryParameters['drill'],
+        version: ExamIIVersion.values.asNameMap()[state.uri.queryParameters['v']],
       ),
     ),
     GoRoute(

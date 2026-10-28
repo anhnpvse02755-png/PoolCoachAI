@@ -12,6 +12,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/test_data.dart';
@@ -188,5 +189,34 @@ void main() {
         ),
       ),
     );
+  });
+
+  group('bài BU đếm theo cú (d11: 3 cú)', () {
+    testWidgets('gợi ý Từ 0 đến 3', (tester) async {
+      await openSession(tester, 'd11');
+      expect(find.text(Vi.sessionScoreHintRange(3)), findsOneWidget);
+    });
+
+    for (final (bad, err) in [
+      ('4', ShotScoreError.aboveShots),
+      ('2.5', ShotScoreError.notWhole),
+    ]) {
+      testWidgets('"$bad" bị từ chối, không ghi gì', (tester) async {
+        final (db, _) = await openSession(tester, 'd11');
+        await fill(tester, Vi.sessionScoreLabelTarget, bad);
+        await tester.tap(find.text(Vi.sessionSaveAction));
+        await tester.pumpAndSettle();
+        expect(find.text(Vi.shotScoreError(err)), findsOneWidget);
+        expect(await db.select(db.drillLogRows).get(), isEmpty);
+      });
+    }
+
+    testWidgets('"3" lưu được', (tester) async {
+      final (db, _) = await openSession(tester, 'd11');
+      await fill(tester, Vi.sessionScoreLabelTarget, '3');
+      await tester.tap(find.text(Vi.sessionSaveAction));
+      await tester.pumpAndSettle();
+      expect(await db.select(db.drillLogRows).get(), hasLength(1));
+    });
   });
 }

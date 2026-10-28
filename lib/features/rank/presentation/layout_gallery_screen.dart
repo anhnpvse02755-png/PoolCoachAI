@@ -3,6 +3,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/features/rank/presentation/bu_layout_painter.dart';
 
 /// Mọi sơ đồ bài kiểm tra BU, theo thứ tự đề → bản → bài → hình.
@@ -10,17 +11,29 @@ import 'package:poolcoachai/features/rank/presentation/bu_layout_painter.dart';
 /// Có `?i=` thì chỉ hiện sơ đồ thứ i, to: bài chạy Chrome chụp lần lượt từng
 /// sơ đồ cho chủ sản phẩm xem (spec mục 5.5).
 class LayoutGalleryScreen extends StatelessWidget {
-  const LayoutGalleryScreen({this.index, super.key});
+  const LayoutGalleryScreen({this.index, this.drillId, this.version, super.key});
 
   final int? index;
 
+  /// Có `drillId` thì chỉ hiện sơ đồ của bài đó ở bậc [version], đánh số
+  /// trong tập con. Thiếu bậc hoặc không có sơ đồ thì "Hết sơ đồ.".
+  final String? drillId;
+  final ExamIIVersion? version;
+
   @override
   Widget build(BuildContext context) {
-    final all = allLayouts();
+    final d = drillId;
+    final all = d == null
+        ? allLayouts()
+        : version == null
+            ? const <BuLayout>[]
+            : layoutsFor(d, version);
     final i = index;
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.buLayoutsTitle)),
-      body: PcReadableWidth(child: i == null
+      body: PcReadableWidth(child: all.isEmpty
+          ? const Center(child: Text(Vi.buLayoutsEnd))
+          : i == null
           ? ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [

@@ -800,6 +800,22 @@ abstract final class Vi {
   static String drillLevel(int level) => 'Cấp $level';
   static String drillUnitLabel(String unit) => 'Đơn vị: $unit';
   static const drillStepsTitle = 'Các bước thực hiện';
+
+  /// Dòng nguồn của bài nâng cao. Dựng cơ chỉ dẫn BU: chưa có mẹo kỹ thuật
+  /// có nguồn cho nhóm này nên không viện dẫn Từ điển.
+  static String drillSource(SkillCategory cat, DrillProvenance p) =>
+      'Nguồn: Billiard University Exam II, ${p.buDrillId}, bậc ${buVersionName(p.version)}'
+      '${switch (cat) {
+        SkillCategory.nhayBi => '; mẹo theo Dr. Dave Alciatore; lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 17.',
+        SkillCategory.matXe => '; mẹo theo Dr. Dave Alciatore; cách ngắm, lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 18.',
+        _ => '.',
+      }}';
+  static const drillClothWarning =
+      'Nên luyện trên bàn tập hoặc nỉ cũ, dễ làm rách nỉ.';
+  static const drillNoSourcedTips =
+      'Chưa có mẹo kỹ thuật có nguồn cho dựng cơ.';
+  static const drillOpenBuLayouts = 'Xem sơ đồ BU';
+  static String sessionScoreHintRange(int n) => 'Từ 0 đến $n';
   static const drillHistoryTitle = 'Lịch sử tập';
   static const drillReadinessTitle = 'Tiến độ buổi đạt liên tiếp';
   static String drillReadinessProgress(int count) =>

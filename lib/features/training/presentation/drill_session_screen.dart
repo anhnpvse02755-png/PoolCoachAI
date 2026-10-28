@@ -10,6 +10,7 @@ import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:uuid/uuid.dart';
 
@@ -165,6 +166,9 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
                           : Vi.sessionScoreLabelTarget,
                       hintText: drill.usesAttempts
                           ? Vi.sessionScoreHintAttempts
+                          : drillProvenanceOf(drill.id) != null &&
+                                drill.target != null
+                          ? Vi.sessionScoreHintRange(drill.target!.toInt())
                           : Vi.sessionScoreHintTarget,
                       suffixText: drill.unit,
                     ),
@@ -181,6 +185,8 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
                       if (parsed == null || !parsed.isFinite || parsed < 0) {
                         return Vi.sessionScoreInvalid;
                       }
+                      final shotError = checkShotScore(drill, parsed);
+                      if (shotError != null) return Vi.shotScoreError(shotError);
                       return null;
                     },
                   ),
