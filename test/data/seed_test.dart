@@ -156,16 +156,17 @@ void main() {
       for (final id in ['d16', 'd19']) {
         expect(
           seedDrills.firstWhere((d) => d.id == id).steps.last,
-          contains('bi cái vào lỗ góc'),
+          contains('bi cái vào lỗ góc (chết cái)'),
         );
       }
     });
 
-    test('chỉ Nhảy bi có dòng cảnh báo luật cơ nhảy', () {
+    test('cảnh báo nỉ/bàn có ở mọi bài Nhảy bi và Mát xê, không có ở Dựng cơ', () {
       for (final d in seedDrills.where((d) => d.cat.isAdvanced)) {
         final t = d.steps.join(' ');
-        expect(t.contains('Nhiều giải giới hạn'), d.cat == SkillCategory.nhayBi,
-            reason: d.id);
+        final warns = t.contains('Nhiều giải giới hạn') ||
+            t.contains('rách nỉ');
+        expect(warns, d.cat != SkillCategory.dungCo, reason: d.id);
       }
     });
   });

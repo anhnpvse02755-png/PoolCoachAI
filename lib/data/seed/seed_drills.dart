@@ -204,7 +204,7 @@ bool _isDoctorate(String id) =>
     drillProvenance[id]!.version == ExamIIVersion.doctorate;
 
 String _s9Scoring(String id) => _isDoctorate(id)
-    ? 'Mỗi cú bi cái vào lỗ góc mà không chạm bi chướng ngại được 1 điểm. '
+    ? 'Mỗi cú bi cái vào lỗ góc (chết cái) mà không chạm bi chướng ngại được 1 điểm. '
           'Ghi số cú thành công.'
     : 'Mỗi cú ăn được bi treo miệng lỗ được 1 điểm; chết cái vẫn tính. '
           'Ghi số cú thành công.';
@@ -251,6 +251,7 @@ Drill _matXe(String id) => _buShotDrill(
     'Mát xê làm bi cái đi theo đường cong, né được bi chướng ngại mà không cần chạm băng; bi cái còn cong tiếp được sau khi chạm bi.',
     'Ngắm điểm chạm lệch tâm bi cái về phía muốn bi cái cong tới.',
     'Lỗi hay gặp: nâng cơ quá ít hoặc quá nhiều làm bi cái đi sai đường cong; đẩy cơ quá chậm làm bi cái không đủ xoáy để cong rõ. Cách sửa: bắt đầu với mát xê nhẹ, nâng cơ ít, rồi mới tăng dần.',
+    'Mát xê dễ làm rách nỉ nếu làm sai; luyện trên bàn hoặc nỉ không quan trọng cho tới khi thành thạo.',
     _s9Scoring(id),
   ],
 );
