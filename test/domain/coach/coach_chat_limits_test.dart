@@ -1,7 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
+
+import '../../support/coach_chat_fixtures.dart';
+import '../../support/match_fixtures.dart';
 
 /// Giá trị của `export const NAME = N;` trong mã dịch vụ. Không tìm thấy thì
 /// test đỏ — đổi tên hằng bên dịch vụ không được làm phép so lặng lẽ biến mất.
@@ -19,5 +24,13 @@ void main() {
     expect(serverConstant(source, 'MAX_HISTORY_TURNS'), coachChatHistoryTurns);
     expect(serverConstant(source, 'MAX_TURN_CHARS'), coachChatMaxTurnChars);
     expect(serverConstant(source, 'MAX_QUESTION_CHARS'), coachChatMaxQuestion);
+  });
+
+  test('facts đầy đủ với 10 trận nhiều cú vẫn dưới MAX_FACTS_BYTES', () {
+    final max = serverConstant(File('server/coach-chat/src/validate.mjs').readAsStringSync(), 'MAX_FACTS_BYTES');
+    final ten = matchesWeakAt(SkillCategory.aiming, count: 10, at: DateTime(2026, 10, 20));
+    final facts = contextWithMatches(ten).toFacts();
+    expect(((facts['matches']! as Map)['analysis']! as Map)['matches'], 10);
+    expect(utf8.encode(jsonEncode(facts)).length, lessThan(max));
   });
 }
