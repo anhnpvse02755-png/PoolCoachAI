@@ -18,7 +18,9 @@ Tournament? linkedTournament(PlayerGoal? goal, Iterable<Tournament> live) {
   return null;
 }
 
-enum TournamentGoalState { notUpcoming, linked, otherGoal, noGoal }
+/// [linkOnly]: mục tiêu hiện tại đã là Chuẩn bị giải đúng ngày giải này nhưng
+/// chưa nối; chỉ cần gắn mã giải, không hỏi và không đặt lại mục tiêu.
+enum TournamentGoalState { notUpcoming, linked, linkOnly, otherGoal, noGoal }
 
 /// Trạng thái nút "Chuẩn bị cho giải này" của [t].
 TournamentGoalState tournamentGoalState(
@@ -33,7 +35,13 @@ TournamentGoalState tournamentGoalState(
   if (linkedTournament(goal, live)?.id == t.id) {
     return TournamentGoalState.linked;
   }
-  return goal != null
-      ? TournamentGoalState.otherGoal
-      : TournamentGoalState.noGoal;
+  if (goal == null) return TournamentGoalState.noGoal;
+  final eventDate = goal.eventDate;
+  if (goal.kind == GoalKind.chuanBiGiai &&
+      linkedTournament(goal, live) == null &&
+      eventDate != null &&
+      dateOnly(eventDate) == dateOnly(t.startDate)) {
+    return TournamentGoalState.linkOnly;
+  }
+  return TournamentGoalState.otherGoal;
 }

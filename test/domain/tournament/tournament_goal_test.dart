@@ -60,7 +60,34 @@ void main() {
       s(up, prepGoal(tDay(5), tournamentId: 'up')),
       TournamentGoalState.linked,
     );
-    expect(s(up, prepGoal(tDay(5))), TournamentGoalState.otherGoal);
+    expect(s(up, prepGoal(tDay(5))), TournamentGoalState.linkOnly);
+    // Cùng ngày nhưng nối giải khác còn sống: đó là mục tiêu của giải khác.
+    final sameDay = tour('same', start: tDay(5));
+    expect(
+      tournamentGoalState(
+        up,
+        goal: prepGoal(tDay(5), tournamentId: 'same'),
+        live: [up, sameDay],
+        today: tToday,
+      ),
+      TournamentGoalState.otherGoal,
+    );
+    // Chuẩn bị giải nhưng khác ngày: mục tiêu khác.
+    expect(s(up, prepGoal(tDay(6))), TournamentGoalState.otherGoal);
+    // Cùng ngày nhưng sai loại mục tiêu.
+    expect(
+      s(
+        up,
+        PlayerGoal(
+          goalId: 'g',
+          kind: GoalKind.thuanThucKyNang,
+          category: SkillCategory.aiming,
+          eventDate: tDay(5),
+          createdAt: tToday,
+        ),
+      ),
+      TournamentGoalState.otherGoal,
+    );
     expect(s(up, null), TournamentGoalState.noGoal);
   });
   test(

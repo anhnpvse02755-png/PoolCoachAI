@@ -293,8 +293,8 @@ void main() {
   );
 
   testWidgets(
-    'đổi ngày bắt đầu sau khi đã nối mục tiêu: liên kết bỏ, nút Chuẩn bị hiện '
-    'lại, Lộ trình về tiêu đề cũ',
+    'đổi ngày bắt đầu khi mục tiêu đang nối: mục tiêu đi theo, vẫn đang chuẩn '
+    'bị, Lộ trình hiện ngày mới kèm tên giải',
     (tester) async {
       final db = await newDb();
       await createUp(db);
@@ -310,11 +310,62 @@ void main() {
         TournamentDraft(name: 'Cúp Mùa Đông', startDate: DateTime(2026, 10, 3)),
       );
       await tester.pumpAndSettle();
-      expect(find.text(Vi.tournamentPreparing), findsNothing);
-      expect(find.byKey(const Key('tournament-prepare')), findsOneWidget);
+      expect(find.text(Vi.tournamentPreparing), findsOneWidget);
+      expect(find.byKey(const Key('tournament-prepare')), findsNothing);
       router.go(Routes.roadmap);
       await tester.pumpAndSettle();
-      expect(find.text('Chuẩn bị giải ngày 02/10/2026'), findsOneWidget);
+      expect(
+        find.text('Chuẩn bị giải Cúp Mùa Đông — ngày 03/10/2026'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('đổi tên giải đang nối: tiêu đề Lộ trình đổi theo tên mới', (
+    tester,
+  ) async {
+    final db = await newDb();
+    await createUp(db);
+    await gRepo(db).setGoal(
+      kind: GoalKind.chuanBiGiai,
+      eventDate: DateTime(2026, 10, 2),
+      tournamentId: 'up',
+    );
+    final router = await open(tester, dbContainer(db), 'up');
+    await tRepo(db).update(
+      'up',
+      TournamentDraft(name: 'Cúp Xuân', startDate: DateTime(2026, 10, 2)),
+    );
+    await tester.pumpAndSettle();
+    router.go(Routes.roadmap);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Chuẩn bị giải Cúp Xuân — ngày 02/10/2026'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Cúp Mùa Đông'), findsNothing);
+  });
+
+  testWidgets(
+    'mục tiêu Chuẩn bị giải đúng ngày nhưng chưa nối: bấm Chuẩn bị chỉ gắn '
+    'giải, không hỏi, không đặt lại mục tiêu',
+    (tester) async {
+      final db = await newDb();
+      await createUp(db);
+      await gRepo(
+        db,
+      ).setGoal(kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 10, 2));
+      final before = await db.select(db.playerGoalRows).getSingle();
+      await open(tester, dbContainer(db), 'up');
+      await tester.tap(find.byKey(const Key('tournament-prepare')));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.tournamentReplaceGoalTitle), findsNothing);
+      final g = await db.select(db.playerGoalRows).getSingle();
+      expect(
+        [g.goalId, g.createdAt, g.tournamentId, g.eventDate],
+        [before.goalId, before.createdAt, 'up', DateTime(2026, 10, 2)],
+      );
+      expect(find.text(Vi.tournamentPreparing), findsOneWidget);
     },
   );
 

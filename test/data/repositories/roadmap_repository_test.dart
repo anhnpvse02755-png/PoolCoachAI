@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -59,6 +60,48 @@ void main() {
         .setGoal(kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick);
     await repo('u1').setGoal(kind: GoalKind.lenHang);
     expect((await db.select(db.playerGoalRows).getSingle()).category, isNull);
+  });
+
+  test(
+    'gắn giải vào mục tiêu Chuẩn bị giải: giữ goalId và createdAt, chờ đồng bộ',
+    () async {
+      await repo(
+        'u1',
+      ).setGoal(kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2));
+      await (db.update(db.playerGoalRows))
+          .write(PlayerGoalRowsCompanion(syncedAt: Value(clock)));
+      clock = DateTime(2026, 10, 16, 9);
+      await repo('u1').linkTournament('t9');
+      final r = await db.select(db.playerGoalRows).getSingle();
+      expect(
+        [
+          r.goalId,
+          r.createdAt,
+          r.tournamentId,
+          r.eventDate,
+          r.updatedAt,
+          r.syncedAt,
+        ],
+        [
+          'g1',
+          DateTime(2026, 10, 15, 9),
+          't9',
+          DateTime(2026, 11, 2),
+          clock,
+          null,
+        ],
+      );
+    },
+  );
+
+  test('gắn giải khi mục tiêu không phải Chuẩn bị giải hoặc của người khác thì ném', () async {
+    await repo('u1').setGoal(kind: GoalKind.lenHang);
+    await expectLater(repo('u1').linkTournament('t9'), throwsStateError);
+    await expectLater(repo('u2').linkTournament('t9'), throwsStateError);
+    expect(
+      (await db.select(db.playerGoalRows).getSingle()).tournamentId,
+      isNull,
+    );
   });
 
   test('bỏ mục tiêu để lại dòng rỗng mới hơn (R2)', () async {

@@ -56,6 +56,26 @@ class RoadmapRepository {
     );
   }
 
+  /// Gắn giải vào mục tiêu Chuẩn bị giải hiện có (đã đúng ngày giải): không
+  /// đổi `goalId` hay `createdAt`, không tính lại từ đầu. Mục tiêu không phải
+  /// Chuẩn bị giải thì ném, để khỏi gắn nhầm.
+  Future<void> linkTournament(String tournamentId) async {
+    final changed =
+        await (_db.update(_db.playerGoalRows)..where(
+              (t) =>
+                  t.userId.equals(_userId) &
+                  t.kind.equals(GoalKind.chuanBiGiai.name),
+            ))
+            .write(
+              PlayerGoalRowsCompanion(
+                tournamentId: Value(tournamentId),
+                updatedAt: Value(_now()),
+                syncedAt: const Value(null),
+              ),
+            );
+    if (changed == 0) throw StateError('Không có mục tiêu Chuẩn bị giải');
+  }
+
   Future<void> clearGoal() => _write(GoalRecord(updatedAt: _now()));
 
   // toCompanion(false): ghi cả cột null. Ghi thẳng dòng dữ liệu thì Drift bỏ

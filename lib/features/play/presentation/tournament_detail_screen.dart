@@ -158,11 +158,15 @@ class _TournamentDetailScreenState
     try {
       final repo = ref.read(roadmapRepositoryProvider);
       if (repo == null) throw StateError('no-repo');
-      await repo.setGoal(
-        kind: GoalKind.chuanBiGiai,
-        eventDate: t.startDate,
-        tournamentId: t.id,
-      );
+      if (goal.state == TournamentGoalState.linkOnly) {
+        await repo.linkTournament(t.id);
+      } else {
+        await repo.setGoal(
+          kind: GoalKind.chuanBiGiai,
+          eventDate: t.startDate,
+          tournamentId: t.id,
+        );
+      }
     } on Object {
       if (mounted) _message(Vi.tournamentGoalFailed);
     } finally {
@@ -227,6 +231,7 @@ class _TournamentDetailScreenState
           ),
         if (goal != null &&
             (state == TournamentGoalState.noGoal ||
+                state == TournamentGoalState.linkOnly ||
                 state == TournamentGoalState.otherGoal))
           OutlinedButton(
             key: const Key('tournament-prepare'),
