@@ -24,6 +24,7 @@ void main() {
         Routes.notifications,
         Routes.drillPattern,
         Routes.drillSessionPattern,
+        Routes.skillTestPattern,
         Routes.simulator,
         Routes.planner,
         Routes.roadmap,
@@ -77,7 +78,16 @@ void main() {
         Routes.drillSession('x'),
         Routes.drillSessionPattern.replaceAll(':id', 'x'),
       );
+      expect(
+        Routes.skillTest('x'),
+        Routes.skillTestPattern.replaceAll(':id', 'x'),
+      );
       expect(Routes.article('x'), Routes.articlePattern.replaceAll(':id', 'x'));
+    });
+
+    test('Skill Test nằm trong nhánh Luyện tập', () {
+      expect(Routes.skillTestPattern, '${Routes.training}/skill-test/:id');
+      expect(Routes.skillTest('d3'), '/training/skill-test/d3');
     });
 
     test('buổi tập nằm sâu trong chi tiết bài, không phải route rời', () {

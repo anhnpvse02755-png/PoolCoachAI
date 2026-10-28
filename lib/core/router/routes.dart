@@ -41,6 +41,9 @@ abstract final class Routes {
   static const drillPattern = '$training/drills/:id';
   static const drillSessionPattern = '$drillPattern/session';
 
+  /// Bài kiểm tra kỹ năng của một bài — trong nhánh Luyện tập.
+  static const skillTestPattern = '$training/skill-test/:id';
+
   /// Mô phỏng góc cắt — trong nhánh Luyện tập như các màn bài tập.
   static const simulator = '$training/simulator';
 
@@ -73,6 +76,9 @@ abstract final class Routes {
 
   /// Đường dẫn buổi tập của một bài.
   static String drillSession(String id) => '${drill(id)}/session';
+
+  /// Đường dẫn bài kiểm tra kỹ năng của một bài.
+  static String skillTest(String id) => '$training/skill-test/$id';
 
   /// Đường dẫn một bài kiến thức.
   static String article(String id) => '/knowledge/$id';
@@ -113,6 +119,7 @@ abstract final class Routes {
     notifications,
     drillPattern,
     drillSessionPattern,
+    skillTestPattern,
     simulator,
     planner,
     roadmap,

@@ -31,7 +31,10 @@ import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart'
 import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart' as gate;
 import 'package:poolcoachai/domain/table_geometry/difficulty.dart';
 import 'package:poolcoachai/domain/table_geometry/saws.dart';
 import 'package:poolcoachai/domain/table_physics/scratch.dart';
@@ -712,6 +715,69 @@ abstract final class Vi {
   static const sessionAttemptsRequired = 'Bài này cần nhập số lần thử';
   static const sessionAttemptsInvalid = 'Nhập số nguyên dương';
   static const sessionSaveFailed = 'Không lưu được kết quả. Hãy thử lại.';
+
+  // Skill Test và chứng nhận (spec 2026-10-28)
+  static String skillTestTitle(String drillName) => 'Kiểm tra: $drillName';
+  static const skillTestConditionsTitle = 'Điều kiện đo';
+  static String skillTestCriterion(Drill drill) => drill.usesAttempts
+      ? 'Tiêu chí đạt: từ ${(drill.passThreshold! * 100).round()}% số lần thử'
+      : 'Tiêu chí đạt: từ ${skillTestNumber(drill.target!)} — ${drill.unit}';
+
+  /// Tiêu chí mà lần kiểm tra đã được chấm theo, lấy từ ảnh chụp lúc hoàn
+  /// tất (không phải bài hiện tại). Null khi không có ảnh chụp.
+  static String? skillTestGradedAgainst(SkillTest test, String unit) {
+    final threshold = test.passThreshold;
+    final target = test.target;
+    if (threshold != null) {
+      return 'Chấm theo tiêu chí: từ ${(threshold * 100).round()}% số lần thử';
+    }
+    if (target != null) {
+      return 'Chấm theo tiêu chí: từ ${skillTestNumber(target)} — $unit';
+    }
+    return null;
+  }
+
+  static const skillTestStart = 'Bắt đầu kiểm tra';
+  static const skillTestSubmit = 'Nộp kết quả';
+  static const skillTestCancel = 'Huỷ bài kiểm tra';
+  static const skillTestCancelled =
+      'Đã huỷ bài kiểm tra. Không có kết quả nào được lưu.';
+  static String skillTestPassed(String drillName, int level) =>
+      'Đã chứng nhận $drillName — cấp $level';
+  static String skillTestFailed(num score, num mark) =>
+      'Chưa đạt: ${skillTestNumber(score)}/${skillTestNumber(mark)}';
+  static const skillTestFailedAdvice = 'Tập thêm bài này rồi kiểm tra lại';
+  static const skillTestRetakeRule =
+      'Cần ít nhất ${SkillTestConstants.retakeSessions} buổi tập mới của bài này trước lần kiểm tra lại.';
+  static String skillTestNextLevel(List<String> names) =>
+      'Cấp tiếp theo trong nhóm: ${names.join(', ')}';
+  static const skillTestNoNextLevel = 'Chưa có cấp tiếp theo trong nhóm này';
+  static const skillTestBackToDrill = 'Về bài tập';
+  static const skillTestNotFoundTitle = 'Không tìm thấy bài tập';
+  static const skillTestNotFoundBody =
+      'Bài tập này không còn trong thư viện, nên không thể làm bài kiểm tra.';
+  static String skillTestNumber(num n) =>
+      n == n.truncate() ? '${n.truncate()}' : '$n';
+  static String skillTestGateLine(
+    gate.SkillTestGate g, {
+    required String Function(String drillId) nameOf,
+  }) => switch (g) {
+    gate.SkillTestOpen() => 'Đủ điều kiện làm bài kiểm tra',
+    gate.AlreadyCertified(:final at) => 'Đã chứng nhận ngày ${shortDate(at)}',
+    gate.NeedLowerLevel(:final drillIds) =>
+      'Cần chứng nhận ${drillIds.map(nameOf).join(', ')} trước',
+    gate.NeedStreak(:final missing) => 'Cần thêm $missing buổi đạt liên tiếp',
+    gate.NeedPracticeAfterFail() => skillTestRetakeRule,
+  };
+  static String skillTestInputError(SkillTestInputError e) => switch (e) {
+    SkillTestInputError.scoreInvalid => sessionScoreInvalid,
+    SkillTestInputError.scoreNotWhole => 'Số lần đạt phải là số nguyên',
+    SkillTestInputError.scoreAboveAttempts =>
+      'Số lần đạt không được lớn hơn số lần thử',
+    SkillTestInputError.attemptsRequired => sessionAttemptsRequired,
+    SkillTestInputError.attemptsInvalid => sessionAttemptsInvalid,
+    SkillTestInputError.attemptsNotAllowed => 'Bài này không chấm theo số lần thử',
+  };
 
   /// Xác nhận sau khi lưu, kèm tỉ lệ đạt của chính buổi vừa ghi.
   ///
