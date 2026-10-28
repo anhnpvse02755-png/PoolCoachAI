@@ -67,6 +67,7 @@ Nếu `consecutivePassCount` của bài đã chứng nhận về 0 trong 5 buổ
   - `started_at`, `completed_at?`, `cancelled_at?`
   - `score?`, `attempts?`, `passed?`, `notes?`
   - `synced_at?`
+  - ảnh chụp tiêu chí lúc kiểm tra: `pass_threshold?` / `target?` (đúng một trong hai). Bổ sung 28/10 theo yêu cầu "lưu điều kiện đo": tiêu chí của bài có thể đổi về sau, chứng nhận vẫn phải nói đã đạt theo tiêu chí nào.
 - **Chứng nhận:** thêm `AchievementKind.chungNhan` với `refId = drillId`. Bảng `achievements` có sẵn dùng id tất định, nên đồng bộ nhiều máy là idempotent.
   - Ghi khi một bài kiểm tra hoàn tất và đạt.
   - Tính lại được từ `skill_test_rows`. Hai nguồn phải khớp, có test.
