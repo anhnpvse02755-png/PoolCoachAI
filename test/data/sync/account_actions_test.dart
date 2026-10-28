@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/skill_test_converters.dart';
 import 'package:poolcoachai/data/remote/directus_auth_repository.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
@@ -16,6 +17,7 @@ import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
 import '../../support/in_memory_session_store.dart';
+import '../../support/skill_test_fixtures.dart';
 
 void main() {
   late AppDatabase db;
@@ -487,5 +489,20 @@ void main() {
     }
     await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
     expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), ['u2', 'u2']);
+  });
+
+  test('đăng xuất xoá lần kiểm tra kỹ năng của người đó, giữ của người khác', () async {
+    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u1'), userId: 'u1'));
+    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u2'), userId: 'u2'));
+    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
+    expect((await db.select(db.skillTestRows).get()).map((r) => r.id), ['st-u2']);
+  });
+
+  test('lần kiểm tra kỹ năng chưa đồng bộ tính vào phần đánh giá', () async {
+    final at = DateTime(2026, 10, 28, 10);
+    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, at, id: 'cho'), userId: 'u1'));
+    await db.into(db.skillTestRows).insert(toSkillTestRow(failedTest('a1', 1, at, id: 'da'), userId: 'u1', syncedAt: at));
+    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, at, id: 'khac'), userId: 'u2'));
+    expect(await pendingAssessmentCount(db, 'u1'), 1);
   });
 }
