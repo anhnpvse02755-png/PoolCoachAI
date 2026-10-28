@@ -93,7 +93,7 @@ void main() {
     final facts = ctx.toFacts();
     expect(facts.keys, ['skills', 'rank', 'currentStep', 'coach', 'lastSituation', 'skillLevels', 'today', 'matches']);
     expect((facts['skills']! as Map).keys,
-        ['aiming', 'position', 'breakShot', 'safety', 'kick', 'bank']);
+        ['aiming', 'position', 'breakShot', 'safety', 'kick', 'bank', 'dungCo', 'nhayBi', 'matXe']);
     expect((facts['coach']! as Map).keys, ['aiming', 'position', 'safety', 'kick']);
     final kick = (facts['coach']! as Map)['kick'] as Map;
     expect(kick, {'total': 2, 'solved': 1, 'enough': false, 'recurring': null, 'recurringCount': 0});

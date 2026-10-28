@@ -27,7 +27,7 @@ import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
 
 // tên/mã mà chính bản này chưa biết — với bản đã phát hành đó là tên mới của plan 2026-10-29
-const unknownCategory = 'dungCo';
+const unknownCategory = 'nhomTuongLai';
 // tên/mã mà chính bản này chưa biết — với bản đã phát hành đó là tên mới của plan 2026-10-29
 const unknownDrillId = 'd11';
 

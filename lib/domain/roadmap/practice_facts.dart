@@ -33,6 +33,8 @@ final class PracticeFacts {
   int? mastery(SkillCategory c) => intelligence.categories[c]!.mastery;
   int sessions(SkillCategory c) => intelligence.categories[c]!.sessionCount;
 
+  bool inScope(SkillCategory c) => intelligence.inScope(c);
+
   bool atLeastStrong(SkillCategory c) =>
       (mastery(c) ?? -1) >= PracticeConstants.strongCutoff;
 

@@ -87,7 +87,9 @@ RoadmapStep _milestone(Rank r, DateTime? retestFrom, {required bool retake}) => 
 
 /// Nhóm dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
 List<RoadmapStep> _weakGroups(PracticeFacts facts) {
-  final weak = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList()
+  final weak = SkillCategory.values
+      .where((c) => facts.inScope(c) && !facts.atLeastStrong(c))
+      .toList()
     ..sort(facts.compareWeakness);
   return [for (final c in weak) facts.groupStep(c, facts.groupReason(c))];
 }
@@ -203,7 +205,15 @@ Roadmap _tournament(
           .withStatus(StepStatus.chuaToi),
   ];
   final placed = {for (final s in fromMatches) s.category};
-  final below = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList();
+  final below = SkillCategory.values
+      .where(
+        (c) =>
+            !facts.atLeastStrong(c) &&
+            (facts.inScope(c) ||
+                (result != null &&
+                    (lostByCategory(result).byCategory[c] ?? 0) > 0)),
+      )
+      .toList();
   final List<RoadmapStep> steps;
   if (result == null) {
     below.sort(facts.compareWeakness);

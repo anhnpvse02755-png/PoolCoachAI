@@ -31,6 +31,23 @@ final roadmapDrills = <Drill>[
   _drill('n1', SkillCategory.bank, 1),
 ];
 
+/// Hai bài nhóm nâng cao chấm theo `target` (3 lần).
+final advancedDrills = <Drill>[
+  _targetDrill('j1', SkillCategory.nhayBi, 1),
+  _targetDrill('c1', SkillCategory.dungCo, 1),
+];
+
+Drill _targetDrill(String id, SkillCategory cat, int level) => Drill(
+      id: id,
+      cat: cat,
+      name: 'Bai $id',
+      level: level,
+      unit: 'lan',
+      target: 3,
+      goal: 'g',
+      steps: const [],
+    );
+
 /// Mỗi ngày trong [days] một buổi [made]/10. Ngưỡng đạt 0.8: 8 trở lên là đạt.
 List<DrillLog> sessions(String drillId, int made, List<DateTime> days) => [
       for (final d in days)

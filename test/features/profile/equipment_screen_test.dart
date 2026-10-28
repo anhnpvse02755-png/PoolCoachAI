@@ -32,6 +32,23 @@ void main() {
     return db;
   }
 
+  testWidgets('hộp thoại thêm cơ có đủ ba nhóm nâng cao', (tester) async {
+    await openEquipment(tester);
+    await tester.tap(find.text(Vi.equipmentAdd));
+    await tester.pumpAndSettle();
+    for (final c in [
+      SkillCategory.dungCo,
+      SkillCategory.nhayBi,
+      SkillCategory.matXe,
+    ]) {
+      expect(
+        find.widgetWithText(FilterChip, Vi.skill(c), skipOffstage: false),
+        findsOneWidget,
+        reason: '$c',
+      );
+    }
+  });
+
   testWidgets('creates, edits and deletes cue equipment', (tester) async {
     final db = await openEquipment(tester);
 

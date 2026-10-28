@@ -1,6 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter/material.dart' show CircularProgressIndicator;
+import 'package:flutter/material.dart' show ActionChip, CircularProgressIndicator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -59,6 +59,23 @@ void main() {
       expect(find.text(Vi.goalNeedRank), findsOneWidget);
     },
   );
+
+  testWidgets('Thuần thục kỹ năng có đủ chín nhóm, gồm ba nhóm nâng cao', (
+    tester,
+  ) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await open(tester, dbContainer(db));
+    await tester.tap(find.text(Vi.goalKind(GoalKind.thuanThucKyNang)));
+    await tester.pumpAndSettle();
+    for (final c in SkillCategory.values) {
+      expect(
+        find.widgetWithText(ActionChip, Vi.skill(c), skipOffstage: false),
+        findsOneWidget,
+        reason: '$c',
+      );
+    }
+  });
 
   testWidgets('chọn Thuần thục kỹ năng rồi ghi mục tiêu và hiện lộ trình', (
     tester,

@@ -87,7 +87,8 @@ void main() {
     });
 
     test('mỗi nhóm kỹ năng có ít nhất một bài tập', () {
-      for (final cat in SkillCategory.values) {
+      // Nhóm nâng cao có bài từ Task 5 của plan 2026-10-29
+      for (final cat in SkillCategory.values.where((c) => !c.isAdvanced)) {
         expect(
           seedDrills.any((d) => d.cat == cat),
           isTrue,

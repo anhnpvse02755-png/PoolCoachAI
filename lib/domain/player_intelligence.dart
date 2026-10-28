@@ -112,6 +112,9 @@ class PlayerIntelligence {
     this.weakSources = const {},
   });
 
+  /// Nhóm này có trong phạm vi gợi ý không (★6).
+  bool inScope(SkillCategory c) => categoryInScope(c, categories);
+
   /// Mọi nhóm kỹ năng đều có mặt, kể cả nhóm chưa tập buổi nào.
   final Map<SkillCategory, CategoryInsight> categories;
 
@@ -164,6 +167,16 @@ int consecutivePassCount(Drill drill, List<DrillLog> logs) {
   }
   return count;
 }
+
+/// Nhóm có nằm trong phạm vi gợi ý, danh sách yếu và Lộ trình tự động không.
+///
+/// Nhóm cơ bản luôn trong phạm vi; nhóm nâng cao (spec 2026-10-29 §3) chỉ
+/// vào khi đã có ít nhất một buổi tập.
+bool categoryInScope(
+  SkillCategory c,
+  Map<SkillCategory, CategoryInsight> categories,
+) =>
+    !c.isAdvanced || categories[c]!.sessionCount > 0;
 
 /// Tính toàn bộ bức tranh trình độ từ danh sách bài tập và bản ghi.
 PlayerIntelligence computePlayerIntelligence({
@@ -220,7 +233,8 @@ PlayerIntelligence computePlayerIntelligence({
       : buCategoryPercent(latestBu);
   final buWeak = [
     for (final cat in SkillCategory.values)
-      if (categories[cat]!.mastery == null &&
+      if (categoryInScope(cat, categories) &&
+          categories[cat]!.mastery == null &&
           buPercent[cat] != null &&
           buPercent[cat]! < PracticeConstants.weakCutoff)
         cat,

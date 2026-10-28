@@ -122,7 +122,24 @@ void main() {
       final pi = computePlayerIntelligence(
           drills: roadmapDrills, logs: const [], latestBu: allLost);
       expect(pi.buPercent.values.toSet(), {0});
-      expect(pi.weak, SkillCategory.values);
+      expect(pi.weak, SkillCategory.values.where((c) => !c.isAdvanced));
+    });
+
+    test('nhóm nâng cao chưa có buổi: không trong phạm vi, không yếu', () {
+      final pi = computePlayerIntelligence(drills: roadmapDrills, logs: const []);
+      expect(pi.inScope(SkillCategory.dungCo), isFalse);
+      expect(pi.inScope(SkillCategory.aiming), isTrue);
+      expect(pi.weak, isEmpty);
+    });
+
+    test('ba buổi Nhảy bi kém: Nhảy bi vào danh sách yếu như mọi nhóm', () {
+      final pi = computePlayerIntelligence(
+        drills: [...roadmapDrills, ...advancedDrills],
+        logs: sessions('j1', 0, [on(10, 1), on(10, 2), on(10, 3)]),
+      );
+      expect(pi.inScope(SkillCategory.nhayBi), isTrue);
+      expect(pi.weak, contains(SkillCategory.nhayBi));
+      expect(pi.weakSources[SkillCategory.nhayBi], WeakSource.drills);
     });
 
     test('không truyền trận, không truyền BU: kết quả như cũ', () {

@@ -83,6 +83,9 @@ abstract final class Vi {
     SkillCategory.safety => 'Phòng thủ',
     SkillCategory.kick => 'A băng',
     SkillCategory.bank => 'Cân bi',
+    SkillCategory.dungCo => 'Dựng cơ',
+    SkillCategory.nhayBi => 'Nhảy bi',
+    SkillCategory.matXe => 'Mát xê',
   };
 
   /// Câu giải thích vì sao hôm nay lại là nhóm kỹ năng này.

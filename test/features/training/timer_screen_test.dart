@@ -12,6 +12,29 @@ import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 import '../../support/test_data.dart';
 
 void main() {
+  testWidgets('bộ chọn nhóm có đủ ba nhóm nâng cao', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = dbContainer(db);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TimerScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<SkillCategory?>));
+    await tester.pumpAndSettle();
+    for (final c in [
+      SkillCategory.dungCo,
+      SkillCategory.nhayBi,
+      SkillCategory.matXe,
+    ]) {
+      expect(find.text(Vi.skill(c)), findsWidgets, reason: '$c');
+    }
+  });
+
   testWidgets('timer saves an elapsed free-practice session', (tester) async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);

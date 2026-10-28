@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -32,11 +33,12 @@ void main() {
     List<BuTest> tests = const [],
     BuResult? result,
     PlayerGoal? target,
+    List<Drill>? drills,
   }) =>
       buildRoadmap(
         goal: target ?? goal,
         rank: r,
-        drills: roadmapDrills,
+        drills: drills ?? roadmapDrills,
         logs: logs,
         tests: tests,
         latestResult: result,
@@ -165,6 +167,12 @@ void main() {
       expect(r.steps.first.status, StepStatus.dangLam);
       expect(r.steps[1].status, StepStatus.chuaToi);
     });
+  });
+
+  test('Lên hạng chưa có BU: nhóm nâng cao chưa tập không thành bước', () {
+    final r = build(
+        r: rank(Rank.h), drills: [...roadmapDrills, ...advancedDrills]);
+    expect(r.steps.where((s) => s.category?.isAdvanced ?? false), isEmpty);
   });
 
   group('ngày dự kiến (spec mục 4.5)', () {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -23,11 +24,12 @@ void main() {
     List<DrillLog> logs = const [],
     BuResult? result,
     List<PoolMatch> matches = const [],
+    List<Drill>? drills,
   }) =>
       buildRoadmap(
         goal: goal,
         rank: rank,
-        drills: roadmapDrills,
+        drills: drills ?? roadmapDrills,
         logs: logs,
         tests: const [],
         latestResult: result,
@@ -94,6 +96,21 @@ void main() {
       expect(r.steps.first.status, StepStatus.dangLam);
       expect(r.steps[2].status, StepStatus.chuaToi);
       expect(r.steps.any((s) => s.kind == StepKind.lamBaiBu), isFalse);
+    });
+
+    test('Chuẩn bị giải không có BU: nhóm nâng cao chưa tập không thành bước', () {
+      final r = build(tournament(DateTime(2026, 12, 1)),
+          drills: [...roadmapDrills, ...advancedDrills]);
+      expect(r.steps.where((s) => s.category?.isAdvanced ?? false), isEmpty);
+    });
+
+    test('một buổi Nhảy bi: Nhảy bi thành bước Chưa đo', () {
+      final r = build(tournament(DateTime(2026, 12, 1)),
+          drills: [...roadmapDrills, ...advancedDrills],
+          logs: sessions('j1', 2, [on(10, 10)]));
+      final step = r.steps.singleWhere((s) => s.category == SkillCategory.nhayBi);
+      expect(step.reason, isA<Unmeasured>());
+      expect((step.reason as Unmeasured).sessions, 1);
     });
 
     test('đủ trận: bước chưa đủ dữ liệu vẫn ở lại và thành đang làm', () {

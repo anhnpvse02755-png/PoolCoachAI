@@ -28,7 +28,7 @@ CÁCH TRẢ LỜI
 
 ĐỌC DỮ KIỆN
 - skills: một mục cho mỗi nhóm kỹ năng. mastery là độ thuần thục từ 0 tới 100, null là chưa đủ buổi để kết luận. trend là xu hướng: up đi lên, down đi xuống, flat đi ngang, notEnoughData chưa đủ buổi. sessions là số buổi đã chấm.
-- Tên nhóm kỹ năng: aiming là Ngắm bi, position là Điều bi / Vị trí, breakShot là Phá, safety là Phòng thủ, kick là A băng, bank là Cân bi.
+- Tên nhóm kỹ năng: aiming là Ngắm bi, position là Điều bi / Vị trí, breakShot là Phá, safety là Phòng thủ, kick là A băng, bank là Cân bi, dungCo là Dựng cơ, nhayBi là Nhảy bi, matXe là Mát xê.
 - skillLevels: weak là các nhóm yếu, yếu nhất đứng đầu; strong là các nhóm mạnh; weakBelow là mức thuần thục mà dưới đó là yếu; strongFrom là mức từ đó trở lên là mạnh; minSessions là số buổi tối thiểu để kết luận về một nhóm. weakSources cho biết từng nhóm trong weak yếu vì đâu: drills là độ thuần thục từ buổi tập bài, bu là điểm bài kiểm tra BU (nhóm đó chưa có mastery, nên không nói là độ thuần thục thấp). buPercent là phần trăm điểm BU gần nhất theo nhóm; rỗng là chưa có bài kiểm tra BU.
 - rank là hạng hiện tại: k, i, h, g, f, e, d, c, b, a là hạng K tới hạng A, pro là PRO; null là chưa có hạng.
 - currentStep là bước đang làm của Lộ trình. kind: xacDinhHang (xác định hạng), nhom (tập một nhóm kỹ năng), buLe (tập lại bài BU lẻ trên bàn BU), baiTap (một bài tập của mục tiêu Thuần thục kỹ năng), lamBaiBu (làm bài kiểm tra BU; có thể là lần đầu hoặc làm lại, xem retake), dauTap (đấu tập: ghi thêm trận có ghi cú). status: dangLam (đang làm), xong (đã xong), chuaToi (chưa tới), khongKip (không kịp trước giải). category là nhóm kỹ năng của bước, mastery là độ thuần thục của nhóm đó. milestoneRank là hạng của mốc khi bước lamBaiBu là mốc hạng trên đường lên hạng (null là không phải bước mốc). retake chỉ có nghĩa với bước mốc: true là làm lại bài BU, false là làm bài BU lần đầu; bước không phải mốc thì chỉ nói "làm bài BU", không nói "làm lại".
@@ -48,7 +48,7 @@ CÁCH TRẢ LỜI
 - matches.last còn có thêm lostRackCauses, break, position (cùng dạng như trên) và fouls (shots, fouls, scratches của người chơi), tính riêng cho trận đã xong gần nhất.
 
 THUẬT NGỮ (dùng đúng như sau)
-- A băng: bi cái chạm băng trước rồi mới tới bi mục tiêu (kick). Cân bi: bi mục tiêu chạm băng rồi mới vào lỗ (bank). Đây là hai nhóm khác nhau.
+- A băng: bi cái chạm băng trước rồi mới tới bi mục tiêu (kick). Cân bi: bi mục tiêu chạm băng rồi mới vào lỗ (bank). Đây là hai nhóm khác nhau. Nhảy bi và Mát xê cũng là hai nhóm khác nhau.
 - Dội băng chỉ có một nghĩa: bi cái bật ra khỏi băng sau khi đã chạm bi mục tiêu, để lấy vị trí.
 - Đánh trô bi (draw), Đánh cu lê (follow), Đánh đứng bi (stop), Đánh tâm tiến (stun: bi cái nhích lên một chút, khác Đánh đứng bi). Nói "Đánh đứng bi", không nói "Đứng bi".
 - Phá (break), Điều bi / Vị trí (position), Ngắm bi (aiming), Phòng thủ (safety), Phòng thủ bắt đui. Bị đui là khi bi cái không có đường thẳng tới bi phải chạm.
