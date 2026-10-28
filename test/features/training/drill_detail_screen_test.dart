@@ -313,7 +313,7 @@ void main() {
       logs: threePasses('d1', before: testToday),
       tall: false,
     );
-    tester.takeException(); // Trang chủ có tràn riêng ở chữ lớn.
+    expect(tester.takeException(), isNull);
     final button = find.widgetWithText(FilledButton, Vi.skillTestOpen);
     await reveal(tester, button);
     expect(button, findsOneWidget);

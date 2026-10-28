@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
 import 'roadmap_fixtures.dart';
+import 'skill_test_fixtures.dart';
 import 'test_data.dart';
 
 const _longPlayer = 'Nguyễn Văn Trường Giang';
@@ -185,4 +186,8 @@ ProviderContainer richContainer() => testContainer(
     lost: const {'F1': 5, 'F3': 4, 'S5': 6},
   ),
   coachChatTurns: coachChatTurnsRich,
+  // d1 vẫn còn ba buổi đạt sau lần trượt này: testable, Hồ sơ hiện "3/3".
+  skillTests: [
+    failedTest('d1', 1, testToday.subtract(const Duration(days: 3, hours: 12))),
+  ],
 );

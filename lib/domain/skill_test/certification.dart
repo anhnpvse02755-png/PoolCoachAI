@@ -12,6 +12,8 @@ final class Certification {
     required this.drillLevel,
     required this.tableSize,
     required this.certifiedAt,
+    this.passThreshold,
+    this.target,
   });
 
   final String testId;
@@ -19,6 +21,11 @@ final class Certification {
   final int drillLevel;
   final TableSize tableSize;
   final DateTime certifiedAt;
+
+  /// Tiêu chí lần kiểm tra đã được chấm theo, từ ảnh chụp lúc hoàn tất (không
+  /// phải bài hiện tại). Cả hai null khi bản ghi không có ảnh chụp.
+  final double? passThreshold;
+  final num? target;
 }
 
 /// Mỗi bài một chứng nhận, lấy từ lần đạt sớm nhất (hoà thì id nhỏ hơn).
@@ -43,6 +50,8 @@ Map<String, Certification> certificationsOf(Iterable<SkillTest> tests) {
         drillLevel: t.drillLevel,
         tableSize: t.tableSize,
         certifiedAt: t.completedAt!,
+        passThreshold: t.passThreshold,
+        target: t.target,
       ),
   };
 }

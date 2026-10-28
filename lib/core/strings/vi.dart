@@ -725,9 +725,14 @@ abstract final class Vi {
 
   /// Tiêu chí mà lần kiểm tra đã được chấm theo, lấy từ ảnh chụp lúc hoàn
   /// tất (không phải bài hiện tại). Null khi không có ảnh chụp.
-  static String? skillTestGradedAgainst(SkillTest test, String unit) {
-    final threshold = test.passThreshold;
-    final target = test.target;
+  static String? skillTestGradedAgainst(SkillTest test, String unit) =>
+      criterionSnapshot(test.passThreshold, test.target, unit);
+
+  static String? criterionSnapshot(
+    double? threshold,
+    num? target,
+    String unit,
+  ) {
     if (threshold != null) {
       return 'Chấm theo tiêu chí: từ ${(threshold * 100).round()}% số lần thử';
     }
@@ -736,6 +741,18 @@ abstract final class Vi {
     }
     return null;
   }
+
+  static const certificationTitle = 'Chứng nhận';
+  static const certificationEmpty = 'Chưa có chứng nhận';
+  static String certificationClosest(String drillName, int count) =>
+      'Gần sẵn sàng nhất: $drillName — $count/${PracticeConstants.readyStreak} buổi đạt liên tiếp';
+  static const certificationNoProgress = 'Chưa bài nào có buổi đạt liên tiếp.';
+  static String certificationEntry(String drillName, int level, DateTime at) =>
+      '$drillName — cấp $level — ${shortDate(at)}';
+  static const certificationGroupDone = 'Đã chứng nhận toàn nhóm';
+  static String homeSkillTestReady(String drillName, int more) => more == 0
+      ? 'Sẵn sàng kiểm tra: $drillName'
+      : 'Sẵn sàng kiểm tra: $drillName (và $more bài khác)';
 
   static const skillTestStart = 'Bắt đầu kiểm tra';
   static const skillTestSubmit = 'Nộp kết quả';

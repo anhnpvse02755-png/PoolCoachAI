@@ -145,9 +145,12 @@ class HomeRankHeader extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            FilledButton(
-              onPressed: () => context.push(Routes.onboardingRank),
-              child: const Text(Vi.rankDetermine),
+            // Flexible: ở chữ lớn nút tự xuống dòng thay vì đẩy hàng tràn phải.
+            Flexible(
+              child: FilledButton(
+                onPressed: () => context.push(Routes.onboardingRank),
+                child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
+              ),
             ),
           ],
         ),

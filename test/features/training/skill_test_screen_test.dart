@@ -32,7 +32,6 @@ void main() {
   Future<GoRouter> open(
     WidgetTester tester, {
     List<DrillLog>? logs,
-    bool dropHomeException = false,
     String drillId = 'd1',
     List<Drill>? drills,
     bool pushed = false,
@@ -53,9 +52,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // Trang chủ là điểm vào của router và có tràn riêng ở chữ lớn (RankCard);
-    // bỏ ngoại lệ đó để phép đo chỉ tính màn Skill Test.
-    if (dropHomeException) tester.takeException();
     if (pushed) {
       router.go(Routes.drill(drillId));
       await tester.pumpAndSettle();
@@ -225,7 +221,7 @@ void main() {
     tester,
   ) async {
     applyScreen(tester, const Size(360, 640), textScale: 2.0);
-    await open(tester, dropHomeException: true);
+    await open(tester);
     await scrollThroughAll(tester);
     expect(tester.takeException(), isNull);
     await start(tester);

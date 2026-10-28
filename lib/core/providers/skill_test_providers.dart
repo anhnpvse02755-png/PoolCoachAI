@@ -134,3 +134,14 @@ final testableDrillIdsProvider = Provider<AsyncValue<List<String>>>((ref) {
     ),
   );
 });
+
+/// Các bài đủ điều kiện kiểm tra, cấp thấp nhất trước (hoà thì theo mã bài).
+/// Qua cổng: bài nào không còn trong thư viện thì bị bỏ.
+final testableDrillsProvider = Provider<AsyncValue<List<Drill>>>((ref) {
+  final drills = ref.watch(drillsProvider);
+  final ids = ref.watch(testableDrillIdsProvider);
+  final blocked = gate<List<Drill>>([drills, ids]);
+  if (blocked != null) return blocked;
+  final byId = {for (final d in drills.value!) d.id: d};
+  return AsyncData([for (final id in ids.value!) ?byId[id]]);
+});
