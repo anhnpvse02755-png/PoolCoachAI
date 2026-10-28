@@ -29,7 +29,6 @@ import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/domain/tournament/tournament_goal.dart';
 import 'package:poolcoachai/domain/tournament/tournament_results.dart';
-import 'package:poolcoachai/features/play/presentation/tournament_play_card.dart';
 
 import '../support/match_fixtures.dart';
 import '../support/roadmap_fixtures.dart';
@@ -584,45 +583,6 @@ void main() {
           line([...inT(0), ...reg(1)]),
           line([...inT(2), ...reg(0)]),
         }, hasLength(3));
-      });
-
-      testWidgets('thẻ Giải đấu ở Thi đấu đổi theo dữ liệu', (tester) async {
-        for (final (ts, expected) in [
-          (const <Tournament>[], Vi.tournamentNone),
-          (
-            [
-              Tournament(
-                id: 'a',
-                name: 'Giải A',
-                startDate: DateTime(2026, 9, 22),
-              ),
-            ],
-            'Giải A',
-          ),
-          (
-            [
-              Tournament(
-                id: 'b',
-                name: 'Giải B',
-                startDate: DateTime(2026, 9, 30),
-              ),
-            ],
-            'Giải B',
-          ),
-        ]) {
-          final c = testContainer(tournaments: ts);
-          addTearDown(c.dispose);
-          await tester.pumpWidget(
-            UncontrolledProviderScope(
-              container: c,
-              child: const MaterialApp(
-                home: Scaffold(body: TournamentPlayCard()),
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          expect(find.text(expected), findsOneWidget);
-        }
       });
 
       test(

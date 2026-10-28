@@ -185,6 +185,27 @@ void main() {
     });
   });
 
+  testWidgets('thẻ Giải đấu ở Thi đấu đổi theo dữ liệu (chống bịa)', (
+    tester,
+  ) async {
+    for (final (ts, expected) in [
+      (const <Tournament>[], Vi.tournamentNone),
+      ([Tournament(id: 'a', name: 'Giải A', startDate: day(0))], 'Giải A'),
+      ([Tournament(id: 'b', name: 'Giải B', startDate: day(8))], 'Giải B'),
+    ]) {
+      final c = testContainer(tournaments: ts);
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: Scaffold(body: TournamentPlayCard())),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(expected), findsOneWidget);
+    }
+  });
+
   testWidgets('thẻ Play: lỗi dữ liệu giải thì báo lỗi', (tester) async {
     await openAt(
       tester,
