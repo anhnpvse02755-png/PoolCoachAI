@@ -742,6 +742,16 @@ abstract final class Vi {
   static const skillTestCancel = 'Huỷ bài kiểm tra';
   static const skillTestCancelled =
       'Đã huỷ bài kiểm tra. Không có kết quả nào được lưu.';
+  static const skillTestCancelConfirmTitle = 'Huỷ bài kiểm tra?';
+  static const skillTestCancelConfirmBody =
+      'Kết quả đang nhập sẽ không được lưu và không tính là trượt.';
+  static const skillTestCancelConfirm = 'Huỷ bài';
+  static const skillTestKeepGoing = 'Tiếp tục làm bài';
+  static const skillTestCardTitle = 'Bài kiểm tra';
+  static const skillTestOpen = 'Làm bài kiểm tra';
+  static const skillTestFormSlipped = 'Phong độ gần đây chưa đạt';
+  static const certifiedBadge = 'Đã chứng nhận';
+  static const skillTestDataError = 'Chưa tải được dữ liệu bài kiểm tra.';
   static String skillTestPassed(String drillName, int level) =>
       'Đã chứng nhận $drillName — cấp $level';
   static String skillTestFailed(num score, num mark) =>

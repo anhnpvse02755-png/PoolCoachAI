@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +12,13 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
+import 'package:poolcoachai/features/training/presentation/skill_test_screen.dart';
 
 import '../../support/layout_sweep.dart';
 import '../../support/skill_test_fixtures.dart';
@@ -28,13 +33,16 @@ void main() {
     WidgetTester tester, {
     List<DrillLog>? logs,
     bool dropHomeException = false,
+    String drillId = 'd1',
+    List<Drill>? drills,
+    bool pushed = false,
   }) async {
-    final seeded = logs ?? threePasses('d1', before: testToday);
+    final seeded = logs ?? threePasses(drillId, before: testToday);
     // Kho đọc buổi tập thẳng từ DB trong giao dịch, nên ghi cả vào DB.
     for (final l in seeded) {
       await db.into(db.drillLogRows).insert(toDrillLogRow(l, userId: 'u1'));
     }
-    final container = dbContainer(db, logs: seeded);
+    final container = dbContainer(db, logs: seeded, drills: drills);
     addTearDown(container.dispose);
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -48,7 +56,13 @@ void main() {
     // Trang chủ là điểm vào của router và có tràn riêng ở chữ lớn (RankCard);
     // bỏ ngoại lệ đó để phép đo chỉ tính màn Skill Test.
     if (dropHomeException) tester.takeException();
-    router.go(Routes.skillTest('d1'));
+    if (pushed) {
+      router.go(Routes.drill(drillId));
+      await tester.pumpAndSettle();
+      unawaited(router.push<void>(Routes.skillTest(drillId)));
+    } else {
+      router.go(Routes.skillTest(drillId));
+    }
     await tester.pumpAndSettle();
     return router;
   }
@@ -217,5 +231,131 @@ void main() {
     await start(tester);
     await scrollThroughAll(tester);
     expect(tester.takeException(), isNull);
+  });
+
+  // S11: sau "Bắt đầu kiểm tra", quay lại của hệ thống hành xử như Huỷ.
+  testWidgets('đang nhập, bấm quay lại rồi xác nhận: đúng một dòng huỷ', (
+    tester,
+  ) async {
+    await open(tester, pushed: true);
+    await start(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.skillTestCancelConfirmTitle), findsOneWidget);
+    await tester.tap(find.text(Vi.skillTestCancelConfirm));
+    await tester.pumpAndSettle();
+    expect(find.byType(DrillDetailScreen), findsOneWidget);
+    final rows = await db.select(db.skillTestRows).get();
+    expect(rows, hasLength(1));
+    expect([rows.single.cancelledAt, rows.single.score, rows.single.passed], [
+      testToday,
+      null,
+      null,
+    ]);
+  });
+
+  testWidgets('đang nhập, bấm quay lại rồi bỏ qua hộp thoại: ở lại, không ghi', (
+    tester,
+  ) async {
+    await open(tester, pushed: true);
+    await start(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.skillTestKeepGoing));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
+    expect(find.byType(SkillTestScreen), findsOneWidget);
+    expect(find.text(Vi.skillTestSubmit), findsOneWidget);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+  });
+
+  testWidgets('chuẩn bị, bấm quay lại: thoát bình thường, không ghi', (
+    tester,
+  ) async {
+    await open(tester, pushed: true);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
+    expect(find.byType(DrillDetailScreen), findsOneWidget);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+  });
+
+  testWidgets('đã có kết quả, bấm quay lại: thoát bình thường, không thêm dòng', (
+    tester,
+  ) async {
+    await open(tester, pushed: true);
+    await start(tester);
+    await enter(tester, '9', '10');
+    expect(find.text(Vi.skillTestPassed('Đường thẳng cơ bản', 1)), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
+    expect(find.byType(DrillDetailScreen), findsOneWidget);
+    expect(await db.select(db.skillTestRows).get(), hasLength(1));
+  });
+
+  // S12: dấu phẩy thập phân.
+  final target = stDrill('t2', SkillCategory.safety, 2, target: 25);
+  List<DrillLog> targetLogs() => [
+    for (final d in [3, 2, 1])
+      stLog('t2', 30, testToday.subtract(Duration(days: d)), attempts: null),
+  ];
+
+  testWidgets('bài chấm theo mốc: "27,5" được hiểu là 27.5', (tester) async {
+    await open(
+      tester,
+      drillId: 't2',
+      drills: [...testDrills, target],
+      logs: targetLogs(),
+    );
+    await start(tester);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, Vi.sessionScoreLabelTarget),
+      '27,5',
+    );
+    await tapText(tester, Vi.skillTestSubmit);
+    final r = (await db.select(db.skillTestRows).get()).single;
+    expect([r.score, r.passed], [27.5, true]);
+  });
+
+  testWidgets('bài chấm theo mốc: "27.5" vẫn được chấp nhận như trước', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      drillId: 't2',
+      drills: [...testDrills, target],
+      logs: targetLogs(),
+    );
+    await start(tester);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, Vi.sessionScoreLabelTarget),
+      '27.5',
+    );
+    await tapText(tester, Vi.skillTestSubmit);
+    expect((await db.select(db.skillTestRows).get()).single.score, 27.5);
+  });
+
+  testWidgets('bài theo số lần thử: số lần đạt "7,5" bị từ chối vì không nguyên', (
+    tester,
+  ) async {
+    await open(tester);
+    await start(tester);
+    await enter(tester, '7,5', '10');
+    expect(
+      find.text(Vi.skillTestInputError(SkillTestInputError.scoreNotWhole)),
+      findsOneWidget,
+    );
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+  });
+
+  testWidgets('bài theo số lần thử: số lần thử "10,5" bị từ chối', (
+    tester,
+  ) async {
+    await open(tester);
+    await start(tester);
+    await enter(tester, '9', '10,5');
+    expect(find.text(Vi.sessionAttemptsInvalid), findsOneWidget);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
   });
 }

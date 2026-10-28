@@ -4,6 +4,8 @@ import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
+import 'test_data.dart' show testDrills;
+
 final stToday = DateTime(2026, 10, 28, 10);
 
 Drill stDrill(
@@ -34,7 +36,8 @@ final stDrills = <Drill>[
   stDrill('t2', SkillCategory.safety, 2, target: 25),
 ];
 
-Drill stById(String id) => stDrills.firstWhere((d) => d.id == id);
+Drill stById(String id) =>
+    [...stDrills, ...testDrills].firstWhere((d) => d.id == id);
 
 DrillLog stLog(String drillId, num score, DateTime at, {int? attempts = 10}) =>
     DrillLog(

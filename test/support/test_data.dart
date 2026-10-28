@@ -221,6 +221,7 @@ ProviderContainer dbContainer(
   DateTime Function()? clock,
   Duration? rankLag,
   List<DrillLog>? logs,
+  List<Drill>? drills,
 }) {
   return ProviderContainer(
     overrides: [
@@ -237,7 +238,7 @@ ProviderContainer dbContainer(
       // Không widget test nào được chạm mạng: luôn thay backend thật.
       coachChatBackendProvider.overrideWithValue(FakeCoachChat()),
       nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
-      drillsProvider.overrideWith((ref) => Stream.value(testDrills)),
+      drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),
       drillLogsProvider.overrideWith(
         (ref) => Stream.value(logs ?? const <DrillLog>[]),

@@ -11,11 +11,13 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 
+import '../../support/skill_test_fixtures.dart';
 import '../../support/test_data.dart';
 
 /// Thư viện bài tập — mục 6.2 của thiết kế.
@@ -26,10 +28,14 @@ import '../../support/test_data.dart';
 /// phải "9.0". Hiện điểm thô dưới nhãn tỉ lệ là con số không truy được
 /// về logic nào — đúng thứ mục 2.1 của thiết kế cấm.
 void main() {
-  Future<void> openTraining(WidgetTester tester, List<DrillLog> logs) async {
+  Future<void> openTraining(
+    WidgetTester tester,
+    List<DrillLog> logs, {
+    List<SkillTest> skillTests = const [],
+  }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
-    final container = testContainer(logs: logs);
+    final container = testContainer(logs: logs, skillTests: skillTests);
     addTearDown(container.dispose);
 
     // Thẻ đầu trang đã nhiều: cao hơn để danh sách bài vẫn nằm trong khung.
@@ -60,6 +66,18 @@ void main() {
     score: score,
     attempts: attempts,
   );
+
+  testWidgets('bài đã chứng nhận có huy hiệu Đã chứng nhận', (tester) async {
+    await openTraining(tester, const [],
+        skillTests: [passedTest('d1', 1, testToday)]);
+    expect(find.text(Vi.certifiedBadge), findsOneWidget);
+  });
+
+  testWidgets('bài trượt kiểm tra không có huy hiệu', (tester) async {
+    await openTraining(tester, const [],
+        skillTests: [failedTest('d1', 1, testToday)]);
+    expect(find.text(Vi.certifiedBadge), findsNothing);
+  });
 
   testWidgets('bài chưa từng tập thì không hiện con số nào', (tester) async {
     await openTraining(tester, const []);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -47,6 +49,35 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
     super.dispose();
   }
 
+  /// Số có thể gõ dấu phẩy thập phân ("7,5") như dấu chấm.
+  double? _parseDecimal(String? value) =>
+      double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+
+  /// Đã bấm Bắt đầu mà chưa có kết quả: thoát giữa chừng phải qua Huỷ.
+  bool get _inProgress => _startedAt != null && _result == null;
+
+  Future<void> _onBack() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(Vi.skillTestCancelConfirmTitle),
+        content: const Text(Vi.skillTestCancelConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(Vi.skillTestKeepGoing),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(Vi.skillTestCancelConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted && _inProgress) await _cancel();
+  }
+
   String _nameOf(SkillTestDrillState s, String id) =>
       s.drills.where((d) => d.id == id).firstOrNull?.name ?? id;
 
@@ -71,7 +102,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
         drills: state.drills,
         tableSize: _size,
         startedAt: _startedAt!,
-        score: num.parse(_scoreController.text),
+        score: _parseDecimal(_scoreController.text)!,
         attempts: drill.usesAttempts
             ? int.parse(_attemptsController.text)
             : null,
@@ -105,6 +136,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
   }
 
   Future<void> _cancel() async {
+    if (_busy) return;
     final state = _frozen!;
     final repo = ref.read(skillTestRepositoryProvider);
     setState(() => _busy = true);
@@ -130,6 +162,17 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Quay lại của hệ thống giữa lúc làm bài hành xử như Huỷ (có xác nhận).
+    return PopScope(
+      canPop: !_inProgress,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_onBack());
+      },
+      child: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     // Kết quả ở lại màn dù cổng đã đổi (vừa đạt thì cổng thành AlreadyCertified).
     final result = _result;
     final frozen = _frozen;
@@ -305,7 +348,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
 
   String? _validateScore(Drill drill, String? value) {
     if (value == null || value.trim().isEmpty) return Vi.sessionScoreRequired;
-    final score = double.tryParse(value);
+    final score = _parseDecimal(value);
     if (score == null) return Vi.sessionScoreInvalid;
     final error = checkSkillTestInput(
       drill,

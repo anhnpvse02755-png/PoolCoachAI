@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/knowledge_lookup.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/features/training/presentation/skill_test_card.dart';
 
 /// Chi tiết một bài tập — mục 6.3 của thiết kế.
 class DrillDetailScreen extends ConsumerWidget {
@@ -141,6 +142,7 @@ class DrillDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 _ReadinessCard(drill: drill, logs: history),
               ],
+              SkillTestCard(drill: drill),
               const SizedBox(height: 24),
               // Lịch sử hiện tỉ lệ đạt mục tiêu, không phải điểm thô:
               // "9" một mình không nói lên bài đó cần trúng mấy trên
