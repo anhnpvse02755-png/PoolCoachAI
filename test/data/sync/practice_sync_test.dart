@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/drift_match_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
+import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/data/sync/practice_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/auth.dart';
@@ -12,6 +15,7 @@ import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
@@ -28,7 +32,7 @@ void main() {
     server = FakeDirectus();
     auth = FakeAuthRepository.signedIn(userId: 'u1');
     api = DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl);
-    for (final path in ['pool_matches', 'timer_sessions', 'schedule_slots']) {
+    for (final path in ['pool_matches', 'timer_sessions', 'schedule_slots', 'tournaments']) {
       server.routes['GET /items/$path'] = (_) => FakeDirectus.ok([]);
     }
   });
@@ -37,6 +41,8 @@ void main() {
 
   PracticeSyncService service() =>
       PracticeSyncService(db: db, auth: auth, api: api, now: () => now);
+
+  TournamentRepository tournaments() => TournamentRepository(db, userId: 'u1', now: () => now, newId: () => 't1');
 
   DriftMatchRepository matches() =>
       DriftMatchRepository(db, userId: 'u1', now: () => now);
@@ -525,6 +531,149 @@ void main() {
     });
   });
 
+  group('tournaments', () {
+    test('đẩy giải chưa đồng bộ đủ trường, ngày dạng YYYY-MM-DD, rồi đánh dấu', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 11, 2), endDate: DateTime(2026, 11, 3),
+          location: 'CLB A', gameType: PoolGameType.nineBall, resultNote: 'Vào vòng 16', notes: 'n'));
+      Map<String, Object?>? sent;
+      server.routes['POST /items/tournaments'] = (req) {
+        sent = FakeDirectus.body(req);
+        return FakeDirectus.ok({'id': 't1'});
+      };
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect([sent!['id'], sent!['name'], sent!['start_date'], sent!['end_date'], sent!['location'], sent!['game_type'],
+          sent!['result_note'], sent!['notes'], sent!['is_deleted']], ['t1', 'Giải Q1', '2026-11-02', '2026-11-03', 'CLB A', 'nineBall', 'Vào vòng 16', 'n', false]);
+      expect(sent!.containsKey('user_created'), isFalse);
+      expect((await db.select(db.tournamentRows).getSingle()).syncedAt, isNotNull);
+    });
+
+    test('xóa giải gửi tombstone bằng PATCH, không DELETE', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 11, 2)));
+      await tournaments().remove('t1');
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', updatedAt: now.subtract(const Duration(hours: 1)))]);
+      server.routes['PATCH /items/tournaments/t1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      await service().syncNow();
+      expect(FakeDirectus.body(server.sent('PATCH', '/items/tournaments/t1').single)['is_deleted'], true);
+      expect(server.requests.where((r) => r.method == 'DELETE'), isEmpty);
+    });
+
+    test('kéo giải từ máy khác: ngày về đúng ngày, đánh dấu đã đồng bộ', () async {
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t9', startDate: '2026-11-02', endDate: '2026-11-03')]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      final r = await db.select(db.tournamentRows).getSingle();
+      expect([r.id, r.userId, r.name, r.startDate, r.endDate, r.isDeleted], ['t9', 'u1', 'Giải xa', DateTime(2026, 11, 2), DateTime(2026, 11, 3), false]);
+      expect(r.syncedAt, isNotNull);
+    });
+
+    test('Directus trả ngày kèm giờ vẫn về đúng ngày', () async {
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t9', startDate: '2026-11-02T00:00:00')]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect((await db.select(db.tournamentRows).getSingle()).startDate, DateTime(2026, 11, 2));
+    });
+
+    test('bản máy chủ mới hơn thay bản trên máy; cũ hơn thì không ghi đè bản sửa trên máy', () async {
+      await tournaments().create(TournamentDraft(name: 'Tên trên máy', startDate: DateTime(2026, 11, 2)));
+      server.routes['POST /items/tournaments'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['PATCH /items/tournaments/t1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', name: 'Cũ', updatedAt: now.subtract(const Duration(hours: 1)))]);
+      await service().syncNow();
+      expect((await db.select(db.tournamentRows).getSingle()).name, 'Tên trên máy');
+      expect(server.sent('PATCH', '/items/tournaments/t1'), hasLength(1));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', name: 'Mới', updatedAt: now.add(const Duration(hours: 1)))]);
+      await service().syncNow();
+      expect((await db.select(db.tournamentRows).getSingle()).name, 'Mới');
+    });
+
+    test('giải của tài khoản khác bị từ chối; trận đã đồng bộ trước đó vẫn lên', () async {
+      await matches().start(match('m1'));
+      server.routes['POST /items/pool_matches'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t9', owner: 'u2')]);
+      expect(await service().syncNow(), SyncOutcome.failed);
+      expect((await db.select(db.poolMatchRows).getSingle()).syncedAt, isNotNull);
+      expect(await db.select(db.tournamentRows).get(), isEmpty);
+    });
+
+    test('id giải đã nằm trên máy dưới tài khoản khác: từ chối, không ghi đè', () async {
+      await TournamentRepository(db, userId: 'u2', now: () => now, newId: () => 't1')
+          .create(TournamentDraft(name: 'Của u2', startDate: DateTime(2026, 11, 2)));
+      server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([_remoteTournament('t1', name: 'Của u1')]);
+      expect(await service().syncNow(), SyncOutcome.failed);
+      final r = await db.select(db.tournamentRows).getSingle();
+      expect([r.userId, r.name], ['u2', 'Của u2']);
+    });
+
+    test('giải hỏng từ máy chủ (thiếu id, ngày sai) không lưu, sync báo failed, trận vẫn lên', () async {
+      await matches().start(match('m1'));
+      server.routes['POST /items/pool_matches'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      for (final bad in [
+        {..._remoteTournament('t9'), 'id': null},
+        {..._remoteTournament('t9'), 'end_date': '2026-13-40'},
+        {..._remoteTournament('t9'), 'start_date': '2026-02-30'},
+      ]) {
+        server.routes['GET /items/tournaments'] = (_) => FakeDirectus.ok([bad]);
+        expect(await service().syncNow(), SyncOutcome.failed);
+        expect(await db.select(db.tournamentRows).get(), isEmpty);
+      }
+      expect((await db.select(db.poolMatchRows).getSingle()).syncedAt, isNotNull);
+    });
+
+    test('giải mới tạo trên máy tự kích hoạt đồng bộ (start())', () async {
+      server.routes['POST /items/tournaments'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      final svc = service()..start();
+      addTearDown(svc.dispose);
+      await pumpEventQueue();
+      await tournaments().create(TournamentDraft(name: 'Giải mới', startDate: DateTime(2026, 11, 2)));
+      await pumpEventQueue(times: 200);
+      expect(server.sent('POST', '/items/tournaments'), hasLength(1));
+      expect((await db.select(db.tournamentRows).getSingle()).syncedAt, isNotNull);
+    });
+
+    test('lỗi 4xx với giải: không gửi lại tới khi giải đổi', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 11, 2)));
+      server.routes['POST /items/tournaments'] = (_) => FakeDirectus.error(403, 'FORBIDDEN');
+      final svc = service();
+      expect(await svc.syncNow(), SyncOutcome.done);
+      expect(await svc.syncNow(), SyncOutcome.done);
+      expect(server.sent('POST', '/items/tournaments'), hasLength(1));
+      expect((await db.select(db.tournamentRows).getSingle()).syncedAt, isNull);
+    });
+  });
+
+  group('trường giải ở trận', () {
+    test('trận mang tournament_id và round_label lên và về', () async {
+      await tournaments().create(TournamentDraft(name: 'Giải Q1', startDate: DateTime(2026, 10, 21)));
+      await matches().start(PoolMatch(id: 'm1', gameType: PoolGameType.nineBall, playerName: 'An', opponentName: 'Bình', targetRacks: 3,
+          rackWinners: const [], startedAt: DateTime.utc(2026, 10, 21, 8), tournamentId: 't1', roundLabel: 'Tứ kết'));
+      Map<String, Object?>? uploaded;
+      server.routes['POST /items/pool_matches'] = (req) {
+        uploaded = FakeDirectus.body(req);
+        return FakeDirectus.ok({'id': 'm1'});
+      };
+      server.routes['POST /items/tournaments'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      await service().syncNow();
+      expect([uploaded!['tournament_id'], uploaded!['round_label']], ['t1', 'Tứ kết']);
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        {..._remoteMatch('m2', updatedAt: now.add(const Duration(hours: 1))), 'tournament_id': 't1', 'round_label': 'Bán kết'},
+      ]);
+      await service().syncNow();
+      final m2 = await (db.select(db.poolMatchRows)..where((r) => r.id.equals('m2'))).getSingle();
+      expect([m2.tournamentId, m2.roundLabel], ['t1', 'Bán kết']);
+    });
+
+    test('PATCH trận cố ý gửi tournament_id và round_label, kể cả null khi không thuộc giải', () async {
+      await matches().start(match('m1'));
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        {..._remoteMatch('m1', updatedAt: now.subtract(const Duration(hours: 1))), 'tournament_id': 'cu', 'round_label': 'Cũ'},
+      ]);
+      server.routes['PATCH /items/pool_matches/m1'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+      expect(await service().syncNow(), SyncOutcome.done);
+      final body = FakeDirectus.body(server.sent('PATCH', '/items/pool_matches/m1').single);
+      expect(body.containsKey('tournament_id'), isTrue);
+      expect(body.containsKey('round_label'), isTrue);
+      expect([body['tournament_id'], body['round_label']], [null, null]);
+    });
+  });
+
   test('start() uploads a row that becomes pending later', () async {
     server.routes['POST /items/pool_matches'] = (request) =>
         FakeDirectus.ok(FakeDirectus.body(request));
@@ -607,6 +756,29 @@ Map<String, Object?> _remoteSlot(
   'time': '19:00',
   'label': label,
   'cat': cat,
+  'updated_at': (updatedAt ?? DateTime.utc(2026, 10, 21, 8)).toIso8601String(),
+  'is_deleted': isDeleted,
+};
+
+Map<String, Object?> _remoteTournament(
+  String id, {
+  String owner = 'u1',
+  DateTime? updatedAt,
+  bool isDeleted = false,
+  String startDate = '2026-11-02',
+  String? endDate,
+  String name = 'Giải xa',
+}) => {
+  'id': id,
+  'user_created': owner,
+  'name': name,
+  'start_date': startDate,
+  'end_date': endDate,
+  'location': null,
+  'game_type': null,
+  'result_note': null,
+  'notes': null,
+  'created_at': '2026-10-20T08:00:00.000Z',
   'updated_at': (updatedAt ?? DateTime.utc(2026, 10, 21, 8)).toIso8601String(),
   'is_deleted': isDeleted,
 };

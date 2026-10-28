@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/match_codec.dart';
+import 'package:poolcoachai/data/database/tournament_converters.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
@@ -14,10 +15,12 @@ import 'package:poolcoachai/domain/skill_category.dart';
 const _matchesPath = '/items/pool_matches';
 const _timersPath = '/items/timer_sessions';
 const _slotsPath = '/items/schedule_slots';
+const _tournamentsPath = '/items/tournaments';
 
 const poolMatchRemoteFields =
     'id,user_created,game_type,player_name,opponent_name,target_racks,'
-    'rack_winners,shots,cue_id,started_at,completed_at,updated_at,is_deleted';
+    'rack_winners,shots,cue_id,started_at,completed_at,updated_at,is_deleted,'
+    'tournament_id,round_label';
 const timerSessionRemoteFields =
     'id,user_created,date,duration_sec,cat,cue_id';
 const scheduleSlotRemoteFields =
@@ -74,6 +77,7 @@ class PracticeSyncService {
     'match': {},
     'timer': {},
     'slot': {},
+    'tournament': {},
   };
 
   /// Bản ghi server từ chối (4xx): vẫn chờ, không tự khởi động lượt.
@@ -110,6 +114,14 @@ class PracticeSyncService {
           .watch()
           .map(
             (rows) => {for (final r in rows) r.id: _slotRevision(r)},
+          ),
+    );
+    _watch(
+      'tournament',
+      (_db.select(_db.tournamentRows)..where((row) => row.syncedAt.isNull()))
+          .watch()
+          .map(
+            (rows) => {for (final r in rows) r.id: _tournamentRevision(r)},
           ),
     );
     _timer = Timer.periodic(_retryEvery, (_) {
@@ -168,6 +180,8 @@ class PracticeSyncService {
       await _syncMatches(userId);
       await _syncTimerSessions(userId);
       await _syncSlots(userId);
+      // Cuối cùng: giải hỏng không được chặn đồng bộ trận, buổi tập, lịch.
+      await _syncTournaments(userId);
       return SyncOutcome.done;
     } on _UserChanged {
       return SyncOutcome.signedOut;
@@ -228,6 +242,9 @@ class PracticeSyncService {
           'completed_at': row.completedAt?.toUtc().toIso8601String(),
           'updated_at': sentAt.toUtc().toIso8601String(),
           'is_deleted': row.isDeleted,
+          // Cố ý luôn gửi, kể cả null: trận bỏ giải thì xoá liên kết trên server.
+          'tournament_id': row.tournamentId,
+          'round_label': row.roundLabel,
         },
         rejectedKey: key,
         userId: userId,
@@ -320,6 +337,8 @@ class PracticeSyncService {
       completedAt: Value(_nullableDate(item, 'completed_at')),
       updatedAt: Value(_date(item, 'updated_at')),
       isDeleted: Value(item['is_deleted'] == true),
+      tournamentId: Value(_nullableString(item, 'tournament_id')),
+      roundLabel: Value(_nullableString(item, 'round_label')),
       syncedAt: Value(syncedAt),
     );
   }
@@ -514,6 +533,80 @@ class PracticeSyncService {
     }
   }
 
+  // ─── Giải đấu ───────────────────────────────────────────────────────────
+  // Song song với _syncSlots (cùng luật: bản sửa mới nhất thắng, xóa là
+  // tombstone); mỗi loại có hàm riêng trong file này.
+
+  Future<void> _syncTournaments(String userId) async {
+    final remoteItems = await _fetch(
+      _tournamentsPath,
+      tournamentRemoteFields,
+      userId,
+    );
+    final remoteById = {for (final item in remoteItems) _id(item): item};
+    final pending = await (_db.select(_db.tournamentRows)
+          ..where((r) => r.userId.equals(userId) & r.syncedAt.isNull())
+          ..orderBy([(r) => OrderingTerm.asc(r.updatedAt)]))
+        .get();
+
+    for (final row in pending) {
+      _checkAlive();
+      _checkUser(userId);
+      final key = 'tournament:${row.id}:${_tournamentRevision(row)}';
+      if (_rejected.contains(key)) continue;
+      final remote = remoteById[row.id];
+      if (remote != null && !row.updatedAt.isAfter(_date(remote, 'updated_at'))) {
+        continue;
+      }
+      final ok = await _upsert(
+        path: _tournamentsPath,
+        id: row.id,
+        exists: remote != null,
+        body: toRemoteTournament(row),
+        rejectedKey: key,
+        userId: userId,
+      );
+      if (!ok) continue;
+      await _db.transaction(() async {
+        final current = await (_db.select(
+          _db.tournamentRows,
+        )..where((r) => r.id.equals(row.id))).getSingleOrNull();
+        if (current == null ||
+            current.userId != row.userId ||
+            current.updatedAt != row.updatedAt ||
+            current.isDeleted != row.isDeleted) {
+          return;
+        }
+        await (_db.update(_db.tournamentRows)..where((r) => r.id.equals(row.id)))
+            .write(TournamentRowsCompanion(syncedAt: Value(_now())));
+      });
+    }
+
+    final receivedAt = _now();
+    for (final item in remoteItems) {
+      _checkAlive();
+      _checkUser(userId);
+      final remote = tournamentFromRemote(
+        item,
+        userId: userId,
+        syncedAt: receivedAt,
+      );
+      final remoteUpdatedAt = remote.updatedAt.value;
+      await _db.transaction(() async {
+        final local = await (_db.select(
+          _db.tournamentRows,
+        )..where((r) => r.id.equals(remote.id.value))).getSingleOrNull();
+        _checkAlive();
+        _checkUser(userId);
+        if (local != null && local.userId != userId) {
+          throw const FormatException('ID giải bị trùng giữa các tài khoản');
+        }
+        if (local != null && local.updatedAt.isAfter(remoteUpdatedAt)) return;
+        await _db.into(_db.tournamentRows).insertOnConflictUpdate(remote);
+      });
+    }
+  }
+
   // ─── Dùng chung ─────────────────────────────────────────────────────────
 
   Future<List<Map<String, Object?>>> _fetch(
@@ -596,6 +689,9 @@ class PracticeSyncService {
   String _slotRevision(ScheduleSlotRow row) =>
       '${row.userId}:${row.updatedAt?.toIso8601String() ?? "unversioned"}:'
       '${row.isDeleted}';
+
+  String _tournamentRevision(TournamentRow r) =>
+      '${r.userId}:${r.updatedAt.toIso8601String()}:${r.isDeleted}';
 
   /// Dòng không có chủ (`:` đứng đầu) không bao giờ khớp người đang đăng nhập.
   bool _isCurrentOwner(String revision) {

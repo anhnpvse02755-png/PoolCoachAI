@@ -589,12 +589,61 @@ void main() {
         tournamentId: t,
         roundLabel: round,
       );
+      Future<void> markSynced() => db
+          .update(db.poolMatchRows)
+          .write(PoolMatchRowsCompanion(syncedAt: Value(DateTime(2026, 10, 21))));
+      await markSynced();
       await edit('t2', 'Chung kết');
       var r = await db.select(db.poolMatchRows).getSingle();
       expect([r.tournamentId, r.roundLabel], ['t2', 'Chung kết']);
+      expect(r.syncedAt, isNull);
+      await markSynced();
+      expect((await db.select(db.poolMatchRows).getSingle()).syncedAt, isNotNull);
       await edit(null, 'Chung kết');
       r = await db.select(db.poolMatchRows).getSingle();
       expect([r.tournamentId, r.roundLabel, r.syncedAt], [null, null, null]);
+    });
+
+    test('sửa trận: vòng 41 ký tự bị từ chối; vòng được cắt khoảng trắng, rỗng thành null', () async {
+      await addTournament('u1', 't1');
+      await repo.start(inTournament('m1', 't1', round: 'Tứ kết'));
+      Future<void> edit(String? round) => repo.updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 2,
+        tournamentId: 't1',
+        roundLabel: round,
+      );
+      await expectLater(edit('x' * 41), throwsArgumentError);
+      expect((await db.select(db.poolMatchRows).getSingle()).roundLabel, 'Tứ kết');
+      await edit('  Bán kết  ');
+      expect((await db.select(db.poolMatchRows).getSingle()).roundLabel, 'Bán kết');
+      await edit('   ');
+      expect((await db.select(db.poolMatchRows).getSingle()).roundLabel, isNull);
+    });
+
+    test('sửa trận: giải của người khác hoặc giải lạ bị từ chối, trận không đổi', () async {
+      await addTournament('u1', 't1');
+      await addTournament('u2', 'theirs');
+      await repo.start(inTournament('m1', 't1', round: 'Tứ kết'));
+      for (final t in ['theirs', 'nope']) {
+        await expectLater(
+          repo.updateDetails(
+            matchId: 'm1',
+            gameType: PoolGameType.nineBall,
+            playerName: 'An',
+            opponentName: 'Bình',
+            targetRacks: 2,
+            tournamentId: t,
+            roundLabel: 'Chung kết',
+          ),
+          throwsStateError,
+        );
+      }
+      final r = await db.select(db.poolMatchRows).getSingle();
+      expect([r.tournamentId, r.roundLabel], ['t1', 'Tứ kết']);
     });
 
     test('giải của trận đã bị xóa: sửa trận mà giữ nguyên giải thì được, chuyển sang giải đã xóa khác thì không', () async {

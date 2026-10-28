@@ -182,6 +182,51 @@ try {
 
   // ─── Lộ trình: player_goals, achievements ───────────────────────────────
   if (aId && bId) {
+    // ─── Giải đấu: chủ sở hữu, xóa mềm, không xóa cứng ───────────────────
+    // Đặt trước phần mục tiêu và trận, vì cả hai cần tour.id.
+    const tour = {
+      id: randomUUID(),
+      name: 'Giải verify',
+      start_date: '2026-11-02',
+      end_date: null,
+      location: null,
+      game_type: 'nineBall',
+      result_note: 'Vào vòng 16',
+      notes: null,
+      created_at: '2026-10-28T03:00:00.000Z',
+      updated_at: '2026-10-28T03:00:00.000Z',
+      is_deleted: false,
+    };
+    const tourMade = await call('POST', '/items/tournaments', tour, a.access_token);
+    tourMade.status === 200 || tourMade.status === 201
+      ? ok('A tạo được giải')
+      : fail(`A tạo giải → ${tourMade.status} ${tourMade.code}`);
+    const tDate = await call('GET', `/items/tournaments/${tour.id}?fields=start_date`, undefined, a.access_token);
+    tDate.data?.start_date === '2026-11-02'
+      ? ok('ngày giải về đúng dạng YYYY-MM-DD')
+      : fail(`ngày giải về sai: ${JSON.stringify(tDate.data)}`);
+    const bTours = await call('GET', '/items/tournaments', undefined, b.access_token);
+    (bTours.data ?? []).length === 0
+      ? ok('B không thấy giải của A')
+      : fail(`B thấy ${bTours.data.length} giải`);
+    const bTourPatch = await call('PATCH', `/items/tournaments/${tour.id}`, { name: 'Ghi đè' }, b.access_token);
+    bTourPatch.status === 403
+      ? ok('B không sửa được giải của A')
+      : fail(`B sửa giải của A → ${bTourPatch.status}`);
+    const tTomb = await call(
+      'PATCH',
+      `/items/tournaments/${tour.id}`,
+      { is_deleted: true, updated_at: '2026-10-28T04:00:00.000Z' },
+      a.access_token,
+    );
+    tTomb.status === 200
+      ? ok('A xóa mềm được giải')
+      : fail(`A xóa mềm giải → ${tTomb.status} ${tTomb.code}`);
+    const tDelete = await call('DELETE', `/items/tournaments/${tour.id}`, undefined, a.access_token);
+    tDelete.status === 403
+      ? ok('A không xóa cứng giải')
+      : fail(`A xóa cứng giải → ${tDelete.status}`);
+
     const goal = {
       id: aId,
       goal_id: randomUUID(),
@@ -227,6 +272,42 @@ try {
     gRankBack.data?.target_rank === 'd'
       ? ok('A đọc lại được hạng đích')
       : fail(`A đọc hạng đích → ${JSON.stringify(gRankBack.data)}`);
+    // Mục tiêu chuẩn bị giải mang tournament_id; bản cũ PATCH không có khoá này.
+    const gLinked = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      {
+        kind: 'chuanBiGiai',
+        category: null,
+        target_rank: null,
+        event_date: '2026-11-02T00:00:00.000Z',
+        tournament_id: tour.id,
+        updated_at: '2026-10-16T04:00:00.000Z',
+      },
+      a.access_token,
+    );
+    gLinked.status === 200
+      ? ok('A nối được mục tiêu chuẩn bị giải với giải')
+      : fail(`A nối mục tiêu với giải → ${gLinked.status} ${gLinked.code}`);
+    const gOldBuild = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      { event_date: '2026-11-03T00:00:00.000Z', updated_at: '2026-10-16T05:00:00.000Z' },
+      a.access_token,
+    );
+    gOldBuild.status === 200
+      ? ok('PATCH mục tiêu kiểu bản cũ (không có tournament_id) được nhận')
+      : fail(`PATCH mục tiêu kiểu bản cũ → ${gOldBuild.status} ${gOldBuild.code}`);
+    const gLinkBack = await call(
+      'GET',
+      `/items/player_goals/${aId}?fields=tournament_id`,
+      undefined,
+      a.access_token,
+    );
+    note('liên kết cũ còn sót sau PATCH kiểu bản cũ — app bỏ qua nhờ luật ba điều kiện');
+    gLinkBack.data?.tournament_id === tour.id
+      ? ok('tournament_id của mục tiêu còn nguyên sau PATCH kiểu bản cũ')
+      : fail(`tournament_id của mục tiêu sau PATCH kiểu bản cũ: ${JSON.stringify(gLinkBack.data)}`);
     const gDropped = await call(
       'PATCH',
       `/items/player_goals/${aId}`,
@@ -364,6 +445,8 @@ try {
       completed_at: null,
       updated_at: '2026-10-21T08:05:00.000Z',
       is_deleted: false,
+      tournament_id: tour.id,
+      round_label: 'Tứ kết',
     };
     const mMade = await call('POST', '/items/pool_matches', matchBody, a.access_token);
     mMade.status === 200 || mMade.status === 201
@@ -391,6 +474,24 @@ try {
     mPatch.status === 200
       ? ok('A cập nhật được trận của mình')
       : fail(`A cập nhật trận → ${mPatch.status} ${mPatch.code}`);
+    const mLinkBack = await call(
+      'GET',
+      `/items/pool_matches/${matchId}?fields=tournament_id,round_label`,
+      undefined,
+      a.access_token,
+    );
+    mLinkBack.data?.tournament_id === tour.id && mLinkBack.data?.round_label === 'Tứ kết'
+      ? ok('trận mang tournament_id đọc lại đúng; PATCH kiểu bản cũ (không có tournament_id) giữ liên kết')
+      : fail(`liên kết giải của trận sai: ${JSON.stringify(mLinkBack.data)}`);
+    const mOldFields = await call(
+      'GET',
+      `/items/pool_matches/${matchId}?fields=id,game_type,updated_at`,
+      undefined,
+      a.access_token,
+    );
+    mOldFields.data && !('tournament_id' in mOldFields.data)
+      ? ok('bản cũ xin danh sách trường riêng nên không nhận trường mới')
+      : fail(`danh sách trường cũ vẫn nhận tournament_id: ${JSON.stringify(mOldFields.data)}`);
     const mTomb = await call(
       'PATCH',
       `/items/pool_matches/${matchId}`,

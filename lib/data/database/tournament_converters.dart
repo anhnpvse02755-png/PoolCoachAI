@@ -33,11 +33,16 @@ DateTime fromRemoteDate(Object? value) {
   }
   final m = _datePattern.firstMatch(value);
   if (m == null) throw FormatException('Ngày sai dạng YYYY-MM-DD', value);
-  return DateTime(
-    int.parse(m.group(1)!),
-    int.parse(m.group(2)!),
-    int.parse(m.group(3)!),
-  );
+  final y = int.parse(m.group(1)!);
+  final mo = int.parse(m.group(2)!);
+  final d = int.parse(m.group(3)!);
+  final date = DateTime(y, mo, d);
+  // DateTime tự cuốn ngày/tháng vượt khoảng (2026-02-30 thành 2026-03-02):
+  // đi vòng lại để bắt ngày không có thật.
+  if (date.year != y || date.month != mo || date.day != d) {
+    throw FormatException('Ngày không tồn tại', value);
+  }
+  return date;
 }
 
 /// Danh sách trường yêu cầu khi kéo giải về; `user_created` là chủ dòng.

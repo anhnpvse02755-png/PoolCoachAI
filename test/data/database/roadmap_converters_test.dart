@@ -244,6 +244,21 @@ void main() {
     expect(goalFromRemote(json), linked);
   });
 
+  test('goalFromRemote giữ tournament_id nguyên văn cả với mục tiêu không phải chuanBiGiai', () {
+    final stale = GoalRecord(
+      updatedAt: at,
+      goal: PlayerGoal(
+        goalId: 'g10',
+        kind: GoalKind.lenHang,
+        createdAt: at,
+        tournamentId: 'stale',
+      ),
+    );
+    final json = toRemoteGoal(toGoalRow(stale, userId: 'u1'));
+    expect(json['tournament_id'], 'stale');
+    expect(goalFromRemote(json).goal!.tournamentId, 'stale');
+  });
+
   test(
     'luôn gửi khoá tournament_id, kể cả null, để xoá liên kết cũ trên máy chủ',
     () {

@@ -197,6 +197,7 @@ void main() {
       final keys = FakeDirectus.body(
         server.sent('PATCH', '/items/pool_matches/m1').single,
       ).keys;
+      expect(keys, isNotEmpty);
       expect(poolMatchRemoteFields.split(','), containsAll(keys));
     },
   );
@@ -217,6 +218,7 @@ void main() {
       final keys = FakeDirectus.body(
         server.sent('PATCH', '/items/player_goals/u1').single,
       ).keys;
+      expect(keys, isNotEmpty);
       expect(remoteGoalFields.split(','), containsAll(keys));
     },
   );

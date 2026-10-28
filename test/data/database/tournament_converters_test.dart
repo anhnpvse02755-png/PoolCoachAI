@@ -59,6 +59,10 @@ void main() {
     );
     expect(() => fromRemoteDate('02/11/2026'), throwsFormatException);
     expect(() => fromRemoteDate(null), throwsFormatException);
+    for (final bad in ['2026-13-40', '2026-02-30', '2026-00-10', '2026-04-31']) {
+      expect(() => fromRemoteDate(bad), throwsFormatException, reason: bad);
+    }
+    expect(fromRemoteDate('2028-02-29'), DateTime(2028, 2, 29));
   });
 
   test('gửi đúng các khoá của danh sách trường, không gửi chủ', () {
@@ -108,6 +112,10 @@ void main() {
       {...ok, 'name': ''},
       {...ok, 'start_date': null},
       {...ok, 'is_deleted': null},
+      {...ok, 'id': null},
+      {...ok, 'id': ''},
+      {...ok, 'end_date': 'khong-phai-ngay'},
+      {...ok, 'end_date': '2026-13-40'},
     ]) {
       expect(
         () => tournamentFromRemote(
