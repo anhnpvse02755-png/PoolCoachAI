@@ -254,6 +254,21 @@ void main() {
     );
   });
 
+  testWidgets('thành tích chứng nhận hiện tên bài', (tester) async {
+    await open(
+      tester,
+      testContainer(
+        goal: goal(
+          PlayerGoal(goalId: 'g', kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick, createdAt: at),
+        ),
+        achievements: [Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: at)],
+      ),
+    );
+    final text = Vi.achievement(AchievementKind.chungNhan, 'Đường thẳng cơ bản');
+    await tester.scrollUntilVisible(find.text(text), 200, scrollable: roadmapList);
+    expect(find.text(text), findsOneWidget);
+  });
+
   testWidgets('Chuẩn bị giải đưa bước không kịp vào mục riêng', (tester) async {
     final logs = <DrillLog>[
       for (final (index, date) in [

@@ -72,11 +72,11 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
 String achievementId(String userId, Achievement a) => const Uuid()
     .v5(Namespace.url.value, 'poolcoachai:achievement:$userId:${a.kind.name}:${a.refId}');
 
-Achievement toAchievement(AchievementRow r) => Achievement(
-      kind: AchievementKind.values.byName(r.kind),
-      refId: r.refId,
-      achievedAt: r.achievedAt,
-    );
+/// Loại lạ (máy chủ mới hơn) coi là không có: null, không ném.
+Achievement? toAchievement(AchievementRow r) {
+  final kind = AchievementKind.values.asNameMap()[r.kind];
+  return kind == null ? null : Achievement(kind: kind, refId: r.refId, achievedAt: r.achievedAt);
+}
 
 AchievementRow toAchievementRow(Achievement a, {required String userId, DateTime? syncedAt}) =>
     AchievementRow(
@@ -97,16 +97,20 @@ Map<String, Object?> toRemoteAchievement(AchievementRow r) => {
       'achieved_at': _iso(r.achievedAt),
     };
 
-AchievementRow achievementFromRemote(
+/// Null khi loại thành tích lạ: bản app này chưa biết nên bỏ qua dòng đó.
+AchievementRow? achievementFromRemote(
   Map<String, Object?> j, {
   required String userId,
   required DateTime syncedAt,
-}) =>
-    AchievementRow(
-      id: j['id']! as String,
-      userId: userId,
-      kind: j['kind']! as String,
-      refId: j['ref_id']! as String,
-      achievedAt: _local(j['achieved_at'])!,
-      syncedAt: syncedAt,
-    );
+}) {
+  final kind = j['kind']! as String;
+  if (AchievementKind.values.asNameMap()[kind] == null) return null;
+  return AchievementRow(
+    id: j['id']! as String,
+    userId: userId,
+    kind: kind,
+    refId: j['ref_id']! as String,
+    achievedAt: _local(j['achieved_at'])!,
+    syncedAt: syncedAt,
+  );
+}

@@ -63,7 +63,7 @@ class RoadmapRepository {
         ..where((t) => t.userId.equals(_userId))
         ..orderBy([(t) => OrderingTerm.desc(t.achievedAt), (t) => OrderingTerm.asc(t.refId)]))
       .watch()
-      .map((rows) => rows.map(toAchievement).toList());
+      .map((rows) => rows.map(toAchievement).nonNulls.toList());
 
   /// Thành tích đã có (cùng id) thì bỏ qua — chỉ thêm, không sửa.
   Future<void> recordAchievements(List<Achievement> list) => _db.batch((b) {

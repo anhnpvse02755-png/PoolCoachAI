@@ -138,6 +138,7 @@ void main() {
   });
 
   test('thành tích', () {
+    expect(Vi.achievement(AchievementKind.chungNhan, 'Bài A'), 'Chứng nhận: Bài A');
     expect(
       Vi.achievement(AchievementKind.chuoiNgay, '7'),
       'Chuỗi 7 ngày tập liên tiếp',

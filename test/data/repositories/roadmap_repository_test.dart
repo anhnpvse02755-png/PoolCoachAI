@@ -65,6 +65,14 @@ void main() {
     expect(await repo('u1').watchAchievements().first, [b, a]);
   });
 
+  test('dòng thành tích có loại lạ bị bỏ qua, các dòng khác vẫn ra', () async {
+    final a = Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10));
+    await repo('u1').recordAchievements([a]);
+    await db.into(db.achievementRows).insert(AchievementRow(
+        id: 'x', userId: 'u1', kind: 'zzz', refId: 'r', achievedAt: DateTime(2026, 10, 11)));
+    expect(await repo('u1').watchAchievements().first, [a]);
+  });
+
   test('mục tiêu và thành tích tách theo người', () async {
     await repo('u1').setGoal(kind: GoalKind.lenHang);
     await repo('u1').recordAchievements(

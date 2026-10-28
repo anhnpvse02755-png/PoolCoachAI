@@ -5,9 +5,11 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/pace.dart';
 import 'package:poolcoachai/domain/roadmap/practice_facts.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/certification.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
-/// Ba loại thành tích — mỗi loại một sự kiện dữ liệu thật (spec mục 7).
-enum AchievementKind { xongBuoc, duDieuKienLenCap, chuoiNgay }
+/// Bốn loại thành tích — mỗi loại một sự kiện dữ liệu thật (spec mục 7).
+enum AchievementKind { xongBuoc, duDieuKienLenCap, chuoiNgay, chungNhan }
 
 /// Mốc chuỗi ngày tập liên tiếp (chủ sản phẩm chọn 15/10/2026).
 const streakMilestones = <int>[7, 14, 30, 60, 100];
@@ -44,6 +46,7 @@ List<Achievement> newAchievements({
   required List<DrillLog> logs,
   required Set<String> existing,
   required DateTime today,
+  List<SkillTest> skillTests = const [],
 }) {
   final facts = PracticeFacts(drills: drills, logs: logs, today: today);
   final out = <Achievement>[];
@@ -84,6 +87,10 @@ List<Achievement> newAchievements({
   final streak = streakDays(logs: logs, timerSessions: const [], today: today);
   for (final m in streakMilestones) {
     if (streak >= m) add(AchievementKind.chuoiNgay, '$m', dateOnly(today));
+  }
+  // Chứng nhận: ngày là ngày hoàn tất lần đạt sớm nhất; trượt/huỷ/dòng lệch không tính.
+  for (final c in certificationsOf(skillTests).values) {
+    add(AchievementKind.chungNhan, c.drillId, c.certifiedAt);
   }
   return out;
 }

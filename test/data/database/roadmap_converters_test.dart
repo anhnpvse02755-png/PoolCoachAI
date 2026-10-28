@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
@@ -46,10 +47,26 @@ void main() {
     final a = Achievement(kind: AchievementKind.xongBuoc, refId: 'g1:aiming', achievedAt: at);
     final row = toAchievementRow(a, userId: 'u1');
     expect(toAchievement(row), a);
-    final back = achievementFromRemote(toRemoteAchievement(row), userId: 'u1', syncedAt: at);
+    final back = achievementFromRemote(toRemoteAchievement(row), userId: 'u1', syncedAt: at)!;
     expect(toAchievement(back), a);
     expect(back.syncedAt, at);
     expect(back.id, row.id);
+  });
+
+  test('chứng nhận: hai máy cùng người ra cùng id, qua Directus về nguyên vẹn', () {
+    final a = Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: at);
+    final b = Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: at.add(const Duration(hours: 3)));
+    expect(achievementId('u1', a), achievementId('u1', b));
+    final row = toAchievementRow(a, userId: 'u1');
+    expect(toAchievement(achievementFromRemote(toRemoteAchievement(row), userId: 'u1', syncedAt: at)!), a);
+  });
+
+  test('loại thành tích lạ (máy chủ mới hơn) bị bỏ qua, không ném', () {
+    final row = toAchievementRow(Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: at), userId: 'u1');
+    final unknown = AchievementRow(id: 'x', userId: 'u1', kind: 'zzz', refId: 'r', achievedAt: at);
+    expect(toAchievement(unknown), isNull);
+    expect(achievementFromRemote({...toRemoteAchievement(row), 'kind': 'zzz'}, userId: 'u1', syncedAt: at), isNull);
+    expect(achievementFromRemote(toRemoteAchievement(row), userId: 'u1', syncedAt: at), isNotNull);
   });
 
   test('mục tiêu có hạng đích qua Drift và Directus rồi về nguyên vẹn', () {

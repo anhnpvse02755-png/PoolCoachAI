@@ -139,6 +139,16 @@ void main() {
     expect(row.syncedAt, now);
   });
 
+  test('kéo thành tích: loại lạ bị bỏ qua, các dòng còn lại vẫn về', () async {
+    final a = Achievement(kind: AchievementKind.duDieuKienLenCap, refId: 'd1', achievedAt: older);
+    serve(achievements: [
+      {...toRemoteAchievement(toAchievementRow(a, userId: 'u1')), 'id': 'unknown-1', 'kind': 'zzz'},
+      toRemoteAchievement(toAchievementRow(a, userId: 'u1')),
+    ]);
+    expect(await build().syncNow(), SyncOutcome.done);
+    expect(toAchievement(await db.select(db.achievementRows).getSingle()), a);
+  });
+
   test('mất mạng: không ném, trả offline', () async {
     serve();
     server.offline = true;

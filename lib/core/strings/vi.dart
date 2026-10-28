@@ -1893,6 +1893,7 @@ abstract final class Vi {
         AchievementKind.xongBuoc => 'Xong bước: $subject',
         AchievementKind.duDieuKienLenCap => 'Đủ điều kiện lên cấp: $subject',
         AchievementKind.chuoiNgay => 'Chuỗi $subject ngày tập liên tiếp',
+        AchievementKind.chungNhan => 'Chứng nhận: $subject',
       };
 
   static String homeCurrentStep(String step) => 'Bước hiện tại: $step';

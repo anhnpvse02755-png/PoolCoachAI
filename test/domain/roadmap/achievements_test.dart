@@ -3,12 +3,46 @@ import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
 import '../../support/roadmap_fixtures.dart';
+import '../../support/skill_test_fixtures.dart';
 
 void main() {
   List<Achievement> run({PlayerGoal? goal, List<DrillLog> logs = const [], Set<String> existing = const {}}) =>
       newAchievements(goal: goal, drills: roadmapDrills, logs: logs, existing: existing, today: roadmapToday);
+
+  group('chứng nhận (Skill Test)', () {
+    List<Achievement> certs(List<SkillTest> tests, {Set<String> existing = const {}}) => newAchievements(
+            goal: null, drills: stDrills, logs: const [], existing: existing, today: stToday, skillTests: tests)
+        .where((a) => a.kind == AchievementKind.chungNhan)
+        .toList();
+    final at = stToday.subtract(const Duration(days: 1));
+
+    test('lần đạt ra đúng một chứng nhận, ngày là ngày hoàn tất; trượt và huỷ không', () {
+      expect(certs([passedTest('a1', 1, at), failedTest('p2a', 2, at), cancelledTest('p2b', 2, at)]),
+          [Achievement(kind: AchievementKind.chungNhan, refId: 'a1', achievedAt: at)]);
+    });
+    test('đã có thì không ghi lại', () => expect(certs([passedTest('a1', 1, stToday)], existing: {'chungNhan|a1'}), isEmpty));
+    test('đạt nhiều lần: ngày là lần đạt sớm nhất', () {
+      final early = stToday.subtract(const Duration(days: 3));
+      expect(certs([passedTest('a1', 1, stToday), passedTest('a1', 1, early)]),
+          [Achievement(kind: AchievementKind.chungNhan, refId: 'a1', achievedAt: early)]);
+    });
+    test('lần đạt sau lần trượt vẫn ra chứng nhận, ngày là lần đạt', () {
+      expect(certs([failedTest('a1', 1, at), passedTest('a1', 1, stToday)]),
+          [Achievement(kind: AchievementKind.chungNhan, refId: 'a1', achievedAt: stToday)]);
+    });
+    test('dòng lệch (passed=true mà điểm không đạt) không ra chứng nhận', () {
+      final ok = passedTest('a1', 1, at);
+      final mismatch = SkillTest(
+        id: ok.id, drillId: 'a1', drillLevel: 1, tableSize: ok.tableSize, startedAt: ok.startedAt,
+        completedAt: at, score: 2, attempts: 10, passed: true, passThreshold: 0.8,
+      );
+      expect(certs([mismatch]), isEmpty);
+    });
+    test('không có lần kiểm tra thì không có chứng nhận', () => expect(certs(const []), isEmpty));
+  });
 
   test('mốc chuỗi ngày đúng 7 / 14 / 30 / 60 / 100 (chủ sản phẩm chọn 15/10)', () {
     expect(streakMilestones, [7, 14, 30, 60, 100]);

@@ -231,11 +231,9 @@ class RoadmapSyncService {
     final at = _now();
     await _db.batch((batch) {
       for (final item in items) {
-        batch.insert(
-          _db.achievementRows,
-          achievementFromRemote(item! as Map<String, Object?>, userId: userId, syncedAt: at),
-          mode: InsertMode.insertOrIgnore,
-        );
+        final row = achievementFromRemote(item! as Map<String, Object?>, userId: userId, syncedAt: at);
+        if (row == null) continue;
+        batch.insert(_db.achievementRows, row, mode: InsertMode.insertOrIgnore);
       }
     });
   }
