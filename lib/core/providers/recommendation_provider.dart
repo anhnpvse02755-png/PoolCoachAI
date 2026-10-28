@@ -1,14 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 
-bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
-
 /// Today's recommendation computed from all data streams.
 ///
 /// Waits for all recommendation inputs and surfaces source errors to Home.
+/// The latest BU result only enriches the recommendation: when it errored the
+/// recommendation is computed without it (Roadmap and Rank still show that
+/// error). A BU that is reloading still counts as loading.
 final todayRecommendationProvider = Provider<AsyncValue<TodayRecommendation>>((
   ref,
 ) {
@@ -20,37 +22,17 @@ final todayRecommendationProvider = Provider<AsyncValue<TodayRecommendation>>((
   final matchesAsync = ref.watch(matchesProvider);
   final buAsync = ref.watch(latestBuResultProvider);
 
-  if (drillsAsync.hasError) {
-    return AsyncError(drillsAsync.error!, drillsAsync.stackTrace!);
-  }
-  if (knowledgeAsync.hasError) {
-    return AsyncError(knowledgeAsync.error!, knowledgeAsync.stackTrace!);
-  }
-  if (logsAsync.hasError) {
-    return AsyncError(logsAsync.error!, logsAsync.stackTrace!);
-  }
-  if (timerSessionsAsync.hasError) {
-    return AsyncError(
-      timerSessionsAsync.error!,
-      timerSessionsAsync.stackTrace!,
-    );
-  }
-  if (scheduleAsync.hasError) {
-    return AsyncError(scheduleAsync.error!, scheduleAsync.stackTrace!);
-  }
-  if (matchesAsync.hasError) {
-    return AsyncError(matchesAsync.error!, matchesAsync.stackTrace!);
-  }
-  if (buAsync.hasError) {
-    return AsyncError(buAsync.error!, buAsync.stackTrace!);
-  }
-  if (!drillsAsync.hasValue ||
-      !knowledgeAsync.hasValue ||
-      !logsAsync.hasValue ||
-      !timerSessionsAsync.hasValue ||
-      !scheduleAsync.hasValue ||
-      !_ready(matchesAsync) ||
-      !_ready(buAsync)) {
+  final blocked = gate<TodayRecommendation>([
+    drillsAsync,
+    knowledgeAsync,
+    logsAsync,
+    timerSessionsAsync,
+    scheduleAsync,
+    matchesAsync,
+  ]);
+  if (blocked != null) return blocked;
+  final buFailed = buAsync.hasError && !buAsync.isLoading;
+  if (!buFailed && gate<TodayRecommendation>([buAsync]) != null) {
     return const AsyncLoading();
   }
 
@@ -66,7 +48,7 @@ final todayRecommendationProvider = Provider<AsyncValue<TodayRecommendation>>((
       schedule: scheduleAsync.requireValue,
       today: today,
       matches: matchesAsync.requireValue,
-      latestBu: buAsync.value,
+      latestBu: buFailed ? null : buAsync.value,
     ),
   );
 });

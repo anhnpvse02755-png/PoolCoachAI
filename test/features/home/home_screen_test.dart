@@ -10,6 +10,7 @@ import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
@@ -38,6 +39,7 @@ void main() {
     GoalRecord? goal,
     PlayerRank? rank,
     BuResult? buResult,
+    Stream<List<BuTest>>? buTestsStream,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -50,6 +52,7 @@ void main() {
       goal: goal,
       rank: rank,
       buResult: buResult,
+      buTestsStream: buTestsStream,
     );
     addTearDown(container.dispose);
 
@@ -66,6 +69,14 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('bài BU đọc lỗi: Home vẫn hiện gợi ý, không báo lỗi', (tester) async {
+    await openHome(tester, buTestsStream: Stream.error(StateError('bu offline')));
+
+    expect(find.text(Vi.dataErrorTitle), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text(Vi.homeDrillTitle), findsOneWidget);
+  });
 
   testWidgets('chưa tập buổi nào thì chuỗi ngày tập là 0, hiện bình thường', (
     tester,

@@ -293,5 +293,50 @@ void main() {
       await settle();
       expect(container.read(latestBuResultProvider).hasError, isTrue);
     });
+
+    test('buTests lỗi: latestBu là AsyncError, không quay vòng mãi', () async {
+      final container = ProviderContainer(
+        overrides: [buTestsProvider.overrideWith((ref) => Stream.error(StateError('bu tests offline')))],
+      );
+      addTearDown(container.dispose);
+      container.listen(latestBuResultProvider, (_, _) {});
+      await settle();
+      final state = container.read(latestBuResultProvider);
+      expect(state.hasError, isTrue);
+      expect(state.error, isA<StateError>());
+    });
+
+    test('snapshot lỗi: latestBu là AsyncError', () async {
+      final done = BuTest(
+        id: 'ok', startedAt: at, tableSize: TableSize.nineFootPlus, completedAt: at,
+        examIScore: 60, examIIVersion: ExamIIVersion.masters, totalScore: 80,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          buTestsProvider.overrideWith((ref) => Stream.value([done])),
+          testSnapshotProvider.overrideWith((ref, id) => Stream.error(StateError('snapshot offline'))),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(latestBuResultProvider, (_, _) {});
+      await settle();
+      final state = container.read(latestBuResultProvider);
+      expect(state.hasError, isTrue);
+      expect(state.error, isA<StateError>());
+    });
+  });
+
+  test('danh sách trận lỗi: lộ trình là AsyncError', () async {
+    final container = testContainer(
+      goal: lenHangGoal(),
+      rank: rankH(),
+      matchesStream: Stream.error(StateError('matches offline')),
+    );
+    addTearDown(container.dispose);
+    container.listen(roadmapProvider, (_, _) {});
+    await settle();
+    final state = container.read(roadmapProvider);
+    expect(state.hasError, isTrue);
+    expect(state.error, isA<StateError>());
   });
 }

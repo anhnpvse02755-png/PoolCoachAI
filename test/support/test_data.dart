@@ -94,6 +94,7 @@ ProviderContainer testContainer({
   AuthRepository? auth,
   PlayerRank? rank,
   List<BuTest>? tests,
+  Stream<List<BuTest>>? buTestsStream,
   TestSnapshot? activeTest,
   GoalRecord? goal,
   List<Achievement>? achievements,
@@ -150,7 +151,7 @@ ProviderContainer testContainer({
       ),
       playerRankProvider.overrideWith((ref) => Stream.value(rank)),
       buTestsProvider.overrideWith(
-        (ref) => Stream.value(tests ?? const <BuTest>[]),
+        (ref) => buTestsStream ?? Stream.value(tests ?? const <BuTest>[]),
       ),
       activeTestProvider.overrideWith((ref) => Stream.value(activeTest)),
       goalProvider.overrideWith((ref) => Stream.value(goal)),

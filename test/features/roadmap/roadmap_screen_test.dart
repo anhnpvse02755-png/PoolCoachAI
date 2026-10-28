@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -302,5 +303,25 @@ void main() {
       scrollable: roadmapList,
     );
     expect(find.text(Vi.roadmapMissedTitle), findsOneWidget);
+  });
+
+  testWidgets('danh sách trận lỗi: Lộ trình báo lỗi đọc dữ liệu, không quay mãi', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      testContainer(
+        goal: goal(PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at)),
+        rank: PlayerRank(
+          rank: Rank.h,
+          source: RankSource.estimated,
+          onboardingState: OnboardingState.done,
+          updatedAt: at,
+        ),
+        matchesStream: Stream.error(StateError('matches offline')),
+      ),
+    );
+    expect(find.text(Vi.dataErrorTitle), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 }

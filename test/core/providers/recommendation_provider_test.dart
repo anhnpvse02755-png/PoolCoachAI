@@ -275,14 +275,25 @@ void main() {
       expect(result.error, isA<StateError>());
     });
 
-    test('lỗi ở BU thì chuyển lỗi', () async {
+    test('lỗi ở BU chỉ mất phần bổ sung: gợi ý vẫn tính, không báo lỗi', () async {
       final container = containerWith(
         latestBu: AsyncError<BuResult?>(StateError('bu offline'), StackTrace.empty),
       );
       await settle(container);
 
       final result = container.read(todayRecommendationProvider);
-      expect(result, isA<AsyncError<TodayRecommendation>>());
+      expect(result, isA<AsyncData<TodayRecommendation>>());
+    });
+
+    test('BU đang tải lại mà còn lỗi cũ vẫn tính là đang tải', () async {
+      // ignore: invalid_use_of_internal_member
+      final stale = const AsyncLoading<BuResult?>().copyWithPrevious(
+        AsyncError<BuResult?>(StateError('bu cũ'), StackTrace.empty),
+      );
+      final container = containerWith(latestBu: stale);
+      await settle(container);
+
+      expect(container.read(todayRecommendationProvider), isA<AsyncLoading<TodayRecommendation>>());
     });
 
     test('đủ năm nguồn thì tính ra gợi ý của người mới', () async {

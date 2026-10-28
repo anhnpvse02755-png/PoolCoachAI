@@ -1,9 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart' show computePlayerIntelligence, PlayerIntelligence;
-
-bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 
 /// Player intelligence computed from drills, logs, matches and the latest BU.
 ///
@@ -15,7 +14,7 @@ final playerIntelligenceProvider = Provider<PlayerIntelligence?>((ref) {
   final matches = ref.watch(matchesProvider);
   final bu = ref.watch(latestBuResultProvider);
 
-  if (![drills, logs, matches, bu].every(_ready)) return null;
+  if (gate<PlayerIntelligence>([drills, logs, matches, bu]) != null) return null;
 
   return computePlayerIntelligence(
     drills: drills.value!,

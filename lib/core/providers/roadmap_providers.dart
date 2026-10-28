@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
@@ -48,13 +49,17 @@ bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 /// [AsyncError] để màn hình báo lỗi thay vì Provider ném ra và treo vòng tải.
 final latestBuResultProvider = Provider<AsyncValue<BuResult?>>((ref) {
   final tests = ref.watch(buTestsProvider);
-  if (!_ready(tests)) return const AsyncLoading();
+  final testsGate = gate<BuResult?>([tests]);
+  if (testsGate != null) return testsGate;
   final id = latestCompletedTestId(tests.value!);
   if (id == null) return const AsyncData(null);
   final snapshot = ref.watch(testSnapshotProvider(id));
-  if (!_ready(snapshot)) return const AsyncLoading();
+  final snapshotGate = gate<BuResult?>([snapshot]);
+  if (snapshotGate != null) return snapshotGate;
   final value = snapshot.value;
-  if (value == null || !value.test.isCompleted || value.test.examIIVersion == null) {
+  if (value == null ||
+      !value.test.isCompleted ||
+      value.test.examIIVersion == null) {
     return const AsyncData(null);
   }
   try {
@@ -73,9 +78,8 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
   final tests = ref.watch(buTestsProvider);
   final result = ref.watch(latestBuResultProvider);
   final matches = ref.watch(matchesProvider);
-  if (![goal, rank, drills, logs, tests, result, matches].every(_ready)) {
-    return const AsyncLoading();
-  }
+  final blocked = gate<Roadmap?>([goal, rank, drills, logs, tests, result, matches]);
+  if (blocked != null) return blocked;
 
   final currentGoal = goal.value?.goal;
   if (currentGoal == null) return const AsyncData(null);
