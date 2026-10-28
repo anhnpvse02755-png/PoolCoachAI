@@ -2,10 +2,11 @@ import 'dart:ui' show Size;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart' show CircularProgressIndicator, ListTile, ListView, MaterialApp, Scaffold;
+import 'package:flutter/material.dart' show CircularProgressIndicator, FilledButton, ListTile, ListView, MaterialApp, Scaffold;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -264,6 +265,28 @@ void main() {
     await scrollThroughAll(tester);
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets('${width.toInt()} px, chữ thường, chưa có hạng: nút một dòng, cột chữ không bị chia đôi', (tester) async {
+      applyScreen(tester, Size(width, 640));
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      final container = testContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container, child: PoolCoachApp(router: router)));
+      await tester.pumpAndSettle();
+      final button = find.widgetWithText(FilledButton, Vi.rankDetermine);
+      expect(tester.getSize(button).height, lessThan(50));
+      final label = tester.getSize(find.text(Vi.rankDetermine));
+      expect(label.height, lessThan(24));
+      // Cột chữ nhận phần còn lại của hàng, không phải một nửa.
+      final column = tester.getSize(find.text(Vi.homeRankCardBody)).width;
+      final row = tester.getSize(find.byType(PcCard).first).width;
+      expect(column, greaterThan((row - tester.getSize(button).width) * 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('có bài sẵn sàng kiểm tra: một dòng mở thẳng màn kiểm tra', (tester) async {
     await openHome(tester, logs: threePasses('d1', before: testToday));

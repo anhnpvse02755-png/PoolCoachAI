@@ -137,6 +137,10 @@ void main() {
       tester.getTopLeft(find.text(Vi.certificationTitle)).dy,
       greaterThan(tester.getTopLeft(find.text(Vi.equipmentTitle)).dy),
     );
+    expect(
+      tester.getTopLeft(find.text(Vi.certificationTitle)).dy,
+      lessThan(tester.getTopLeft(find.text(Vi.rankHistoryTitle)).dy),
+    );
   });
 
   testWidgets('360×640 chữ lớn: Hồ sơ có chứng nhận không tràn', (tester) async {
@@ -147,6 +151,16 @@ void main() {
     );
     router.go(Routes.profile);
     await tester.pumpAndSettle();
+    final entry = find.text(
+      Vi.certificationEntry('Đường thẳng cơ bản', 1, testToday),
+    );
+    await tester.dragUntilVisible(
+      entry,
+      find.byType(ListView),
+      const Offset(0, -150),
+    );
+    expect(entry, findsOneWidget);
+    expect(tester.takeException(), isNull);
     await scrollThroughAll(tester);
     expect(tester.takeException(), isNull);
   });

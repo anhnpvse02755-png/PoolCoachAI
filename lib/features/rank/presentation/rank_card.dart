@@ -133,26 +133,51 @@ class HomeRankHeader extends ConsumerWidget {
       // Gọn một hàng: Trang chủ là chỗ của buổi tập hôm nay, thẻ hạng không
       // được đẩy chúng xuống dưới màn hình.
       child: PcCard(
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final texts = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(Vi.homeRankCardTitle, style: Theme.of(context).textTheme.titleSmall),
+                Text(Vi.homeRankCardBody, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            );
+            final button = FilledButton(
+              onPressed: () => context.push(Routes.onboardingRank),
+              child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
+            );
+            // Nút giữ độ rộng tự nhiên; hàng chỉ chuyển thành cột khi cột chữ
+            // không còn đủ chỗ (chữ lớn), không bao giờ chia đôi hàng.
+            final label = TextPainter(
+              text: TextSpan(
+                text: Vi.rankDetermine,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              textDirection: TextDirection.ltr,
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            const buttonPadding = 48.0;
+            const minTextWidth = 72.0;
+            final fitsInRow = label.width + buttonPadding + AppSpacing.sm + minTextWidth <=
+                box.maxWidth;
+            if (fitsInRow) {
+              return Row(
                 children: [
-                  Text(Vi.homeRankCardTitle, style: Theme.of(context).textTheme.titleSmall),
-                  Text(Vi.homeRankCardBody, style: Theme.of(context).textTheme.bodySmall),
+                  Expanded(child: texts),
+                  const SizedBox(width: AppSpacing.sm),
+                  button,
                 ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            // Flexible: ở chữ lớn nút tự xuống dòng thay vì đẩy hàng tràn phải.
-            Flexible(
-              child: FilledButton(
-                onPressed: () => context.push(Routes.onboardingRank),
-                child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
-              ),
-            ),
-          ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                texts,
+                const SizedBox(height: AppSpacing.sm),
+                button,
+              ],
+            );
+          },
         ),
       ),
     );
