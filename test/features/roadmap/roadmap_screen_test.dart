@@ -226,6 +226,8 @@ void main() {
         logs: logs,
       ),
     );
+    // Chưa có trận nào có ghi cú: bước đầu là Đấu tập, nút mở Thi đấu.
+    expect(find.text(Vi.stepRecordMatch), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text(Vi.roadmapMissedTitle),
       200,

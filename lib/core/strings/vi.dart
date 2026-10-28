@@ -1830,6 +1830,10 @@ abstract final class Vi {
         StepKind.buLe => 'Tập lại ${step.buDrillIds.join('/')} trên bàn BU',
         StepKind.baiTap => drillName ?? step.drillId!,
         StepKind.lamBaiBu => 'Làm bài BU',
+        StepKind.dauTap => () {
+          final r = step.reason as NotEnoughMatches;
+          return 'Đấu tập: ghi ít nhất ${r.need - r.have} trận có ghi cú';
+        }(),
       };
 
   static String stepProgress(int? mastery, int streak) =>
@@ -1854,6 +1858,11 @@ abstract final class Vi {
     RetestFrom(:final from) =>
       from == null ? 'Làm được ngay.' : 'Mở từ ngày ${shortDate(from)}.',
     NeedRank() => 'Làm bộ câu hỏi hoặc bài BU để có hạng.',
+    MatchWeakness(:final failures, :final attempts) =>
+      'Hỏng $failures/$attempts lần trong các trận gần đây.',
+    NotEnoughMatches(:final have, :final need) =>
+      'Có $have/$need trận có ghi cú trong '
+          '${MatchAnalysisConstants.matchWindowDays} ngày qua.',
   };
 
   static String estimateLine(Estimate estimate) => estimate.date == null
@@ -1861,6 +1870,7 @@ abstract final class Vi {
       : 'Dự kiến: ${shortDate(estimate.date!)}';
 
   static const stepTrain = 'Tập ngay';
+  static const stepRecordMatch = 'Ghi trận';
   static const stepOpenTest = 'Làm bài kiểm tra';
   static const roadmapMissedTitle = 'Không kịp trước giải';
   static const achievementsTitle = 'Thành tích';

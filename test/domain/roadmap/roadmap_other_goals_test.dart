@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
@@ -8,6 +10,7 @@ import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
+import '../../support/match_fixtures.dart';
 import '../../support/roadmap_fixtures.dart';
 
 void main() {
@@ -15,13 +18,20 @@ void main() {
       rank: Rank.h, source: RankSource.estimated,
       onboardingState: OnboardingState.done, updatedAt: on(10, 1));
 
-  Roadmap build(PlayerGoal goal, {List<DrillLog> logs = const [], BuResult? result}) => buildRoadmap(
+  Roadmap build(
+    PlayerGoal goal, {
+    List<DrillLog> logs = const [],
+    BuResult? result,
+    List<PoolMatch> matches = const [],
+  }) =>
+      buildRoadmap(
         goal: goal,
         rank: rank,
         drills: roadmapDrills,
         logs: logs,
         tests: const [],
         latestResult: result,
+        matches: matches,
         today: roadmapToday,
       );
 
@@ -75,17 +85,22 @@ void main() {
 
     test('bước có ngày sau ngày giải chuyển xuống không kịp; bước chưa đủ dữ liệu vẫn ở lại', () {
       final r = build(tournament(DateTime(2026, 10, 16)), logs: slowAiming);
-      expect(r.steps.first.category, SkillCategory.aiming);
-      expect(r.steps.first.status, StepStatus.khongKip);
+      expect(r.steps.first.kind, StepKind.dauTap);
+      expect(r.steps[1].category, SkillCategory.aiming);
+      expect(r.steps[1].status, StepStatus.khongKip);
       expect(r.missed.single.category, SkillCategory.aiming);
-      expect(r.steps[1].estimate!.date, isNull);
-      expect(r.steps[1].status, StepStatus.dangLam);
+      expect(r.steps[2].estimate!.date, isNull);
+      // Đấu tập đang giữ chỗ "đang làm"; bước này vẫn ở lại, chưa tới.
+      expect(r.steps.first.status, StepStatus.dangLam);
+      expect(r.steps[2].status, StepStatus.chuaToi);
       expect(r.steps.any((s) => s.kind == StepKind.lamBaiBu), isFalse);
     });
 
     test('ngày giải xa thì bước đó vẫn kịp', () {
       final r = build(tournament(DateTime(2027, 6, 1)), logs: slowAiming);
+      expect(r.steps.first.kind, StepKind.dauTap);
       expect(r.steps.first.status, StepStatus.dangLam);
+      expect(r.steps[1].status, StepStatus.chuaToi);
       expect(r.missed, isEmpty);
     });
 
@@ -95,7 +110,8 @@ void main() {
         logs: sessions('k1', 9, [on(10, 10), on(10, 11), on(10, 12)]),
         result: BuResult(testId: 't', completedAt: on(10, 1), total: 120, lost: const {'S5': 6, 'F3': 2, 'S9': 3}),
       );
-      expect(r.steps.map((s) => s.category), [
+      expect(r.steps.first.kind, StepKind.dauTap);
+      expect(r.steps.skip(1).map((s) => s.category), [
         SkillCategory.safety, // 6
         null, // S9: 3
         SkillCategory.position, // 2
@@ -112,8 +128,56 @@ void main() {
           ...sessions(id, 9, [on(10, 10), on(10, 11), on(10, 12)]),
       ];
       final r = build(tournament(DateTime(2027, 6, 1)), logs: logs);
-      expect(r.steps, isEmpty);
-      expect(r.achieved, isTrue);
+      // Chỉ còn bước Đấu tập (chưa có trận nào): chưa đạt.
+      expect(r.steps.map((s) => s.kind), [StepKind.dauTap]);
+      expect(r.achieved, isFalse);
+      final enough = build(tournament(DateTime(2027, 6, 1)),
+          logs: logs, matches: matchesWeakAt(SkillCategory.position, at: roadmapToday));
+      expect(enough.steps.map((s) => s.kind), [StepKind.nhom]);
+      expect(enough.steps.single.category, SkillCategory.position);
+      expect(enough.achieved, isFalse);
+      final none = build(tournament(DateTime(2027, 6, 1)), logs: logs, matches: [
+        for (var i = 0; i < 3; i++)
+          completedMatch('x$i', const [RackWinner.player], const [], at: roadmapToday)
+      ]);
+      expect(none.steps.map((s) => s.kind), [StepKind.dauTap]);
+    });
+
+    final lostAiming = BuResult(testId: 't', completedAt: on(10, 1), total: 120, lost: const {'F7': 20});
+    final weakPosition = matchesWeakAt(SkillCategory.position, at: roadmapToday);
+
+    test('ít hơn 3 trận có ghi cú trong 28 ngày: bước đầu là Đấu tập', () {
+      final recent = weakPosition.take(2).toList();
+      final old = completedMatch('old', weakPosition.first.rackWinners, weakPosition.first.shots,
+          at: roadmapToday.subtract(const Duration(days: 40)));
+      final noShots = completedMatch('ns', const [RackWinner.player], const [], at: roadmapToday);
+      final r = build(tournament(DateTime(2027, 6, 1)), matches: [...recent, old, noShots]);
+      expect(r.steps.first.kind, StepKind.dauTap);
+      final reason = r.steps.first.reason as NotEnoughMatches;
+      expect(reason.have, 2);
+      expect(reason.need, MatchAnalysisConstants.tournamentMinMatches);
+      expect(r.currentStep!.kind, StepKind.dauTap);
+      expect(recentRecordedMatches([...recent, old, noShots], roadmapToday), 2);
+    });
+
+    test('đủ trận: không có bước Đấu tập; nhóm yếu trong trận đứng đầu, trước nhóm mất điểm BU', () {
+      final r = build(tournament(DateTime(2027, 6, 1)), matches: weakPosition, result: lostAiming);
+      expect(r.steps.any((s) => s.kind == StepKind.dauTap), isFalse);
+      expect(r.steps.map((s) => s.category).take(2), [SkillCategory.position, SkillCategory.aiming]);
+      expect(r.steps.first.reason, isA<MatchWeakness>());
+      final reason = r.steps.first.reason as MatchWeakness;
+      expect(reason.attempts, greaterThanOrEqualTo(MatchAnalysisConstants.minAttempts));
+      expect(reason.failures, greaterThan(0));
+      expect(r.steps.where((s) => s.category == SkillCategory.position), hasLength(1));
+    });
+
+    test('nhóm yếu trong trận dù bài tập đã ≥ 75 vẫn chưa xong', () {
+      final logs = sessions('p1', 9, [on(10, 10), on(10, 11), on(10, 12)]);
+      final r = build(tournament(DateTime(2027, 6, 1)), logs: logs, matches: weakPosition);
+      final step = r.steps.firstWhere((s) => s.category == SkillCategory.position);
+      expect(step.reason, isA<MatchWeakness>());
+      expect(step.status, isNot(StepStatus.xong));
+      expect(r.steps.first, same(step));
     });
   });
 }

@@ -42,6 +42,14 @@ void main() {
     );
   });
 
+  test('lý do và tên của bước dùng dữ liệu trận', () {
+    expect(Vi.stepReason(const MatchWeakness(7, 12)), 'Hỏng 7/12 lần trong các trận gần đây.');
+    expect(Vi.stepReason(const NotEnoughMatches(1, 3)), 'Có 1/3 trận có ghi cú trong 28 ngày qua.');
+    expect(Vi.stepTitle(step(StepKind.dauTap, const NotEnoughMatches(1, 3))),
+        'Đấu tập: ghi ít nhất 2 trận có ghi cú');
+    expect(Vi.stepRecordMatch, 'Ghi trận');
+  });
+
   test('tên bước', () {
     expect(
       Vi.stepTitle(

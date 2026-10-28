@@ -3,6 +3,9 @@ import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/retest_gate.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/pace.dart';
@@ -20,12 +23,13 @@ Roadmap buildRoadmap({
   required List<BuTest> tests,
   required BuResult? latestResult,
   required DateTime today,
+  List<PoolMatch> matches = const [],
 }) {
   final facts = PracticeFacts(drills: drills, logs: logs, today: today);
   return switch (goal.kind) {
     GoalKind.lenHang => _lenHang(goal, rank, facts, tests, latestResult),
     GoalKind.thuanThucKyNang => _skill(goal, facts),
-    GoalKind.chuanBiGiai => _tournament(goal, facts, latestResult),
+    GoalKind.chuanBiGiai => _tournament(goal, facts, latestResult, matches),
   };
 }
 
@@ -140,7 +144,28 @@ Roadmap _skill(PlayerGoal goal, PracticeFacts facts) {
 
 /// Mọi nhóm dưới 75; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
 /// có bước làm BU; bước không kịp trước ngày giải xếp riêng (mục 4.3).
-Roadmap _tournament(PlayerGoal goal, PracticeFacts facts, BuResult? result) {
+Roadmap _tournament(
+  PlayerGoal goal,
+  PracticeFacts facts,
+  BuResult? result,
+  List<PoolMatch> matches,
+) {
+  final have = recentRecordedMatches(matches, facts.day);
+  final fromMatches = <RoadmapStep>[
+    if (have < MatchAnalysisConstants.tournamentMinMatches)
+      RoadmapStep(
+        kind: StepKind.dauTap,
+        status: StepStatus.chuaToi,
+        reason: NotEnoughMatches(have, MatchAnalysisConstants.tournamentMinMatches),
+      ),
+    // Nhóm yếu trong trận không bao giờ bắt đầu ở "xong": nó rời danh sách
+    // khi dữ liệu trận thôi đánh dấu.
+    for (final w in analyzeMatches(matches).weaknesses)
+      facts
+          .groupStep(w.category, MatchWeakness(w.failures, w.attempts))
+          .withStatus(StepStatus.chuaToi),
+  ];
+  final placed = {for (final s in fromMatches) s.category};
   final below = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList();
   final List<RoadmapStep> steps;
   if (result == null) {
@@ -154,7 +179,24 @@ Roadmap _tournament(PlayerGoal goal, PracticeFacts facts, BuResult? result) {
     ]..sort((a, b) => _byPointsThenWeakness(facts, a, b));
     steps = [for (final e in entries) _lostStep(facts, result, e)];
   }
-  return Roadmap(goal: goal, steps: placeSteps(facts, steps, eventDate: goal.eventDate));
+  return Roadmap(
+    goal: goal,
+    steps: placeSteps(
+      facts,
+      [...fromMatches, ...steps.where((s) => s.category == null || !placed.contains(s.category))],
+      eventDate: goal.eventDate,
+    ),
+  );
+}
+
+/// Số trận hoàn tất có ít nhất một cú ghi, kết thúc trong
+/// [MatchAnalysisConstants.matchWindowDays] ngày tính tới [today].
+int recentRecordedMatches(List<PoolMatch> matches, DateTime today) {
+  final from = DateTime(today.year, today.month, today.day - MatchAnalysisConstants.matchWindowDays);
+  return matches.where((m) {
+    if (!m.isComplete || m.shots.isEmpty) return false;
+    return !(m.completedAt ?? m.startedAt).isBefore(from);
+  }).length;
 }
 
 /// Đặt ngày dự kiến rồi trạng thái cho cả danh sách (mục 4.4, 4.5).

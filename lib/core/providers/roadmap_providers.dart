@@ -61,7 +61,8 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
   final logs = ref.watch(drillLogsProvider);
   final tests = ref.watch(buTestsProvider);
   final result = ref.watch(latestBuResultProvider);
-  if (![goal, rank, drills, logs, tests, result].every(_ready)) {
+  final matches = ref.watch(matchesProvider);
+  if (![goal, rank, drills, logs, tests, result, matches].every(_ready)) {
     return const AsyncLoading();
   }
 
@@ -75,6 +76,7 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
       logs: logs.value!,
       tests: tests.value!,
       latestResult: result.value,
+      matches: matches.value!,
       today: ref.watch(nowProvider)(),
     ),
   );

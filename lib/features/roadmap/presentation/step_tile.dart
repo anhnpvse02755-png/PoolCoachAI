@@ -34,6 +34,11 @@ class StepTile extends StatelessWidget {
           onPressed: () => context.push(Routes.rankTest),
           child: const Text(Vi.stepOpenTest),
         );
+      case StepKind.dauTap:
+        return FilledButton(
+          onPressed: () => context.go(Routes.play),
+          child: const Text(Vi.stepRecordMatch),
+        );
       case StepKind.xacDinhHang:
         return FilledButton(
           onPressed: () => context.push(Routes.onboardingRank),
