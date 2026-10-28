@@ -368,6 +368,9 @@ void main() {
         server.routes['GET /items/player_goals'] = (_) =>
             FakeDirectus.ok([bad]);
         expect(await roadmapService().syncNow(), SyncOutcome.failed);
+        // goal hỏng chặn cả lượt: không kéo thành tích, không lưu mục tiêu
+        expect(server.sent('GET', '/items/achievements'), isEmpty);
+        expect(await db.select(db.playerGoalRows).get(), isEmpty);
       },
     );
 
@@ -379,7 +382,13 @@ void main() {
         timerJson(cat: null, extra: {'cat_ext': unknownCategory}),
       ]);
       server.routes['GET /items/schedule_slots'] = (_) => FakeDirectus.ok([
-        slotJson(cat: null, extra: {'cat_ext': unknownCategory}),
+        slotJson(
+          cat: null,
+          extra: {
+            'cat_ext': unknownCategory,
+            'cat_ext_at': '2026-10-27T08:00:00.000Z',
+          },
+        ),
       ]);
       expect(await service().syncNow(), SyncOutcome.done);
       expect((await db.select(db.timerSessionRows).getSingle()).cat, isNull);
@@ -483,25 +492,47 @@ void main() {
           ...server.sent('PATCH', '/items/player_goals/u1'),
         ];
         expect([timers.length, slots.length, cues.length], [9, 9, 9]);
-        expect(goals, isNotEmpty);
+        expect(goals.length, 9);
+        const advanced = {'dungCo', 'nhayBi', 'matXe'};
         for (final r in [...timers, ...slots]) {
           final body = FakeDirectus.body(r);
           expect(body['cat'] == null || legacy.contains(body['cat']), isTrue,
               reason: '${body['cat']}');
+          // nhóm nâng cao chỉ đi bằng cat_ext; nhóm cơ bản thì cat_ext null
+          if (body['cat'] == null) {
+            expect(advanced, contains(body['cat_ext']));
+          } else {
+            expect(body['cat_ext'], isNull);
+          }
+        }
+        for (final r in slots) {
+          final body = FakeDirectus.body(r);
+          expect(
+            body['cat_ext_at'],
+            body['cat_ext'] == null ? isNull : body['updated_at'],
+          );
         }
         for (final r in cues) {
           final body = FakeDirectus.body(r);
-          expect(
-            (body['skill_categories'] as List).every(legacy.contains),
-            isTrue,
-          );
+          final skills = body['skill_categories'] as List;
+          expect(skills.every(legacy.contains), isTrue);
+          final ext = body['skill_categories_ext'] as List;
+          if (skills.isEmpty) {
+            expect(ext.length, 1);
+            expect(advanced, contains(ext.single));
+          } else {
+            expect(ext, isEmpty);
+          }
         }
         for (final r in goals) {
           final body = FakeDirectus.body(r);
           expect(body['category'] == null || legacy.contains(body['category']),
               isTrue);
-          if (body['category_ext'] != null) {
+          if (body['category'] == null) {
+            expect(advanced, contains(body['category_ext']));
             expect(body['kind'], isNull);
+          } else {
+            expect(body['category_ext'], isNull);
           }
         }
         // chín nhóm: mỗi nhóm nâng cao đi đúng một trường _ext

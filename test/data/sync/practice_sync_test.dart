@@ -465,7 +465,7 @@ void main() {
     }
 
     test(
-      'buổi tập Dựng cơ lên với cat null, cat_ext dungCo; Ngắm bi lên với cat aiming, cat_ext null',
+      'buổi tập Dựng cơ lên với cat null, cat_ext dungCo',
       () async {
         final adv = await pushedTimer(SkillCategory.dungCo);
         expect(adv, containsPair('cat', null));
@@ -625,9 +625,37 @@ void main() {
 
     test('cat_ext_at thiếu hoặc lệch: bỏ qua cat_ext', () async {
       const t1 = '2026-10-21T08:00:00.000Z';
+      const t2 = '2026-10-21T09:00:00.000Z';
       expect(
         (await pullSlot(remoteSlotAt(t1, catExt: 'dungCo'))).cat,
         isNull,
+      );
+      expect(
+        (await pullSlot(remoteSlotAt(t2, catExt: 'dungCo', catExtAt: t1))).cat,
+        isNull,
+      );
+    });
+
+    test('cat_ext_at cùng một thời điểm nhưng khác định dạng (…Z và …000+00:00): vẫn tin cat_ext', () async {
+      expect(
+        (await pullSlot(
+          remoteSlotAt(
+            '2026-10-21T08:00:00.000Z',
+            catExt: 'dungCo',
+            catExtAt: '2026-10-21T08:00:00.000+00:00',
+          ),
+        )).cat,
+        SkillCategory.dungCo,
+      );
+      expect(
+        (await pullSlot(
+          remoteSlotAt(
+            '2026-10-21T08:00:00+00:00',
+            catExt: 'nhayBi',
+            catExtAt: '2026-10-21T08:00:00Z',
+          ),
+        )).cat,
+        SkillCategory.nhayBi,
       );
     });
   });
