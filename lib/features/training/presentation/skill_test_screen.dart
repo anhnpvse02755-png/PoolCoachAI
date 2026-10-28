@@ -287,6 +287,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
 
   Widget _entryView(BuildContext context, SkillTestDrillState state) {
     final drill = state.drill;
+    final provenance = drillProvenanceOf(drill.id);
     return Form(
       key: _formKey,
       child: Column(
@@ -302,10 +303,8 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
                   : Vi.sessionScoreLabelTarget,
               hintText: drill.usesAttempts
                   ? Vi.sessionScoreHintAttempts
-                  : drillProvenanceOf(drill.id) != null
-                  ? Vi.sessionScoreHintShots(
-                      drillProvenanceOf(drill.id)!.shots,
-                    )
+                  : provenance != null
+                  ? Vi.sessionScoreHintShots(provenance.shots)
                   : Vi.sessionScoreHintTarget,
               suffixText: drill.unit,
             ),

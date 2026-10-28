@@ -41,9 +41,10 @@ enum ShotScoreError { notWhole, aboveShots }
 /// `null` với bài không có nguồn BU. Điểm âm hoặc không hữu hạn để cho
 /// các kiểm tra sẵn có xử lý.
 ShotScoreError? checkShotScore(Drill drill, num score) {
-  if (drillProvenanceOf(drill.id) == null) return null;
+  final provenance = drillProvenanceOf(drill.id);
+  if (provenance == null) return null;
   if (!score.isFinite || score < 0) return null;
   if (score != score.truncate()) return ShotScoreError.notWhole;
-  if (score > drill.target!) return ShotScoreError.aboveShots;
+  if (score > (drill.target ?? provenance.shots)) return ShotScoreError.aboveShots;
   return null;
 }

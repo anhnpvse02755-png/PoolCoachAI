@@ -30,7 +30,7 @@ void main() {
     container.listen(drillsProvider, (_, _) {});
     await pumpEventQueue();
 
-    expect(container.read(drillsProvider).value?.length, 10);
+    expect(container.read(drillsProvider).value?.length, 19);
   });
 
   test('khôi phục phiên trước khung đầu tiên', () async {

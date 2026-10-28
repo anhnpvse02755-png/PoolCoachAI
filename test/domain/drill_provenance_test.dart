@@ -69,6 +69,22 @@ void main() {
     expect(checkShotScore(_drill('d6', 1), 4), isNull); // bài cũ không đổi
   });
 
+  test('bài không target không dựng được (Drill assert), nên checkShotScore '
+      'không bao giờ gặp target rỗng ở bản debug', () {
+    expect(
+      () => Drill(
+        id: 'd11',
+        cat: SkillCategory.dungCo,
+        name: 'n',
+        level: 1,
+        unit: 'u',
+        goal: 'g',
+        steps: const [],
+      ),
+      throwsA(isA<AssertionError>()),
+    );
+  });
+
   test('điểm âm và không hữu hạn để cho kiểm tra có sẵn', () {
     final d = _drill('d11', drillProvenanceOf('d11')!.shots);
     expect(checkShotScore(d, -1), isNull);

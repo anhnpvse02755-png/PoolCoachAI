@@ -29,7 +29,7 @@ import '../../support/fake_directus.dart';
 // tên/mã mà chính bản này chưa biết — với bản đã phát hành đó là tên mới của plan 2026-10-29
 const unknownCategory = 'nhomTuongLai';
 // tên/mã mà chính bản này chưa biết — với bản đã phát hành đó là tên mới của plan 2026-10-29
-const unknownDrillId = 'd11';
+const unknownDrillId = 'd99';
 
 /// Bản đã phát hành chưa biết Giải đấu. Các test này chứng minh nó bỏ qua
 /// trường mới của Directus (tournament_id, round_label) và chỉ gửi khoá nó
