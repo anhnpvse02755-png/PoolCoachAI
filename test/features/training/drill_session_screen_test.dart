@@ -191,14 +191,16 @@ void main() {
     );
   });
 
-  group('bài BU đếm theo cú (d11: 3 cú)', () {
-    testWidgets('gợi ý Từ 0 đến 3', (tester) async {
+  group('bài BU đếm theo cú (d11)', () {
+    final shots = drillProvenanceOf('d11')!.shots;
+
+    testWidgets('gợi ý Từ 0 đến số cú của nguồn', (tester) async {
       await openSession(tester, 'd11');
-      expect(find.text(Vi.sessionScoreHintRange(3)), findsOneWidget);
+      expect(find.text(Vi.sessionScoreHintRange(shots)), findsOneWidget);
     });
 
     for (final (bad, err) in [
-      ('4', ShotScoreError.aboveShots),
+      ('${shots + 1}', ShotScoreError.aboveShots),
       ('2.5', ShotScoreError.notWhole),
     ]) {
       testWidgets('"$bad" bị từ chối, không ghi gì', (tester) async {
@@ -211,9 +213,9 @@ void main() {
       });
     }
 
-    testWidgets('"3" lưu được', (tester) async {
+    testWidgets('đủ số cú thì lưu được', (tester) async {
       final (db, _) = await openSession(tester, 'd11');
-      await fill(tester, Vi.sessionScoreLabelTarget, '3');
+      await fill(tester, Vi.sessionScoreLabelTarget, '$shots');
       await tester.tap(find.text(Vi.sessionSaveAction));
       await tester.pumpAndSettle();
       expect(await db.select(db.drillLogRows).get(), hasLength(1));

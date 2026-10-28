@@ -450,7 +450,32 @@ void main() {
       await tester.pumpAndSettle();
       final n = layoutsFor('S8', ExamIIVersion.masters).length;
       expect(find.textContaining('Sơ đồ 1 / $n'), findsOneWidget);
+      // quay lại: về đúng chi tiết bài, không rơi ra ngoài
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(LayoutGalleryScreen), findsNothing);
+      expect(find.text(Vi.drillOpenBuLayouts), findsOneWidget);
     });
+
+    for (final (id, version) in [
+      ('d14', ExamIIVersion.bachelors),
+      ('d18', ExamIIVersion.masters),
+    ]) {
+      testWidgets('nút Xem sơ đồ BU của $id mở đúng các sơ đồ S9 $version', (
+        tester,
+      ) async {
+        await openDrill(tester, id, drills: seedDrills);
+        await reveal(tester, find.text(Vi.drillOpenBuLayouts));
+        await tester.tap(find.text(Vi.drillOpenBuLayouts));
+        await tester.pumpAndSettle();
+        expect(find.byType(LayoutGalleryScreen), findsOneWidget);
+        final n = layoutsFor('S9', version).length;
+        expect(find.textContaining('Sơ đồ 1 / $n'), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(find.byType(LayoutGalleryScreen), findsNothing);
+      });
+    }
 
     for (final id in ['d12', 'd14', 'd18']) {
       testWidgets('360×640 chữ lớn: $id không tràn', (tester) async {
