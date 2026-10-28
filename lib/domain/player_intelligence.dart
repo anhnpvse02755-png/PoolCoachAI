@@ -171,7 +171,7 @@ int consecutivePassCount(Drill drill, List<DrillLog> logs) {
 /// Nhóm có nằm trong phạm vi gợi ý, danh sách yếu và Lộ trình tự động không.
 ///
 /// Nhóm cơ bản luôn trong phạm vi; nhóm nâng cao (spec 2026-10-29 §3) chỉ
-/// vào khi đã có ít nhất một buổi tập.
+/// vào khi đã có ít nhất một buổi có điểm.
 bool categoryInScope(
   SkillCategory c,
   Map<SkillCategory, CategoryInsight> categories,

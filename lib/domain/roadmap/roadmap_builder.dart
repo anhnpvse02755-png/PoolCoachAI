@@ -85,7 +85,8 @@ RoadmapStep _milestone(Rank r, DateTime? retestFrom, {required bool retake}) => 
       reason: RankMilestone(r, from: retestFrom, retake: retake),
     );
 
-/// Nhóm dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
+/// Nhóm trong phạm vi (nhóm cơ bản, hoặc nhóm nâng cao đã có buổi có điểm)
+/// mà dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
 List<RoadmapStep> _weakGroups(PracticeFacts facts) {
   final weak = SkillCategory.values
       .where((c) => facts.inScope(c) && !facts.atLeastStrong(c))
@@ -181,7 +182,7 @@ Roadmap _skill(PlayerGoal goal, PracticeFacts facts) {
   return Roadmap(goal: goal, steps: placeSteps(facts, steps));
 }
 
-/// Mọi nhóm dưới 75; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
+/// Mọi nhóm dưới 75 trong phạm vi, cộng nhóm nâng cao đang mất điểm BU; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
 /// có bước làm BU; bước không kịp trước ngày giải xếp riêng (mục 4.3).
 Roadmap _tournament(
   PlayerGoal goal,
@@ -205,13 +206,12 @@ Roadmap _tournament(
           .withStatus(StepStatus.chuaToi),
   ];
   final placed = {for (final s in fromMatches) s.category};
+  final lostByCat = result == null ? null : lostByCategory(result);
   final below = SkillCategory.values
       .where(
         (c) =>
             !facts.atLeastStrong(c) &&
-            (facts.inScope(c) ||
-                (result != null &&
-                    (lostByCategory(result).byCategory[c] ?? 0) > 0)),
+            (facts.inScope(c) || (lostByCat?.byCategory[c] ?? 0) > 0),
       )
       .toList();
   final List<RoadmapStep> steps;
