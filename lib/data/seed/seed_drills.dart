@@ -235,6 +235,7 @@ Drill _nhayBi(String id) => _buShotDrill(
     if (!_isDoctorate(id))
       'Cú nhảy bi hay chạm bi mục tiêu dày hơn dự tính, vì bi cái còn đang nảy lúc chạm bi.',
     'Lỗi hay gặp: đâm cơ quá thẳng xuống làm bi cái không nhảy mà trượt cơ; đánh quá mạnh làm mất kiểm soát hướng bi cái sau khi bi tiếp đất. Cách sửa: tập nâng cơ từ thấp lên cao dần, tìm độ nâng thấp nhất vẫn đủ để bi cái nhảy qua bi chướng ngại.',
+    'Nhảy bi dễ làm rách nỉ nếu sai kỹ thuật; chỉ nên luyện trên bàn tập hoặc nỉ cũ.',
     'Nhiều giải giới hạn hoặc cấm cơ nhảy chuyên dụng; xem luật trước khi dùng.',
     _s9Scoring(id),
   ],

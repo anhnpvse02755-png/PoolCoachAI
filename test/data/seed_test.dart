@@ -164,9 +164,8 @@ void main() {
     test('cảnh báo nỉ/bàn có ở mọi bài Nhảy bi và Mát xê, không có ở Dựng cơ', () {
       for (final d in seedDrills.where((d) => d.cat.isAdvanced)) {
         final t = d.steps.join(' ');
-        final warns = t.contains('Nhiều giải giới hạn') ||
-            t.contains('rách nỉ');
-        expect(warns, d.cat != SkillCategory.dungCo, reason: d.id);
+        expect(t.contains('rách nỉ'), d.cat != SkillCategory.dungCo,
+            reason: d.id);
       }
     });
   });
