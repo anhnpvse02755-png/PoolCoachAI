@@ -180,7 +180,7 @@ try {
 
   step(3, 'Bắt đầu trận Tứ kết trong giải, thắng 3 ván');
   await tab.click(NAME);
-  await tab.waitForText('Đang diễn ra');
+  await tab.waitForText('Tổng kết'); // chỉ có ở màn chi tiết (danh sách cũng có 'Đang diễn ra')
   await tab.click('Bắt đầu trận trong giải');
   await tab.type('Tên của bạn', 'An');
   await tab.type('Tên đối thủ', 'Bình');
@@ -199,7 +199,7 @@ try {
   await tab.goto(`${APP}/play/tournaments`);
   await scrollUntilText(NAME);
   await tab.click(NAME);
-  await tab.waitForText('Thắng 1 – thua 0 trận');
+  await tab.waitForText('Tỷ lệ ván thắng'); // chỉ ở chi tiết; dòng 'Thắng 1 – thua 0 trận' cũng có ở danh sách
   const detail = await scrollUntilText('Kết quả do bạn ghi');
   for (const piece of [
     'Thắng 1 – thua 0 trận',
@@ -248,7 +248,7 @@ try {
   }
   await check(listText.includes(UP), `Danh sách giải có ${UP}`);
   await tab.click(UP);
-  await tab.waitForText('Sắp tới');
+  await tab.waitForText('Chuẩn bị cho giải này'); // nút chỉ có ở chi tiết ('Sắp tới' cũng là tiêu đề nhóm ở danh sách)
   await tab.click('Chuẩn bị cho giải này');
   await tab.waitForText('Đang chuẩn bị cho giải này');
   await tab.click('Mở Lộ trình');

@@ -90,6 +90,10 @@ Sai bất kỳ điều kiện nào thì bỏ qua liên kết và hiển thị nh
 
 **Tương thích bản cũ:** bản cũ kéo `pool_matches` và `player_goals` sẽ gặp trường lạ. Plan phải có test chứng minh bộ chuyển đổi bỏ qua trường lạ. Khi bản cũ sửa một trận, nó gửi PATCH không có `tournament_id`, nên liên kết trên server được giữ.
 
+**Hai giới hạn đã chấp nhận (quyết định của Claude, sau review cuối nhánh):**
+- **M2.** Máy dùng bản cũ sửa mục tiêu khi **đang offline** rồi nâng cấp: bản mục tiêu cũ đó (không có `tournament_id`) có thể thắng ở "mới nhất thắng" và xóa liên kết mà máy khác đã đặt. Chi phí: thỉnh thoảng mất một liên kết mục tiêu–giải; các trận vẫn còn nguyên, và người chơi bấm lại "Chuẩn bị cho giải này" (nếu mục tiêu đúng ngày giải thì chỉ gắn lại, xem §5.3).
+- **M7.** `game_type` lạ (do bản mới hơn thêm loại bi) bị bản này đọc thành rỗng, và khi sửa giải ở máy này thì ghi `null` đè lên. Nhất quán với cách xử lý trường lạ ở chỗ khác. Chi phí: không có gì cho tới khi có bản app thêm loại bi mới.
+
 ### 4.5 Đăng xuất
 
 Đăng xuất xóa `tournament_rows` cùng các bảng khác. Giải chưa đồng bộ được tính vào cảnh báo "dữ liệu chưa đồng bộ".
@@ -115,6 +119,8 @@ Sai bất kỳ điều kiện nào thì bỏ qua liên kết và hiển thị nh
    - **"Chuẩn bị cho giải này"** (khi giải còn `sapToi`): đặt mục tiêu `chuanBiGiai` với `eventDate = start_date` và `tournament_id`.
      - Nếu đã có mục tiêu khác, hỏi xác nhận thay, giống bộ chọn mục tiêu hiện có.
      - Nếu mục tiêu hiện tại đã nối với chính giải này: hiện "Đang chuẩn bị cho giải này" và nút mở Lộ trình.
+     - **Chỉ gắn giải** (quyết định của Claude): nếu mục tiêu hiện tại đã là `chuanBiGiai` đúng ngày bắt đầu của giải này nhưng chưa nối giải nào, bấm "Chuẩn bị cho giải này" chỉ gắn `tournament_id` vào mục tiêu đó: không hỏi xác nhận, không đổi `goalId` hay `createdAt`, không tính lại Lộ trình từ đầu.
+     - **Sửa ngày bắt đầu của giải đang nối** (quyết định của Claude): khi lưu, ngày của mục tiêu đi theo ngày bắt đầu mới, trong cùng một giao dịch với việc sửa giải. Giữ `goalId` và `createdAt`, đánh dấu chờ đồng bộ. Chỉ áp dụng khi liên kết đang hợp lệ theo §4.3 ngay trước khi sửa. Lý do: nếu không, liên kết gãy ngầm (lộ trình vẫn lập cho ngày cũ) và bấm lại "Chuẩn bị" sẽ đặt lại mục tiêu.
 4. **Form bắt đầu trận / sửa trận** (Play) thêm hai trường tùy chọn:
    - **"Giải đấu"** là danh sách chọn.
      - Khi bắt đầu trận, danh sách gồm các giải chưa xóa có `start_date` ≤ hôm nay và kết thúc trong 7 ngày gần đây, tức `(end_date ?? start_date)` ≥ hôm nay − 7.
