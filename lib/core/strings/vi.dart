@@ -1868,7 +1868,7 @@ abstract final class Vi {
   static String signOutPendingCoach(int count) =>
       'Còn $count lần làm tình huống Coach chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
   static String signOutPendingPractice(int count) =>
-      'Còn $count trận, buổi tập tự do hoặc lịch tập chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
+      'Còn $count trận, giải đấu, buổi tập tự do hoặc lịch tập chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
   static String signOutPendingEquipment(int count) =>
       'Còn $count hồ sơ cơ chưa đồng bộ — đăng xuất bây giờ sẽ mất.';
 

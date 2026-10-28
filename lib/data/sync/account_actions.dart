@@ -78,6 +78,9 @@ Future<void> signOutAndForget({
   await (db.delete(
     db.poolMatchRows,
   )..where((t) => t.userId.equals(userId))).go();
+  await (db.delete(
+    db.tournamentRows,
+  )..where((t) => t.userId.equals(userId))).go();
   // Hạng và bài kiểm tra cũng là dữ liệu riêng của người này.
   await (db.delete(
     db.playerRankRows,
@@ -157,7 +160,8 @@ Future<int> pendingCueEquipmentCount(AppDatabase db, String userId) async {
   return rows.length;
 }
 
-/// Trận đấu, buổi tập tự do và khung lịch tập của [userId] chưa lên server.
+/// Trận đấu, giải đấu (kể cả đã xóa mềm), buổi tập tự do và khung lịch tập
+/// của [userId] chưa lên server.
 /// Dòng không có chủ không tính: chúng không bao giờ được đẩy lên.
 Future<int> pendingPracticeCount(AppDatabase db, String userId) async {
   final matches = await (db.select(
@@ -169,7 +173,10 @@ Future<int> pendingPracticeCount(AppDatabase db, String userId) async {
   final slots = await (db.select(
     db.scheduleSlotRows,
   )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
-  return matches.length + timers.length + slots.length;
+  final tournaments = await (db.select(
+    db.tournamentRows,
+  )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
+  return matches.length + tournaments.length + timers.length + slots.length;
 }
 
 /// [userId] có lần kiểm tra đang làm dở trên máy này không.

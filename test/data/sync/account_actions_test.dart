@@ -572,4 +572,49 @@ void main() {
         );
     expect(await pendingAssessmentCount(db, 'u1'), 1);
   });
+
+  Future<void> addTournament(
+    String id,
+    String userId, {
+    DateTime? syncedAt,
+    bool isDeleted = false,
+  }) => db
+      .into(db.tournamentRows)
+      .insert(
+        TournamentRowsCompanion.insert(
+          id: id,
+          userId: userId,
+          name: 'Giải $id',
+          startDate: DateTime(2026, 11, 2),
+          createdAt: DateTime(2026, 10, 28),
+          updatedAt: DateTime(2026, 10, 28),
+          syncedAt: Value(syncedAt),
+          isDeleted: Value(isDeleted),
+        ),
+      );
+
+  test('đăng xuất xoá giải của người đó, giữ của người khác', () async {
+    await addTournament('t-u1', 'u1');
+    await addTournament('t-u2', 'u2');
+    await signOutAndForget(
+      db: db,
+      auth: FakeAuthRepository.signedIn(userId: 'u1'),
+      userId: 'u1',
+      forgetChatInFlight: (_) {},
+    );
+    expect((await db.select(db.tournamentRows).get()).map((r) => r.id), [
+      't-u2',
+    ]);
+  });
+
+  test(
+    'giải chưa đồng bộ (kể cả đã xóa mềm) tính vào phần luyện tập',
+    () async {
+      await addTournament('cho', 'u1');
+      await addTournament('xoa', 'u1', isDeleted: true);
+      await addTournament('da', 'u1', syncedAt: DateTime(2026, 10, 28, 12));
+      await addTournament('khac', 'u2');
+      expect(await pendingPracticeCount(db, 'u1'), 2);
+    },
+  );
 }
