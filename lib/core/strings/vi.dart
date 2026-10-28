@@ -1935,6 +1935,7 @@ abstract final class Vi {
   static String coachRecReason(CoachTopicReason reason, CoachTopic topic) => switch (reason) {
     CoachTopicReason.sameAsToday => 'Cùng nhóm với gợi ý hôm nay: ${coachTopic(topic)}.',
     CoachTopicReason.weakest => '${coachTopic(topic)} là nhóm yếu nhất có tình huống để luyện.',
+    CoachTopicReason.matchWeakness => '${coachTopic(topic)} đang yếu trong các trận gần đây.',
     CoachTopicReason.lowest => 'Bắt đầu với ${coachTopic(topic)}.',
   };
 

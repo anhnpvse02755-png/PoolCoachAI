@@ -11,6 +11,10 @@ enum CoachTopicReason {
   /// Cùng nhóm với gợi ý hôm nay ở Trang chủ.
   sameAsToday,
 
+  /// Nhóm yếu trong các trận gần đây (gợi ý hôm nay hoặc nhóm yếu trong trận
+  /// đầu tiên có tình huống).
+  matchWeakness,
+
   /// Nhóm yếu nhất có tình huống.
   weakest,
 
@@ -57,9 +61,18 @@ CoachRecommendation computeCoachRecommendation({
   late final CoachTopic topic;
   late final CoachTopicReason reason;
   final weakTopic = pi.weak.map(coachTopicOf).whereType<CoachTopic>().firstOrNull;
+  final matchTopic = pi.matchWeak
+      .map((s) => coachTopicOf(s.category))
+      .whereType<CoachTopic>()
+      .firstOrNull;
   if (todayTopic != null) {
     topic = todayTopic;
-    reason = CoachTopicReason.sameAsToday;
+    reason = today!.reason == PickReason.matchWeakness
+        ? CoachTopicReason.matchWeakness
+        : CoachTopicReason.sameAsToday;
+  } else if (matchTopic != null) {
+    topic = matchTopic;
+    reason = CoachTopicReason.matchWeakness;
   } else if (weakTopic != null) {
     topic = weakTopic;
     reason = CoachTopicReason.weakest;
