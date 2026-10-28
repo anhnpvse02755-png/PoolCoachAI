@@ -7,6 +7,7 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../../support/assessment_fixtures.dart';
+import '../../support/roadmap_fixtures.dart';
 
 void main() {
   group('bảng nối 18 bài BU vào 6 nhóm (spec mục 5, chủ sản phẩm duyệt 15/10)', () {
@@ -93,6 +94,15 @@ void main() {
       expect(r.lost.length, 18);
     });
 
+    test('buResultFrom điền max của từng bài', () {
+      final r = buResultFrom(snapshot);
+      expect(r.max['F7'], 20);
+      expect(r.max['F1'], 10);
+      expect(r.max['S1'], 7);
+      expect(r.max['S10'], 5);
+      expect(r.max.length, 18);
+    });
+
     test('cộng dồn theo nhóm; S8, S9 tính riêng', () {
       final r = BuResult(
         testId: 't',
@@ -117,6 +127,33 @@ void main() {
       final lost = lostByCategory(r);
       final sum = lost.byCategory.values.fold(0, (s, v) => s + v) + lost.unmapped;
       expect(sum, r.lost.values.fold(0, (s, v) => s + v));
+    });
+  });
+
+  group('điểm BU theo nhóm', () {
+    test('buCategoryPercent theo bản đã làm, S8/S9 không tính', () {
+      final r = buResultGraded(
+        completedAt: DateTime(2026, 10, 1),
+        // aiming: F1 10 + F6 10 + F7 20 + S1 7 + S2 11 = 58; mất 30 -> 28
+        // position: F2-F5 40 + F8 20 + S3 12 + S4 12 = 84; mất 21 -> 63
+        // safety: S5 10; mất 0 -> 100. S8/S9 mất hết nhưng bị bỏ qua.
+        lost: const {
+          'F7': 20, 'F6': 10, 'F2': 10, 'F8': 11, 'S8': 5, 'S9': 5,
+        },
+      );
+      final p = buCategoryPercent(r);
+      expect(p[SkillCategory.aiming], 48);
+      expect(p[SkillCategory.position], 75);
+      expect(p[SkillCategory.safety], 100);
+      expect(p[SkillCategory.kick], 100);
+      expect(p[SkillCategory.bank], 100);
+      expect(p[SkillCategory.breakShot], 100);
+    });
+
+    test('kết quả không có max: không nhóm nào có phần trăm', () {
+      final r = BuResult(
+          testId: 't', completedAt: DateTime(2026, 10, 1), total: 100, lost: const {'F7': 20});
+      expect(buCategoryPercent(r), isEmpty);
     });
   });
 }

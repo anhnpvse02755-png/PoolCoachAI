@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
@@ -81,6 +84,8 @@ void main() {
         scheduleProvider.overrideWith(
           (ref) => scheduleStream ?? Stream.value(const <ScheduleSlot>[]),
         ),
+        matchesProvider.overrideWith((ref) => Stream.value(const <PoolMatch>[])),
+        latestBuResultProvider.overrideWithValue(const AsyncData<BuResult?>(null)),
       ],
     );
     addTearDown(container.dispose);

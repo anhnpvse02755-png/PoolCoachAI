@@ -1,6 +1,7 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart' show percentOf;
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/bu_category_map.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -16,7 +17,9 @@ final class BuResult {
     required this.completedAt,
     required this.total,
     required Map<String, int> lost,
-  }) : lost = Map.unmodifiable(lost);
+    Map<String, int> max = const {},
+  })  : lost = Map.unmodifiable(lost),
+        max = Map.unmodifiable(max);
 
   final String testId;
   final DateTime completedAt;
@@ -24,6 +27,9 @@ final class BuResult {
 
   /// 'F1'…'S10' → tối đa của bản đã làm trừ điểm đạt.
   final Map<String, int> lost;
+
+  /// 'F1'…'S10' → điểm tối đa của bản đã làm. Rỗng khi không biết.
+  final Map<String, int> max;
 }
 
 /// Điểm mất từng bài của một lần đã hoàn tất (spec mục 4.1 bước 3).
@@ -38,6 +44,7 @@ BuResult buResultFrom(TestSnapshot s) {
     testId: test.id,
     completedAt: test.completedAt!,
     total: test.totalScore ?? s.scoreOf(drills),
+    max: {for (final d in drills) d.id: d.maxScore},
     lost: lost,
   );
 }
@@ -83,3 +90,20 @@ List<String> lostDrillsIn(BuResult r, SkillCategory c) => [
       for (final MapEntry(key: id, value: cat) in buDrillCategory.entries)
         if (cat == c && (r.lost[id] ?? 0) > 0) id,
     ];
+
+/// Phần trăm điểm đạt theo nhóm: (tối đa − mất) / tối đa, cộng qua các bài của
+/// nhóm. Nhóm không có điểm tối đa thì vắng mặt; S8, S9 không tính.
+Map<SkillCategory, int> buCategoryPercent(BuResult r) {
+  final maxByCat = <SkillCategory, int>{};
+  final lostByCat = <SkillCategory, int>{};
+  for (final MapEntry(key: id, value: cat) in buDrillCategory.entries) {
+    final max = r.max[id] ?? 0;
+    if (cat == null || max <= 0) continue;
+    maxByCat[cat] = (maxByCat[cat] ?? 0) + max;
+    lostByCat[cat] = (lostByCat[cat] ?? 0) + (r.lost[id] ?? 0);
+  }
+  return {
+    for (final MapEntry(key: cat, value: max) in maxByCat.entries)
+      cat: percentOf(max - lostByCat[cat]!, max)!,
+  };
+}

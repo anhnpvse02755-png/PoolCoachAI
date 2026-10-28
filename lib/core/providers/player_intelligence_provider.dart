@@ -1,19 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart' show computePlayerIntelligence, PlayerIntelligence;
 
-/// Player intelligence computed from drills and logs.
+bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
+
+/// Player intelligence computed from drills, logs, matches and the latest BU.
 ///
-/// Waits for both streams to have loaded — returns null during loading.
+/// Returns null until every source is loaded and is not the previous
+/// account's stale value (hasValue && !isLoading).
 final playerIntelligenceProvider = Provider<PlayerIntelligence?>((ref) {
-  final drillsAsync = ref.watch(drillsProvider);
-  final logsAsync = ref.watch(drillLogsProvider);
+  final drills = ref.watch(drillsProvider);
+  final logs = ref.watch(drillLogsProvider);
+  final matches = ref.watch(matchesProvider);
+  final bu = ref.watch(latestBuResultProvider);
 
-  final drills = drillsAsync.hasValue ? drillsAsync.value : null;
-  final logs = logsAsync.hasValue ? logsAsync.value : null;
+  if (![drills, logs, matches, bu].every(_ready)) return null;
 
-  // Not ready until both streams have loaded at least once
-  if (drills == null || logs == null) return null;
-
-  return computePlayerIntelligence(drills: drills, logs: logs);
+  return computePlayerIntelligence(
+    drills: drills.value!,
+    logs: logs.value!,
+    matches: matches.value!,
+    latestBu: bu.value,
+  );
 });

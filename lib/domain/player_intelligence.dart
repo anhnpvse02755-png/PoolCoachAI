@@ -3,7 +3,10 @@ import 'dart:math' as math;
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Xu hướng của một nhóm kỹ năng theo thời gian.
@@ -89,6 +92,9 @@ class CategoryInsight {
   final int sessionCount;
 }
 
+/// Nhóm yếu đến từ đâu: điểm mastery của bài tập, hay điểm BU.
+enum WeakSource { drills, bu }
+
 /// Bức tranh trình độ người chơi, tính hoàn toàn bằng công thức xác định.
 ///
 /// Đây là object mà lớp Coach (LLM) sẽ nhận làm ngữ cảnh ở giai đoạn sau.
@@ -101,6 +107,9 @@ class PlayerIntelligence {
     required this.strong,
     required this.readyDrillIds,
     required this.hasAnyData,
+    this.matchWeak = const [],
+    this.buPercent = const {},
+    this.weakSources = const {},
   });
 
   /// Mọi nhóm kỹ năng đều có mặt, kể cả nhóm chưa tập buổi nào.
@@ -117,6 +126,15 @@ class PlayerIntelligence {
 
   /// Đã có bất kỳ buổi tập nào chưa.
   final bool hasAnyData;
+
+  /// Nhóm yếu trong các trận gần đây. Không trộn vào mastery (spec 6.3).
+  final List<SkillSignal> matchWeak;
+
+  /// Phần trăm điểm BU gần nhất theo nhóm; rỗng khi chưa có BU.
+  final Map<SkillCategory, int> buPercent;
+
+  /// Nguồn của từng nhóm trong [weak].
+  final Map<SkillCategory, WeakSource> weakSources;
 }
 
 /// Đã đủ điều kiện mở cấp tiếp theo của bài này chưa.
@@ -151,6 +169,8 @@ int consecutivePassCount(Drill drill, List<DrillLog> logs) {
 PlayerIntelligence computePlayerIntelligence({
   required List<Drill> drills,
   required List<DrillLog> logs,
+  List<PoolMatch> matches = const [],
+  BuResult? latestBu,
 }) {
   final drillById = {for (final d in drills) d.id: d};
 
@@ -194,6 +214,18 @@ PlayerIntelligence computePlayerIntelligence({
       .toList()
     ..sort((a, b) => b.value.mastery!.compareTo(a.value.mastery!));
 
+  // Nhóm chưa có mastery thì mới xét điểm BU; có mastery thì chỉ tin mastery.
+  final buPercent = latestBu == null
+      ? const <SkillCategory, int>{}
+      : buCategoryPercent(latestBu);
+  final buWeak = [
+    for (final cat in SkillCategory.values)
+      if (categories[cat]!.mastery == null &&
+          buPercent[cat] != null &&
+          buPercent[cat]! < PracticeConstants.weakCutoff)
+        cat,
+  ]..sort((a, b) => buPercent[a]!.compareTo(buPercent[b]!));
+
   final readyDrillIds = <String>[];
   for (final entry in logsByDrill.entries) {
     final drill = drillById[entry.key];
@@ -204,9 +236,15 @@ PlayerIntelligence computePlayerIntelligence({
 
   return PlayerIntelligence(
     categories: categories,
-    weak: weak.map((e) => e.key).toList(),
+    weak: [...weak.map((e) => e.key), ...buWeak],
     strong: strong.map((e) => e.key).toList(),
     readyDrillIds: readyDrillIds,
     hasAnyData: logsByDrill.isNotEmpty,
+    matchWeak: analyzeMatches(matches).weaknesses,
+    buPercent: Map.unmodifiable(buPercent),
+    weakSources: {
+      for (final e in weak) e.key: WeakSource.drills,
+      for (final c in buWeak) c: WeakSource.bu,
+    },
   );
 }

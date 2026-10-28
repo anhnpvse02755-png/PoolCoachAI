@@ -1,5 +1,8 @@
+import 'package:poolcoachai/domain/assessment/bu_exams.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Hôm nay cố định cho các test Lộ trình.
@@ -42,3 +45,20 @@ List<DrillLog> sessions(String drillId, int made, List<DateTime> days) => [
 
 /// Ngày [day] của tháng [month] năm 2026, 9 giờ sáng.
 DateTime on(int month, int day) => DateTime(2026, month, day, 9);
+
+/// Kết quả BU có đủ điểm tối đa của Đề I + Đề II bản Thạc sĩ.
+BuResult buResultGraded({
+  required DateTime completedAt,
+  Map<String, int> lost = const {},
+  int total = 100,
+}) =>
+    BuResult(
+      testId: 't-graded',
+      completedAt: completedAt,
+      total: total,
+      lost: lost,
+      max: {
+        for (final d in [...examIDrills, ...examIIDrills(ExamIIVersion.masters)])
+          d.id: d.maxScore,
+      },
+    );
