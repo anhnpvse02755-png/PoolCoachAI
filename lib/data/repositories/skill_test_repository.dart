@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
+import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/skill_test_converters.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
-import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
 
@@ -59,7 +59,6 @@ class SkillTestRepository {
   Future<SkillTestOutcome> completeTest({
     required Drill drill,
     required List<Drill> drills,
-    required List<DrillLog> logs,
     required TableSize tableSize,
     required DateTime startedAt,
     required num score,
@@ -74,10 +73,16 @@ class SkillTestRepository {
       final rows = await (_db.select(
         _db.skillTestRows,
       )..where((t) => t.userId.equals(_userId))).get();
+      // Buổi tập đọc trong cùng giao dịch với cổng: không tin danh sách từ
+      // người gọi, và không có khe hở giữa kiểm tra và ghi.
+      final logRows = await (_db.select(_db.drillLogRows)
+            ..where((t) => t.userId.equals(_userId))
+            ..orderBy([(t) => OrderingTerm.asc(t.date)]))
+          .get();
       final gate = skillTestGate(
         drill: drill,
         drills: drills,
-        logs: logs,
+        logs: [for (final l in logRows) toDrillLog(l)],
         tests: _usable(rows),
       );
       if (gate is! SkillTestOpen) return SkillTestLocked(gate);

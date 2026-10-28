@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/assessment_converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/skill_test_converters.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
@@ -11,13 +12,15 @@ import 'package:poolcoachai/domain/assessment/rank_merge.dart';
 import 'package:poolcoachai/domain/auth.dart';
 
 /// Số thứ đang chờ lên server của phần đánh giá, của mọi người trên máy:
-/// dòng hạng chưa đồng bộ và lần kiểm tra đã xong (hoàn tất hoặc hủy).
+/// dòng hạng chưa đồng bộ, lần kiểm tra BU đã xong và lần Skill Test chưa lên
+/// (hoàn tất hoặc huỷ; dòng skill_test_rows chỉ được ghi khi đã xong).
 Stream<int> watchPendingAssessment(AppDatabase db) => db
     .customSelect(
       'SELECT (SELECT COUNT(*) FROM bu_test_rows WHERE synced_at IS NULL '
       'AND (completed_at IS NOT NULL OR cancelled_at IS NOT NULL)) '
-      '+ (SELECT COUNT(*) FROM player_rank_rows WHERE synced_at IS NULL) AS n',
-      readsFrom: {db.buTestRows, db.playerRankRows},
+      '+ (SELECT COUNT(*) FROM player_rank_rows WHERE synced_at IS NULL) '
+      '+ (SELECT COUNT(*) FROM skill_test_rows WHERE synced_at IS NULL) AS n',
+      readsFrom: {db.buTestRows, db.playerRankRows, db.skillTestRows},
     )
     .watchSingle()
     .map((row) => row.read<int>('n'));
@@ -118,10 +121,12 @@ class AssessmentSyncService {
 
     try {
       await _pushFinishedTests(userId);
+      await _pushSkillTests(userId);
       final hadRow = await _syncRank(userId);
       rankFetched = true;
       _onRankFetch(userId, hadRow ? RankFetch.found : RankFetch.foundNone);
       await _pullTests(userId);
+      await _pullSkillTests(userId);
       return SyncOutcome.done;
     } on _UserChanged {
       return SyncOutcome.signedOut;
@@ -203,6 +208,30 @@ class AssessmentSyncService {
       }
       await (_db.update(_db.buTestRows)..where((t) => t.id.equals(test.id)))
           .write(BuTestRowsCompanion(syncedAt: Value(_now())));
+    }
+  }
+
+  /// Lần Skill Test đã xong (đạt, trượt hoặc huỷ) lên server. Chỉ thêm: máy
+  /// chủ không cho sửa hay xoá, id đã có thì coi là đã lên.
+  Future<void> _pushSkillTests(String userId) async {
+    final rows = await (_db.select(_db.skillTestRows)
+          ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
+        .get();
+    for (final row in rows) {
+      if (_rejected.contains(row.id)) continue;
+      _checkAlive();
+      try {
+        await _create('/items/skill_tests', toRemoteSkillTest(row), userId);
+      } on DirectusError catch (e) {
+        if (e.status >= 400 && e.status < 500 && e.status != 401) {
+          _rejected.add(row.id);
+          continue;
+        }
+        rethrow;
+      }
+      await (_db.update(_db.skillTestRows)..where((t) => t.id.equals(row.id)))
+          .write(SkillTestRowsCompanion(syncedAt: Value(_now())));
     }
   }
 
@@ -301,6 +330,29 @@ class AssessmentSyncService {
         batch.insert(_db.buDrillResultRows,
             fromRemoteResult(r! as Map<String, Object?>, syncedAt: at),
             mode: InsertMode.insertOrReplace);
+      }
+    });
+  }
+
+  /// Chỉ thêm, máy thắng: dòng cùng id đã có trên máy giữ nguyên. Dòng máy
+  /// chủ không dùng được (dữ liệu lạ) bị bỏ, không làm hỏng cả lượt.
+  Future<void> _pullSkillTests(String userId) async {
+    final token = await _tokenFor(userId);
+    final items = await _api.get('/items/skill_tests',
+        token: token,
+        query: {'limit': '-1', 'fields': remoteSkillTestFields}) as List<Object?>;
+    _checkAlive();
+    if (!_stillSignedInAs(userId)) throw const _UserChanged();
+    final at = _now();
+    final rows = <SkillTestRow>[];
+    for (final item in items) {
+      if (item is! Map<String, Object?>) continue;
+      final row = skillTestFromRemote(item, userId: userId, syncedAt: at);
+      if (row != null) rows.add(row);
+    }
+    await _db.batch((batch) {
+      for (final row in rows) {
+        batch.insert(_db.skillTestRows, row, mode: InsertMode.insertOrIgnore);
       }
     });
   }

@@ -134,6 +134,9 @@ void main() {
       ..routes['GET /items/player_ranks'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/player_ranks'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['GET /items/skill_tests'] = ((_) => FakeDirectus.ok([]))
+      ..routes['POST /items/skill_tests'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/bu_tests'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/bu_drill_results'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/bu_tests'] = ((req) =>

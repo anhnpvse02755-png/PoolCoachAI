@@ -152,6 +152,30 @@ try {
     typeof rList.data?.[0]?.attempts === 'object' ? ok('attempts về dạng JSON, không phải chuỗi') : fail(`attempts về dạng ${typeof rList.data?.[0]?.attempts}`);
     const bTests = await call('GET', '/items/bu_tests', undefined, b.access_token);
     (bTests.data ?? []).length === 0 ? ok('B không thấy lần kiểm tra của A') : fail(`B thấy ${bTests.data.length} lần kiểm tra`);
+
+    // Skill Test: chỉ thêm, đọc của mình.
+    const skill = { id: randomUUID(), drill_id: 'd1', drill_level: 1, table_size: 'eightFoot',
+      started_at: '2026-10-28T02:40:00.000Z', completed_at: '2026-10-28T03:00:00.000Z', cancelled_at: null,
+      score: 9, attempts: 10, passed: true, notes: null, pass_threshold: 0.8, target: null };
+    const sMade = await call('POST', '/items/skill_tests', skill, a.access_token);
+    sMade.status === 200 ? ok('A tạo được lần kiểm tra kỹ năng') : fail(`A tạo lần kiểm tra kỹ năng → ${sMade.status} ${sMade.code}`);
+    const sRead = await call('GET', '/items/skill_tests?fields=id,pass_threshold,target', undefined, a.access_token);
+    const sBack = (sRead.data ?? []).find((r) => r.id === skill.id);
+    sBack && Number(sBack.pass_threshold) === 0.8 && sBack.target === null
+      ? ok('ảnh chụp tiêu chí (pass_threshold, target) đọc lại đúng')
+      : fail(`ảnh chụp tiêu chí đọc lại → ${JSON.stringify(sBack)}`);
+    const sAgain = await call('POST', '/items/skill_tests', skill, a.access_token);
+    sAgain.code === 'RECORD_NOT_UNIQUE'
+      ? ok('gửi lại lần kiểm tra kỹ năng cùng id → RECORD_NOT_UNIQUE (app coi là đã đồng bộ)')
+      : fail(`gửi lại lần kiểm tra kỹ năng cùng id → ${sAgain.status} ${sAgain.code}`);
+    const sPatch = await call('PATCH', `/items/skill_tests/${skill.id}`, { passed: false }, a.access_token);
+    sPatch.status === 403 ? ok('A không sửa được lần kiểm tra kỹ năng') : fail(`A sửa lần kiểm tra kỹ năng → ${sPatch.status}`);
+    const sDelete = await call('DELETE', `/items/skill_tests/${skill.id}`, undefined, a.access_token);
+    sDelete.status === 403 ? ok('A không xoá được lần kiểm tra kỹ năng') : fail(`A xoá lần kiểm tra kỹ năng → ${sDelete.status}`);
+    const bSkill = await call('GET', '/items/skill_tests', undefined, b.access_token);
+    (bSkill.data ?? []).length === 0 ? ok('B không thấy lần kiểm tra kỹ năng của A') : fail(`B thấy ${bSkill.data.length} lần kiểm tra kỹ năng`);
+    const bSkillRead = await call('GET', `/items/skill_tests/${skill.id}`, undefined, b.access_token);
+    bSkillRead.status >= 400 ? ok('B không đọc được lần kiểm tra kỹ năng của A theo id') : fail(`B đọc được theo id → ${bSkillRead.status}`);
   } else {
     fail('thiếu id của A hoặc B, bỏ qua phần hạng');
   }
@@ -482,6 +506,11 @@ try {
     aPatch.status === 403
       ? ok('A không sửa được thành tích')
       : fail(`A sửa thành tích → ${aPatch.status}`);
+    const cert = { id: randomUUID(), kind: 'chungNhan', ref_id: 'd1', achieved_at: '2026-10-28T03:00:00.000Z' };
+    const cMade = await call('POST', '/items/achievements', cert, a.access_token);
+    cMade.status === 200
+      ? ok('A tạo được thành tích chứng nhận (kind là chuỗi tự do)')
+      : fail(`A tạo thành tích chứng nhận → ${cMade.status} ${cMade.code}`);
     const bAch = await call('GET', '/items/achievements', undefined, b.access_token);
     (bAch.data ?? []).length === 0
       ? ok('B không thấy thành tích của A')

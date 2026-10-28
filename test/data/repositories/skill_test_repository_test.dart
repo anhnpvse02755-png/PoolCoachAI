@@ -1,10 +1,13 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:poolcoachai/data/database/converters.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/skill_test_converters.dart';
 import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
 
@@ -26,21 +29,32 @@ void main() {
   });
   tearDown(() => db.close());
 
+  /// Buổi tập nằm trong cơ sở dữ liệu: completeTest tự đọc, không nhận từ ngoài.
+  Future<void> seedLogs(String userId, List<DrillLog> logs) async {
+    for (final l in logs) {
+      await db.into(db.drillLogRows).insertOnConflictUpdate(
+        toDrillLogRow(l, userId: userId),
+      );
+    }
+  }
+
   Future<SkillTestOutcome> submit(
     String id,
     num score, {
     int? attempts = 10,
     List<DrillLog>? logs,
-  }) => repo.completeTest(
+  }) async {
+    await seedLogs('u1', logs ?? threePasses(id));
+    return repo.completeTest(
     drill: stById(id),
     drills: stDrills,
-    logs: logs ?? threePasses(id),
     tableSize: TableSize.eightFoot,
     startedAt: stToday.subtract(const Duration(minutes: 20)),
     score: score,
     attempts: attempts,
     notes: 'bàn hơi nhanh',
-  );
+    );
+  }
 
   test('đạt: ghi một dòng đủ cột cho mọi nơi đọc', () async {
     expect(
@@ -96,10 +110,17 @@ void main() {
         now: () => stToday,
         newId: () => 'x$score',
       );
+      await db.batch((b) {
+        for (final l in threePasses('a1')) {
+          b.insert(
+            db.drillLogRows,
+            toDrillLogRow(l, userId: 'p$score').copyWith(id: Value('p$score-${l.id}')),
+          );
+        }
+      });
       await r.completeTest(
         drill: stById('a1'),
         drills: stDrills,
-        logs: threePasses('a1'),
         tableSize: TableSize.sevenFoot,
         startedAt: stToday,
         score: score,
@@ -152,6 +173,41 @@ void main() {
     await expectLater(submit('a1', 8.5), throwsArgumentError);
     // attempts trên bài mục tiêu
     await expectLater(submit('t2', 25, logs: const []), throwsArgumentError);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+  });
+
+  test('bài không chấm được (target 0): không bao giờ ghi dòng không có kết luận', () async {
+    final broken = stDrill('t2', SkillCategory.safety, 2, target: 0);
+    await seedLogs('u1', threePasses('t2'));
+    // Cổng dùng cùng drillRatio nên đã khoá trước khi tới bước chấm; nhánh
+    // StateError chỉ là lưới an toàn. Dù đi đường nào, bảng cũng phải rỗng.
+    final outcome = repo.completeTest(
+      drill: broken,
+      drills: [broken],
+      tableSize: TableSize.eightFoot,
+      startedAt: stToday,
+      score: 0,
+    );
+    expect(
+      await outcome.then<Object>((o) => o, onError: (Object e) => e),
+      anyOf(isA<SkillTestLocked>(), isA<StateError>()),
+    );
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+  });
+
+  test('cổng đọc buổi tập của chính người này, không của người khác', () async {
+    await seedLogs('u2', threePasses('a1'));
+    expect(
+      await repo.completeTest(
+        drill: stById('a1'),
+        drills: stDrills,
+        tableSize: TableSize.eightFoot,
+        startedAt: stToday,
+        score: 9,
+        attempts: 10,
+      ),
+      isA<SkillTestLocked>(),
+    );
     expect(await db.select(db.skillTestRows).get(), isEmpty);
   });
 

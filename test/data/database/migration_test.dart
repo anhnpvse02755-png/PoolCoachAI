@@ -29,6 +29,7 @@ void main() {
 
     expect(await db.select(db.drillLogRows).get(), isEmpty);
     expect(await db.select(db.authSessionRows).get(), isEmpty);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
 
     await db
         .into(db.drillLogRows)
@@ -261,6 +262,7 @@ void main() {
     addTearDown(db.close);
 
     expect(db.schemaVersion, 15);
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
     expect(match.userId, 'u1');
