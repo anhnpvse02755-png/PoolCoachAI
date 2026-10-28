@@ -6,6 +6,8 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/repositories/tournament_repository.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/domain/tournament/tournament_goal.dart';
@@ -127,3 +129,25 @@ final tournamentGoalStateProvider =
         currentKind: current?.kind,
       ));
     });
+
+/// Những gì hộp thoại bắt đầu trận cần: cơ, trận (để chọn cơ mặc định) và các
+/// giải. Qua cổng: chưa đủ thì đang tải, không thay bằng danh sách rỗng (cơ mặc
+/// định và danh sách giải sẽ sai).
+typedef StartMatchInputs = ({
+  List<CueEquipment> cues,
+  List<PoolMatch> matches,
+  Map<String, Tournament> tournamentsById,
+});
+
+final startMatchInputsProvider = Provider<AsyncValue<StartMatchInputs>>((ref) {
+  final cues = ref.watch(cueEquipmentProvider);
+  final matches = ref.watch(matchesProvider);
+  final tournaments = ref.watch(tournamentsProvider);
+  final blocked = gate<StartMatchInputs>([cues, matches, tournaments]);
+  if (blocked != null) return blocked;
+  return AsyncData((
+    cues: cues.value!,
+    matches: matches.value!,
+    tournamentsById: {for (final t in tournaments.value!) t.id: t},
+  ));
+});

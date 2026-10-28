@@ -23,6 +23,7 @@ import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -92,6 +93,7 @@ ProviderContainer testContainer({
   List<TimerSession>? timerSessions,
   List<ScheduleSlot>? schedule,
   List<CueEquipment>? equipment,
+  Stream<List<CueEquipment>>? equipmentStream,
   List<PoolMatch>? matches,
   Stream<List<PoolMatch>>? matchesStream,
   DateTime? now,
@@ -153,7 +155,9 @@ ProviderContainer testContainer({
         (ref) => Stream.value(schedule ?? const <ScheduleSlot>[]),
       ),
       cueEquipmentProvider.overrideWith(
-        (ref) => Stream.value(equipment ?? const <CueEquipment>[]),
+        (ref) =>
+            equipmentStream ??
+            Stream.value(equipment ?? const <CueEquipment>[]),
       ),
       matchesProvider.overrideWith(
         (ref) => matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
@@ -232,6 +236,7 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
 /// Như [testContainer] nhưng hạng và bài kiểm tra đọc từ [db] thật (SQLite
 /// trong bộ nhớ) — cho widget test cần ghi rồi đọc lại.
 ///
+/// [tournamentRepo] thay kho giải (ví dụ kho ghi xong rồi mới trả về chậm).
 /// [rankLag] làm stream hạng trễ như Drift trên web (chạy trong worker):
 /// dòng vừa ghi tới màn hình sau một nhịp.
 ProviderContainer dbContainer(
@@ -242,9 +247,14 @@ ProviderContainer dbContainer(
   Duration? rankLag,
   List<DrillLog>? logs,
   List<Drill>? drills,
+  TournamentRepository Function(AppDatabase db)? tournamentRepo,
 }) {
   return ProviderContainer(
     overrides: [
+      if (tournamentRepo != null)
+        tournamentRepositoryProvider.overrideWith(
+          (ref) => tournamentRepo(ref.watch(appDatabaseProvider)),
+        ),
       if (rankLag != null)
         playerRankProvider.overrideWith((ref) {
           final repo = ref.watch(assessmentRepositoryProvider);

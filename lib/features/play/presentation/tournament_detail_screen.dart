@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
-import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
-import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -38,6 +36,12 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
 class _TournamentDetailScreenState
     extends ConsumerState<TournamentDetailScreen> {
   bool _busy = false;
+
+  /// Đã xóa giải xong và đang chờ rời màn: luồng dữ liệu báo "giải đã mất"
+  /// trước khi route đổi, nên màn giữ nội dung cuối thay vì hiện "không tìm
+  /// thấy" một khung hình.
+  bool _deleting = false;
+  TournamentView? _lastView;
 
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -81,7 +85,10 @@ class _TournamentDetailScreenState
       ),
     );
     if (sure != true || !mounted) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _deleting = true;
+    });
     try {
       final repo = ref.read(tournamentRepositoryProvider);
       if (repo == null) throw StateError('no-repo');
@@ -89,7 +96,10 @@ class _TournamentDetailScreenState
     } on Object {
       if (mounted) {
         _message(Vi.tournamentDeleteFailed);
-        setState(() => _busy = false);
+        setState(() {
+          _busy = false;
+          _deleting = false;
+        });
       }
       return;
     }
@@ -99,17 +109,19 @@ class _TournamentDetailScreenState
   }
 
   Future<void> _startMatch(Tournament t) async {
-    final cues = ref.read(cueEquipmentProvider).value ?? const <CueEquipment>[];
-    final byId = ref.read(tournamentsByIdProvider).value ?? const {};
+    // Nút chỉ bật khi nguồn đã sẵn sàng; không có thì thôi, không đoán.
+    final inputs = ref.read(startMatchInputsProvider).value;
+    if (inputs == null) return;
+    final cues = inputs.cues;
     final form = await showStartMatchDialog(
       context,
       cues: cues,
       defaultCueId: defaultMatchCueId(
-        matches: ref.read(matchesProvider).value ?? const <PoolMatch>[],
+        matches: inputs.matches,
         knownCueIds: {for (final cue in cues) cue.id},
       ),
       tournaments: pickableForNewMatch(
-        byId.values,
+        inputs.tournamentsById.values,
         ref.read(nowProvider)(),
         include: t.id,
       ),
@@ -217,6 +229,7 @@ class _TournamentDetailScreenState
     Tournament t,
     TournamentStatus status,
     TournamentGoalView? goal,
+    bool canStart,
   ) {
     final state = goal?.state;
     return Column(
@@ -225,7 +238,7 @@ class _TournamentDetailScreenState
         if (status != TournamentStatus.sapToi)
           FilledButton.icon(
             key: const Key('tournament-start-match'),
-            onPressed: _busy ? null : () => _startMatch(t),
+            onPressed: _busy || !canStart ? null : () => _startMatch(t),
             icon: const Icon(Icons.sports_score),
             label: const Text(Vi.tournamentStartMatch),
           ),
@@ -309,12 +322,13 @@ class _TournamentDetailScreenState
     final t = view.tournament;
     final status = tournamentStatus(t, ref.watch(nowProvider)());
     final goal = ref.watch(tournamentGoalStateProvider(t.id)).value;
+    final canStart = ref.watch(startMatchInputsProvider).hasValue;
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
         _info(t, status, textTheme),
         const SizedBox(height: 12),
-        _actions(t, status, goal),
+        _actions(t, status, goal, canStart),
         const SizedBox(height: 12),
         _summary(view, textTheme),
         const SizedBox(height: 12),
@@ -349,17 +363,22 @@ class _TournamentDetailScreenState
           title: Vi.dataErrorTitle,
           body: Vi.dataErrorBody,
         ),
-        data: (v) => v == null
-            ? PcEmptyState(
-                icon: Icons.search_off,
-                title: Vi.tournamentNotFoundTitle,
-                body: Vi.tournamentNotFoundBody,
-                action: FilledButton(
-                  onPressed: () => context.go(Routes.tournaments),
-                  child: const Text(Vi.tournamentBackToList),
-                ),
-              )
-            : _body(v),
+        data: (v) {
+          if (v != null) _lastView = v;
+          final last = _lastView;
+          if (v == null && _deleting && last != null) return _body(last);
+          return v == null
+              ? PcEmptyState(
+                  icon: Icons.search_off,
+                  title: Vi.tournamentNotFoundTitle,
+                  body: Vi.tournamentNotFoundBody,
+                  action: FilledButton(
+                    onPressed: () => context.go(Routes.tournaments),
+                    child: const Text(Vi.tournamentBackToList),
+                  ),
+                )
+              : _body(v);
+        },
       ),
     );
   }

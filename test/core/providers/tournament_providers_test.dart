@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
@@ -238,6 +241,61 @@ void main() {
       expect(c.read(tournamentGoalStateProvider('u1-giai')).value, isNull);
     },
   );
+
+  group('startMatchInputsProvider (qua cổng)', () {
+    test('đủ nguồn: cơ, trận và giải', () async {
+      final c = make(
+        ts: [on, up],
+        ms: [tMatch('a', tournamentId: 'on')],
+      );
+      c.listen(startMatchInputsProvider, (_, _) {});
+      await settle();
+      final v = c.read(startMatchInputsProvider).value!;
+      expect(
+        [v.cues, v.matches.map((m) => m.id), v.tournamentsById.keys],
+        [
+          isEmpty,
+          ['a'],
+          ['on', 'up'],
+        ],
+      );
+    });
+
+    test(
+      'cơ hay trận chưa tới: đang tải, không thay bằng danh sách rỗng',
+      () async {
+        for (final build in [
+          () => testContainer(
+            tournaments: [up],
+            equipmentStream: StreamController<List<CueEquipment>>().stream,
+          ),
+          () => testContainer(
+            tournaments: [up],
+            matchesStream: StreamController<List<PoolMatch>>().stream,
+          ),
+        ]) {
+          final c = build();
+          addTearDown(c.dispose);
+          c.listen(startMatchInputsProvider, (_, _) {});
+          await settle();
+          final v = c.read(startMatchInputsProvider);
+          expect([v.isLoading, v.value], [true, null]);
+        }
+      },
+    );
+
+    test('nguồn giải lỗi: thành lỗi', () async {
+      final c = make(
+        async: AsyncError<List<Tournament>>(
+          StateError('hỏng'),
+          StackTrace.empty,
+        ),
+      );
+      c.listen(startMatchInputsProvider, (_, _) {});
+      await settle();
+      expect(c.read(startMatchInputsProvider).hasError, isTrue);
+    });
+  });
 
   test('chưa đăng nhập: không có repository, danh sách rỗng', () async {
     final c = ProviderContainer(

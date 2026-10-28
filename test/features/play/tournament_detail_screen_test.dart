@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/repositories/tournament_repository.dart';
+import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -81,6 +84,17 @@ TournamentRepository tRepo(AppDatabase db, [String id = 'x']) =>
 
 RoadmapRepository gRepo(AppDatabase db) =>
     RoadmapRepository(db, userId: 'u1', now: () => testToday, newId: () => 'g');
+
+class _LaggyRepo extends TournamentRepository {
+  _LaggyRepo(super.db, {required super.userId, required super.now})
+    : super(newId: () => 'x');
+
+  @override
+  Future<void> remove(String id) async {
+    await super.remove(id);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+}
 
 Future<AppDatabase> newDb() async {
   final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -206,6 +220,31 @@ void main() {
     expect(find.byKey(const Key('tournament-prepare')), findsNothing);
     expect(find.byKey(const Key('tournament-start-match')), findsOneWidget);
   });
+
+  testWidgets(
+    'cơ chưa tải xong: nút Bắt đầu trận tắt, không mở hộp thoại với danh sách '
+    'cơ rỗng; có cơ rồi thì bật',
+    (tester) async {
+      final cues = StreamController<List<CueEquipment>>();
+      addTearDown(cues.close);
+      await open(
+        tester,
+        testContainer(tournaments: [on], equipmentStream: cues.stream),
+        'on',
+      );
+      final button = find.byKey(const Key('tournament-start-match'));
+      expect(tester.widget<FilledButton>(button).onPressed, isNull);
+      await tester.tap(button, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.matchStartAction), findsNothing);
+      cues.add(const <CueEquipment>[]);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.matchStartAction), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'bắt đầu trận ở giải đã xong 20 ngày: chọn sẵn giải, loại bi theo giải, '
@@ -387,6 +426,35 @@ void main() {
     expect((await db.select(db.tournamentRows).getSingle()).isDeleted, isTrue);
     expect(find.byType(TournamentListScreen), findsOneWidget);
   });
+
+  testWidgets(
+    'xóa giải: không có khung hình nào hiện "không tìm thấy" trước khi về danh sách',
+    (tester) async {
+      final db = await newDb();
+      await createUp(db);
+      // Kho ghi xong rồi mới trả về chậm: luồng dữ liệu báo "giải đã mất"
+      // trước khi màn kịp rời đi.
+      await open(
+        tester,
+        dbContainer(
+          db,
+          tournamentRepo: (d) =>
+              _LaggyRepo(d, userId: 'u1', now: () => testToday),
+        ),
+        'up',
+      );
+      await tester.tap(find.byKey(const Key('tournament-delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.tournamentDeleteConfirm));
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 5));
+        expect(find.text(Vi.tournamentNotFoundTitle), findsNothing);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.tournamentNotFoundTitle), findsNothing);
+      expect(find.byType(TournamentListScreen), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'sửa giải từ màn chi tiết: form có sẵn giá trị, bỏ ngày kết thúc rồi lưu '
