@@ -104,12 +104,17 @@ async function clickNear(label, nearText, maxHops = 25) {
     const maxHops = ${maxHops};
     const hits = [...document.querySelectorAll('flt-semantics')]
       .map((e) => ({ e, t: (e.getAttribute('aria-label') || e.textContent || '').trim() }))
-      .filter((x) => x.t.includes(label));
+      .filter((x) => x.t.includes(label) && !x.t.includes(nearText) && !x.e.querySelector('flt-semantics'));
+    // textContent của tổ tiên KHÔNG chứa aria-label của các nút/nhãn con
+    // (tên người chơi nằm ở aria-label), nên gộp cả hai khi tìm mốc.
+    const fullText = (n) => (n.textContent || '') + ' ' +
+      [...n.querySelectorAll('[aria-label]')].map((c) => c.getAttribute('aria-label')).join(' ') +
+      ' ' + (n.getAttribute('aria-label') || '');
     let best = null;
     for (const hit of hits) {
       let node = hit.e;
       for (let hops = 0; node && hops <= maxHops; hops++, node = node.parentElement) {
-        const txt = node.textContent || '';
+        const txt = fullText(node);
         if (txt.includes(nearText)) {
           if (!best || hops < best.hops || (hops === best.hops && txt.length < best.len)) {
             best = { e: hit.e, hops, len: txt.length, t: hit.t };

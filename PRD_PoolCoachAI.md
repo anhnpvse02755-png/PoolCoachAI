@@ -120,7 +120,9 @@ Công cụ độc lập trong Training Center, không gắn với một Drill ha
 - Đã có đồng hồ đếm lên/đếm ngược (15, 30, 45 hoặc 60 phút), gắn nhóm kỹ năng tùy chọn, lưu/xem buổi tập gần đây; dữ liệu được tính vào streak, tổng thời gian tập tự do trong tuần và ưu tiên gợi ý trên Home.
 - Đã có tạo/sửa/xóa lịch lặp theo thứ, giờ, tên buổi và nhóm kỹ năng tùy chọn; dữ liệu ngày/giờ được kiểm tra ở tầng lưu trữ. Home hiển thị các khung giờ hôm nay, lịch có nhóm kỹ năng sẽ ưu tiên nhóm đó trong gợi ý.
 - Dữ liệu được lưu cục bộ và cô lập theo tài khoản trên cùng thiết bị. Dữ liệu lịch/buổi tập cũ không có chủ được giữ ở trạng thái chưa gán, không tự động tiết lộ cho tài khoản mới.
-- **Còn thiếu:** đồng bộ lịch/buổi tập qua thiết bị, thông báo nhắc lịch và điều chỉnh mục tiêu theo thời lượng dự kiến.
+- Đã đồng bộ buổi đồng hồ (`timer_sessions`) và khung lịch (`schedule_slots`) theo tài khoản qua `practice_sync.dart`.
+- Đã có nhắc lịch tập và nhắc giữ streak (`NotificationKind.schedule`, `NotificationKind.streak`), kèm kênh thông báo Android riêng; lịch nhắc được lập cục bộ trên thiết bị (nhắc lịch trước giờ bắt đầu trong 7 ngày tới, nhắc streak lúc 20:00 nếu hôm nay chưa tập).
+- **Còn thiếu:** điều chỉnh mục tiêu theo thời lượng dự kiến của khung lịch (hiện lịch chỉ ưu tiên nhóm kỹ năng trong gợi ý); thông báo khi có gợi ý mới từ Coach; push khi ứng dụng đã đóng (thông báo hiện là cục bộ, trên web chỉ hiện khi tab còn mở).
 
 ### 6.6 Knowledge
 Phần học lý thuyết, không khóa chặt vào Drill: kỹ thuật, cách thực hiện, lỗi thường gặp, nguyên lý, tình huống áp dụng. Một Drill có thể liên kết tới Knowledge và ngược lại (Knowledge ↔ Drill là quan hệ hỗ trợ, không phải dependency cứng). Người dùng có quyền khám phá Knowledge độc lập, tương tự thư viện bài viết ngắn theo từng kỹ năng.
