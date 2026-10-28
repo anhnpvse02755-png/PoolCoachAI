@@ -65,7 +65,8 @@ void main() {
     await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
         id: 'cu', userId: 'u1', startedAt: testToday, tableSize: 'nineFootPlus',
         completedAt: Value(testToday.subtract(const Duration(days: 3))),
-        totalScore: const Value(80), resultRank: const Value('g')));
+        examIScore: const Value(50), examIIVersion: const Value('masters'),
+        examIIScore: const Value(30), totalScore: const Value(80), resultRank: const Value('g')));
     await open(tester);
     final from = DateTime(testToday.year, testToday.month, testToday.day - 3 + 14);
     expect(find.text(Vi.buRetestFrom(from)), findsOneWidget);

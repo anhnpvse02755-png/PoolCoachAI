@@ -1,5 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
+
+import '../support/match_fixtures.dart';
+import '../support/roadmap_fixtures.dart';
 
 void main() {
   group('categoryMastery', () {
@@ -55,6 +61,76 @@ void main() {
 
     test('chênh lệch âm đúng bằng ngưỡng vẫn tính là đi xuống', () {
       expect(categoryTrend([0.1, 0.1, 0.0, 0.0]), SkillTrend.down);
+    });
+  });
+
+  group('trận và BU trong Player Intelligence', () {
+    final bu = buResultGraded(
+      completedAt: DateTime(2026, 10, 10),
+      lost: const {'F7': 20, 'F6': 10},
+    );
+
+    test('matchWeak đến từ phân tích trận và không đổi mastery', () {
+      final pi = computePlayerIntelligence(
+        drills: roadmapDrills,
+        logs: const [],
+        matches: matchesWeakAt(SkillCategory.position, at: DateTime(2026, 10, 20)),
+      );
+      expect(pi.matchWeak.first.category, SkillCategory.position);
+      expect(pi.categories[SkillCategory.position]!.mastery, isNull);
+      expect(pi.weak, isEmpty);
+    });
+
+    test('nhóm chưa có mastery mà BU < 55 thì vào weak, nguồn bu', () {
+      final pi = computePlayerIntelligence(
+          drills: roadmapDrills, logs: const [], latestBu: bu);
+      expect(pi.buPercent[SkillCategory.aiming], 48);
+      expect(pi.weak, [SkillCategory.aiming]);
+      expect(pi.weakSources[SkillCategory.aiming], WeakSource.bu);
+    });
+
+    test('nhóm đã có mastery giữ mastery làm nguồn; BU không kéo nó vào weak', () {
+      final logs = sessions('a1', 9, [on(10, 1), on(10, 2), on(10, 3)]);
+      final pi = computePlayerIntelligence(
+          drills: roadmapDrills, logs: logs, latestBu: bu);
+      expect(pi.categories[SkillCategory.aiming]!.mastery, isNotNull);
+      expect(pi.buPercent[SkillCategory.aiming], 48);
+      expect(pi.weak, isNot(contains(SkillCategory.aiming)));
+      expect(pi.weakSources.containsKey(SkillCategory.aiming), isFalse);
+    });
+
+    test('nhóm yếu theo bài tập đứng trước nhóm yếu theo BU; nguồn từng nhóm', () {
+      final logs = sessions('p1', 3, [on(10, 1), on(10, 2), on(10, 3)]);
+      final pi = computePlayerIntelligence(
+          drills: roadmapDrills, logs: logs, latestBu: bu);
+      expect(pi.categories[SkillCategory.position]!.mastery!,
+          lessThan(PracticeConstants.weakCutoff));
+      expect(pi.weak, [SkillCategory.position, SkillCategory.aiming]);
+      expect(pi.weakSources[SkillCategory.position], WeakSource.drills);
+      expect(pi.weakSources[SkillCategory.aiming], WeakSource.bu);
+    });
+
+    test('các nhóm yếu theo BU bằng điểm nhau xếp theo thứ tự nhóm', () {
+      final base = buResultGraded(completedAt: DateTime(2026, 10, 10));
+      final allLost = BuResult(
+        testId: base.testId,
+        completedAt: base.completedAt,
+        total: base.total,
+        lost: base.max,
+        max: base.max,
+      );
+      final pi = computePlayerIntelligence(
+          drills: roadmapDrills, logs: const [], latestBu: allLost);
+      expect(pi.buPercent.values.toSet(), {0});
+      expect(pi.weak, SkillCategory.values);
+    });
+
+    test('không truyền trận, không truyền BU: kết quả như cũ', () {
+      final pi = computePlayerIntelligence(drills: roadmapDrills, logs: const []);
+      expect(pi.matchWeak, isEmpty);
+      expect(pi.buPercent, isEmpty);
+      expect(pi.weakSources, isEmpty);
+      expect(pi.weak, isEmpty);
     });
   });
 }

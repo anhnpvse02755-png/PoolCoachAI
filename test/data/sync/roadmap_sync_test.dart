@@ -7,6 +7,7 @@ import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -149,5 +150,32 @@ void main() {
   test('đếm dòng chờ của mọi người trên máy', () async {
     await local(skill(SkillCategory.kick, newer));
     expect(await watchPendingRoadmap(db).first, 1);
+  });
+
+  test('mục tiêu có hạng đích: POST mang target_rank', () async {
+    serve();
+    await local(GoalRecord(
+        updatedAt: newer,
+        goal: PlayerGoal(goalId: 'g-rank', kind: GoalKind.lenHang, createdAt: newer, targetRank: Rank.d)));
+    expect(await build().syncNow(), SyncOutcome.done);
+    final body = FakeDirectus.body(server.sent('POST', '/items/player_goals').single);
+    expect(body['target_rank'], 'd');
+  });
+
+  test('kéo mục tiêu có hạng đích về; dòng máy chủ cũ không có target_rank vẫn đọc được', () async {
+    final withRank = GoalRecord(
+        updatedAt: newer,
+        goal: PlayerGoal(goalId: 'g-rank', kind: GoalKind.lenHang, createdAt: newer, targetRank: Rank.c));
+    serve(goals: [remote(withRank)]);
+    await build().syncNow();
+    expect((await db.select(db.playerGoalRows).getSingle()).targetRank, 'c');
+
+    final legacy = remote(GoalRecord(
+        updatedAt: newer.add(const Duration(hours: 1)),
+        goal: PlayerGoal(goalId: 'g-old', kind: GoalKind.lenHang, createdAt: newer)))
+      ..remove('target_rank');
+    serve(goals: [legacy]);
+    await build().syncNow();
+    expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -6,6 +7,9 @@ import 'package:uuid/uuid.dart';
 
 String? _iso(DateTime? d) => d?.toUtc().toIso8601String();
 DateTime? _local(Object? s) => s == null ? null : DateTime.parse(s as String).toLocal();
+
+/// Hạng lạ (máy chủ mới hơn) coi là không có: lấy hạng kế tiếp thay vì ném.
+Rank? _rankOrNull(String? name) => name == null ? null : Rank.values.asNameMap()[name];
 
 GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
       updatedAt: r.updatedAt,
@@ -17,6 +21,7 @@ GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
               category: r.category == null ? null : SkillCategory.values.byName(r.category!),
               eventDate: r.eventDate,
               createdAt: r.createdAt!,
+              targetRank: _rankOrNull(r.targetRank),
             ),
     );
 
@@ -27,11 +32,12 @@ PlayerGoalRow toGoalRow(GoalRecord g, {required String userId, DateTime? syncedA
       category: g.goal?.category?.name,
       eventDate: g.goal?.eventDate,
       createdAt: g.goal?.createdAt,
+      targetRank: g.goal?.targetRank?.name,
       updatedAt: g.updatedAt,
       syncedAt: syncedAt,
     );
 
-const remoteGoalFields = 'id,goal_id,kind,category,event_date,created_at,updated_at';
+const remoteGoalFields = 'id,goal_id,kind,category,event_date,created_at,updated_at,target_rank';
 
 /// Dòng mục tiêu cho `POST /items/player_goals` (id là id người dùng, R1).
 Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
@@ -40,6 +46,7 @@ Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
       'kind': r.kind,
       'category': r.category,
       'event_date': _iso(r.eventDate),
+      'target_rank': r.targetRank,
       'created_at': _iso(r.createdAt),
       'updated_at': _iso(r.updatedAt),
     };
@@ -54,6 +61,10 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
               category: j['category'] == null ? null : SkillCategory.values.byName(j['category']! as String),
               eventDate: _local(j['event_date']),
               createdAt: _local(j['created_at'])!,
+              // Máy cũ có thể để target_rank thừa ở dòng không phải Lên hạng.
+              targetRank: j['kind'] == GoalKind.lenHang.name && j['target_rank'] != null
+                  ? _rankOrNull(j['target_rank'] as String?)
+                  : null,
             ),
     );
 

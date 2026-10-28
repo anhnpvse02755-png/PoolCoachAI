@@ -75,4 +75,27 @@ void main() {
       expect(lenHangBlock(rank(Rank.h)), isNull);
     });
   });
+
+  group('hạng đích của Lên hạng', () {
+    PlayerGoal lenHang({Rank? target}) =>
+        PlayerGoal(goalId: 'g1', kind: GoalKind.lenHang, createdAt: t1, targetRank: target);
+
+    test('null nghĩa là hạng kế tiếp; có hạng đích thì khác mục tiêu không đích', () {
+      expect(lenHang().targetRank, isNull);
+      expect(lenHang(target: Rank.d), lenHang(target: Rank.d));
+      expect(lenHang(target: Rank.d), isNot(lenHang()));
+      expect(lenHang(target: Rank.d), isNot(lenHang(target: Rank.c)));
+      expect(lenHang(target: Rank.d).hashCode, lenHang(target: Rank.d).hashCode);
+      expect(lenHang(target: Rank.d).toString(), contains('Rank.d'));
+    });
+
+    test('chỉ Lên hạng mới có hạng đích', () {
+      expect(
+        () => PlayerGoal(
+            goalId: 'g', kind: GoalKind.thuanThucKyNang, category: SkillCategory.safety,
+            createdAt: t1, targetRank: Rank.d),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+  });
 }

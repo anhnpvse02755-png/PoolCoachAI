@@ -29,3 +29,24 @@ test('final fix wave (I2a/M7): hai câu CÁCH TRẢ LỜI mới, bốn từ sai 
     'cụm "lệch 0,5 / 1 / 2 đầu cơ" vẫn còn — đưa số cấm thẳng ra trước mặt model (M7)',
   );
 });
+
+test('lời dặn giải thích khoá phân tích trận, nguồn nhóm yếu và thuật ngữ phá-và-dọn', () => {
+  for (const must of ['lostRackCauses', 'breakAndRuns', 'fullRacks', 'weakRule', 'opponentBreakAndRun', 'notFull', 'unclear',
+    'weakSources', 'buPercent', 'Phá-và-dọn', 'Dọn bàn', 'Phá khô', 'ván ghi đủ']) {
+    assert.ok(SYSTEM_PROMPT.includes(must), must);
+  }
+});
+
+test('lời dặn không nói "weak rỗng là chưa đủ dữ liệu" bừa: phân biệt theo sampled', () => {
+  assert.ok(!SYSTEM_PROMPT.includes('weak rỗng là chưa có nhóm nào đủ dữ liệu'), 'câu cũ vẫn còn');
+  for (const must of ['sampled', 'không nhóm nào yếu', 'chưa đủ dữ liệu']) {
+    assert.ok(SYSTEM_PROMPT.includes(must), must);
+  }
+});
+
+test('lời dặn mô tả milestoneRank và retake của currentStep, lamBaiBu không luôn là làm lại', () => {
+  for (const must of ['milestoneRank', 'retake']) {
+    assert.ok(SYSTEM_PROMPT.includes(must), must);
+  }
+  assert.ok(!SYSTEM_PROMPT.includes('lamBaiBu (làm lại bài kiểm tra BU)'), 'lamBaiBu vẫn luôn là làm lại');
+});

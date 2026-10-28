@@ -12,6 +12,7 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/features/play/presentation/match_analysis_sheet.dart';
 import 'package:uuid/uuid.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
@@ -633,6 +634,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                           ].join(' · '),
                         ),
                 ),
+            ],
+            if (match.isComplete) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: Key('analyze-match-${match.id}'),
+                onPressed: () => showMatchAnalysis(context, match),
+                icon: const Icon(Icons.insights_outlined),
+                label: const Text(Vi.matchAnalysisOpen),
+              ),
             ],
             if (!match.isComplete) ...[
               const SizedBox(height: 12),

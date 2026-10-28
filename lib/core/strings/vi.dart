@@ -14,7 +14,9 @@ import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart' show SkillSignal, percentOf;
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart' show RankCheckBasis, RankCheckDirection, RankCheckSignal;
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
@@ -25,6 +27,8 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
+import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -79,12 +83,25 @@ abstract final class Vi {
   /// đây không phải bịa nội dung. Mục 2.1 của tài liệu thiết kế cấm
   /// con số bịa, không cấm câu chữ có tham số.
   ///
-  /// Sáu lý do phải ra sáu câu khác nhau. Dùng chung một câu là lớp
+  /// Bảy lý do phải ra bảy câu khác nhau. Dùng chung một câu là lớp
   /// suy luận nói mà người chơi không nghe được gì.
-  static String pickReason(PickReason reason, String skill) => switch (reason) {
+  ///
+  /// [signal] chỉ dùng cho [PickReason.matchWeakness]: có thì câu nêu số
+  /// trận, số lần hỏng và tỷ lệ; không có thì câu không chứa con số nào.
+  static String pickReason(
+    PickReason reason,
+    String skill, {
+    SkillSignal? signal,
+  }) => switch (reason) {
     PickReason.scheduled => 'Lịch tập hôm nay của bạn là $skill.',
     PickReason.streakAtRisk =>
       'Hai hôm rồi bạn chưa tập. Quay lại nhẹ nhàng với $skill.',
+    PickReason.matchWeakness =>
+      signal == null
+          ? '$skill đang yếu khi thi đấu.'
+          : 'Trong ${signal.matches} trận gần đây, $skill hỏng '
+                '${signal.failures}/${signal.attempts} lần '
+                '(${percentOf(signal.failures, signal.attempts)}%).',
     PickReason.weakest => '$skill đang là nhóm yếu nhất của bạn.',
     PickReason.newcomer => 'Bắt đầu với $skill — nền của mọi cú đánh.',
     PickReason.declining =>
@@ -159,7 +176,7 @@ abstract final class Vi {
   static const matchShotMade = 'Có bi';
   static const matchShotMissed = 'Trượt';
   static const matchShotFoul = 'Phạm lỗi';
-  static const matchShotScratch = 'Scratch';
+  static const matchShotScratch = 'Chết cái';
   static const matchCompleted = 'Đã kết thúc';
   static const matchInProgress = 'Đang diễn ra';
   static const matchNameRequired = 'Nhập tên của cả hai người chơi.';
@@ -178,6 +195,47 @@ abstract final class Vi {
     int opponentScore,
     String opponent,
   ) => '$player $playerScore – $opponentScore $opponent';
+  // --- Phân tích trận (spec 2026-10-28) ---
+  static const matchAnalysisOpen = 'Phân tích trận';
+  static String matchAnalysisRacks(int withShots, int full) =>
+      '$withShots ván có ghi cú · $full ván ghi đủ';
+  static const matchAnalysisNoShots =
+      'Trận này chưa ghi cú đánh nên chưa phân tích được nguyên nhân. '
+      'Ghi cú ở trận sau để xem phân tích.';
+  static const matchAnalysisLostTitle = 'Nguyên nhân mất ván';
+  static String lostRackCause(LostRackCause c, int n) => switch (c) {
+    LostRackCause.offensiveMiss => 'Mất $n ván sau khi trượt cú tấn công',
+    LostRackCause.safety => 'Mất $n ván sau cú phòng thủ',
+    LostRackCause.foul => 'Mất $n ván sau khi phạm lỗi',
+    LostRackCause.scratch => 'Mất $n ván sau khi chết cái',
+    LostRackCause.dryBreak => 'Mất $n ván sau khi phá khô',
+    LostRackCause.opponentBreakAndRun => 'Đối thủ phá-và-dọn $n ván',
+    LostRackCause.notFull => '$n ván thua chưa ghi đủ cú',
+    LostRackCause.unclear => '$n ván thua chưa rõ nguyên nhân',
+  };
+  static const matchAnalysisBreakTitle = 'Phá';
+  static String matchAnalysisBreak(int shots, int made, int breakAndRuns) =>
+      'Phá $shots ván, vào bi $made, phá-và-dọn $breakAndRuns';
+  static String matchAnalysisOpponentBreak(
+    String name,
+    int shots,
+    int made,
+    int breakAndRuns,
+  ) => '$name: phá $shots ván, vào bi $made, phá-và-dọn $breakAndRuns';
+  static const matchAnalysisPositionTitle = 'Điều bi và lỗi';
+  static String matchAnalysisPositionFouls(
+    int failed,
+    int assessed,
+    int fouls,
+    int scratches,
+  ) => 'Điều bi hỏng $failed/$assessed, phạm lỗi $fouls, chết cái $scratches';
+  static const matchAnalysisFocusTitle = 'Nên luyện';
+  static String matchAnalysisFocus(String skill, int failures, int attempts) =>
+      '$skill: hỏng $failures/$attempts lần trong trận này';
+  static String matchAnalysisFocusDrill(String drill) => 'Bài nên tập: $drill';
+  static const matchAnalysisFocusNone =
+      'Trong trận này chưa có nhóm nào đủ '
+      '${MatchAnalysisConstants.singleMatchMinAttempts} lần thử và vượt ngưỡng yếu.';
   static String matchRaceTo(int target) => 'Chạm $target ván thắng';
   static String matchRackProgress(int count) => '$count ván đã ghi';
   static String matchRackLabel(int number) => 'Ván $number';
@@ -266,7 +324,7 @@ abstract final class Vi {
   static const statsSafeties = 'Cú phòng thủ';
   static const statsMisses = 'Cú trượt';
   static const statsFouls = 'Lỗi';
-  static const statsScratches = 'Scratch';
+  static const statsScratches = 'Chết cái';
   static const statsPositionSuccess = 'Vị trí bi cái đạt ý đồ';
   static const statsNoShotRecords = 'Chưa có dữ liệu cú đánh.';
   static const statsSkills = 'Tiến bộ theo nhóm kỹ năng';
@@ -277,8 +335,69 @@ abstract final class Vi {
   static const statsNoTraining =
       'Hoàn thành bài tập hoặc lưu buổi tập tự do để bắt đầu thống kê.';
   static const statsTargetAverage = 'Trung bình mục tiêu';
-  static const statsMatchAnalysisNotAvailable =
-      'Phân tích cú đánh, break, safety và vị trí sẽ có khi ghi nhận chi tiết từng cú.';
+  static const statsMatchAnalysisTitle = 'Phân tích trận gần đây';
+  static String statsMatchAnalysisBasis(int matches, int fullRacks) =>
+      'Dựa trên $matches trận, $fullRacks ván ghi đủ';
+  static const statsMatchAnalysisEmpty =
+      'Chưa có trận hoàn tất nào có ghi cú. Ghi cú trong trận để xem phân tích.';
+  static String statsBreakLine(
+    int shots,
+    int madePercent,
+    int dry,
+    int fouls,
+    int scratches,
+  ) =>
+      'Phá: $shots cú · vào bi $madePercent% · phá khô $dry · phạm lỗi $fouls · chết cái $scratches';
+  static String statsBreakAndRun(int breakAndRuns, int racksBroken) =>
+      'Phá-và-dọn: $breakAndRuns/$racksBroken ván bạn phá';
+  static String statsRunOuts(int n) => 'Dọn bàn: $n ván';
+  static String statsOffense(int missed, int shots, int percent) =>
+      'Tấn công: trượt $missed/$shots cú thường ($percent%)';
+  static String statsPositionMiss(int failed, int assessed, int percent) =>
+      'Điều bi hỏng: $failed/$assessed cú có ghi vị trí ($percent%)';
+
+  /// Mỗi nửa chỉ hiện khi mẫu số của nó lớn hơn 0; cả hai bằng 0 thì rỗng.
+  static String statsPositionFollowUp(
+    int afterFailed,
+    int nextFailed,
+    int afterGood,
+    int nextGood,
+  ) {
+    final parts = [
+      if (nextFailed > 0) '$afterFailed/$nextFailed sau điều bi hỏng',
+      if (nextGood > 0) '$afterGood/$nextGood sau điều bi tốt',
+    ];
+    return parts.isEmpty ? '' : 'Trượt cú kế tiếp: ${parts.join(', ')}';
+  }
+
+  /// Mỗi nửa chỉ hiện khi mẫu số của nó lớn hơn 0; cả hai bằng 0 thì rỗng.
+  static String statsSafety(
+    int successful,
+    int assessed,
+    int safetyTurnovers,
+    int proactive,
+  ) {
+    final parts = [
+      if (assessed > 0) 'thành công $successful/$assessed',
+      if (proactive > 0)
+        '$safetyTurnovers/$proactive lần mất lượt chủ động là phòng thủ',
+    ];
+    return parts.isEmpty ? '' : 'Phòng thủ: ${parts.join(' · ')}';
+  }
+
+  static String statsErrors(int fouls, int scratches, int shots) =>
+      'Phạm lỗi $fouls, chết cái $scratches trên $shots cú';
+  static const statsMatchWeakTitle = 'Nhóm yếu khi thi đấu';
+  static String statsMatchWeak(
+    String skill,
+    int failures,
+    int attempts,
+    int percent,
+  ) => '$skill: hỏng $failures/$attempts lần ($percent%)';
+  static const statsMatchWeakNone =
+      'Chưa đủ dữ liệu để kết luận (cần ít nhất ${MatchAnalysisConstants.minMatches} trận và ${MatchAnalysisConstants.minAttempts} lần thử mỗi nhóm).';
+  static String statsMatchWeakNoneOverThreshold(int matches) =>
+      'Không nhóm nào đủ mẫu vượt ngưỡng yếu trong $matches trận gần đây.';
   static String statsMatchCount(int recorded, int completed) =>
       '$recorded ($completed)';
   static String statsPositionCount(int success, int assessed) =>
@@ -460,7 +579,7 @@ abstract final class Vi {
   /// Khi nhóm hôm nay đã tập hết bài.
   ///
   /// Không đổi sang bài của nhóm khác: gợi ý phải trung thành với
-  /// nhóm mà sáu luật ưu tiên đã chọn, nói thật là hết bài thì hơn.
+  /// nhóm mà bảy luật ưu tiên đã chọn, nói thật là hết bài thì hơn.
   static const homeDrillAllDone =
       'Hôm nay bạn đã tập hết bài trong nhóm này rồi.';
 
@@ -1645,7 +1764,7 @@ abstract final class Vi {
 
   static String goalKindBody(GoalKind kind) => switch (kind) {
     GoalKind.lenHang =>
-      'Nhắm hạng ngay trên hạng hiện tại, theo điểm BU còn thiếu.',
+      'Chọn hạng đích, từ hạng ngay trên tới hạng A, theo điểm BU còn thiếu.',
     GoalKind.thuanThucKyNang =>
       'Chọn một nhóm kỹ năng, tập tới khi đạt ${PracticeConstants.strongCutoff} '
           'và ${PracticeConstants.readyStreak} buổi đạt liên tiếp.',
@@ -1655,6 +1774,7 @@ abstract final class Vi {
 
   static const goalPickTitle = 'Chọn mục tiêu';
   static const goalPickDate = 'Chọn ngày giải';
+  static const goalTargetRankTitle = 'Lên tới hạng';
 
   static String goalBlocked(LenHangBlock block) => switch (block) {
     LenHangBlock.noRank => 'Cần có hạng trước khi đặt mục tiêu lên hạng.',
@@ -1713,7 +1833,16 @@ abstract final class Vi {
               : '${skill(step.category!)} · $drillName',
         StepKind.buLe => 'Tập lại ${step.buDrillIds.join('/')} trên bàn BU',
         StepKind.baiTap => drillName ?? step.drillId!,
-        StepKind.lamBaiBu => 'Làm bài BU',
+        StepKind.lamBaiBu => switch (step.reason) {
+          RankMilestone(:final rank, :final retake) =>
+            '${retake ? 'Làm lại' : 'Làm'} bài BU — mốc hạng ${rank.label}',
+          _ => 'Làm bài BU',
+        },
+        StepKind.dauTap => switch (step.reason) {
+          NotEnoughMatches(:final have, :final need) =>
+            'Đấu tập: ghi ít nhất ${need - have} trận có ghi cú',
+          _ => 'Đấu tập',
+        },
       };
 
   static String stepProgress(int? mastery, int streak) =>
@@ -1737,7 +1866,14 @@ abstract final class Vi {
     DrillLevel(:final level) => 'Bài cấp $level của nhóm.',
     RetestFrom(:final from) =>
       from == null ? 'Làm được ngay.' : 'Mở từ ngày ${shortDate(from)}.',
+    RankMilestone(:final rank) =>
+      'Đạt ${buFloor(rank)} điểm BU là lên hạng ${rank.label}.',
     NeedRank() => 'Làm bộ câu hỏi hoặc bài BU để có hạng.',
+    MatchWeakness(:final failures, :final attempts) =>
+      'Hỏng $failures/$attempts lần trong các trận gần đây.',
+    NotEnoughMatches(:final have, :final need) =>
+      'Có $have/$need trận có ghi cú trong '
+          '${MatchAnalysisConstants.matchWindowDays} ngày qua.',
   };
 
   static String estimateLine(Estimate estimate) => estimate.date == null
@@ -1745,6 +1881,7 @@ abstract final class Vi {
       : 'Dự kiến: ${shortDate(estimate.date!)}';
 
   static const stepTrain = 'Tập ngay';
+  static const stepRecordMatch = 'Ghi trận';
   static const stepOpenTest = 'Làm bài kiểm tra';
   static const roadmapMissedTitle = 'Không kịp trước giải';
   static const achievementsTitle = 'Thành tích';
@@ -1759,6 +1896,21 @@ abstract final class Vi {
       };
 
   static String homeCurrentStep(String step) => 'Bước hiện tại: $step';
+
+  /// Gợi ý làm lại bài BU (spec 2026-10-28 mục 6.5): nhóm và hạng do
+  /// rankCheckSignal điền, không có suy diễn nào ngoài dữ liệu.
+  static String rankCheck(RankCheckSignal s) {
+    final skills = s.categories.map(skill).join(', ');
+    final rank = s.rank.label;
+    return switch ((s.direction, s.basis)) {
+      (RankCheckDirection.down, RankCheckBasis.drills) =>
+        'Kết quả tập gần đây ở $skills đang đi xuống — làm lại bài BU để kiểm tra hạng $rank.',
+      (RankCheckDirection.down, RankCheckBasis.matches) =>
+        'Khi thi đấu gần đây, $skills đang yếu — làm lại bài BU để kiểm tra hạng $rank.',
+      (RankCheckDirection.up, _) =>
+        'Kết quả tập gần đây ở $skills đang đi lên — làm lại bài BU để thử hạng $rank.',
+    };
+  }
 
   // ─── Coach tình huống — docs/superpowers/specs/2026-10-21-poolcoachai-coach-design.md mục 15.
   // Mọi câu có tham số đều do hàm thuần của lib/domain/coach điền; ở đây chỉ
@@ -1819,6 +1971,7 @@ abstract final class Vi {
   static String coachRecReason(CoachTopicReason reason, CoachTopic topic) => switch (reason) {
     CoachTopicReason.sameAsToday => 'Cùng nhóm với gợi ý hôm nay: ${coachTopic(topic)}.',
     CoachTopicReason.weakest => '${coachTopic(topic)} là nhóm yếu nhất có tình huống để luyện.',
+    CoachTopicReason.matchWeakness => '${coachTopic(topic)} đang yếu trong các trận gần đây.',
     CoachTopicReason.lowest => 'Bắt đầu với ${coachTopic(topic)}.',
   };
 

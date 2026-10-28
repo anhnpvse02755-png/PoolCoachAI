@@ -1,20 +1,30 @@
 import 'dart:ui' show Size;
 
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
+import '../../support/roadmap_fixtures.dart';
 import '../../support/test_data.dart';
 
 /// AI Home — mục 6.1 của thiết kế.
@@ -27,6 +37,9 @@ void main() {
     List<TimerSession>? timerSessions,
     List<ScheduleSlot>? schedule,
     GoalRecord? goal,
+    PlayerRank? rank,
+    BuResult? buResult,
+    Stream<List<BuTest>>? buTestsStream,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -37,6 +50,9 @@ void main() {
       timerSessions: timerSessions,
       schedule: schedule,
       goal: goal,
+      rank: rank,
+      buResult: buResult,
+      buTestsStream: buTestsStream,
     );
     addTearDown(container.dispose);
 
@@ -53,6 +69,14 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('bài BU đọc lỗi: Home vẫn hiện gợi ý, không báo lỗi', (tester) async {
+    await openHome(tester, buTestsStream: Stream.error(StateError('bu offline')));
+
+    expect(find.text(Vi.dataErrorTitle), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text(Vi.homeDrillTitle), findsOneWidget);
+  });
 
   testWidgets('chưa tập buổi nào thì chuỗi ngày tập là 0, hiện bình thường', (
     tester,
@@ -170,5 +194,52 @@ void main() {
   ) async {
     await openHome(tester);
     expect(find.textContaining('Bước hiện tại'), findsNothing);
+  });
+
+  testWidgets('Trang chủ hiện gợi ý kiểm tra lại hạng dù chưa có mục tiêu', (tester) async {
+    await openHome(
+      tester,
+      drills: roadmapDrills,
+      logs: decliningLogs(testToday.subtract(const Duration(days: 10))),
+      rank: PlayerRank(
+        rank: Rank.d,
+        source: RankSource.verified,
+        buScore: 137,
+        testId: 't1',
+        onboardingState: OnboardingState.done,
+        updatedAt: testToday,
+      ),
+      buResult: buResultGraded(completedAt: testToday.subtract(const Duration(days: 30))),
+    );
+    const signal = RankCheckSignal(
+      direction: RankCheckDirection.down,
+      basis: RankCheckBasis.drills,
+      categories: [SkillCategory.aiming, SkillCategory.position],
+      rank: Rank.d,
+    );
+    expect(find.text(Vi.rankCheck(signal)), findsOneWidget);
+    expect(find.textContaining('Bước hiện tại'), findsNothing);
+  });
+
+  testWidgets('bài BU hoàn tất thiếu bản Đề II (dữ liệu đồng bộ hỏng): Trang chủ vẫn dựng xong', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.buTestRows).insert(BuTestRowsCompanion.insert(
+        id: 'hong', userId: 'u1', startedAt: testToday, tableSize: 'nineFootPlus',
+        completedAt: Value(testToday.subtract(const Duration(days: 3))),
+        totalScore: const Value(80), resultRank: const Value('g')));
+    final container = dbContainer(db);
+    addTearDown(container.dispose);
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container, child: PoolCoachApp(router: router)));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text(Vi.homeStreakUnit), findsOneWidget);
+    expect(find.text(Vi.homeDrillTitle), findsOneWidget);
   });
 }

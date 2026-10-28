@@ -100,6 +100,11 @@ void main() {
     expect(Vi.coachHintOne(const HintPathBlocked(1, Pocket.topLeft)), contains('bi ảo'));
   });
 
+  test('lý do matchWeakness nêu nhóm yếu trong các trận gần đây', () {
+    expect(Vi.coachRecReason(CoachTopicReason.matchWeakness, CoachTopic.position),
+        'Điều bi / Vị trí đang yếu trong các trận gần đây.');
+  });
+
   test('không có chữ cấm trong mọi câu Coach', () {
     final all = [
       ...hintOnes.map(Vi.coachHintOne),

@@ -1,16 +1,19 @@
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/data/database/assessment_converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -76,6 +79,72 @@ void main() {
       (await db.select(db.playerGoalRows).getSingle()).kind,
       GoalKind.thuanThucKyNang.name,
     );
+  });
+
+  Future<void> seedRankH(AppDatabase db) => db.into(db.playerRankRows).insert(
+        toPlayerRankRow(
+          PlayerRank(
+            rank: Rank.h,
+            source: RankSource.estimated,
+            onboardingState: OnboardingState.done,
+            updatedAt: testToday,
+          ),
+          userId: 'u1',
+        ),
+      );
+
+  testWidgets('chọn Lên hạng rồi chọn hạng F: lưu hạng đích F', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedRankH(db);
+    await open(tester, dbContainer(db));
+    await tester.tap(find.text(Vi.goalKind(GoalKind.lenHang)));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.goalTargetRankTitle), findsOneWidget);
+    expect(find.byKey(const Key('goal-target-a')), findsOneWidget);
+    expect(find.byKey(const Key('goal-target-h')), findsNothing);
+    await tester.tap(find.byKey(const Key('goal-target-f')));
+    await tester.pumpAndSettle();
+    expect((await db.select(db.playerGoalRows).get()).single.targetRank, 'f');
+    expect(find.text('Lên hạng: H → F'), findsOneWidget);
+  });
+
+  testWidgets('chọn hạng kế tiếp thì lưu hạng đích rỗng', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedRankH(db);
+    await open(tester, dbContainer(db));
+    await tester.tap(find.text(Vi.goalKind(GoalKind.lenHang)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('goal-target-g')));
+    await tester.pumpAndSettle();
+    final row = (await db.select(db.playerGoalRows).get()).single;
+    expect(row.kind, GoalKind.lenHang.name);
+    expect(row.targetRank, isNull);
+    expect(find.text('Lên hạng: H → G'), findsOneWidget);
+  });
+
+  testWidgets('mục tiêu lên 2 hạng: màn lộ trình vẽ bước mốc hạng không lỗi', (tester) async {
+    await open(
+      tester,
+      testContainer(
+        goal: goal(PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.f)),
+        rank: PlayerRank(
+          rank: Rank.h,
+          source: RankSource.estimated,
+          onboardingState: OnboardingState.done,
+          updatedAt: at,
+        ),
+      ),
+    );
+    expect(find.text('Lên hạng: H → F'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Làm bài BU — mốc hạng G'),
+      200,
+      scrollable: roadmapList,
+    );
+    expect(find.text('Đạt ${buFloor(Rank.g)} điểm BU là lên hạng G.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Tập ngay mở buổi tập của bài trong bước', (tester) async {
@@ -226,11 +295,33 @@ void main() {
         logs: logs,
       ),
     );
+    // Chưa có trận nào có ghi cú: bước đầu là Đấu tập, nút mở Thi đấu.
+    expect(find.text(Vi.stepRecordMatch), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text(Vi.roadmapMissedTitle),
       200,
       scrollable: roadmapList,
     );
     expect(find.text(Vi.roadmapMissedTitle), findsOneWidget);
+  });
+
+  testWidgets('danh sách trận lỗi: Lộ trình báo lỗi đọc dữ liệu, không quay mãi', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      testContainer(
+        goal: goal(PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at)),
+        rank: PlayerRank(
+          rank: Rank.h,
+          source: RankSource.estimated,
+          onboardingState: OnboardingState.done,
+          updatedAt: at,
+        ),
+        matchesStream: Stream.error(StateError('matches offline')),
+      ),
+    );
+    expect(find.text(Vi.dataErrorTitle), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 }

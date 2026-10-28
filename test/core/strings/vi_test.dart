@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 
 void main() {
   group('Vi', () {
@@ -48,6 +50,28 @@ void main() {
         expect(Vi.pickReason(reason, 'Cân bi'), contains('Cân bi'),
             reason: reason.name);
       }
+    });
+
+    test('lý do yếu trong trận nói số trận, số lần hỏng và tỷ lệ', () {
+      expect(
+        Vi.pickReason(
+          PickReason.matchWeakness,
+          'Điều bi / Vị trí',
+          signal: const SkillSignal(
+            category: SkillCategory.position,
+            failures: 6,
+            attempts: 10,
+            matches: 3,
+          ),
+        ),
+        'Trong 3 trận gần đây, Điều bi / Vị trí hỏng 6/10 lần (60%).',
+      );
+    });
+
+    test('lý do yếu trong trận không có tín hiệu thì không có con số', () {
+      final text = Vi.pickReason(PickReason.matchWeakness, 'Phá');
+      expect(text, 'Phá đang yếu khi thi đấu.');
+      expect(RegExp(r'\d').hasMatch(text), isFalse);
     });
 
     test('đúng khuôn câu đã chốt ở mục 6.1 của thiết kế', () {

@@ -31,9 +31,10 @@ void main() {
     List<DrillLog> logs = const [],
     List<BuTest> tests = const [],
     BuResult? result,
+    PlayerGoal? target,
   }) =>
       buildRoadmap(
-        goal: goal,
+        goal: target ?? goal,
         rank: r,
         drills: roadmapDrills,
         logs: logs,
@@ -220,5 +221,131 @@ void main() {
 
   test('Lên hạng không bao giờ đạt xong: lên hạng thì đích tự chuyển', () {
     expect(build(r: rank(Rank.h)).achieved, isFalse);
+  });
+
+  group('lên nhiều hạng một lúc', () {
+    PlayerGoal to(Rank r) =>
+        PlayerGoal(goalId: 'g2', kind: GoalKind.lenHang, createdAt: on(10, 1), targetRank: r);
+
+    (StepKind, SkillCategory?, Rank?) shape(RoadmapStep s) =>
+        (s.kind, s.category, s.reason is RankMilestone ? (s.reason as RankMilestone).rank : null);
+
+    test('lên 2 hạng có BU: mốc trung gian sau khối bài đủ điểm của mốc đó', () {
+      final r = build(
+        r: rank(Rank.h, source: RankSource.verified),
+        target: to(Rank.f),
+        result: result(50, const {'F7': 20, 'F2': 15, 'S5': 12}),
+      );
+      expect(r.steps.map(shape), [
+        (StepKind.nhom, SkillCategory.aiming, null),
+        (StepKind.lamBaiBu, null, Rank.g),
+        (StepKind.nhom, SkillCategory.position, null),
+        (StepKind.nhom, SkillCategory.safety, null),
+        (StepKind.lamBaiBu, null, null),
+      ]);
+      expect([r.target, r.pointsNeeded], [Rank.f, 45]);
+      expect(r.from, Rank.h);
+    });
+
+    test('lên 2 hạng chưa có BU: các mốc đứng sau bước nhóm, trước bước BU cuối', () {
+      final r = build(r: rank(Rank.h), target: to(Rank.e));
+      final shapes = r.steps.map(shape).toList();
+      expect(shapes.where((x) => x.$3 != null).map((x) => x.$3), [Rank.g, Rank.f]);
+      expect(shapes.last, (StepKind.lamBaiBu, null, null));
+      expect(shapes[shapes.length - 2].$3, Rank.f);
+      expect(shapes[shapes.length - 3].$3, Rank.g);
+      expect(shapes.take(shapes.length - 3).every((x) => x.$1 == StepKind.nhom), isTrue);
+      expect(r.target, Rank.e);
+      expect(r.pointsNeeded, isNull);
+    });
+
+    test('mốc mang cổng làm lại BU; có BU thì làm lại, chưa có BU thì làm', () {
+      final gate = DateTime(2026, 11, 3);
+      final tests = [
+        BuTest(
+          id: 't1',
+          startedAt: DateTime(2026, 10, 20, 8),
+          tableSize: TableSize.nineFootPlus,
+          completedAt: DateTime(2026, 10, 20, 9),
+        ),
+      ];
+      final withBu = build(
+        r: rank(Rank.h, source: RankSource.verified),
+        target: to(Rank.f),
+        result: result(50, const {'F7': 20}),
+        tests: tests,
+      );
+      final m1 = withBu.steps.firstWhere((s) => s.reason is RankMilestone).reason as RankMilestone;
+      expect([m1.rank, m1.retake, m1.from], [Rank.g, true, gate]);
+      final noBu = build(r: rank(Rank.h), target: to(Rank.f));
+      final m2 = noBu.steps.firstWhere((s) => s.reason is RankMilestone).reason as RankMilestone;
+      expect([m2.rank, m2.retake, m2.from], [Rank.g, false, null]);
+    });
+
+    test('BU gần nhất đã vượt sàn hạng đích: điểm còn thiếu là 0, không âm', () {
+      final r = build(
+        r: rank(Rank.h),
+        target: to(Rank.f),
+        result: result(100, const {'F7': 5}),
+      );
+      expect(r.target, Rank.f);
+      expect(r.pointsNeeded, 0);
+      expect(r.steps.map(shape).first, (StepKind.lamBaiBu, null, Rank.g));
+      expect(r.steps.last.reason, isA<RetestFrom>());
+    });
+
+    test('mốc đã đủ điểm đứng đầu danh sách', () {
+      final r = build(
+        r: rank(Rank.h, source: RankSource.verified),
+        target: to(Rank.f),
+        result: result(75, const {'F7': 20, 'F2': 15}),
+      );
+      expect(r.steps.map(shape).first, (StepKind.lamBaiBu, null, Rank.g));
+      expect(r.pointsNeeded, 20);
+    });
+
+    test('mốc chưa xếp khi hết bài thì đứng ngay trước bước BU cuối', () {
+      final r = build(
+        r: rank(Rank.h, source: RankSource.verified),
+        target: to(Rank.f),
+        result: result(50, const {'F7': 3}),
+      );
+      expect(r.steps.map(shape), [
+        (StepKind.nhom, SkillCategory.aiming, null),
+        (StepKind.lamBaiBu, null, Rank.g),
+        (StepKind.lamBaiBu, null, null),
+      ]);
+    });
+
+    test('targetRank null: hành vi cũ, đích là hạng kế tiếp, không mốc', () {
+      final r = build(r: rank(Rank.h));
+      expect(r.target, Rank.g);
+      expect(r.steps.any((s) => s.reason is RankMilestone), isFalse);
+    });
+
+    test('đã đạt hoặc vượt hạng đích: quay về hạng kế tiếp, không điểm âm', () {
+      final r = build(
+        r: rank(Rank.f, source: RankSource.verified),
+        target: to(Rank.g),
+        result: result(100, const {'F7': 20}),
+      );
+      expect(r.target, Rank.e);
+      expect(r.steps.any((s) => s.reason is RankMilestone), isFalse);
+      expect(r.pointsNeeded, buFloor(Rank.e) - 100);
+      expect(r.steps, isNotEmpty);
+      final same = build(r: rank(Rank.g), target: to(Rank.g));
+      expect(same.target, Rank.f);
+    });
+
+    test('effectiveTarget và targetRankChoices', () {
+      expect(effectiveTarget(to(Rank.f), Rank.h), Rank.f);
+      expect(effectiveTarget(to(Rank.g), Rank.g), Rank.f);
+      expect(effectiveTarget(goal, Rank.h), Rank.g);
+      expect(effectiveTarget(goal, Rank.a), isNull);
+      expect(targetRankChoices(Rank.h), [Rank.g, Rank.f, Rank.e, Rank.d, Rank.c, Rank.b, Rank.a]);
+      expect(targetRankChoices(Rank.b), [Rank.a]);
+      expect(targetRankChoices(Rank.a), isEmpty);
+      expect(targetRankChoices(Rank.pro), isEmpty);
+    });
   });
 }

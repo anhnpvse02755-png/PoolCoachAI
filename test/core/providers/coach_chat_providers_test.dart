@@ -21,7 +21,9 @@ import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_context.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -60,6 +62,8 @@ void main() {
     AsyncValue<List<TimerSession>>? timerSessions,
     AsyncValue<List<ScheduleSlot>>? schedule,
     AsyncValue<List<DrillLog>>? drillLogs,
+    AsyncValue<List<Drill>>? drills,
+    AsyncValue<BuResult?>? latestBu,
   }) => [
         playerIntelligenceProvider.overrideWithValue(computePlayerIntelligence(drills: seedDrills, logs: const [])),
         playerRankProvider.overrideWithValue(
@@ -75,6 +79,8 @@ void main() {
         timerSessionsProvider.overrideWithValue(timerSessions ?? const AsyncData<List<TimerSession>>([])),
         scheduleProvider.overrideWithValue(schedule ?? const AsyncData<List<ScheduleSlot>>([])),
         drillLogsProvider.overrideWithValue(drillLogs ?? const AsyncData<List<DrillLog>>([])),
+        drillsProvider.overrideWithValue(drills ?? const AsyncData<List<Drill>>([])),
+        latestBuResultProvider.overrideWithValue(latestBu ?? const AsyncData<BuResult?>(null)),
       ];
 
   test(
@@ -104,6 +110,34 @@ void main() {
       expect(container.read(coachContextProvider).isLoading, isTrue);
     },
   );
+
+  test('bài BU lỗi: context lỗi, PI không che lỗi này', () async {
+    final error = Exception('fx-bu-error');
+    final container = ProviderContainer(
+      overrides: readySourcesExcept(latestBu: AsyncError<BuResult?>(error, StackTrace.empty)),
+    );
+    addTearDown(container.dispose);
+    container.listen(coachContextProvider, (_, _) {});
+    await pumpEventQueue();
+
+    final result = container.read(coachContextProvider);
+    expect(result.hasError, isTrue);
+    expect(result.error, error);
+  });
+
+  test('danh sách bài tập lỗi: context lỗi', () async {
+    final error = Exception('fx-drills-error');
+    final container = ProviderContainer(
+      overrides: readySourcesExcept(drills: AsyncError<List<Drill>>(error, StackTrace.empty)),
+    );
+    addTearDown(container.dispose);
+    container.listen(coachContextProvider, (_, _) {});
+    await pumpEventQueue();
+
+    final result = container.read(coachContextProvider);
+    expect(result.hasError, isTrue);
+    expect(result.error, error);
+  });
 
   test('một nguồn lỗi: context lỗi luôn, dù các nguồn khác đã sẵn sàng', () async {
     final error = Exception('fx-rank-error');

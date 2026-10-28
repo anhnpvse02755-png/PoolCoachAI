@@ -11,6 +11,7 @@ import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/retest_gate.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_badge_line.dart';
+import 'package:poolcoachai/features/rank/presentation/rank_check_line.dart';
 
 /// Thẻ hạng của Hồ sơ (spec mục 7.4).
 class RankCard extends ConsumerWidget {
@@ -42,6 +43,7 @@ class RankCard extends ConsumerWidget {
             Text(Vi.rankWarning(rank!.warningRank!),
                 style: const TextStyle(color: AppColors.warning)),
           ],
+          const RankCheckLine(),
           if (last != null) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(Vi.rankLastTest(last.completedAt!, last.totalScore!, last.resultRank!)),

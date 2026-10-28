@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
@@ -23,15 +24,20 @@ class GoalPicker extends ConsumerStatefulWidget {
 
 class _GoalPickerState extends ConsumerState<GoalPicker> {
   bool _pickingCategory = false;
+  bool _pickingRank = false;
 
   Future<void> _set(
     GoalKind kind, {
     SkillCategory? category,
     DateTime? eventDate,
+    Rank? targetRank,
   }) async {
-    await ref
-        .read(roadmapRepositoryProvider)!
-        .setGoal(kind: kind, category: category, eventDate: eventDate);
+    await ref.read(roadmapRepositoryProvider)!.setGoal(
+          kind: kind,
+          category: category,
+          eventDate: eventDate,
+          targetRank: targetRank,
+        );
     if (mounted) widget.onPicked();
   }
 
@@ -51,7 +57,9 @@ class _GoalPickerState extends ConsumerState<GoalPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final block = lenHangBlock(ref.watch(playerRankProvider).value);
+    final playerRank = ref.watch(playerRankProvider).value;
+    final block = lenHangBlock(playerRank);
+    final from = playerRank?.rank;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -66,7 +74,9 @@ class _GoalPickerState extends ConsumerState<GoalPicker> {
                   ? Vi.goalKindBody(GoalKind.lenHang)
                   : Vi.goalBlocked(block),
             ),
-            onTap: block == null ? () => _set(GoalKind.lenHang) : null,
+            onTap: block == null
+                ? () => setState(() => _pickingRank = !_pickingRank)
+                : null,
             trailing: block == LenHangBlock.noRank
                 ? TextButton(
                     onPressed: () => context.push(Routes.onboardingRank),
@@ -75,6 +85,35 @@ class _GoalPickerState extends ConsumerState<GoalPicker> {
                 : null,
           ),
         ),
+        if (_pickingRank && block == null && from != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Vi.goalTargetRankTitle,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final r in targetRankChoices(from))
+                      ActionChip(
+                        key: Key('goal-target-${r.name}'),
+                        label: Text(r.label),
+                        onPressed: () => _set(
+                          GoalKind.lenHang,
+                          targetRank: r == nextRank(from) ? null : r,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 8),
         PcCard(
           child: ListTile(

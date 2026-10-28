@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/config.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/coach_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
@@ -27,28 +28,14 @@ final coachChatBackendProvider = Provider<CoachChatBackend>(
   ),
 );
 
-/// Đã tải xong và không phải giá trị cũ của tài khoản trước (đang tải lại) —
-/// như `_ready` trong `roadmap_providers.dart`. Chỉ `hasValue` là chưa đủ:
-/// một `StreamProvider` đang xây lại (vd. đổi tài khoản) vẫn giữ giá trị cũ
-/// kèm `isLoading == true`; dùng giá trị đó sẽ lẫn dữ liệu tài khoản trước
-/// vào ngữ cảnh Coach Chat của tài khoản mới (controller review Task 9).
-bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
-
+/// Nguồn đang tải lại còn giá trị cũ của tài khoản trước được `gate` tính là
+/// đang tải (controller review Task 9).
 /// Ngữ cảnh gửi cho Coach Chat (R21): gộp sáu nguồn, mọi số đã tính sẵn
 /// (spec Giai đoạn B mục 7 — LLM chỉ diễn giải, không tính lại).
 ///
-/// `timerSessionsProvider`/`scheduleProvider`/`drillLogsProvider` được canh
-/// TRỰC TIẾP ở đây (không chỉ qua `todayRecommendationProvider`, vốn chỉ
-/// kiểm `hasValue` cho ba nguồn này — xem `recommendation_provider.dart` —
-/// nên có thể lọt giá trị cũ của tài khoản trước trong lúc đổi tài khoản).
-/// `drillLogsProvider` trước đây chỉ được canh GIÁN TIẾP qua `_ready
-/// (roadmapAsync)` (vì `roadmapProvider` tự canh nó nội bộ) — không đủ tin
-/// cậy vì đó là tác dụng phụ của logic khác, không phải một ràng buộc cục
-/// bộ của provider này (I2, review Task 11 fix round 1, probe F2: buổi tập
-/// hẹn giờ — `timerSessionsProvider` — tải lại chậm 100 ms khi đổi tài
-/// khoản vẫn lọt qua `_ready(todayAsync)`, vì `todayRecommendationProvider`
-/// không phân biệt "sẵn sàng" với "còn giá trị cũ, đang tải lại" cho ba
-/// nguồn này).
+/// `timerSessionsProvider`/`scheduleProvider`/`drillLogsProvider` được canh TRỰC TIẾP ở đây
+/// vì `todayRecommendationProvider` gate mọi nguồn của nó bằng `gate()`; lỗi BU được coi là không có kết quả BU trên Home.
+/// Canh trực tiếp để không lọt giá trị cũ của tài khoản trước khi đang tải lại.
 final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final pi = ref.watch(playerIntelligenceProvider);
   final rankAsync = ref.watch(playerRankProvider);
@@ -59,27 +46,25 @@ final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final timerSessionsAsync = ref.watch(timerSessionsProvider);
   final scheduleAsync = ref.watch(scheduleProvider);
   final drillLogsAsync = ref.watch(drillLogsProvider);
+  final drillsAsync = ref.watch(drillsProvider);
+  final buAsync = ref.watch(latestBuResultProvider);
 
-  if (rankAsync.hasError) return AsyncError(rankAsync.error!, rankAsync.stackTrace!);
-  if (roadmapAsync.hasError) return AsyncError(roadmapAsync.error!, roadmapAsync.stackTrace!);
-  if (attemptsAsync.hasError) return AsyncError(attemptsAsync.error!, attemptsAsync.stackTrace!);
-  if (todayAsync.hasError) return AsyncError(todayAsync.error!, todayAsync.stackTrace!);
-  if (matchesAsync.hasError) return AsyncError(matchesAsync.error!, matchesAsync.stackTrace!);
-  if (timerSessionsAsync.hasError) return AsyncError(timerSessionsAsync.error!, timerSessionsAsync.stackTrace!);
-  if (scheduleAsync.hasError) return AsyncError(scheduleAsync.error!, scheduleAsync.stackTrace!);
-  if (drillLogsAsync.hasError) return AsyncError(drillLogsAsync.error!, drillLogsAsync.stackTrace!);
-
-  if (pi == null ||
-      !_ready(rankAsync) ||
-      !_ready(roadmapAsync) ||
-      !_ready(attemptsAsync) ||
-      !_ready(todayAsync) ||
-      !_ready(matchesAsync) ||
-      !_ready(timerSessionsAsync) ||
-      !_ready(scheduleAsync) ||
-      !_ready(drillLogsAsync)) {
-    return const AsyncLoading();
-  }
+  // PI trả null khi một nguồn lỗi, nên lỗi của bài tập và bài BU phải được
+  // chuyển tiếp ở đây, không để chat quay mãi.
+  final blocked = gate<CoachContext>([
+    rankAsync,
+    roadmapAsync,
+    attemptsAsync,
+    todayAsync,
+    matchesAsync,
+    timerSessionsAsync,
+    scheduleAsync,
+    drillLogsAsync,
+    drillsAsync,
+    buAsync,
+  ]);
+  if (blocked != null) return blocked;
+  if (pi == null) return const AsyncLoading();
 
   return AsyncData(
     buildCoachContext(

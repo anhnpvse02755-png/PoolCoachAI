@@ -14,6 +14,11 @@
 //      lib/domain/training_statistics.dart): mở /stats, đọc nhãn semantics
 //      của đúng hôm nay trong biểu đồ tuần, kiểm tra phản ánh đúng 1 buổi tập
 //      và ĐÚNG 1 trận — xem bước 9 dưới để biết vì sao phải là 1, không phải 2.
+//   4) Phân tích trận (play_screen.dart + match_analysis_sheet.dart): trận C
+//      race-to 3, ván 1 ghi đủ cú rồi mất ván; mở 'Phân tích trận' và đọc nguyên
+//      nhân mất ván 'Mất 1 ván sau khi trượt cú tấn công'.
+//   5) Lộ trình (goal_picker.dart): xác định hạng H, đặt mục tiêu Lên hạng F
+//      (2 hạng), kiểm tra tiêu đề 'Lên hạng: H → F' và bước mốc hạng G trung gian.
 //
 //   PCAI_ALLOW_LIVE_DIRECTUS_E2E=1 node tool/e2e/match_drill_stats.mjs <appUrl>
 //
@@ -59,6 +64,12 @@ const A_PLAYER_EDITED = 'Hoa E2E';
 const A_OPPONENT_EDITED = 'Tuan E2E';
 const B_PLAYER = 'Nam E2E';
 const B_OPPONENT = 'Son E2E';
+const C_PLAYER = 'Cuc E2E';
+const C_OPPONENT = 'Dung E2E';
+
+// Bộ câu hỏi ra hạng H (cùng tool/e2e/rank.mjs, bước 2).
+const TO_H = ['Chưa từng chơi', 'Dưới 2 giờ / tuần', '1', '1', 'Đã từng 1–2 lần', 'Chưa từng',
+  'Thường không có bi đánh tiếp', 'Thường xuyên bị khó'];
 
 // Ảnh của lượt trước nằm lẫn vào thì ảnh lỗi của lượt này không còn đúng.
 fs.rmSync(shots, { recursive: true, force: true });
@@ -364,6 +375,94 @@ try {
       `Thống kê hôm nay: trận = ${matchesToday} (đúng 1 — chỉ trận A; trận B đã xoá không được tính)`,
     );
   }
+
+  step(10, 'Thi đấu: trận C (race-to 3), ván 1 ghi đủ cú rồi mất ván, mở Phân tích trận đọc nguyên nhân mất ván');
+  await tab.goto(`${APP}/play`);
+  await tab.waitForText('Thi đấu');
+  await tab.click('Ghi trận mới');
+  await tab.type('Tên của bạn', C_PLAYER);
+  await tab.type('Tên đối thủ', C_OPPONENT);
+  await tab.click('Chạm 5 ván thắng'); // mặc định; mở dropdown race-to
+  await tab.click('Chạm 3 ván thắng'); // Vi.matchRaceTo(3)
+  await tab.click('Bắt đầu trận');
+  await tab.waitForText(`${C_PLAYER} 0 – 0 ${C_OPPONENT}`);
+
+  // Trận A còn đang mở nên 'Ghi cú đánh' và các nút ván có hai bản: luôn dò theo tên người chơi trận C.
+  // Mặc định hộp thoại: người đánh = người chơi, loại = Cú thường, kết quả = Có bi.
+  const recordShot = async ({ shooter, type, outcome }) => {
+    await clickNear('Ghi cú đánh', C_PLAYER); // Vi.matchRecordShot
+    await tab.waitForText('Lưu cú đánh');
+    if (shooter) {
+      await tab.click('Người đánh'); // Vi.matchShooter
+      await tab.click(shooter);
+    }
+    if (type) {
+      await tab.click('Loại cú'); // Vi.matchShotType
+      await tab.click(type);
+    }
+    if (outcome) {
+      await tab.click('Kết quả cú'); // Vi.matchShotOutcome
+      await tab.click(outcome);
+    }
+    await tab.click('Lưu cú đánh'); // Vi.matchSaveShot
+    await sleep(1000);
+  };
+  await recordShot({ type: 'Phá' }); // người chơi phá, Có bi (Vi.matchBreakShot, Vi.matchShotMade)
+  await recordShot({ outcome: 'Trượt' }); // người chơi Cú thường, Trượt (Vi.matchShotMissed)
+  await recordShot({ shooter: C_OPPONENT }); // đối thủ Cú thường, Có bi
+  await clickNear('Đối thủ thắng ván', C_PLAYER); // Vi.matchOpponentWinsRack
+  await clickNear('Đối thủ thắng ván', C_PLAYER);
+  await clickNear('Đối thủ thắng ván', C_PLAYER);
+  await tab.waitForText(`${C_PLAYER} 0 – 3 ${C_OPPONENT}`);
+
+  await clickNear('Phân tích trận', C_PLAYER); // Vi.matchAnalysisOpen
+  await tab.waitForText('Mất 1 ván sau khi trượt cú tấn công');
+  const analysisText = await tab.text();
+  await check(
+    analysisText.includes('Mất 1 ván sau khi trượt cú tấn công'), // Vi.lostRackCause(offensiveMiss, 1)
+    'Phân tích trận: ván 1 mất sau cú tấn công trượt (nguyên nhân đọc từ các cú đã ghi)',
+  );
+  await check(analysisText.includes('Phân tích trận'), 'Phân tích trận: bảng phân tích đang mở');
+
+  step(11, 'Lộ trình: xác định hạng H, đặt mục tiêu Lên hạng F (2 hạng), thấy bước mốc hạng G');
+  await tab.goto(`${APP}/training/roadmap`);
+  await tab.waitForText('Chọn mục tiêu');
+  await tab.click('Xác định hạng'); // Vi.goalNeedRank, mở bộ câu hỏi (user thử chưa có hạng)
+  await tab.click('Bắt đầu');
+  for (const pick of TO_H) {
+    await tab.click(pick);
+    await tab.click('Tiếp');
+  }
+  await tab.waitForText('HẠNG H');
+  await tab.click('Xác nhận');
+  await tab.waitForText('ước lượng');
+  await tab.goto(`${APP}/training/roadmap`);
+  await tab.waitForText('Chọn mục tiêu');
+  await tab.click('Lên hạng'); // Vi.goalKind(lenHang)
+  await tab.waitForText('Lên tới hạng'); // Vi.goalTargetRankTitle
+  await tab.click('F'); // chip hạng đích, Vi: label của Rank.f
+  await tab.waitForText('Lên hạng: H → F'); // Vi.roadmapHeadline
+  const roadmapText = await tab.text();
+  await check(roadmapText.includes('Lên hạng: H → F'), 'Lộ trình: tiêu đề mục tiêu Lên hạng: H → F');
+  // Danh sách Lộ trình là ListView lười: bước mốc hạng G là mục thứ 8 trên màn
+  // 412x915 nên chưa được dựng, chưa có node semantics. Cuộn từng đoạn ngắn (không nhảy hẳn xuống cuối, kẻo mục bị gỡ) tới khi
+  // dựng ra rồi mới đọc chữ.
+  const milestone = 'Làm bài BU — mốc hạng G';
+  let scrolledText = roadmapText;
+  for (let i = 0; i < 12 && !scrolledText.includes(milestone); i++) {
+    await tab.eval(`(() => {
+      for (const e of document.querySelectorAll('flt-semantics')) {
+        if (e.scrollHeight > e.clientHeight + 1) e.scrollTop += Math.max(200, Math.floor(e.clientHeight * 0.6));
+      }
+    })()`);
+    await sleep(1000);
+    scrolledText = await tab.text();
+  }
+  await check(
+    // Chưa có kết quả BU nên là "Làm", không phải "Làm lại" (Vi.stepTitle, retake=false).
+    scrolledText.includes(milestone),
+    'Lộ trình: có bước mốc hạng G trung gian cho mục tiêu lên 2 hạng',
+  );
 
   console.log(`\n${failed ? `HỎNG ${failed} kiểm tra.` : 'Xong, mọi kiểm tra đạt.'} Ảnh lỗi (nếu có) ở ${shots}`);
 } catch (error) {

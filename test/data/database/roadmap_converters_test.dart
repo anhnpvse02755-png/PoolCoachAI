@@ -1,5 +1,7 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -48,5 +50,54 @@ void main() {
     expect(toAchievement(back), a);
     expect(back.syncedAt, at);
     expect(back.id, row.id);
+  });
+
+  test('mục tiêu có hạng đích qua Drift và Directus rồi về nguyên vẹn', () {
+    final target = GoalRecord(
+      updatedAt: at,
+      goal: PlayerGoal(goalId: 'g3', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.d),
+    );
+    final row = toGoalRow(target, userId: 'u1');
+    expect(row.targetRank, 'd');
+    expect(toGoalRecord(row), target);
+    final json = toRemoteGoal(row);
+    expect(json['target_rank'], 'd');
+    expect(goalFromRemote(json), target);
+    expect(remoteGoalFields, contains('target_rank'));
+  });
+
+  test('máy chủ cũ không có target_rank thì coi là null', () {
+    final json = toRemoteGoal(toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g4', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ))..remove('target_rank');
+    expect(goalFromRemote(json).goal!.targetRank, isNull);
+  });
+
+  test('target_rank thừa ở dòng không phải Lên hạng bị bỏ qua', () {
+    final json = toRemoteGoal(toGoalRow(
+      GoalRecord(
+        updatedAt: at,
+        goal: PlayerGoal(goalId: 'g5', kind: GoalKind.thuanThucKyNang, category: SkillCategory.aiming, createdAt: at),
+      ),
+      userId: 'u1',
+    ))..['target_rank'] = 'd';
+    final goal = goalFromRemote(json).goal!;
+    expect(goal.kind, GoalKind.thuanThucKyNang);
+    expect(goal.targetRank, isNull);
+  });
+
+  test('target_rank lạ (máy chủ mới hơn) coi là null, không ném', () {
+    final lenHang = toRemoteGoal(toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g6', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ))..['target_rank'] = 'xyz';
+    expect(goalFromRemote(lenHang).goal!.targetRank, isNull);
+
+    final row = toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g7', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ).copyWith(targetRank: const Value('xyz'));
+    expect(toGoalRecord(row).goal!.targetRank, isNull);
   });
 }

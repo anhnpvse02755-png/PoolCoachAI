@@ -259,6 +259,9 @@ class PlayerGoalRows extends Table {
   /// `SkillCategory.name` cho Thuần thục kỹ năng.
   TextColumn get category => text().nullable()();
   DateTimeColumn get eventDate => dateTime().nullable()();
+
+  /// `Rank.name` của hạng đích Lên hạng; null = hạng kế tiếp.
+  TextColumn get targetRank => text().nullable()();
   DateTimeColumn get createdAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get syncedAt => dateTime().nullable()();
@@ -364,7 +367,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -441,8 +444,12 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(drillLogRows, drillLogRows.durationSec);
       }
       if (from >= 7 && from < 13) {
-        // Bảng trận đấu có từ v7; v13 chưa phát hành nên gộp cột xóa mềm vào.
+        // Bảng trận đấu có từ v7; cột xóa mềm thêm ở v13.
         await m.addColumn(poolMatchRows, poolMatchRows.isDeleted);
+      }
+      if (from >= 4 && from < 14) {
+        // Bảng mục tiêu có từ v4; bảng tạo mới ở các bước trên đã có cột này.
+        await m.addColumn(playerGoalRows, playerGoalRows.targetRank);
       }
     },
   );

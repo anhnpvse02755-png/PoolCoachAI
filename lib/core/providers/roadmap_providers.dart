@@ -2,15 +2,18 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/assessment_providers.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/sync/roadmap_sync.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
 import 'package:uuid/uuid.dart';
@@ -40,17 +43,30 @@ final achievementsProvider = StreamProvider<List<Achievement>>((ref) {
 bool _ready(AsyncValue<Object?> value) => value.hasValue && !value.isLoading;
 
 /// Đã tải xong và không phải giá trị cũ của người trước (đang tải lại).
+///
+/// Bài hoàn tất mà thiếu bản Đề II (dữ liệu đồng bộ hỏng) không có điểm mất
+/// từng bài: coi như chưa có kết quả dùng được. Lỗi khác khi chấm thành
+/// [AsyncError] để màn hình báo lỗi thay vì Provider ném ra và treo vòng tải.
 final latestBuResultProvider = Provider<AsyncValue<BuResult?>>((ref) {
   final tests = ref.watch(buTestsProvider);
-  if (!_ready(tests)) return const AsyncLoading();
+  final testsGate = gate<BuResult?>([tests]);
+  if (testsGate != null) return testsGate;
   final id = latestCompletedTestId(tests.value!);
   if (id == null) return const AsyncData(null);
   final snapshot = ref.watch(testSnapshotProvider(id));
-  if (!_ready(snapshot)) return const AsyncLoading();
+  final snapshotGate = gate<BuResult?>([snapshot]);
+  if (snapshotGate != null) return snapshotGate;
   final value = snapshot.value;
-  return AsyncData(
-    value == null || !value.test.isCompleted ? null : buResultFrom(value),
-  );
+  if (value == null ||
+      !value.test.isCompleted ||
+      value.test.examIIVersion == null) {
+    return const AsyncData(null);
+  }
+  try {
+    return AsyncData(buResultFrom(value));
+  } catch (e, st) {
+    return AsyncError(e, st);
+  }
 });
 
 /// Tính lại khi mục tiêu, hạng, bài BU hoặc dữ liệu tập thay đổi.
@@ -61,9 +77,9 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
   final logs = ref.watch(drillLogsProvider);
   final tests = ref.watch(buTestsProvider);
   final result = ref.watch(latestBuResultProvider);
-  if (![goal, rank, drills, logs, tests, result].every(_ready)) {
-    return const AsyncLoading();
-  }
+  final matches = ref.watch(matchesProvider);
+  final blocked = gate<Roadmap?>([goal, rank, drills, logs, tests, result, matches]);
+  if (blocked != null) return blocked;
 
   final currentGoal = goal.value?.goal;
   if (currentGoal == null) return const AsyncData(null);
@@ -75,6 +91,7 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
       logs: logs.value!,
       tests: tests.value!,
       latestResult: result.value,
+      matches: matches.value!,
       today: ref.watch(nowProvider)(),
     ),
   );
@@ -109,4 +126,19 @@ final roadmapSyncProvider = Provider<RoadmapSyncService>((ref) {
   )..start();
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Gợi ý làm lại bài BU (spec 2026-10-28 mục 6.5). Null khi một nguồn chưa
+/// tải xong hoặc là giá trị cũ của người trước. Không bao giờ đổi hạng.
+final rankCheckSignalProvider = Provider<RankCheckSignal?>((ref) {
+  final rank = ref.watch(playerRankProvider);
+  final bu = ref.watch(latestBuResultProvider);
+  final pi = ref.watch(playerIntelligenceProvider);
+  if (!_ready(rank) || !_ready(bu) || pi == null) return null;
+  return rankCheckSignal(
+    rank: rank.value,
+    latestBu: bu.value,
+    pi: pi,
+    today: ref.watch(nowProvider)(),
+  );
 });

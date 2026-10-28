@@ -180,6 +180,29 @@ try {
     gForged.status >= 400
       ? ok(`A không tạo được mục tiêu mang id của B → ${gForged.status}`)
       : fail('A tạo được mục tiêu mang id của B');
+    const gRank = await call(
+      'PATCH',
+      `/items/player_goals/${aId}`,
+      {
+        kind: 'lenHang',
+        category: null,
+        target_rank: 'd',
+        updated_at: '2026-10-16T02:00:00.000Z',
+      },
+      a.access_token,
+    );
+    gRank.status === 200
+      ? ok('A đặt được hạng đích cho mục tiêu Lên hạng')
+      : fail(`A đặt hạng đích → ${gRank.status} ${gRank.code}`);
+    const gRankBack = await call(
+      'GET',
+      `/items/player_goals/${aId}?fields=target_rank`,
+      undefined,
+      a.access_token,
+    );
+    gRankBack.data?.target_rank === 'd'
+      ? ok('A đọc lại được hạng đích')
+      : fail(`A đọc hạng đích → ${JSON.stringify(gRankBack.data)}`);
     const gDropped = await call(
       'PATCH',
       `/items/player_goals/${aId}`,

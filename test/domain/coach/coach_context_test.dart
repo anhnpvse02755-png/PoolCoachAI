@@ -7,14 +7,17 @@ import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
+import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../../support/coach_chat_fixtures.dart';
 import '../../support/coach_fixtures.dart';
+import '../../support/match_fixtures.dart';
 import 'coach_recommendation_test.dart' show playerWeakAt;
 
 Map<String, Object?> facts({
@@ -30,6 +33,49 @@ Map<String, Object?> facts({
       today: today,
       matches: matches,
     ).toFacts();
+
+Map<String, Object?> _breakFacts({
+  required int shots,
+  required int made,
+  required int? madePercent,
+  required int dry,
+  required int racksBroken,
+  required int breakAndRuns,
+}) =>
+    {
+      'shots': shots,
+      'made': made,
+      'madePercent': madePercent,
+      'dry': dry,
+      'fouls': 0,
+      'scratches': 0,
+      'racksBroken': racksBroken,
+      'breakAndRuns': breakAndRuns,
+    };
+
+Map<String, Object?> _positionFacts({
+  required int assessed,
+  required int failed,
+  required int? failedPercent,
+  required int nextAfterGood,
+}) =>
+    {
+      'assessed': assessed,
+      'failed': failed,
+      'failedPercent': failedPercent,
+      'nextAfterFailed': 0,
+      'missAfterFailed': 0,
+      'nextAfterGood': nextAfterGood,
+      'missAfterGood': 0,
+    };
+
+Map<String, Object?> _noLostRacks() => {for (final c in LostRackCause.values) c.name: 0};
+
+const _weakRule = {
+  'minMatches': 3,
+  'minAttempts': 10,
+  'failPercentFrom': {'breakShot': 50, 'aiming': 35, 'position': 40, 'safety': 50},
+};
 
 void main() {
   test('toFacts(): khoá ổn định (chụp mẫu) — đổi khoá là đổi hợp đồng với Giai đoạn B', () {
@@ -58,6 +104,60 @@ void main() {
     expect(facts['rank'], 'g');
     // JSON được: chỉ số, chữ, null, map.
     expect(() => jsonEncode(facts), returnsNormally);
+  });
+
+  group('currentStep: mốc hạng và làm lại bài BU', () {
+    Map<String, Object?> stepFacts(RoadmapStep step) => (buildCoachContext(
+          pi: computePlayerIntelligence(drills: seedDrills, logs: const []),
+          rank: null,
+          currentStep: step,
+          attempts: const [],
+          today: null,
+          matches: const [],
+        ).toFacts())['currentStep']! as Map<String, Object?>;
+
+    test('mốc hạng làm lại: milestoneRank là hạng mốc, retake đúng', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.dangLam,
+        reason: RankMilestone(Rank.h),
+      ));
+      expect(f['kind'], 'lamBaiBu');
+      expect(f['milestoneRank'], 'h');
+      expect(f['retake'], isTrue);
+    });
+
+    test('mốc hạng làm lần đầu: retake sai', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.dangLam,
+        reason: RankMilestone(Rank.h, retake: false),
+      ));
+      expect(f['milestoneRank'], 'h');
+      expect(f['retake'], isFalse);
+    });
+
+    test('bước làm bài BU cuối (không phải mốc): không có mốc, retake sai vì không biết lần đầu hay làm lại', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.chuaToi,
+        reason: RetestFrom(null),
+      ));
+      expect(f['milestoneRank'], isNull);
+      expect(f['retake'], isFalse);
+    });
+
+    test('bước khác: không có mốc, retake sai', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.nhom,
+        status: StepStatus.dangLam,
+        reason: NeedStreak(),
+        category: SkillCategory.aiming,
+      ));
+      expect(f.keys, ['kind', 'status', 'category', 'mastery', 'milestoneRank', 'retake']);
+      expect(f['milestoneRank'], isNull);
+      expect(f['retake'], isFalse);
+    });
   });
 
   test('chưa có lần làm nào: lastSituation null, số liệu 0', () {
@@ -122,8 +222,125 @@ void main() {
   });
 
   test('chưa có trận nào xong: recent 0, last null', () {
-    expect(facts(matches: [openMatch('x', [p], startedAt: DateTime(2026, 10, 1))])['matches'],
-        {'recent': {'played': 0, 'won': 0, 'lost': 0}, 'last': null});
+    expect(facts(matches: [openMatch('x', [p], startedAt: DateTime(2026, 10, 1))])['matches'], {
+      'recent': {'played': 0, 'won': 0, 'lost': 0},
+      'last': null,
+      'analysis': {
+        'matches': 0,
+        'racksWon': 0,
+        'racksLost': 0,
+        'racksWithShots': 0,
+        'fullRacks': 0,
+        'runOuts': 0,
+        'break': _breakFacts(shots: 0, made: 0, madePercent: null, dry: 0, racksBroken: 0, breakAndRuns: 0),
+        'offense': {'shots': 0, 'missed': 0, 'missPercent': null},
+        'position': _positionFacts(assessed: 0, failed: 0, failedPercent: null, nextAfterGood: 0),
+        'safety': {
+          'shots': 0,
+          'assessed': 0,
+          'successful': 0,
+          'successPercent': null,
+          'turnovers': 0,
+          'proactiveTurnovers': 0,
+        },
+        'errors': {'shots': 0, 'fouls': 0, 'scratches': 0},
+        'lostRackCauses': _noLostRacks(),
+        'weak': <Object?>[],
+        'weakRule': _weakRule,
+        'sampled': <Object?>[],
+      },
+    });
+  });
+
+  test('matches.analysis có đủ khoá và đúng số của analyzeMatches', () {
+    // Ba trận yếu Tấn công: mỗi trận 1 ván thắng do người chơi dọn bàn, đối thủ
+    // phá khô; 5 cú thường của người chơi, 3 trượt (60%); 2 điều bi đều tốt.
+    final m = facts(matches: matchesWeakAt(SkillCategory.aiming, at: DateTime(2026, 10, 20)))['matches']! as Map;
+    final a = m['analysis']! as Map;
+    expect(a.keys, [
+      'matches', 'racksWon', 'racksLost', 'racksWithShots', 'fullRacks', 'runOuts', 'break', 'offense',
+      'position', 'safety', 'errors', 'lostRackCauses', 'weak', 'weakRule', 'sampled',
+    ]);
+    expect(a, {
+      'matches': 3,
+      'racksWon': 3,
+      'racksLost': 0,
+      'racksWithShots': 3,
+      'fullRacks': 3,
+      'runOuts': 3,
+      'break': _breakFacts(shots: 0, made: 0, madePercent: null, dry: 0, racksBroken: 0, breakAndRuns: 0),
+      'offense': {'shots': 15, 'missed': 9, 'missPercent': 60},
+      'position': _positionFacts(assessed: 6, failed: 0, failedPercent: 0, nextAfterGood: 3),
+      'safety': {
+        'shots': 0,
+        'assessed': 0,
+        'successful': 0,
+        'successPercent': null,
+        'turnovers': 0,
+        'proactiveTurnovers': 9,
+      },
+      'errors': {'shots': 15, 'fouls': 0, 'scratches': 0},
+      'lostRackCauses': _noLostRacks(),
+      'weak': [
+        {'category': 'aiming', 'failures': 9, 'attempts': 15, 'matches': 3, 'failPercent': 60},
+      ],
+      'weakRule': _weakRule,
+      'sampled': ['aiming'],
+    });
+    expect((a['lostRackCauses']! as Map).keys, [for (final c in LostRackCause.values) c.name]);
+  });
+
+  test('matches.last có nguyên nhân mất ván, phá, điều bi và lỗi của riêng trận đó', () {
+    // Ván 1: người chơi phá khô rồi đối thủ dọn bàn -> thua do dryBreak.
+    // Ván 2: người chơi phá vào rồi dọn hết (phá-và-dọn), 1 điều bi tốt.
+    final one = completedMatch('last', const [o, p], [
+      shotAt(1, 1, p, MatchShotType.breakShot, MatchShotOutcome.missed),
+      shotAt(1, 2, o, MatchShotType.normal, MatchShotOutcome.made),
+      shotAt(2, 1, p, MatchShotType.breakShot, MatchShotOutcome.made),
+      shotAt(2, 2, p, MatchShotType.normal, MatchShotOutcome.made, position: PositionOutcome.successful),
+    ]);
+    final last = (facts(matches: [one])['matches']! as Map)['last']! as Map;
+    expect(last.keys, [
+      'gameType', 'targetRacks', 'racksWon', 'racksLost', 'won', 'shots', 'positionOutcomes',
+      'lostRackCauses', 'break', 'position', 'fouls',
+    ]);
+    expect(last['lostRackCauses'], {..._noLostRacks(), 'dryBreak': 1});
+    expect(last['break'], _breakFacts(shots: 2, made: 1, madePercent: 50, dry: 1, racksBroken: 2, breakAndRuns: 1));
+    expect(last['position'], _positionFacts(assessed: 1, failed: 0, failedPercent: 0, nextAfterGood: 0));
+    expect(last['fouls'], {'shots': 3, 'fouls': 0, 'scratches': 0});
+  });
+
+  test('matches.last dùng phân tích của chính trận đó, không trộn các trận khác', () {
+    final newest = completedMatch('b', const [p], [
+      shotAt(1, 1, p, MatchShotType.breakShot, MatchShotOutcome.scratch),
+      shotAt(1, 2, o, MatchShotType.normal, MatchShotOutcome.foul),
+      shotAt(1, 3, p, MatchShotType.normal, MatchShotOutcome.made),
+    ], at: DateTime(2026, 10, 20));
+    final all = [...matchesWeakAt(SkillCategory.aiming, at: DateTime(2026, 10, 19)), newest];
+    final m = facts(matches: all)['matches']! as Map;
+    expect((m['last']! as Map)['fouls'], {'shots': 2, 'fouls': 0, 'scratches': 1});
+    expect((m['analysis']! as Map)['matches'], 4);
+  });
+
+  test('skillLevels: weakSources và buPercent nói nhóm yếu đến từ bài tập hay từ BU', () {
+    final f = facts(pi: computePlayerIntelligence(drills: seedDrills, logs: playerWeakAt(SkillCategory.safety)))['skillLevels']! as Map;
+    expect(f.keys, ['weak', 'strong', 'weakBelow', 'strongFrom', 'minSessions', 'weakSources', 'buPercent']);
+    expect(f['weakSources'], {'safety': 'drills'});
+    expect(f['buPercent'], <String, Object?>{});
+
+    const bu = PlayerIntelligence(
+      categories: {},
+      weak: [SkillCategory.position],
+      strong: [],
+      readyDrillIds: [],
+      hasAnyData: false,
+      buPercent: {SkillCategory.position: 40, SkillCategory.aiming: 80},
+      weakSources: {SkillCategory.position: WeakSource.bu},
+    );
+    final g = facts(pi: bu)['skillLevels']! as Map;
+    expect(g['weak'], ['position']);
+    expect(g['weakSources'], {'position': 'bu'});
+    expect(g['buPercent'], {'position': 40, 'aiming': 80});
   });
 
   test('không gửi tên người chơi hay đối thủ; facts tất định', () {

@@ -8,8 +8,10 @@ import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/training_statistics.dart';
 import 'package:poolcoachai/features/stats/presentation/cue_win_rate_block.dart';
+import 'package:poolcoachai/features/stats/presentation/match_analysis_card.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -156,6 +158,8 @@ class StatsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          MatchAnalysisCard(analysis: analyzeMatches(matchesAsync.requireValue)),
           if (cues != null)
             _CueWinRateCard(
               cues: cues,
@@ -224,17 +228,6 @@ class StatsScreen extends ConsumerWidget {
             ...statistics.drillTrends.map(
               (trend) => _DrillTrendCard(trend: trend),
             ),
-          const SizedBox(height: 12),
-          const PcCard(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline),
-                SizedBox(width: 8),
-                Expanded(child: Text(Vi.statsMatchAnalysisNotAvailable)),
-              ],
-            ),
-          ),
           if (statistics.totalSessionCount == 0) ...[
             const SizedBox(height: 8),
             const PcCard(child: Text(Vi.statsNoTraining)),

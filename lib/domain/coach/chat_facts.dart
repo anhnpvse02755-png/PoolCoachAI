@@ -1,4 +1,5 @@
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -24,10 +25,13 @@ typedef LastMatchFacts = ({
   bool won,
   Map<MatchShotType, Map<MatchShotOutcome, int>> shots,
   Map<PositionOutcome, int> positionOutcomes,
+
+  /// Phân tích riêng trận này (`analyzeMatches([trận])`).
+  MatchAnalysis analysis,
 });
 
 /// Tổng quan các trận gần nhất, dạng dữ liệu (luật R3).
-typedef MatchFacts = ({int played, int won, int lost, LastMatchFacts? last});
+typedef MatchFacts = ({int played, int won, int lost, LastMatchFacts? last, MatchAnalysis analysis});
 
 /// Chuyển gợi ý hôm nay sang dữ liệu cho Coach Chat (luật R2).
 TodayFacts todayFactsOf(TodayRecommendation today) => (
@@ -43,20 +47,12 @@ TodayFacts todayFactsOf(TodayRecommendation today) => (
 
 /// Chuyển lịch sử trận sang dữ liệu cho Coach Chat (luật R3).
 ///
-/// Chỉ trận đã xong (`isComplete`) được tính; sắp theo `completedAt` (hoặc
-/// `startedAt` nếu thiếu), mới nhất trước, hoà ngày thì theo `id`. Tối đa
+/// Chỉ trận đã xong (`isComplete`) được tính, chọn bằng `recentCompletedMatches`
+/// (mới nhất trước, hoà ngày thì theo `id`). Tối đa
 /// [coachChatRecentMatches] trận gần nhất vào `played`/`won`/`lost`; `last`
 /// là trận đầu sau khi sắp.
 MatchFacts matchFactsOf(List<PoolMatch> matches) {
-  final finished = matches.where((m) => m.isComplete).toList()
-    ..sort((a, b) {
-      final atA = a.completedAt ?? a.startedAt;
-      final atB = b.completedAt ?? b.startedAt;
-      final byDate = atB.compareTo(atA);
-      return byDate != 0 ? byDate : a.id.compareTo(b.id);
-    });
-
-  final recent = finished.take(coachChatRecentMatches).toList();
+  final recent = recentCompletedMatches(matches, limit: coachChatRecentMatches);
   final won = recent.where((m) => m.playerScore >= m.targetRacks).length;
 
   return (
@@ -64,6 +60,7 @@ MatchFacts matchFactsOf(List<PoolMatch> matches) {
     won: won,
     lost: recent.length - won,
     last: recent.isEmpty ? null : _lastMatchFactsOf(recent.first),
+    analysis: analyzeMatches(recent, limit: coachChatRecentMatches),
   );
 }
 
@@ -94,5 +91,6 @@ LastMatchFacts _lastMatchFactsOf(PoolMatch match) {
     won: match.playerScore >= match.targetRacks,
     shots: shots,
     positionOutcomes: positionOutcomes,
+    analysis: analyzeMatches([match]),
   );
 }

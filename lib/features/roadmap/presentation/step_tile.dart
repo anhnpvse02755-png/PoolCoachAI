@@ -19,6 +19,13 @@ class StepTile extends StatelessWidget {
   final Drill? drill;
   final DateTime today;
 
+  /// Ngày được làm bài BU tiếp: bước BU cuối và các mốc hạng dùng chung một cổng.
+  DateTime? get _gate => switch (step.reason) {
+        RetestFrom(:final from) => from,
+        RankMilestone(:final from) => from,
+        _ => null,
+      };
+
   Widget? _action(BuildContext context) {
     switch (step.kind) {
       case StepKind.nhom || StepKind.baiTap
@@ -28,11 +35,16 @@ class StepTile extends StatelessWidget {
           child: const Text(Vi.stepTrain),
         );
       case StepKind.lamBaiBu:
-        final from = (step.reason as RetestFrom).from;
+        final from = _gate;
         if (from != null && today.isBefore(from)) return null;
         return FilledButton(
           onPressed: () => context.push(Routes.rankTest),
           child: const Text(Vi.stepOpenTest),
+        );
+      case StepKind.dauTap:
+        return FilledButton(
+          onPressed: () => context.go(Routes.play),
+          child: const Text(Vi.stepRecordMatch),
         );
       case StepKind.xacDinhHang:
         return FilledButton(
@@ -73,6 +85,13 @@ class StepTile extends StatelessWidget {
             if (step.kind == StepKind.baiTap)
               Text(Vi.stepStreak(step.passStreak)),
             Text(Vi.stepReason(step.reason), style: theme.textTheme.bodySmall),
+            if (step.reason is RankMilestone &&
+                _gate != null &&
+                today.isBefore(_gate!))
+              Text(
+                Vi.stepReason(RetestFrom(_gate)),
+                style: theme.textTheme.bodySmall,
+              ),
             if (step.estimate case final estimate?)
               Text(
                 Vi.estimateLine(estimate),

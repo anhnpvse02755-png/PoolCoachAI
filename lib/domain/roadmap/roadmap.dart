@@ -18,6 +18,9 @@ enum StepKind {
 
   /// Làm lại bài kiểm tra BU — bước cuối của Lên hạng.
   lamBaiBu,
+
+  /// Chuẩn bị giải: ghi thêm trận có ghi cú để biết nhóm yếu.
+  dauTap,
 }
 
 enum StepStatus { dangLam, xong, chuaToi, khongKip }
@@ -57,6 +60,32 @@ final class DrillLevel extends StepReason {
 final class RetestFrom extends StepReason {
   const RetestFrom(this.from);
   final DateTime? from;
+}
+
+/// Mốc hạng [rank] trên đường lên hạng đích xa hơn một bậc: làm lại bài BU
+/// khi điểm đã đủ để lên hạng này.
+///
+/// [from] là ngày được làm bài BU tiếp (null là làm được ngay), cùng cổng với
+/// bước BU cuối. [retake] đúng khi người chơi đã có kết quả BU để làm lại.
+final class RankMilestone extends StepReason {
+  const RankMilestone(this.rank, {this.from, this.retake = true});
+  final Rank rank;
+  final DateTime? from;
+  final bool retake;
+}
+
+/// Nhóm hỏng [failures]/[attempts] lần trong các trận gần đây.
+final class MatchWeakness extends StepReason {
+  const MatchWeakness(this.failures, this.attempts);
+  final int failures;
+  final int attempts;
+}
+
+/// Mới có [have] trận có ghi cú trong cửa sổ, cần [need].
+final class NotEnoughMatches extends StepReason {
+  const NotEnoughMatches(this.have, this.need);
+  final int have;
+  final int need;
 }
 
 final class NeedRank extends StepReason {

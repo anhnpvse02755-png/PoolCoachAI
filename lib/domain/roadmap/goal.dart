@@ -7,8 +7,8 @@ enum GoalKind { lenHang, thuanThucKyNang, chuanBiGiai }
 
 /// Mục tiêu đang chạy của một tài khoản.
 ///
-/// Lên hạng không lưu hạng đích: đích luôn là hạng ngay trên hạng hiện tại,
-/// nên lên được hạng thì đích tự chuyển (spec mục 3).
+/// Lên hạng mặc định nhắm hạng ngay trên hạng hiện tại (targetRank null),
+/// nên lên được hạng thì đích tự chuyển; người chơi có thể chọn hạng xa hơn.
 final class PlayerGoal {
   const PlayerGoal({
     required this.goalId,
@@ -16,10 +16,13 @@ final class PlayerGoal {
     required this.createdAt,
     this.category,
     this.eventDate,
+    this.targetRank,
   })  : assert(kind != GoalKind.thuanThucKyNang || category != null,
             'thuần thục kỹ năng cần một nhóm'),
         assert(kind != GoalKind.chuanBiGiai || eventDate != null,
-            'chuẩn bị giải cần ngày giải');
+            'chuẩn bị giải cần ngày giải'),
+        assert(targetRank == null || kind == GoalKind.lenHang,
+            'hạng đích chỉ dành cho Lên hạng');
 
   /// Đổi mục tiêu là ra id mới: thành tích "xong bước" gắn với id này.
   final String goalId;
@@ -28,6 +31,9 @@ final class PlayerGoal {
   final DateTime? eventDate;
   final DateTime createdAt;
 
+  /// Hạng đích của Lên hạng; null = hạng kế tiếp (hành vi cũ).
+  final Rank? targetRank;
+
   @override
   bool operator ==(Object other) =>
       other is PlayerGoal &&
@@ -35,13 +41,14 @@ final class PlayerGoal {
       other.kind == kind &&
       other.category == category &&
       other.eventDate == eventDate &&
-      other.createdAt == createdAt;
+      other.createdAt == createdAt &&
+      other.targetRank == targetRank;
 
   @override
-  int get hashCode => Object.hash(goalId, kind, category, eventDate, createdAt);
+  int get hashCode => Object.hash(goalId, kind, category, eventDate, createdAt, targetRank);
 
   @override
-  String toString() => 'PlayerGoal($goalId, $kind, $category, $eventDate, $createdAt)';
+  String toString() => 'PlayerGoal($goalId, $kind, $category, $eventDate, $createdAt, $targetRank)';
 }
 
 /// Dòng mục tiêu của một tài khoản. [goal] null nghĩa là người chơi đã bỏ
@@ -82,6 +89,24 @@ Rank? nextRank(Rank rank) => switch (rank) {
       Rank.a || Rank.pro => null,
       _ => Rank.values[rank.index + 1],
     };
+
+/// Hạng đích thật của mục tiêu Lên hạng từ hạng [from]: hạng đích đã chọn khi
+/// nó còn cao hơn [from] (tối đa hạng A), không thì hạng kế tiếp. Null khi
+/// [from] không có hạng kế tiếp.
+Rank? effectiveTarget(PlayerGoal goal, Rank from) {
+  final chosen = goal.targetRank;
+  if (chosen != null && chosen.index > from.index && chosen.index <= Rank.a.index) {
+    return chosen;
+  }
+  return nextRank(from);
+}
+
+/// Các hạng đích chọn được từ hạng [from]: hạng ngay trên tới hạng A.
+List<Rank> targetRankChoices(Rank from) {
+  final next = nextRank(from);
+  if (next == null) return const [];
+  return [for (var i = next.index; i <= Rank.a.index; i++) Rank.values[i]];
+}
 
 /// Vì sao chưa đặt được mục tiêu Lên hạng.
 enum LenHangBlock { noRank, topRank }

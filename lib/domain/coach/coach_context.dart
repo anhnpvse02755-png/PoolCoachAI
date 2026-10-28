@@ -3,7 +3,10 @@ import 'package:poolcoachai/domain/coach/chat_facts.dart';
 import 'package:poolcoachai/domain/coach/coach_constants.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -21,10 +24,30 @@ import 'package:poolcoachai/domain/skill_category.dart';
 // 4. Câu hỏi về một tình huống được trả lời bằng `Reveal` của Giai đoạn A.
 
 /// Bước hiện tại của Lộ trình, dạng dữ liệu (không câu chữ).
-typedef RoadmapStepFacts = ({StepKind kind, StepStatus status, SkillCategory? category, int? mastery});
+///
+/// [milestoneRank] chỉ có ở bước mốc hạng; [retake] chỉ đúng khi bước mốc hạng
+/// là làm lại (đã có kết quả BU). Bước làm bài BU cuối không biết lần đầu hay
+/// làm lại nên [retake] sai.
+typedef RoadmapStepFacts = ({
+  StepKind kind,
+  StepStatus status,
+  SkillCategory? category,
+  int? mastery,
+  Rank? milestoneRank,
+  bool retake,
+});
 
-RoadmapStepFacts roadmapStepFacts(RoadmapStep s) =>
-    (kind: s.kind, status: s.status, category: s.category, mastery: s.mastery);
+RoadmapStepFacts roadmapStepFacts(RoadmapStep s) {
+  final reason = s.reason;
+  return (
+    kind: s.kind,
+    status: s.status,
+    category: s.category,
+    mastery: s.mastery,
+    milestoneRank: reason is RankMilestone ? reason.rank : null,
+    retake: reason is RankMilestone && reason.retake,
+  );
+}
 
 /// Lần làm tình huống gần nhất, dạng dữ liệu.
 typedef CoachSituationFacts = ({
@@ -47,6 +70,8 @@ final class CoachContext {
     required this.strong,
     required this.today,
     required this.matches,
+    this.weakSources = const {},
+    this.buPercent = const {},
   });
 
   final Map<SkillCategory, CategoryInsight> skills;
@@ -67,6 +92,12 @@ final class CoachContext {
   /// Lịch sử trận gần nhất, dạng dữ liệu.
   final MatchFacts matches;
 
+  /// Nguồn của từng nhóm trong [weak]: bài tập hay điểm BU.
+  final Map<SkillCategory, WeakSource> weakSources;
+
+  /// Phần trăm điểm BU gần nhất theo nhóm; rỗng khi chưa có BU.
+  final Map<SkillCategory, int> buPercent;
+
   /// JSON khoá ổn định: đổi tên khoá là đổi hợp đồng với Giai đoạn B.
   Map<String, Object?> toFacts() => {
         'skills': {
@@ -85,6 +116,8 @@ final class CoachContext {
                 'status': currentStep!.status.name,
                 'category': currentStep!.category?.name,
                 'mastery': currentStep!.mastery,
+                'milestoneRank': currentStep!.milestoneRank?.name,
+                'retake': currentStep!.retake,
               },
         'coach': {
           for (final t in CoachTopic.values)
@@ -111,6 +144,13 @@ final class CoachContext {
           'weakBelow': PracticeConstants.weakCutoff,
           'strongFrom': PracticeConstants.strongCutoff,
           'minSessions': PracticeConstants.minSessions,
+          'weakSources': {
+            for (final cat in weak)
+              if (weakSources[cat] != null) cat.name: weakSources[cat]!.name,
+          },
+          'buPercent': {
+            for (final e in buPercent.entries) e.key.name: e.value,
+          },
         },
         'today': today == null
             ? null
@@ -149,10 +189,95 @@ final class CoachContext {
                     for (final entry in matches.last!.positionOutcomes.entries)
                       entry.key.name: entry.value,
                   },
+                  'lostRackCauses': _lostRackCausesFacts(matches.last!.analysis),
+                  'break': _breakFacts(matches.last!.analysis.playerBreak),
+                  'position': _positionFacts(matches.last!.analysis),
+                  'fouls': _errorsFacts(matches.last!.analysis),
                 },
+          'analysis': _analysisFacts(matches.analysis),
         },
       };
 }
+
+Map<String, int> _lostRackCausesFacts(MatchAnalysis a) => {
+      for (final cause in LostRackCause.values) cause.name: a.lostRackCauses[cause] ?? 0,
+    };
+
+Map<String, Object?> _breakFacts(BreakStats b) => {
+      'shots': b.shots,
+      'made': b.made,
+      'madePercent': percentOf(b.made, b.shots),
+      'dry': b.dry,
+      'fouls': b.fouls,
+      'scratches': b.scratches,
+      'racksBroken': b.racksBroken,
+      'breakAndRuns': b.breakAndRuns,
+    };
+
+Map<String, Object?> _positionFacts(MatchAnalysis a) => {
+      'assessed': a.assessedPositions,
+      'failed': a.failedPositions,
+      'failedPercent': percentOf(a.failedPositions, a.assessedPositions),
+      'nextAfterFailed': a.nextAfterFailedPosition,
+      'missAfterFailed': a.missAfterFailedPosition,
+      'nextAfterGood': a.nextAfterGoodPosition,
+      'missAfterGood': a.missAfterGoodPosition,
+    };
+
+Map<String, Object?> _errorsFacts(MatchAnalysis a) => {
+      'shots': a.playerShots,
+      'fouls': a.fouls,
+      'scratches': a.scratches,
+    };
+
+/// Phân tích trận dạng khoá ổn định; mọi phần trăm là số nguyên từ
+/// [percentOf], `null` khi không có mẫu. Nhóm yếu do app quyết định (xem
+/// `weakRule`), LLM không tự kết luận.
+Map<String, Object?> _analysisFacts(MatchAnalysis a) => {
+      'matches': a.matches,
+      'racksWon': a.racksWon,
+      'racksLost': a.racksLost,
+      'racksWithShots': a.racksWithShots,
+      'fullRacks': a.fullRacks,
+      'runOuts': a.runOuts,
+      'break': _breakFacts(a.playerBreak),
+      'offense': {
+        'shots': a.normalShots,
+        'missed': a.missedNormal,
+        'missPercent': percentOf(a.missedNormal, a.normalShots),
+      },
+      'position': _positionFacts(a),
+      'safety': {
+        'shots': a.safeties,
+        'assessed': a.assessedSafeties,
+        'successful': a.successfulSafeties,
+        'successPercent': percentOf(a.successfulSafeties, a.assessedSafeties),
+        'turnovers': a.safetyTurnovers,
+        'proactiveTurnovers': a.proactiveTurnovers,
+      },
+      'errors': _errorsFacts(a),
+      'lostRackCauses': _lostRackCausesFacts(a),
+      'weak': [
+        for (final s in a.weaknesses)
+          {
+            'category': s.category.name,
+            'failures': s.failures,
+            'attempts': s.attempts,
+            'matches': s.matches,
+            'failPercent': percentOf(s.failures, s.attempts),
+          },
+      ],
+      'weakRule': {
+        'minMatches': MatchAnalysisConstants.minMatches,
+        'minAttempts': MatchAnalysisConstants.minAttempts,
+        'failPercentFrom': {
+          for (final e in MatchAnalysisConstants.failPercentFrom.entries) e.key.name: e.value,
+        },
+      },
+      // Nhóm đủ mẫu: `weak` rỗng mà `sampled` có nhóm nghĩa là không nhóm nào
+      // yếu; `sampled` rỗng mới là chưa đủ dữ liệu.
+      'sampled': [for (final c in sampledGroups(a)) c.name],
+    };
 
 /// Ngữ cảnh cho Coach Chat, hàm thuần trên dữ liệu đã có.
 CoachContext buildCoachContext({
@@ -184,6 +309,8 @@ CoachContext buildCoachContext({
     strong: pi.strong,
     today: today == null ? null : todayFactsOf(today),
     matches: matchFactsOf(matches),
+    weakSources: pi.weakSources,
+    buPercent: pi.buPercent,
   );
 }
 

@@ -3,6 +3,8 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/coach/chat_filter.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart' show ThicknessSide;
 
+import '../../support/coach_chat_fixtures.dart';
+
 const facts = <String, Object?>{
   'skills': {
     'aiming': {'mastery': 62, 'trend': 'up', 'sessions': 8},
@@ -69,6 +71,32 @@ void main() {
     }
     test('trả nguyên câu, chỉ bỏ khoảng trắng hai đầu', () {
       expect(filterCoachReply('  Tập Phòng thủ.  ', facts), (text: 'Tập Phòng thủ.', insufficient: false));
+    });
+  });
+
+  group('phân tích trận (matches.analysis)', () {
+    // fullCoachContext(): 4 trận, cú thường của người chơi 16, trượt 9 (56%),
+    // nhóm Tấn công hỏng 9/16 qua 4 trận.
+    final real = fullCoachContext().toFacts();
+
+    test('số của phân tích trận có trong facts thì cho qua', () {
+      for (final text in [
+        'Bạn trượt 9/16 cú thường (56%).',
+        'Tấn công hỏng 9 trên 16 lần, tức 56% qua 4 trận.',
+        'Bạn có 3 ván dọn bàn và 1 ván phá-và-dọn.',
+      ]) {
+        expect(coachReplyBlock(text, real), isNull, reason: text);
+      }
+    });
+
+    test('số bịa về phân tích trận bị chặn', () {
+      for (final text in ['Bạn trượt 57% cú thường.', 'Bạn trượt 9/18 cú thường (50%).', 'Bạn dọn bàn 12 ván.']) {
+        expect(coachReplyBlock(text, real), CoachBlockRule.unknownNumber, reason: text);
+      }
+    });
+
+    test('đổi facts thì số tương ứng đổi trạng thái', () {
+      expect(coachReplyBlock('Bạn trượt 56% cú thường.', const <String, Object?>{}), CoachBlockRule.unknownNumber);
     });
   });
 

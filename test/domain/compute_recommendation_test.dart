@@ -7,6 +7,8 @@ import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
+import '../support/match_fixtures.dart';
+
 final _today = DateTime(2026, 9, 17);
 
 const _aimDrill = Drill(
@@ -29,6 +31,39 @@ const _aimArticle = KnowledgeArticle(
 
 void main() {
   group('computeRecommendation', () {
+    test('gợi ý mang tín hiệu trận khi lý do là yếu trong trận', () {
+      final rec = computeRecommendation(
+        drills: const [_aimDrill],
+        logs: const [],
+        knowledge: const [],
+        timerSessions: const [],
+        schedule: const [],
+        today: _today,
+        matches: matchesWeakAt(SkillCategory.position, at: _today),
+      );
+      expect(
+        [rec.reason, rec.cat, rec.matchSignal!.category],
+        [
+          PickReason.matchWeakness,
+          SkillCategory.position,
+          SkillCategory.position,
+        ],
+      );
+    });
+
+    test('lý do khác yếu trong trận thì không mang tín hiệu trận', () {
+      final rec = computeRecommendation(
+        drills: const [_aimDrill],
+        logs: const [],
+        knowledge: const [],
+        timerSessions: const [],
+        schedule: const [],
+        today: _today,
+      );
+      expect(rec.reason, PickReason.newcomer);
+      expect(rec.matchSignal, isNull);
+    });
+
     test('người mới nhận bài Ngắm bi cấp 1 và bài đọc cùng nhóm', () {
       final rec = computeRecommendation(
         drills: const [_aimDrill],

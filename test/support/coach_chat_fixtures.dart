@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import 'coach_fixtures.dart' show attempt;
+import 'match_fixtures.dart' show matchesWeakAt, shotAt;
 
 /// Tên mẫu dùng trong cố định Coach Chat — không bao giờ xuất hiện trong facts.
 const samplePlayerName = 'Nguyễn Văn An';
@@ -144,9 +145,30 @@ List<DrillLog> _fixtureLogs() => [
 final _fixtureAttempt =
     attempt(CoachAttemptOutcome.revealed, topic: CoachTopic.safety, fault: CoachFault.scratch);
 
+/// Các trận của [fullCoachContext]: `fm-1` mới nhất (20/10), sau đó ba trận
+/// yếu Tấn công (`matchesWeakAt`, 19/10 trở về trước) để `matches.analysis`
+/// có đúng một điểm yếu.
+List<PoolMatch> _fixtureMatches() => [
+      finishedMatch(
+        'fm-1',
+        [RackWinner.player, RackWinner.opponent, RackWinner.player, RackWinner.player],
+        completedAt: DateTime(2026, 10, 20),
+        shots: [
+          // Số cú cố định (không dùng bộ đếm chung của matchShot): ván 1 luôn
+          // ghi đủ, nên facts không phụ thuộc thứ tự chạy test.
+          shotAt(1, 1, RackWinner.player, MatchShotType.breakShot, MatchShotOutcome.made),
+          shotAt(1, 2, RackWinner.player, MatchShotType.normal, MatchShotOutcome.made, position: PositionOutcome.successful),
+        ],
+      ),
+      ...matchesWeakAt(SkillCategory.aiming, at: DateTime(2026, 10, 19)),
+    ];
+
 /// Ngữ cảnh đầy đủ cho Coach Chat: mọi nhánh của facts đều khác null.
-CoachContext fullCoachContext() => buildCoachContext(
-      pi: computePlayerIntelligence(drills: _fixtureDrills, logs: _fixtureLogs()),
+CoachContext fullCoachContext() => contextWithMatches(_fixtureMatches());
+
+/// Như [fullCoachContext] nhưng với danh sách trận [matches].
+CoachContext contextWithMatches(List<PoolMatch> matches) => buildCoachContext(
+      pi: computePlayerIntelligence(drills: _fixtureDrills, logs: _fixtureLogs(), matches: matches),
       rank: Rank.g,
       currentStep: const RoadmapStep(
         kind: StepKind.nhom,
@@ -157,15 +179,5 @@ CoachContext fullCoachContext() => buildCoachContext(
       ),
       attempts: [_fixtureAttempt],
       today: sampleToday(),
-      matches: [
-        finishedMatch(
-          'fm-1',
-          [RackWinner.player, RackWinner.opponent, RackWinner.player, RackWinner.player],
-          completedAt: DateTime(2026, 10, 20),
-          shots: [
-            matchShot(RackWinner.player, MatchShotType.breakShot, MatchShotOutcome.made),
-            matchShot(RackWinner.player, MatchShotType.normal, MatchShotOutcome.made, position: PositionOutcome.successful),
-          ],
-        ),
-      ],
+      matches: matches,
     );

@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
+import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -28,7 +29,7 @@ void main() {
       ...allKeys(fullCoachContext().toFacts()),
       for (final values in <List<Enum>>[SkillCategory.values, CoachTopic.values, StepKind.values,
           StepStatus.values, PickReason.values, MatchShotType.values, MatchShotOutcome.values, PositionOutcome.values,
-          SkillTrend.values, CoachAttemptOutcome.values, CoachFaultGroup.values, PoolGameType.values])
+          SkillTrend.values, CoachAttemptOutcome.values, CoachFaultGroup.values, PoolGameType.values, LostRackCause.values, WeakSource.values])
         for (final v in values) v.name,
     };
     for (final n in names) {

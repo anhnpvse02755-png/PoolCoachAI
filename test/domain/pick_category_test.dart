@@ -2,10 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
+
+import '../support/match_fixtures.dart';
 
 final _today = DateTime(2026, 9, 17); // Thứ Năm -> day index 3
 
@@ -41,8 +44,13 @@ final _drills = [
   List<DrillLog> logs = const [],
   List<ScheduleSlot> schedule = const [],
   List<TimerSession> timers = const [],
+  List<PoolMatch> matches = const [],
 }) {
-  final pi = computePlayerIntelligence(drills: _drills, logs: logs);
+  final pi = computePlayerIntelligence(
+    drills: _drills,
+    logs: logs,
+    matches: matches,
+  );
   return pickCategoryForToday(
     pi: pi,
     drills: _drills,
@@ -55,6 +63,60 @@ final _drills = [
 
 void main() {
   group('pickCategoryForToday', () {
+    group('yếu trong trận', () {
+      final yesterday = _today.subtract(const Duration(days: 1));
+      final weakAim = [
+        _log('aim1', yesterday.subtract(const Duration(days: 2)), 2),
+        _log('aim1', yesterday.subtract(const Duration(days: 1)), 2),
+        _log('aim1', yesterday, 2),
+      ];
+
+      test('yếu trong trận thắng luật yếu theo bài tập', () {
+        final result = _pick(
+          logs: weakAim,
+          matches: matchesWeakAt(SkillCategory.position, at: yesterday),
+        );
+        expect(result.cat, SkillCategory.position);
+        expect(result.reason, PickReason.matchWeakness);
+      });
+
+      test('chỉ có yếu trong trận thì vẫn chọn nhóm đó', () {
+        final result = _pick(
+          logs: [_log('saf1', yesterday, 10)],
+          matches: matchesWeakAt(SkillCategory.aiming, at: yesterday),
+        );
+        expect(result.cat, SkillCategory.aiming);
+        expect(result.reason, PickReason.matchWeakness);
+      });
+
+      test('lịch hôm nay đứng trên yếu trong trận', () {
+        final result = _pick(
+          logs: weakAim,
+          schedule: [
+            const ScheduleSlot(
+              id: 's1',
+              day: 3,
+              time: '19:00',
+              label: 'Tối',
+              cat: SkillCategory.bank,
+            ),
+          ],
+          matches: matchesWeakAt(SkillCategory.position, at: yesterday),
+        );
+        expect(result.cat, SkillCategory.bank);
+        expect(result.reason, PickReason.scheduled);
+      });
+
+      test('sắp mất streak đứng trên yếu trong trận', () {
+        final result = _pick(
+          logs: [_log('saf1', _today.subtract(const Duration(days: 5)), 10)],
+          matches: matchesWeakAt(SkillCategory.position,
+              at: _today.subtract(const Duration(days: 5))),
+        );
+        expect(result.reason, PickReason.streakAtRisk);
+      });
+    });
+
     test('case A — chưa có log nào thì theo thứ tự làm quen, bắt đầu Ngắm bi',
         () {
       final result = _pick();

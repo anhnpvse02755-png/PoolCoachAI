@@ -281,6 +281,7 @@ await ensureCollection(
     nullable('kind', 'string'),
     nullable('category', 'string'),
     nullable('event_date', 'timestamp'),
+    nullable('target_rank', 'string'),
     nullable('created_at', 'timestamp'),
     required('updated_at', 'timestamp'),
   ],
@@ -491,7 +492,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'create',
-    fields: ['id', 'goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at'],
+    fields: ['id', 'goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank'],
     permissions: {},
     validation: { id: { _eq: '$CURRENT_USER' } },
   },
@@ -499,7 +500,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'update',
-    fields: ['goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at'],
+    fields: ['goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank'],
     permissions: { user_created: self },
     validation: {},
   },

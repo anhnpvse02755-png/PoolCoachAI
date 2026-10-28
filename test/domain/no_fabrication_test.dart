@@ -1,5 +1,16 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
+import 'package:poolcoachai/core/providers/recommendation_provider.dart';
+import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/coach/coach_context.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/features/play/presentation/match_analysis_sheet.dart';
+import 'package:poolcoachai/features/stats/presentation/match_analysis_card.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/data/seed/seed_knowledge.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -12,6 +23,10 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap_builder.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+
+import '../support/match_fixtures.dart';
+import '../support/roadmap_fixtures.dart';
+import '../support/test_data.dart';
 
 final _today = DateTime(2026, 9, 17);
 
@@ -173,6 +188,240 @@ void main() {
         Vi.stepReason(aiming.steps.first.reason),
         isNot(Vi.stepReason(safety.steps.first.reason)),
       );
+    });
+  });
+
+  group('phân tích trận bám dữ liệu, không viết cứng (spec 2026-10-28 mục 8)', () {
+    final aimingMatches = matchesWeakAt(SkillCategory.aiming, at: _today);
+    final positionMatches = matchesWeakAt(SkillCategory.position, at: _today);
+
+    test('gợi ý hôm nay đổi theo nhóm yếu trong trận', () {
+      TodayRecommendation rec(List<PoolMatch> m) => computeRecommendation(
+            drills: seedDrills,
+            logs: const [],
+            knowledge: seedKnowledge,
+            timerSessions: const [],
+            schedule: const [],
+            today: _today,
+            matches: m,
+          );
+      final a = rec(aimingMatches);
+      final p = rec(positionMatches);
+      expect(a.reason, PickReason.matchWeakness);
+      expect(p.reason, PickReason.matchWeakness);
+      expect(a.cat, SkillCategory.aiming);
+      expect(p.cat, SkillCategory.position);
+      final sa = Vi.pickReason(a.reason, Vi.skill(a.cat), signal: a.matchSignal);
+      final sp = Vi.pickReason(p.reason, Vi.skill(p.cat), signal: p.matchSignal);
+      expect(sa, contains(Vi.skill(SkillCategory.aiming)));
+      expect(sp, contains(Vi.skill(SkillCategory.position)));
+      expect(sa, isNot(sp));
+    });
+
+    Future<void> pumpHome(
+      WidgetTester tester,
+      ProviderContainer container,
+    ) async {
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      addTearDown(container.dispose);
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Home nêu đúng nhóm yếu trong trận, đổi dữ liệu thì đổi câu', (
+      tester,
+    ) async {
+      for (final (cat, ms) in [
+        (SkillCategory.aiming, matchesWeakAt(SkillCategory.aiming, at: testToday)),
+        (SkillCategory.position, matchesWeakAt(SkillCategory.position, at: testToday)),
+      ]) {
+        final container = testContainer(matches: ms, now: testToday);
+        await pumpHome(tester, container);
+        final rec = container.read(todayRecommendationProvider).requireValue;
+        expect(rec.cat, cat);
+        expect(rec.reason, PickReason.matchWeakness);
+        expect(
+          find.text(
+            Vi.pickReason(rec.reason, Vi.skill(cat), signal: rec.matchSignal),
+          ),
+          findsOneWidget,
+        );
+      }
+    });
+
+    testWidgets('Home: nhóm chỉ yếu theo BU (không bài tập, không trận) được nêu', (
+      tester,
+    ) async {
+      final bu = buResultGraded(
+        completedAt: DateTime(2026, 9, 1),
+        lost: const {'F7': 20, 'F6': 10},
+      );
+      final container = testContainer(buResult: bu, now: testToday);
+      await pumpHome(tester, container);
+      final pi = container.read(playerIntelligenceProvider)!;
+      expect(pi.categories[SkillCategory.aiming]!.mastery, isNull);
+      expect(pi.buPercent[SkillCategory.aiming], lessThan(55));
+      final rec = container.read(todayRecommendationProvider).requireValue;
+      expect(rec.reason, PickReason.weakest);
+      expect(rec.cat, SkillCategory.aiming);
+      expect(
+        find.text(
+          Vi.pickReason(PickReason.weakest, Vi.skill(SkillCategory.aiming)),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('thẻ Thống kê đổi theo nhóm yếu', (tester) async {
+      Future<void> pumpCard(List<PoolMatch> ms) => tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: MatchAnalysisCard(analysis: analyzeMatches(ms)),
+                ),
+              ),
+            ),
+          );
+      await pumpCard(aimingMatches);
+      final aiming =
+          analyzeMatches(aimingMatches).signals[SkillCategory.aiming]!;
+      expect(
+        find.text(
+          Vi.statsMatchWeak(
+            Vi.skill(SkillCategory.aiming),
+            aiming.failures,
+            aiming.attempts,
+            percentOf(aiming.failures, aiming.attempts)!,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('${Vi.skill(SkillCategory.position)}: hỏng'),
+        findsNothing,
+      );
+
+      await pumpCard(positionMatches);
+      final position =
+          analyzeMatches(positionMatches).signals[SkillCategory.position]!;
+      expect(
+        find.text(
+          Vi.statsMatchWeak(
+            Vi.skill(SkillCategory.position),
+            position.failures,
+            position.attempts,
+            percentOf(position.failures, position.attempts)!,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('${Vi.skill(SkillCategory.aiming)}: hỏng'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('bảng Phân tích trận đổi theo nhóm yếu của trận', (tester) async {
+      Future<void> pumpView(PoolMatch m) {
+        final analysis = analyzeMatches([m]);
+        return tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: MatchAnalysisView(
+                  match: m,
+                  analysis: analysis,
+                  focus: singleMatchFocus(
+                    analysis,
+                    drills: seedDrills,
+                    logs: const [],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      final a = aimingMatches.first;
+      await pumpView(a);
+      final sa = analyzeMatches([a]).signals[SkillCategory.aiming]!;
+      final aimingLine = Vi.matchAnalysisFocus(
+        Vi.skill(SkillCategory.aiming),
+        sa.failures,
+        sa.attempts,
+      );
+      expect(find.text(aimingLine), findsOneWidget);
+
+      final p = positionMatches.first;
+      await pumpView(p);
+      final sp = analyzeMatches([p]).signals[SkillCategory.position]!;
+      expect(
+        find.text(
+          Vi.matchAnalysisFocus(
+            Vi.skill(SkillCategory.position),
+            sp.failures,
+            sp.attempts,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(aimingLine), findsNothing);
+    });
+
+    test('fact chat đổi theo', () {
+      String weakOf(List<PoolMatch> ms) {
+        final facts = buildCoachContext(
+          pi: computePlayerIntelligence(drills: seedDrills, logs: const []),
+          rank: null,
+          currentStep: null,
+          attempts: const [],
+          today: null,
+          matches: ms,
+        ).toFacts();
+        final analysis = (facts['matches']! as Map)['analysis']! as Map;
+        return ((analysis['weak']! as List).first as Map)['category']! as String;
+      }
+
+      expect(weakOf(aimingMatches), 'aiming');
+      expect(weakOf(positionMatches), 'position');
+    });
+
+    test('thứ tự bước Lộ trình Chuẩn bị giải đổi theo', () {
+      Roadmap tournament(List<PoolMatch> ms) => buildRoadmap(
+            goal: PlayerGoal(
+              goalId: 'g',
+              kind: GoalKind.chuanBiGiai,
+              eventDate: _today.add(const Duration(days: 30)),
+              createdAt: _today,
+            ),
+            rank: PlayerRank(
+              rank: Rank.h,
+              source: RankSource.estimated,
+              onboardingState: OnboardingState.done,
+              updatedAt: _today,
+            ),
+            drills: seedDrills,
+            logs: const [],
+            tests: const [],
+            latestResult: null,
+            today: _today,
+            matches: ms,
+          );
+      final a = tournament(aimingMatches);
+      final p = tournament(positionMatches);
+      expect(a.steps.first.category, SkillCategory.aiming);
+      expect(p.steps.first.category, SkillCategory.position);
+      expect(Vi.stepTitle(a.steps.first), isNot(Vi.stepTitle(p.steps.first)));
     });
   });
 }
