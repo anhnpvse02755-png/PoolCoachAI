@@ -8,7 +8,10 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/database/skill_test_converters.dart';
+import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/drill_attempts.dart';
@@ -23,9 +26,11 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/rank_check.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:poolcoachai/domain/skill_test/certification.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/roadmap_fixtures.dart';
+import '../../support/skill_test_fixtures.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -338,5 +343,121 @@ void main() {
     final state = container.read(roadmapProvider);
     expect(state.hasError, isTrue);
     expect(state.error, isA<StateError>());
+  });
+
+  group('bộ ghi thành tích với lần kiểm tra kỹ năng (db thật)', () {
+    late AppDatabase db;
+    late SkillTestRepository repo;
+    var n = 0;
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      n = 0;
+      repo = SkillTestRepository(
+        db,
+        userId: 'u1',
+        now: () => stToday,
+        newId: () => 'st${++n}',
+      );
+    });
+    tearDown(() => db.close());
+
+    Future<void> seedLogs(String drillId) async {
+      for (final l in threePasses(drillId)) {
+        await db
+            .into(db.drillLogRows)
+            .insertOnConflictUpdate(toDrillLogRow(l, userId: 'u1'));
+      }
+    }
+
+    Future<void> submit(String drillId, num score) async {
+      await repo.completeTest(
+        drill: stById(drillId),
+        drills: stDrills,
+        tableSize: TableSize.nineFootPlus,
+        startedAt: stToday.subtract(const Duration(minutes: 20)),
+        score: score,
+        attempts: 10,
+      );
+    }
+
+    Future<List<AchievementRow>> chungNhan() async => [
+      for (final r in await db.select(db.achievementRows).get())
+        if (r.kind == AchievementKind.chungNhan.name) r,
+    ];
+
+    test(
+      'lần kiểm tra đạt qua repository: chứng nhận lưu khớp certificationsOf '
+      'của skill_test_rows, ngày là ngày đạt sớm nhất',
+      () async {
+        await seedLogs('a1');
+        final container = dbContainer(db);
+        addTearDown(container.dispose);
+        container.listen(achievementRecorderProvider, (_, _) {});
+        await settle();
+        expect(await chungNhan(), isEmpty);
+
+        await submit('a1', 9);
+        await settle();
+
+        final stored = [
+          for (final r in await db.select(db.skillTestRows).get())
+            ?toSkillTest(r),
+        ];
+        final certs = certificationsOf(stored);
+        final rows = await chungNhan();
+        expect(
+          rows.map((r) => r.refId).toList()..sort(),
+          certs.keys.toList()..sort(),
+        );
+        expect(rows.map((r) => r.refId), ['a1']);
+        expect(rows.single.achievedAt, certs['a1']!.certifiedAt);
+        expect(rows.single.achievedAt, stToday);
+      },
+    );
+
+    test('lần kiểm tra trượt không ra chứng nhận', () async {
+      await seedLogs('a1');
+      final container = dbContainer(db);
+      addTearDown(container.dispose);
+      container.listen(achievementRecorderProvider, (_, _) {});
+      await settle();
+
+      await submit('a1', 5);
+      await settle();
+
+      expect(await db.select(db.skillTestRows).get(), hasLength(1));
+      expect(await chungNhan(), isEmpty);
+    });
+
+    test(
+      'lần đạt thứ hai của cùng bài không thêm bản trùng, ngày giữ sớm nhất',
+      () async {
+        await seedLogs('a1');
+        final container = dbContainer(db);
+        addTearDown(container.dispose);
+        container.listen(achievementRecorderProvider, (_, _) {});
+        await settle();
+        await submit('a1', 9);
+        await settle();
+
+        // Lần đạt thứ hai tới từ đồng bộ (cổng cục bộ không cho nộp hai lần).
+        await db.into(db.skillTestRows).insert(
+          toSkillTestRow(
+            passedTest(
+              'a1',
+              1,
+              stToday.add(const Duration(days: 3)),
+              id: 'remote-2',
+            ),
+            userId: 'u1',
+          ),
+        );
+        await settle();
+
+        final rows = await chungNhan();
+        expect(rows, hasLength(1));
+        expect([rows.single.refId, rows.single.achievedAt], ['a1', stToday]);
+      },
+    );
   });
 }
