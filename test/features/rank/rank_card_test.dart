@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
@@ -18,6 +22,7 @@ import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
+import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 
 import '../../support/roadmap_fixtures.dart';
@@ -143,6 +148,40 @@ void main() {
   testWidgets('chưa có hạng: Trang chủ hiện thẻ Xác định hạng của bạn', (tester) async {
     await pump(tester, Routes.home);
     expect(find.text(Vi.homeRankCardTitle), findsOneWidget);
+  });
+
+  // Font của app tới sau khung hình đầu. Hàng/cột của thẻ phụ thuộc bề rộng
+  // nhãn nút, nên phải quyết định lại khi font tới (giống _MetricGrid).
+  testWidgets('font tới sau khung hình đầu: thẻ Xác định hạng chọn lại hàng/cột', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(300, 640);
+    addTearDown(tester.view.reset);
+    const family = 'FontToiSau';
+    final container = testContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: ThemeData(fontFamily: family),
+        home: const Scaffold(body: HomeRankHeader()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    bool inRow() =>
+        tester.getTopLeft(find.byType(FilledButton)).dx >
+        tester.getTopLeft(find.text(Vi.homeRankCardTitle)).dx + 40;
+    // Chưa nạp họ font: chữ vẽ bằng font dự phòng của test, rộng 1 em mỗi chữ.
+    expect(inRow(), isFalse, reason: 'font dự phòng rộng: phải xuống cột');
+
+    final roboto = File('test/fixtures/fonts/roboto-regular.ttf');
+    expect(roboto.existsSync(), isTrue, reason: 'không thấy ${roboto.path}');
+    final bytes = roboto.readAsBytesSync();
+    await tester.runAsync(() => (FontLoader(family)
+          ..addFont(Future.value(ByteData.sublistView(bytes))))
+        .load());
+    await tester.pumpAndSettle();
+    expect(inRow(), isTrue, reason: 'Roboto hẹp: phải quay về một hàng');
   });
 
   testWidgets('có hạng: Trang chủ hiện huy hiệu nhỏ và nhãn nguồn', (tester) async {

@@ -132,54 +132,88 @@ class HomeRankHeader extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       // Gọn một hàng: Trang chủ là chỗ của buổi tập hôm nay, thẻ hạng không
       // được đẩy chúng xuống dưới màn hình.
-      child: PcCard(
-        child: LayoutBuilder(
-          builder: (context, box) {
-            final texts = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(Vi.homeRankCardTitle, style: Theme.of(context).textTheme.titleSmall),
-                Text(Vi.homeRankCardBody, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            );
-            final button = FilledButton(
-              onPressed: () => context.push(Routes.onboardingRank),
-              child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
-            );
-            // Nút giữ độ rộng tự nhiên; hàng chỉ chuyển thành cột khi cột chữ
-            // không còn đủ chỗ (chữ lớn), không bao giờ chia đôi hàng.
-            final label = TextPainter(
-              text: TextSpan(
-                text: Vi.rankDetermine,
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              textDirection: TextDirection.ltr,
-              textScaler: MediaQuery.textScalerOf(context),
-            )..layout();
-            const buttonPadding = 48.0;
-            const minTextWidth = 72.0;
-            final fitsInRow = label.width + buttonPadding + AppSpacing.sm + minTextWidth <=
-                box.maxWidth;
-            if (fitsInRow) {
-              return Row(
-                children: [
-                  Expanded(child: texts),
-                  const SizedBox(width: AppSpacing.sm),
-                  button,
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                texts,
-                const SizedBox(height: AppSpacing.sm),
-                button,
-              ],
-            );
-          },
-        ),
-      ),
+      child: const PcCard(child: _UnrankedCardBody()),
     );
+  }
+}
+
+/// Thẻ *Xác định hạng của bạn*. Font của app tới sau khung hình đầu và không
+/// có gì buộc dựng lại, nên nghe font đổi (như _MetricGrid ở màn Thống kê) để
+/// chọn lại hàng/cột theo bề rộng chữ thật chứ không theo font dự phòng.
+class _UnrankedCardBody extends StatefulWidget {
+  const _UnrankedCardBody();
+
+  @override
+  State<_UnrankedCardBody> createState() => _UnrankedCardBodyState();
+}
+
+class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
+  var _fontsVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    PaintingBinding.instance.systemFonts.addListener(_onFontsChanged);
+  }
+
+  @override
+  void dispose() {
+    PaintingBinding.instance.systemFonts.removeListener(_onFontsChanged);
+    super.dispose();
+  }
+
+  void _onFontsChanged() => setState(() => _fontsVersion++);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      key: ValueKey(_fontsVersion),
+      builder: (context, box) {
+        final texts = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(Vi.homeRankCardTitle, style: Theme.of(context).textTheme.titleSmall),
+            Text(Vi.homeRankCardBody, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        );
+        final button = FilledButton(
+          onPressed: () => context.push(Routes.onboardingRank),
+          child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
+        );
+        // Nút giữ độ rộng tự nhiên; hàng chỉ chuyển thành cột khi cột chữ
+        // không còn đủ chỗ (chữ lớn), không bao giờ chia đôi hàng.
+        final label = TextPainter(
+          text: TextSpan(
+            text: Vi.rankDetermine,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final labelWidth = label.width;
+        label.dispose();
+        const buttonPadding = 48.0;
+        const minTextWidth = 72.0;
+        final fitsInRow = labelWidth + buttonPadding + AppSpacing.sm + minTextWidth <=
+            box.maxWidth;
+        if (fitsInRow) {
+          return Row(
+            children: [
+              Expanded(child: texts),
+              const SizedBox(width: AppSpacing.sm),
+              button,
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            texts,
+            const SizedBox(height: AppSpacing.sm),
+            button,
+          ],
+        );
+      },
+    );;
   }
 }
