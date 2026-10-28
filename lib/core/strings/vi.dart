@@ -25,6 +25,7 @@ import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
+import 'package:poolcoachai/domain/roadmap/pace.dart' show dateOnly;
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
@@ -256,6 +257,70 @@ abstract final class Vi {
   static const matchAnalysisFocusNone =
       'Trong trận này chưa có nhóm nào đủ '
       '${MatchAnalysisConstants.singleMatchMinAttempts} lần thử và vượt ngưỡng yếu.';
+
+  // ─── Giải đấu (spec 2026-10-28) ───
+  // Thành tích là chữ người chơi tự ghi; mọi con số do lib/domain/tournament tính ra.
+  static const tournamentsTitle = 'Giải đấu';
+  static const tournamentNone = 'Chưa có giải nào';
+  static const tournamentListEmpty =
+      'Chưa có giải nào. Thêm giải bạn sắp đánh hoặc đã đánh để ghi trận vào đó.';
+  static const tournamentAdd = 'Thêm giải';
+  static const tournamentAddTitle = 'Thêm giải';
+  static const tournamentEditTitle = 'Sửa giải';
+  static const tournamentSave = 'Lưu giải';
+  static const tournamentName = 'Tên giải';
+  static const tournamentStartDate = 'Ngày bắt đầu';
+  static const tournamentEndDate = 'Ngày kết thúc (không bắt buộc)';
+  static const tournamentNoEndDate = 'Chưa chọn';
+  static const tournamentPickDate = 'Chọn ngày';
+  static const tournamentClearDate = 'Bỏ ngày kết thúc';
+  static const tournamentLocation = 'Địa điểm (không bắt buộc)';
+  static const tournamentGameType = 'Thể loại (không bắt buộc)';
+  static const tournamentNoGameType = 'Chưa chọn';
+  static const tournamentResultNote = 'Thành tích (không bắt buộc)';
+  static const tournamentResultHint = 'Ví dụ: Vào vòng 16';
+  static const tournamentNotes = 'Ghi chú (không bắt buộc)';
+  static String tournamentInputError(TournamentInputError e) => switch (e) {
+    TournamentInputError.nameRequired => 'Nhập tên giải.',
+    TournamentInputError.nameTooLong =>
+      'Tên giải tối đa ${TournamentConstants.nameMaxLength} ký tự.',
+    TournamentInputError.endBeforeStart =>
+      'Ngày kết thúc không được trước ngày bắt đầu.',
+    TournamentInputError.locationTooLong =>
+      'Địa điểm tối đa ${TournamentConstants.locationMaxLength} ký tự.',
+    TournamentInputError.resultNoteTooLong =>
+      'Thành tích tối đa ${TournamentConstants.resultNoteMaxLength} ký tự.',
+    TournamentInputError.notesTooLong =>
+      'Ghi chú tối đa ${TournamentConstants.notesMaxLength} ký tự.',
+  };
+  static const tournamentSaveFailed = 'Không lưu được giải. Vui lòng thử lại.';
+  static const tournamentDataError = 'Chưa tải được dữ liệu giải đấu.';
+  static String tournamentStatusName(TournamentStatus s) => switch (s) {
+    TournamentStatus.sapToi => 'Sắp tới',
+    TournamentStatus.dangDienRa => 'Đang diễn ra',
+    TournamentStatus.daXong => 'Đã xong',
+  };
+  static String tournamentDates(Tournament t) =>
+      t.endDate == null || dateOnly(t.endDate!) == dateOnly(t.startDate)
+      ? shortDate(t.startDate)
+      : '${shortDate(t.startDate)} – ${shortDate(t.endDate!)}';
+  static String tournamentStatusDates(TournamentStatus s, Tournament t) =>
+      '${tournamentStatusName(s)} · ${tournamentDates(t)}';
+  static String tournamentRecord(int won, int lost) =>
+      'Thắng $won – thua $lost trận';
+  static String tournamentResultLine(String note) => 'Thành tích: $note';
+  static const tournamentSelfReported = 'Kết quả do bạn ghi';
+  static const tournamentCompareTitle = 'Ở giải và trận thường';
+  static String tournamentCompare(
+    int inPercent,
+    int inMatches,
+    int regularPercent,
+    int regularMatches,
+  ) =>
+      'Ở giải: thắng $inPercent% số ván ($inMatches trận) · '
+      'Trận thường: thắng $regularPercent% số ván ($regularMatches trận)';
+  static const tournamentCompareNotEnough =
+      'Cần ít nhất ${MatchAnalysisConstants.minMatches} trận hoàn tất ở mỗi bên để so sánh';
   static String matchRaceTo(int target) => 'Chạm $target ván thắng';
   static String matchRackProgress(int count) => '$count ván đã ghi';
   static String matchRackLabel(int number) => 'Ván $number';

@@ -487,6 +487,8 @@ void main() {
         // bật lên sau, như khi chạm vào ô ghi chú.
         applyScreen(tester, const Size(740, 360));
         await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text(Vi.matchRecordShot));
+        await tester.pumpAndSettle();
         await tester.tap(find.text(Vi.matchRecordShot));
         await tester.pumpAndSettle();
         tester.view.viewInsets = const FakeViewPadding(bottom: 160);
@@ -701,7 +703,7 @@ void main() {
     ) async {
       await addTournament(
         'up',
-        'Sắp tới',
+        'Giải ngày mai',
         start: testToday.add(const Duration(days: 1)),
       );
       await addTournament(
@@ -721,7 +723,9 @@ void main() {
         [
           find.text('Xong 7 ngày').evaluate().isEmpty,
           find.text('Xong 8 ngày').evaluate().isEmpty,
-          find.text('Sắp tới').evaluate().isEmpty,
+          // Thẻ Giải đấu trên Play đã nêu giải sắp tới này đúng một lần;
+          // trong danh sách chọn nó không được xuất hiện thêm.
+          find.text('Giải ngày mai').evaluate().length == 1,
         ],
         [false, true, true],
       );

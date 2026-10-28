@@ -16,6 +16,7 @@ import 'package:poolcoachai/domain/tournament/tournament_lists.dart';
 import 'package:poolcoachai/domain/tournament/tournament_results.dart';
 import 'package:poolcoachai/features/play/presentation/match_analysis_sheet.dart';
 import 'package:poolcoachai/features/play/presentation/match_dialogs.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_play_card.dart';
 import 'package:uuid/uuid.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
@@ -512,6 +513,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         data: (matches) => ListView(
           padding: const EdgeInsets.all(12),
           children: [
+            const TournamentPlayCard(),
+            const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: _mutating ? null : _startMatch,
               icon: const Icon(Icons.add),

@@ -21,6 +21,7 @@ import 'package:poolcoachai/features/knowledge/presentation/knowledge_library_sc
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_list_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/profile_screen.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 import 'package:poolcoachai/features/roadmap/presentation/roadmap_screen.dart';
@@ -141,6 +142,12 @@ GoRouter createAppRouter({
             GoRoute(
               path: Routes.play,
               builder: (context, state) => const PlayScreen(),
+              routes: [
+                GoRoute(
+                  path: 'tournaments',
+                  builder: (_, _) => const TournamentListScreen(),
+                ),
+              ],
             ),
           ],
         ),
