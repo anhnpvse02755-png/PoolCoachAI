@@ -2,6 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+/// Ký tự chỉ có trong tiếng Việt, đủ để bắt mọi câu thật.
+final vietnameseLiteral = RegExp(
+  r"'[^']*[ăâđêôơưàáảãạầấẩẫậằắẳẵặèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ][^']*'",
+  caseSensitive: false,
+);
+
 /// Ba luật kiến trúc mà chỉ đọc mã thì không ai nhớ nổi.
 ///
 /// Cả ba đều thuộc loại vi phạm êm ru: mã vẫn chạy, test khác vẫn
@@ -103,18 +109,13 @@ void main() {
   });
 
   test('không màn hình nào chứa chuỗi tiếng Việt viết thẳng', () {
-    // Ký tự chỉ có trong tiếng Việt, đủ để bắt mọi câu thật.
-    final vietnamese = RegExp(
-      r"'[^']*[ăâđêôơưàáảãạầấẩẫậằắẳẵặèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ][^']*'",
-      caseSensitive: false,
-    );
     final offenders = <String>[];
 
     for (final file in [
       ...dartFilesIn('lib/features'),
       ...dartFilesIn('lib/core/widgets'),
     ]) {
-      final matches = vietnamese.allMatches(codeOnly(file.readAsStringSync()));
+      final matches = vietnameseLiteral.allMatches(codeOnly(file.readAsStringSync()));
       for (final match in matches) {
         offenders.add('${file.path.replaceAll(r'\', '/')}: ${match[0]}');
       }
@@ -288,6 +289,28 @@ void main() {
       isEmpty,
       reason: 'cách tính tỉ lệ thắng và kết luận cơ hợp nhất phải chạy và '
           'test được trên Dart VM thuần',
+    );
+  });
+
+  test('lõi phân tích trận không phụ thuộc Flutter, không dùng Vi, không có chuỗi tiếng Việt', () {
+    final files = dartFilesIn('lib/domain/match_analysis');
+    final offenders = <String>[];
+    for (final file in files) {
+      final code = codeOnly(file.readAsStringSync());
+      final path = file.path.replaceAll(r'', '/');
+      if (code.contains('package:flutter')) offenders.add('$path: flutter');
+      if (code.contains('core/strings/vi.dart')) offenders.add('$path: Vi');
+      for (final m in vietnameseLiteral.allMatches(code)) {
+        offenders.add('$path: ${m[0]}');
+      }
+    }
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'phân tích trận chỉ trả enum và số đếm; câu chữ nằm ở Vi và '
+          'phải chạy được trên Dart VM thuần',
     );
   });
 
