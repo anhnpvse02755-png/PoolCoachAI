@@ -1,5 +1,7 @@
 # PoolCoachAI — Thiết kế Lộ trình (mục tiêu + khảo sát + thích ứng)
 
+> **Đã thay thế** bởi `2026-10-15-poolcoachai-roadmap-design.md` (bản chính). Giữ lại để tra lịch sử.
+
 Ngày: 2026-10-06
 Trạng thái: đã duyệt hướng, chờ duyệt bản viết (chưa thành kế hoạch triển khai). **Phải viết lại sau khi có dự án con Đánh giá + hạng** (xem mục "Đối chiếu với mã" ngay dưới).
 
