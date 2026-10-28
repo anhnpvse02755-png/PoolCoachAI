@@ -397,7 +397,7 @@ abstract final class Vi {
   static const statsMatchWeakNone =
       'Chưa đủ dữ liệu để kết luận (cần ít nhất ${MatchAnalysisConstants.minMatches} trận và ${MatchAnalysisConstants.minAttempts} lần thử mỗi nhóm).';
   static String statsMatchWeakNoneOverThreshold(int matches) =>
-      'Không nhóm nào vượt ngưỡng yếu trong $matches trận gần đây.';
+      'Không nhóm nào đủ mẫu vượt ngưỡng yếu trong $matches trận gần đây.';
   static String statsMatchCount(int recorded, int completed) =>
       '$recorded ($completed)';
   static String statsPositionCount(int success, int assessed) =>

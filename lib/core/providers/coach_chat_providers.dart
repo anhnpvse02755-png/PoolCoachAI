@@ -33,18 +33,9 @@ final coachChatBackendProvider = Provider<CoachChatBackend>(
 /// Ngữ cảnh gửi cho Coach Chat (R21): gộp sáu nguồn, mọi số đã tính sẵn
 /// (spec Giai đoạn B mục 7 — LLM chỉ diễn giải, không tính lại).
 ///
-/// `timerSessionsProvider`/`scheduleProvider`/`drillLogsProvider` được canh
-/// TRỰC TIẾP ở đây (không chỉ qua `todayRecommendationProvider`, vốn chỉ
-/// kiểm `hasValue` cho ba nguồn này — xem `recommendation_provider.dart` —
-/// nên có thể lọt giá trị cũ của tài khoản trước trong lúc đổi tài khoản).
-/// `drillLogsProvider` trước đây chỉ được canh GIÁN TIẾP qua `_ready
-/// (roadmapAsync)` (vì `roadmapProvider` tự canh nó nội bộ) — không đủ tin
-/// cậy vì đó là tác dụng phụ của logic khác, không phải một ràng buộc cục
-/// bộ của provider này (I2, review Task 11 fix round 1, probe F2: buổi tập
-/// hẹn giờ — `timerSessionsProvider` — tải lại chậm 100 ms khi đổi tài
-/// khoản vẫn lọt qua `_ready(todayAsync)`, vì `todayRecommendationProvider`
-/// không phân biệt "sẵn sàng" với "còn giá trị cũ, đang tải lại" cho ba
-/// nguồn này).
+/// `timerSessionsProvider`/`scheduleProvider`/`drillLogsProvider` được canh TRỰC TIẾP ở đây
+/// vì `todayRecommendationProvider` gate mọi nguồn của nó bằng `gate()`; lỗi BU được coi là không có kết quả BU trên Home.
+/// Canh trực tiếp để không lọt giá trị cũ của tài khoản trước khi đang tải lại.
 final coachContextProvider = Provider<AsyncValue<CoachContext>>((ref) {
   final pi = ref.watch(playerIntelligenceProvider);
   final rankAsync = ref.watch(playerRankProvider);
