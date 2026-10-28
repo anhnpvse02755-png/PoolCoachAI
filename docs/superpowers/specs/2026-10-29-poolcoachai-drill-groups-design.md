@@ -71,7 +71,7 @@ Mỗi nhóm có 3 cấp, ứng với 3 bậc BU: **cấp 1 = Bachelors, cấp 2 
 
 **Nguồn trên bài tập.**
 - Thêm khai báo nguồn cho bài tập: một bảng hằng trong seed `drillId → nguồn`. Không lưu vào DB, vì bài tập được upsert từ seed mỗi lần mở app.
-- Chi tiết bài hiện dòng "Nguồn: …", ví dụ "Billiard University Exam II, S8; mẹo theo Dr. Dave Alciatore".
+- Chi tiết bài hiện dòng "Nguồn: …", ví dụ Dựng cơ: "Nguồn: Billiard University Exam II, S8, bậc Bachelors." (chỉ BU, vì Dựng cơ chưa có mẹo có nguồn).
 - Bài cũ `d1`–`d10` không có khai báo nguồn thì không hiện dòng này. App không bịa nguồn cho chúng.
 
 **Nối BU.**
@@ -141,7 +141,7 @@ Bản cũ mất gì, và không có gì hỏng:
 
 **Thứ tự phát hành.**
 - Thứ tự: bootstrap Directus trên prod, rồi verify, rồi đẩy PR, rồi publish web, rồi chạy e2e (`tool/e2e/drill_groups.mjs`).
-- Sau khi người chơi đã dùng nhóm mới, **không rollback web**, vì dữ liệu máy đã chứa tên nhóm mới. Chỉ sửa tiến. Lưu ý: một tab web bản cũ còn mở trên cùng origin sẽ báo lỗi khi đọc các dòng cục bộ đã ghi bằng tên nhóm mới (không sửa code, người chơi tải lại trang).
+- Từ lúc publish web, **không bao giờ rollback** về bản trước tính năng; chỉ sửa tiến. Lý do: ngay lần mở đầu tiên của bản mới, seed ghi d11–d19 với tên nhóm mới vào máy, và bản cũ ném lỗi khi đọc các bài đó. Tab cũ cùng origin hỏng ở lần đọc bài tiếp theo; tải lại là hết (không sửa được code của bản đã phát hành).
 
 **Bảng nguồn.**
 - Nằm ở `lib/domain/drill_provenance.dart`, không nằm trong seed. Lý do: kiến trúc cấm màn hình đọc seed.

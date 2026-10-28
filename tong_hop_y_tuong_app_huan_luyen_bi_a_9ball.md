@@ -380,7 +380,7 @@ Trạng thái dưới đây là **ảnh chụp mã nguồn và tài liệu trong
 |---|---|---|
 | Nền tảng/điều hướng | Flutter, giao diện tiếng Việt, năm tab chính; web build tồn tại | Android/iOS và trải nghiệm thực tế cần tiếp tục kiểm tra trên thiết bị |
 | Đánh giá/hạng | Có onboarding, câu hỏi, bài kiểm tra BU, lịch sử và đồng bộ hạng | Cần đối chiếu nghiệp vụ/UX khi mở rộng mục tiêu và kiểm tra kỹ năng |
-| Training/Drill | Có thư viện seed, lọc chín nhóm (ba nhóm nâng cao Dựng cơ, Nhảy bi, Mát xê, mỗi nhóm ba bài theo bố cục BU S8/S9, có dòng nguồn và cảnh báo nỉ), chi tiết bài, ghi kết quả thủ công/lịch sử; chi tiết bài hiển thị chuỗi buổi đạt gần nhất | Chưa có luồng camera và Recording Preparation; chưa có Skill Test/chứng nhận riêng hoặc tự mở level (tiêu chí cần chốt) |
+| Training/Drill | Có thư viện seed, lọc chín nhóm (ba nhóm nâng cao Dựng cơ, Nhảy bi, Mát xê, mỗi nhóm ba bài theo bố cục BU S8/S9, có dòng nguồn; cảnh báo nỉ chỉ ở Nhảy bi và Mát xê), chi tiết bài, ghi kết quả thủ công/lịch sử; chi tiết bài hiển thị chuỗi buổi đạt gần nhất | Chưa có luồng camera và Recording Preparation; chưa có Skill Test/chứng nhận riêng hoặc tự mở level (tiêu chí cần chốt) |
 | Knowledge | Có nội dung seed, trang đọc và liên kết Drill | Có thể mở rộng bộ nội dung và cách tìm/lọc |
 | Intelligence/Home | Có tính toán xác định cho năng lực/gợi ý; Home hiện lịch hôm nay, streak, thời lượng tập tuần và bước Lộ trình | Tiếp tục kiểm chứng trên thiết bị thật; không suy rộng từ dữ liệu tập luyện sang kết luận trận đấu |
 | Mô phỏng góc cắt | Có màn và lõi hình học/vật lý | Cần tiếp tục kiểm chứng độ chính xác thực tế; đây là mô phỏng, không phải camera/physics đầy đủ |
