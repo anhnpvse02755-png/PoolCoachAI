@@ -92,6 +92,17 @@ void main() {
     expect(find.text('50%'), findsNothing);
   });
 
+  testWidgets('danh sách bài hiện số buổi đạt liên tiếp gần nhất', (
+    tester,
+  ) async {
+    await openTraining(tester, [
+      log(id: 'l1', date: DateTime(2026, 9, 18), score: 8),
+      log(id: 'l2', date: DateTime(2026, 9, 20), score: 8),
+    ]);
+
+    expect(find.text(Vi.drillReadinessProgress(2)), findsOneWidget);
+  });
+
   testWidgets('thiếu số lần thử thì nói chưa chấm được, không quy về 0', (
     tester,
   ) async {

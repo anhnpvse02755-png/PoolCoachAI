@@ -3,6 +3,14 @@ import 'package:poolcoachai/domain/pool_match.dart';
 abstract interface class MatchRepository {
   Stream<List<PoolMatch>> watchAll();
   Future<void> start(PoolMatch match);
+  Future<void> updateDetails({
+    required String matchId,
+    required PoolGameType gameType,
+    required String playerName,
+    required String opponentName,
+    required int targetRacks,
+  });
+  Future<void> remove(String matchId);
   Future<void> recordRack(String matchId, RackWinner winner);
   Future<void> undoLastRack(String matchId);
   Future<void> recordShot(String matchId, MatchShot shot);
@@ -18,6 +26,21 @@ class SignedOutMatchRepository implements MatchRepository {
   @override
   Future<void> start(PoolMatch match) =>
       Future.error(StateError('Chưa đăng nhập thì không lưu trận đấu được'));
+
+  @override
+  Future<void> updateDetails({
+    required String matchId,
+    required PoolGameType gameType,
+    required String playerName,
+    required String opponentName,
+    required int targetRacks,
+  }) => Future.error(
+    StateError('Chưa đăng nhập thì không sửa thông tin trận đấu được'),
+  );
+
+  @override
+  Future<void> remove(String matchId) =>
+      Future.error(StateError('Chưa đăng nhập thì không xóa trận đấu được'));
 
   @override
   Future<void> recordRack(String matchId, RackWinner winner) => Future.error(

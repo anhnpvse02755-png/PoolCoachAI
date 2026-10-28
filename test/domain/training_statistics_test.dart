@@ -28,6 +28,7 @@ void main() {
           date: DateTime(2026, 10, 1 + i),
           score: i + 1,
           attempts: 10,
+          durationSec: i < 2 ? 300 : null,
         ),
       DrillLog(
         id: 'not-scorable',
@@ -142,6 +143,8 @@ void main() {
     expect(statistics.timerSessionCount, 2);
     expect(statistics.totalSessionCount, 11);
     expect(statistics.totalTimerSeconds, 2100);
+    expect(statistics.totalDrillSeconds, 600);
+    expect(statistics.timedDrillSessionCount, 2);
     expect(statistics.timerSecondsThisWeek, 900);
     expect(statistics.recordedMatchCount, 3);
     expect(statistics.completedMatchCount, 2);
@@ -195,5 +198,68 @@ void main() {
     );
     expect(statistics.drillTrends, isEmpty);
     expect(statistics.streakDays, 0);
+  });
+
+  test('combines training and match activity within the current week', () {
+    final statistics = computeTrainingStatistics(
+      drills: [drill],
+      logs: [
+        DrillLog(
+          id: 'monday-drill',
+          drillId: drill.id,
+          date: DateTime(2026, 10, 19, 9),
+          score: 8,
+          attempts: 10,
+        ),
+        DrillLog(
+          id: 'previous-week-drill',
+          drillId: drill.id,
+          date: DateTime(2026, 10, 18),
+          score: 8,
+          attempts: 10,
+        ),
+      ],
+      timerSessions: [
+        TimerSession(
+          id: 'tuesday-timer',
+          date: DateTime(2026, 10, 20, 10),
+          durationSec: 600,
+        ),
+      ],
+      matches: [
+        PoolMatch(
+          id: 'tuesday-match',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 3,
+          rackWinners: const [],
+          startedAt: DateTime(2026, 10, 20, 11),
+        ),
+        PoolMatch(
+          id: 'previous-week-match',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Chi',
+          targetRacks: 3,
+          rackWinners: const [],
+          startedAt: DateTime(2026, 10, 18),
+        ),
+      ],
+      today: DateTime(2026, 10, 20, 12),
+    );
+
+    final combined = statistics.combinedTrainingPlay;
+    expect(combined.days, hasLength(2));
+    expect(combined.trainingSessionCount, 2);
+    expect(combined.matchCount, 1);
+    expect(combined.trainingDays, 2);
+    expect(combined.playDays, 1);
+    expect(combined.sharedDays, 1);
+    expect(combined.activeDays, 2);
+    expect(combined.days[0].trainingSessions, 1);
+    expect(combined.days[0].matches, 0);
+    expect(combined.days[1].trainingSessions, 1);
+    expect(combined.days[1].matches, 1);
   });
 }

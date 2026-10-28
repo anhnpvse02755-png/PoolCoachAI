@@ -43,6 +43,7 @@ class DrillLogRows extends Table {
   RealColumn get score => real()();
   IntColumn get attempts => integer().nullable()();
   TextColumn get notes => text().nullable()();
+  IntColumn get durationSec => integer().nullable()();
 
   /// Chủ của buổi tập. Mọi truy vấn buổi tập đều lọc theo cột này.
   TextColumn get userId => text()();
@@ -140,6 +141,9 @@ class PoolMatchRows extends Table {
 
   /// Null nghĩa là **chưa đồng bộ**.
   DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  /// Xóa mềm: dòng ở lại để đồng bộ báo máy khác, mọi truy vấn đọc bỏ qua nó.
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -360,7 +364,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -432,6 +436,13 @@ class AppDatabase extends _$AppDatabase {
       if (from < 12) {
         // Chỉ thêm bảng (spec Giai đoạn B mục 8): không đụng dữ liệu cũ.
         await m.createTable(coachChatTurnRows);
+      }
+      if (from >= 2 && from < 13) {
+        await m.addColumn(drillLogRows, drillLogRows.durationSec);
+      }
+      if (from >= 7 && from < 13) {
+        // Bảng trận đấu có từ v7; v13 chưa phát hành nên gộp cột xóa mềm vào.
+        await m.addColumn(poolMatchRows, poolMatchRows.isDeleted);
       }
     },
   );

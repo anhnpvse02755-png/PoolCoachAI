@@ -52,6 +52,7 @@ DrillLog toDrillLog(DrillLogRow row) {
     score: row.score,
     attempts: row.attempts,
     notes: row.notes,
+    durationSec: row.durationSec,
   );
 }
 
@@ -68,6 +69,9 @@ DrillLogRowsCompanion toDrillLogRow(DrillLog log, {required String userId}) {
     notes: log.notes != null
         ? drift.Value(log.notes!)
         : const drift.Value.absent(),
+    durationSec: log.durationSec != null
+        ? drift.Value(log.durationSec!)
+        : const drift.Value.absent(),
   );
 }
 
@@ -76,13 +80,14 @@ DrillLogRowsCompanion toDrillLogRow(DrillLog log, {required String userId}) {
 /// Không gửi chủ: server tự điền `user_created` từ token, app không
 /// giả mạo được.
 Map<String, Object?> toRemoteDrillLog(DrillLogRow row) => {
-      'id': row.id,
-      'drill_id': row.drillId,
-      'date': row.date.toUtc().toIso8601String(),
-      'score': row.score,
-      'attempts': row.attempts,
-      'notes': row.notes,
-    };
+  'id': row.id,
+  'drill_id': row.drillId,
+  'date': row.date.toUtc().toIso8601String(),
+  'score': row.score,
+  'attempts': row.attempts,
+  'notes': row.notes,
+  'duration_sec': row.durationSec,
+};
 
 /// Buổi tập kéo từ server về, gắn cho [userId] và đánh dấu đã đồng bộ.
 DrillLogRowsCompanion fromRemoteDrillLog(
@@ -98,6 +103,7 @@ DrillLogRowsCompanion fromRemoteDrillLog(
     score: (json['score']! as num).toDouble(),
     attempts: drift.Value(json['attempts'] as int?),
     notes: drift.Value(json['notes'] as String?),
+    durationSec: drift.Value((json['duration_sec'] as num?)?.toInt()),
     syncedAt: drift.Value(syncedAt),
   );
 }

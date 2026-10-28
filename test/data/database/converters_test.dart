@@ -21,17 +21,17 @@ void main() {
 
   Future<Drill> roundTripDrill(Drill drill) async {
     await db.into(db.drillRows).insertOnConflictUpdate(toDrillRow(drill));
-    final row = await (db.select(db.drillRows)
-          ..where((t) => t.id.equals(drill.id)))
-        .getSingle();
+    final row = await (db.select(
+      db.drillRows,
+    )..where((t) => t.id.equals(drill.id))).getSingle();
     return toDrill(row);
   }
 
   Future<DrillLog> roundTripLog(DrillLog log) async {
     await db.into(db.drillLogRows).insert(toDrillLogRow(log, userId: 'u1'));
-    final row = await (db.select(db.drillLogRows)
-          ..where((t) => t.id.equals(log.id)))
-        .getSingle();
+    final row = await (db.select(
+      db.drillLogRows,
+    )..where((t) => t.id.equals(log.id))).getSingle();
     return toDrillLog(row);
   }
 
@@ -61,25 +61,30 @@ void main() {
       expect(back.target, isNull);
     });
 
-    test('target kiểu num quay về thành double — chỗ mất mát đã biết',
-        () async {
-      final back = await roundTripDrill(
-        const Drill(
-          id: 'd2',
-          cat: SkillCategory.position,
-          name: 'Kéo bi cái',
-          level: 2,
-          unit: 'cm',
-          goal: 'Kéo bi cái về đúng cự ly.',
-          steps: ['Bước một'],
-          target: 25,
-        ),
-      );
+    test(
+      'target kiểu num quay về thành double — chỗ mất mát đã biết',
+      () async {
+        final back = await roundTripDrill(
+          const Drill(
+            id: 'd2',
+            cat: SkillCategory.position,
+            name: 'Kéo bi cái',
+            level: 2,
+            unit: 'cm',
+            goal: 'Kéo bi cái về đúng cự ly.',
+            steps: ['Bước một'],
+            target: 25,
+          ),
+        );
 
-      expect(back.target, 25);
-      expect(back.target, isA<double>(),
-          reason: 'cột real đọc lên luôn là double, dù seed ghi số nguyên');
-    });
+        expect(back.target, 25);
+        expect(
+          back.target,
+          isA<double>(),
+          reason: 'cột real đọc lên luôn là double, dù seed ghi số nguyên',
+        );
+      },
+    );
 
     test('danh sách bước rỗng quay về rỗng, không phải null', () async {
       final back = await roundTripDrill(
@@ -104,8 +109,9 @@ void main() {
   group('hàng hỏng trong bảng', () {
     Future<DrillRow> insertRaw(DrillRowsCompanion row) async {
       await db.into(db.drillRows).insert(row);
-      return (db.select(db.drillRows)..where((t) => t.id.equals(row.id.value)))
-          .getSingle();
+      return (db.select(
+        db.drillRows,
+      )..where((t) => t.id.equals(row.id.value))).getSingle();
     }
 
     test('có cả passThreshold lẫn target thì ném ngay lúc đọc', () async {
@@ -142,46 +148,49 @@ void main() {
       expect(() => toDrill(row), throwsA(isA<AssertionError>()));
     });
 
-    test('tên nhóm kỹ năng lạ thì ném, không im lặng chọn bừa một nhóm',
-        () async {
-      final row = await insertRaw(
-        DrillRowsCompanion.insert(
-          id: 'nhom-la',
-          cat: 'khong-phai-nhom-nao',
-          name: 'Nhóm lạ',
-          level: 1,
-          unit: 'cm',
-          goal: 'Mục tiêu.',
-          steps: '[]',
-          target: const Value(10),
-        ),
-      );
+    test(
+      'tên nhóm kỹ năng lạ thì ném, không im lặng chọn bừa một nhóm',
+      () async {
+        final row = await insertRaw(
+          DrillRowsCompanion.insert(
+            id: 'nhom-la',
+            cat: 'khong-phai-nhom-nao',
+            name: 'Nhóm lạ',
+            level: 1,
+            unit: 'cm',
+            goal: 'Mục tiêu.',
+            steps: '[]',
+            target: const Value(10),
+          ),
+        );
 
-      expect(() => toDrill(row), throwsA(isA<FormatException>()));
-    });
+        expect(() => toDrill(row), throwsA(isA<FormatException>()));
+      },
+    );
 
-    test('steps hỏng JSON thì ném, không âm thầm thành danh sách rỗng',
-        () async {
-      final row = await insertRaw(
-        DrillRowsCompanion.insert(
-          id: 'json-hong',
-          cat: SkillCategory.aiming.name,
-          name: 'JSON hỏng',
-          level: 1,
-          unit: 'cm',
-          goal: 'Mục tiêu.',
-          steps: '{khong phai json}',
-          target: const Value(10),
-        ),
-      );
+    test(
+      'steps hỏng JSON thì ném, không âm thầm thành danh sách rỗng',
+      () async {
+        final row = await insertRaw(
+          DrillRowsCompanion.insert(
+            id: 'json-hong',
+            cat: SkillCategory.aiming.name,
+            name: 'JSON hỏng',
+            level: 1,
+            unit: 'cm',
+            goal: 'Mục tiêu.',
+            steps: '{khong phai json}',
+            target: const Value(10),
+          ),
+        );
 
-      expect(() => toDrill(row), throwsA(isA<FormatException>()));
-    });
+        expect(() => toDrill(row), throwsA(isA<FormatException>()));
+      },
+    );
   });
 
   group('vòng chuyển đổi DrillLog', () {
-    test('score kiểu num quay về thành double — chỗ mất mát đã biết',
-        () async {
+    test('score kiểu num quay về thành double — chỗ mất mát đã biết', () async {
       final back = await roundTripLog(
         DrillLog(
           id: 'l1',
@@ -219,56 +228,71 @@ void main() {
           score: 5,
           attempts: 10,
           notes: 'Hơi lệch phải',
+          durationSec: 300,
         ),
       );
 
       expect(back.date, DateTime(2026, 9, 20, 14, 30));
       expect(back.notes, 'Hơi lệch phải');
+      expect(back.durationSec, 300);
     });
   });
 
-  test('buổi tập đi lên server rồi về máy vẫn nguyên, kể cả chữ tiếng Việt',
-      () async {
-    await db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
-          id: 'x',
-          userId: 'u1',
-          drillId: 'd1',
-          date: DateTime(2026, 9, 23, 10, 30),
-          score: 7,
-          attempts: const Value(10),
-          notes: const Value('Cú đánh hơi lệch phải'),
-        ));
-    final original = (await db.select(db.drillLogRows).get()).single;
+  test(
+    'buổi tập đi lên server rồi về máy vẫn nguyên, kể cả chữ tiếng Việt',
+    () async {
+      await db
+          .into(db.drillLogRows)
+          .insert(
+            DrillLogRowsCompanion.insert(
+              id: 'x',
+              userId: 'u1',
+              drillId: 'd1',
+              date: DateTime(2026, 9, 23, 10, 30),
+              score: 7,
+              attempts: const Value(10),
+              notes: const Value('Cú đánh hơi lệch phải'),
+              durationSec: const Value(300),
+            ),
+          );
+      final original = (await db.select(db.drillLogRows).get()).single;
 
-    final json = toRemoteDrillLog(original);
-    expect(json.containsKey('user_created'), isFalse);
+      final json = toRemoteDrillLog(original);
+      expect(json.containsKey('user_created'), isFalse);
 
-    await db.delete(db.drillLogRows).go();
-    await db.into(db.drillLogRows).insert(
-          fromRemoteDrillLog(json, userId: 'u1', syncedAt: DateTime(2026, 9, 23, 11)),
-        );
-    final back = (await db.select(db.drillLogRows).get()).single;
+      await db.delete(db.drillLogRows).go();
+      await db
+          .into(db.drillLogRows)
+          .insert(
+            fromRemoteDrillLog(
+              json,
+              userId: 'u1',
+              syncedAt: DateTime(2026, 9, 23, 11),
+            ),
+          );
+      final back = (await db.select(db.drillLogRows).get()).single;
 
-    expect(back.date, original.date);
-    expect(back.score, 7);
-    expect(back.attempts, 10);
-    expect(back.notes, 'Cú đánh hơi lệch phải');
-    expect(back.syncedAt, isNotNull);
-  });
+      expect(back.date, original.date);
+      expect(back.score, 7);
+      expect(back.attempts, 10);
+      expect(back.notes, 'Cú đánh hơi lệch phải');
+      expect(back.durationSec, 300);
+      expect(back.syncedAt, isNotNull);
+    },
+  );
 
   group('vòng chuyển đổi KnowledgeArticle', () {
     Future<KnowledgeArticle> roundTrip(KnowledgeArticle article) async {
       await db
           .into(db.knowledgeRows)
           .insertOnConflictUpdate(toKnowledgeRow(article));
-      final row = await (db.select(db.knowledgeRows)
-            ..where((t) => t.id.equals(article.id)))
-          .getSingle();
+      final row = await (db.select(
+        db.knowledgeRows,
+      )..where((t) => t.id.equals(article.id))).getSingle();
       return toKnowledge(row);
     }
 
-    test('giữ nguyên mọi trường, kể cả danh sách bài tập liên quan',
-        () async {
+    test('giữ nguyên mọi trường, kể cả danh sách bài tập liên quan', () async {
       final back = await roundTrip(
         const KnowledgeArticle(
           id: 'k1',
@@ -286,18 +310,20 @@ void main() {
       expect(back.relatedDrillIds, ['d1', 'd2']);
     });
 
-    test('không có bài tập liên quan thì quay về rỗng, không phải null',
-        () async {
-      final back = await roundTrip(
-        const KnowledgeArticle(
-          id: 'k2',
-          cat: SkillCategory.safety,
-          title: 'Phòng thủ',
-          body: 'Thân bài.',
-        ),
-      );
+    test(
+      'không có bài tập liên quan thì quay về rỗng, không phải null',
+      () async {
+        final back = await roundTrip(
+          const KnowledgeArticle(
+            id: 'k2',
+            cat: SkillCategory.safety,
+            title: 'Phòng thủ',
+            body: 'Thân bài.',
+          ),
+        );
 
-      expect(back.relatedDrillIds, isEmpty);
-    });
+        expect(back.relatedDrillIds, isEmpty);
+      },
+    );
   });
 }

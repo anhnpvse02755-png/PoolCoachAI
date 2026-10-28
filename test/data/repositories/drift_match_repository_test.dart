@@ -123,6 +123,279 @@ void main() {
     },
   );
 
+  test('removes only a match owned by the account', () async {
+    final ownRepository = DriftMatchRepository(db, userId: 'u1');
+    final otherRepository = DriftMatchRepository(db, userId: 'u2');
+    await ownRepository.start(newMatch('own'));
+    await otherRepository.start(newMatch('other'));
+
+    await ownRepository.remove('own');
+    expect(
+      (await ownRepository.watchAll().first).map((match) => match.id),
+      isEmpty,
+    );
+    expect((await otherRepository.watchAll().first).map((match) => match.id), [
+      'other',
+    ]);
+    await expectLater(ownRepository.remove('other'), throwsStateError);
+    await expectLater(ownRepository.remove('missing'), throwsStateError);
+  });
+
+  test('remove is a soft delete: hidden, unsynced, updatedAt bumped', () async {
+    var now = DateTime(2026, 10, 20, 10);
+    final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+    await repository.start(newMatch('m1'));
+    await db.update(db.poolMatchRows).write(
+      PoolMatchRowsCompanion(syncedAt: Value(now)),
+    );
+    now = DateTime(2026, 10, 20, 12);
+
+    await repository.remove('m1');
+
+    expect(await repository.watchAll().first, isEmpty);
+    final row = (await db.select(db.poolMatchRows).get()).single;
+    expect(row.isDeleted, isTrue);
+    expect(row.updatedAt, now);
+    expect(row.syncedAt, isNull);
+    await expectLater(repository.remove('m1'), throwsStateError);
+    await expectLater(repository.recordRack('m1', RackWinner.player), throwsStateError);
+    await expectLater(
+      repository.updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 3,
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('updateDetails bumps updatedAt and clears syncedAt', () async {
+    var now = DateTime(2026, 10, 20, 10);
+    final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+    await repository.start(newMatch('m1'));
+    await db.update(db.poolMatchRows).write(
+      PoolMatchRowsCompanion(syncedAt: Value(now)),
+    );
+    now = DateTime(2026, 10, 20, 12);
+
+    await repository.updateDetails(
+      matchId: 'm1',
+      gameType: PoolGameType.nineBall,
+      playerName: 'An',
+      opponentName: 'Bình',
+      targetRacks: 4,
+    );
+
+    final row = (await db.select(db.poolMatchRows).get()).single;
+    expect(row.updatedAt, now);
+    expect(row.syncedAt, isNull);
+  });
+
+  test('updates match details without changing recorded racks or shots', () async {
+    var now = DateTime(2026, 10, 20, 10);
+    final repository = DriftMatchRepository(
+      db,
+      userId: 'u1',
+      now: () => now,
+    );
+    await repository.start(newMatch('m1'));
+    await repository.recordRack('m1', RackWinner.player);
+    now = DateTime(2026, 10, 20, 11);
+
+    await repository.updateDetails(
+      matchId: 'm1',
+      gameType: PoolGameType.eightBall,
+      playerName: '  An mới ',
+      opponentName: ' Bình mới ',
+      targetRacks: 3,
+    );
+
+    final match = (await repository.watchAll().first).single;
+    expect(match.gameType, PoolGameType.eightBall);
+    expect(match.playerName, 'An mới');
+    expect(match.opponentName, 'Bình mới');
+    expect(match.targetRacks, 3);
+    expect(match.rackWinners, [RackWinner.player]);
+    expect(match.isComplete, isFalse);
+    expect(match.completedAt, isNull);
+
+    await expectLater(
+      DriftMatchRepository(db, userId: 'u2').updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.tenBall,
+        playerName: 'Khác',
+        opponentName: 'Khác',
+        targetRacks: 3,
+      ),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'lowers the target to exactly the leader\'s wins and completes the match',
+    () async {
+      var now = DateTime(2026, 10, 20, 10);
+      final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+      await repository.start(
+        PoolMatch(
+          id: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 5,
+          rackWinners: const [],
+          startedAt: now,
+        ),
+      );
+      await repository.recordRack('m1', RackWinner.player);
+      await repository.recordRack('m1', RackWinner.opponent);
+      await repository.recordRack('m1', RackWinner.player);
+      await repository.recordRack('m1', RackWinner.player);
+      // Player đang dẫn 3–1 trong trận chạm 5 ván.
+      now = DateTime(2026, 10, 20, 11);
+
+      await repository.updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 3,
+      );
+
+      final match = (await repository.watchAll().first).single;
+      expect(match.targetRacks, 3);
+      expect(match.playerScore, 3);
+      expect(match.opponentScore, 1);
+      expect(match.isComplete, isTrue);
+      expect(match.completedAt, now);
+    },
+  );
+
+  test(
+    'raises the target above the winner\'s count on a completed match and reopens it',
+    () async {
+      var now = DateTime(2026, 10, 20, 10);
+      final repository = DriftMatchRepository(db, userId: 'u1', now: () => now);
+      await repository.start(
+        PoolMatch(
+          id: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 3,
+          rackWinners: const [],
+          startedAt: now,
+        ),
+      );
+      await repository.recordShot(
+        'm1',
+        MatchShot(
+          id: 'shot-1',
+          rackNumber: 1,
+          shotNumber: 1,
+          shooter: RackWinner.player,
+          type: MatchShotType.breakShot,
+          outcome: MatchShotOutcome.made,
+          recordedAt: now,
+        ),
+      );
+      await repository.recordRack('m1', RackWinner.player);
+      await repository.recordRack('m1', RackWinner.player);
+      await repository.recordRack('m1', RackWinner.player);
+      var match = (await repository.watchAll().first).single;
+      expect(match.isComplete, isTrue);
+      expect(match.completedAt, isNotNull);
+
+      now = DateTime(2026, 10, 20, 12);
+      await repository.updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.nineBall,
+        playerName: 'An',
+        opponentName: 'Bình',
+        targetRacks: 5,
+      );
+
+      match = (await repository.watchAll().first).single;
+      expect(match.targetRacks, 5);
+      expect(match.isComplete, isFalse);
+      expect(match.completedAt, isNull);
+      expect(match.playerScore, 3);
+      expect(match.shots, hasLength(1));
+      expect(match.shots.single.id, 'shot-1');
+    },
+  );
+
+  test(
+    'rejects blank names, a non-positive target, and a target below the '
+    'leader\'s wins',
+    () async {
+      final repository = DriftMatchRepository(db, userId: 'u1');
+      await repository.start(
+        PoolMatch(
+          id: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 5,
+          rackWinners: const [],
+          startedAt: DateTime(2026, 10, 20, 10),
+        ),
+      );
+      await repository.recordRack('m1', RackWinner.player);
+      await repository.recordRack('m1', RackWinner.player);
+      // Player đang dẫn 2–0 trong trận chạm 5 ván.
+
+      await expectLater(
+        repository.updateDetails(
+          matchId: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: '  ',
+          opponentName: 'Bình',
+          targetRacks: 5,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        repository.updateDetails(
+          matchId: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: ' ',
+          targetRacks: 5,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        repository.updateDetails(
+          matchId: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 0,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        repository.updateDetails(
+          matchId: 'm1',
+          gameType: PoolGameType.nineBall,
+          playerName: 'An',
+          opponentName: 'Bình',
+          targetRacks: 1,
+        ),
+        throwsArgumentError,
+      );
+
+      final match = (await repository.watchAll().first).single;
+      expect(match.targetRacks, 5);
+      expect(match.playerName, 'An');
+      expect(match.opponentName, 'Bình');
+      expect(match.playerScore, 2);
+    },
+  );
+
   group('cue on a match', () {
     final now = DateTime(2026, 10, 20, 12);
 
@@ -194,7 +467,6 @@ void main() {
     var row = (await db.select(db.poolMatchRows).get()).single;
     expect(row.updatedAt, now);
     expect(row.syncedAt, isNull);
-
     await (db.update(db.poolMatchRows)).write(
       PoolMatchRowsCompanion(syncedAt: Value(now)),
     );

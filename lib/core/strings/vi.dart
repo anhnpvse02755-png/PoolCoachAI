@@ -121,6 +121,9 @@ abstract final class Vi {
 
   static const playTitle = 'Thi đấu';
   static const matchStart = 'Ghi trận mới';
+  static const matchEdit = 'Sửa thông tin trận';
+  static const matchEditTitle = 'Sửa thông tin trận';
+  static const matchSaveDetails = 'Lưu thay đổi';
   static const matchEmpty = 'Chưa có trận đấu nào được ghi.';
   static const matchGameType = 'Thể loại';
   static const matchEightBall = '8 bi';
@@ -133,6 +136,11 @@ abstract final class Vi {
   static const matchPlayerWinsRack = 'Tôi thắng ván';
   static const matchOpponentWinsRack = 'Đối thủ thắng ván';
   static const matchUndoRack = 'Hoàn tác ván gần nhất';
+  static const matchDelete = 'Xóa trận';
+  static const matchDeleteTitle = 'Xóa trận đấu?';
+  static const matchDeleteBody =
+      'Toàn bộ tỷ số và cú đánh đã ghi trong trận này sẽ bị xóa khỏi thiết bị.';
+  static const matchDeleteConfirm = 'Xóa trận';
   static const matchRecordShot = 'Ghi cú đánh';
   static const matchUndoShot = 'Hoàn tác cú gần nhất';
   static const matchShooter = 'Người đánh';
@@ -160,6 +168,10 @@ abstract final class Vi {
       'Không bắt đầu được trận đấu. Vui lòng thử lại.';
   static const matchRecordFailed =
       'Không cập nhật được kết quả trận đấu. Vui lòng thử lại.';
+  static const matchEditFailed = 'Không sửa được trận đấu. Vui lòng thử lại.';
+  static const matchDeleteFailed = 'Không xóa được trận đấu. Vui lòng thử lại.';
+  static String matchTargetBelowLeader(int leaderWins) =>
+      'Phải chọn ít nhất $leaderWins ván vì đã có người thắng $leaderWins ván.';
   static String matchScore(
     String player,
     int playerScore,
@@ -201,10 +213,42 @@ abstract final class Vi {
 
   static const statsTitle = 'Thống kê';
   static const statsOverview = 'Tổng quan luyện tập';
+  static const statsCombinedTitle = 'Nhịp tập và thi đấu tuần này';
+  static const statsCombinedTraining = 'Buổi tập';
+  static const statsCombinedPlay = 'Trận';
+  static String statsCombinedSummary(
+    int trainingSessions,
+    int matches,
+    int activeDays,
+    int sharedDays,
+  ) =>
+      '$trainingSessions buổi tập · $matches trận · $activeDays ngày có hoạt động · '
+      '$sharedDays ngày vừa tập vừa thi đấu';
+  static String statsCombinedDayLabel(int weekday) => switch (weekday) {
+    DateTime.monday => 'T2',
+    DateTime.tuesday => 'T3',
+    DateTime.wednesday => 'T4',
+    DateTime.thursday => 'T5',
+    DateTime.friday => 'T6',
+    DateTime.saturday => 'T7',
+    DateTime.sunday => 'CN',
+    _ => '',
+  };
+  static String statsCombinedDaySemantics(
+    int weekday,
+    int trainingSessions,
+    int matches,
+  ) =>
+      '${statsCombinedDayLabel(weekday)}: $trainingSessions buổi tập, $matches trận';
+  static const statsCombinedEmpty =
+      'Chưa có hoạt động tập hoặc thi đấu tuần này.';
   static const statsTotalSessions = 'Tổng buổi tập';
   static const statsDrillSessions = 'Buổi theo bài';
   static const statsTimerSessions = 'Buổi tập tự do';
   static const statsTimerTotal = 'Tổng thời gian tập tự do';
+  static const statsDrillDurationTotal = 'Tổng thời lượng Drill đã đo';
+  static String statsDrillDurationValue(int seconds, int sessionCount) =>
+      '${statsDuration(seconds)} · $sessionCount buổi có dữ liệu';
   static const statsTimerWeek = 'Thời gian tập tự do tuần này';
   static const statsStreak = 'Chuỗi ngày tập hiện tại';
   static String statsStreakValue(int days) => '$days ngày';
@@ -513,6 +557,11 @@ abstract final class Vi {
   static String drillUnitLabel(String unit) => 'Đơn vị: $unit';
   static const drillStepsTitle = 'Các bước thực hiện';
   static const drillHistoryTitle = 'Lịch sử tập';
+  static const drillReadinessTitle = 'Tiến độ buổi đạt liên tiếp';
+  static String drillReadinessProgress(int count) =>
+      'Buổi đạt liên tiếp: $count / ${PracticeConstants.readyStreak}';
+  static const drillReadinessQualified =
+      'Đã đạt số buổi liên tiếp theo yêu cầu.';
   static const drillStartAction = 'Bắt đầu tập';
 
   /// Ngày kiểu Việt Nam: ngày trước, tháng sau, đủ bốn chữ số năm.
@@ -534,6 +583,8 @@ abstract final class Vi {
   static const sessionNotesLabel = 'Ghi chú (tùy chọn)';
   static const sessionNotesHint = 'VD: Cú đánh hơi lệch phải...';
   static const sessionSaveAction = 'Lưu kết quả';
+  static const sessionDurationRecordedAutomatically =
+      'Thời lượng được tính từ lúc mở buổi tập đến khi lưu kết quả; thời gian ứng dụng ở nền không tính.';
 
   // Chặn ngay tại nút lưu, kèm câu giải thích. Lưu một log méo rồi để
   // drillRatio() trả null về sau là đẩy lỗi đi xa khỏi chỗ gây ra nó.

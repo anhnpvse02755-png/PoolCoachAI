@@ -49,6 +49,49 @@ void main() {
     expect(find.text(Vi.drillLevel(1)), findsOneWidget);
   });
 
+  testWidgets('hiện tiến độ chuỗi buổi đạt từ kết quả thực tế', (tester) async {
+    await openDrill(
+      tester,
+      'd1',
+      logs: [
+        for (var day = 1; day <= 3; day++)
+          DrillLog(
+            id: 'l$day',
+            drillId: 'd1',
+            date: DateTime(2026, 9, day),
+            score: day == 2 ? 5 : 8,
+            attempts: 10,
+          ),
+      ],
+    );
+
+    expect(find.text(Vi.drillReadinessTitle), findsOneWidget);
+    expect(find.text(Vi.drillReadinessProgress(1)), findsOneWidget);
+  });
+
+  testWidgets('hiện khi đã đạt chuỗi yêu cầu, không tự cấp chứng nhận',
+      (tester) async {
+    await openDrill(
+      tester,
+      'd1',
+      logs: [
+        for (var day = 1; day <= 3; day++)
+          DrillLog(
+            id: 'l$day',
+            drillId: 'd1',
+            date: DateTime(2026, 9, day),
+            score: 8,
+            attempts: 10,
+          ),
+      ],
+    );
+
+    expect(find.text(Vi.drillReadinessTitle), findsOneWidget);
+    expect(find.text(Vi.drillReadinessProgress(3)), findsOneWidget);
+    expect(find.text(Vi.drillReadinessQualified), findsOneWidget);
+    expect(find.textContaining('chứng nhận'), findsNothing);
+  });
+
   testWidgets('chưa tập lần nào thì không hiện khối lịch sử', (tester) async {
     await openDrill(tester, 'd1');
 

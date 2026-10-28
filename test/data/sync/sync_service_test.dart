@@ -23,7 +23,10 @@ void main() {
       SyncService(
         db: db,
         auth: auth,
-        api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
+        api: DirectusClient(
+          client: server.client,
+          baseUrl: FakeDirectus.baseUrl,
+        ),
         now: () => now,
         retryEvery: retryEvery,
       );
@@ -34,15 +37,20 @@ void main() {
     DateTime? syncedAt,
     double score = 7,
     DateTime? date,
-  }) =>
-      db.into(db.drillLogRows).insert(DrillLogRowsCompanion.insert(
-            id: id,
-            userId: userId,
-            drillId: 'd1',
-            date: date ?? DateTime(2026, 9, 22, 18),
-            score: score,
-            syncedAt: Value(syncedAt),
-          ));
+    int? durationSec,
+  }) => db
+      .into(db.drillLogRows)
+      .insert(
+        DrillLogRowsCompanion.insert(
+          id: id,
+          userId: userId,
+          drillId: 'd1',
+          date: date ?? DateTime(2026, 9, 22, 18),
+          score: score,
+          durationSec: Value(durationSec),
+          syncedAt: Value(syncedAt),
+        ),
+      );
 
   Future<DrillLogRow> row(String id) =>
       (db.select(db.drillLogRows)..where((t) => t.id.equals(id))).getSingle();
@@ -55,8 +63,8 @@ void main() {
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     server = FakeDirectus()
-      ..routes['POST /items/drill_logs'] =
-          ((req) => FakeDirectus.ok(jsonDecode(req.body)))
+      ..routes['POST /items/drill_logs'] = ((req) =>
+          FakeDirectus.ok(jsonDecode(req.body)))
       ..routes['GET /items/drill_logs'] = ((_) => FakeDirectus.ok([]));
     auth = FakeAuthRepository.signedIn(userId: 'u1');
     sync = build();
@@ -69,13 +77,22 @@ void main() {
 
   group('đẩy lên', () {
     test('gửi buổi chưa đồng bộ kèm token, rồi đánh dấu đã đồng bộ', () async {
-      await addLog('a');
+      await addLog('a', durationSec: 300);
 
       expect(await sync.syncNow(), SyncOutcome.done);
 
       expect(pushedIds(), ['a']);
       expect(
-        server.sent('POST', '/items/drill_logs').single.headers['Authorization'],
+        FakeDirectus.body(
+          server.sent('POST', '/items/drill_logs').single,
+        )['duration_sec'],
+        300,
+      );
+      expect(
+        server
+            .sent('POST', '/items/drill_logs')
+            .single
+            .headers['Authorization'],
         'Bearer access-u1',
       );
       expect((await row('a')).syncedAt, now);
@@ -91,8 +108,8 @@ void main() {
 
     test('server báo trùng id thì coi như đã lên', () async {
       await addLog('a');
-      server.routes['POST /items/drill_logs'] =
-          (_) => FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
+      server.routes['POST /items/drill_logs'] = (_) =>
+          FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
 
       expect(await sync.syncNow(), SyncOutcome.done);
       expect((await row('a')).syncedAt, isNotNull);
@@ -115,20 +132,22 @@ void main() {
       expect((await row('a')).syncedAt, isNull);
     });
 
-    test('buổi chưa đồng bộ của A không bao giờ đi lên bằng token của B',
-        () async {
-      await addLog('cua-an', userId: 'u1');
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
-      await addLog('cua-binh', userId: 'u2');
+    test(
+      'buổi chưa đồng bộ của A không bao giờ đi lên bằng token của B',
+      () async {
+        await addLog('cua-an', userId: 'u1');
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+        await addLog('cua-binh', userId: 'u2');
 
-      await sync.syncNow();
+        await sync.syncNow();
 
-      expect(pushedIds(), ['cua-binh']);
-      for (final req in server.requests) {
-        expect(req.body, isNot(contains('cua-an')));
-      }
-      expect((await row('cua-an')).syncedAt, isNull);
-    });
+        expect(pushedIds(), ['cua-binh']);
+        for (final req in server.requests) {
+          expect(req.body, isNot(contains('cua-an')));
+        }
+        expect((await row('cua-an')).syncedAt, isNull);
+      },
+    );
   });
 
   group('một buổi hỏng không chặn cả hàng', () {
@@ -140,6 +159,7 @@ void main() {
         'score': 9,
         'attempts': 10,
         'notes': null,
+        'duration_sec': 150,
       },
     ];
 
@@ -162,40 +182,45 @@ void main() {
       expect((await row('hong')).syncedAt, isNull);
       expect((await row('tot')).syncedAt, now);
       expect((await row('tu-may-khac')).syncedAt, now);
+      expect((await row('tu-may-khac')).durationSec, 150);
     });
 
-    test('điểm vô hạn thì báo failed, không ném, không chặn buổi sau',
-        () async {
-      await addLog('vo-han',
-          score: double.infinity, date: DateTime(2026, 9, 22, 8));
-      await addLog('tot', date: DateTime(2026, 9, 22, 9));
+    test(
+      'điểm vô hạn thì báo failed, không ném, không chặn buổi sau',
+      () async {
+        await addLog(
+          'vo-han',
+          score: double.infinity,
+          date: DateTime(2026, 9, 22, 8),
+        );
+        await addLog('tot', date: DateTime(2026, 9, 22, 9));
 
-      expect(await sync.syncNow(), SyncOutcome.failed);
+        expect(await sync.syncNow(), SyncOutcome.failed);
 
-      expect(pushedIds(), ['tot']);
-      expect((await row('vo-han')).syncedAt, isNull);
-      expect((await row('tot')).syncedAt, now);
-      expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
-    });
+        expect(pushedIds(), ['tot']);
+        expect((await row('vo-han')).syncedAt, isNull);
+        expect((await row('tot')).syncedAt, now);
+        expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
+      },
+    );
 
     test('server lỗi 5xx thì dừng lượt, không đánh dấu từ chối', () async {
       await addLog('a');
-      server.routes['POST /items/drill_logs'] =
-          ((_) => FakeDirectus.error(503, 'SERVICE_UNAVAILABLE'));
+      server.routes['POST /items/drill_logs'] = ((_) =>
+          FakeDirectus.error(503, 'SERVICE_UNAVAILABLE'));
 
       expect(await sync.syncNow(), SyncOutcome.failed);
       expect(server.sent('GET', '/items/drill_logs'), isEmpty);
     });
 
     test('lỗi bất ngờ thì syncNow trả failed, không bao giờ ném', () async {
-      server.routes['GET /items/drill_logs'] =
-          ((_) => FakeDirectus.ok({'khong': 'phai danh sach'}));
+      server.routes['GET /items/drill_logs'] = ((_) =>
+          FakeDirectus.ok({'khong': 'phai danh sach'}));
 
       expect(await sync.syncNow(), SyncOutcome.failed);
     });
 
-    test('buổi mới ghi trong lượt có buổi bị từ chối thì đi luôn, không chờ 30 giây',
-        () async {
+    test('buổi mới ghi trong lượt có buổi bị từ chối thì đi luôn, không chờ 30 giây', () async {
       await addLog('xau');
       final gate = Completer<void>();
       server.routes['POST /items/drill_logs'] = (req) async {
@@ -228,7 +253,10 @@ void main() {
 
       // Lượt lúc start (và có thể một lượt dồn từ stream) — không phải
       // mười mấy lượt, mỗi 20 ms một lượt.
-      expect(server.sent('GET', '/items/drill_logs').length, lessThanOrEqualTo(2));
+      expect(
+        server.sent('GET', '/items/drill_logs').length,
+        lessThanOrEqualTo(2),
+      );
     });
   });
 
@@ -316,19 +344,24 @@ void main() {
       expect((await row('a')).syncedAt, isNotNull);
     });
 
-    test('buổi chờ của người khác không làm lần thử lại định kỳ chạy',
-        () async {
-      sync.dispose();
-      sync = build(retryEvery: const Duration(milliseconds: 20));
-      await addLog('cua-an', userId: 'u1');
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+    test(
+      'buổi chờ của người khác không làm lần thử lại định kỳ chạy',
+      () async {
+        sync.dispose();
+        sync = build(retryEvery: const Duration(milliseconds: 20));
+        await addLog('cua-an', userId: 'u1');
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
 
-      sync.start();
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+        sync.start();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
 
-      expect(server.sent('GET', '/items/drill_logs').length, lessThanOrEqualTo(2));
-      expect(pushedIds(), isEmpty);
-    });
+        expect(
+          server.sent('GET', '/items/drill_logs').length,
+          lessThanOrEqualTo(2),
+        );
+        expect(pushedIds(), isEmpty);
+      },
+    );
 
     test('buổi mới của người khác không khởi động lượt nào', () async {
       auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
@@ -371,7 +404,12 @@ void main() {
       server.routes['GET /items/drill_logs'] = (_) async {
         await gate.future;
         return FakeDirectus.ok([
-          {'id': 'tu-server', 'drill_id': 'd1', 'date': '2026-09-22T11:00:00.000Z', 'score': 5},
+          {
+            'id': 'tu-server',
+            'drill_id': 'd1',
+            'date': '2026-09-22T11:00:00.000Z',
+            'score': 5,
+          },
         ]);
       };
 

@@ -128,6 +128,8 @@ Phần học lý thuyết, không khóa chặt vào Drill: kỹ thuật, cách t
 ### 6.7 Skill Test / Certification
 Kiểm tra người chơi đã đạt yêu cầu của một level hay chưa, dựa trên kết quả thực hiện thực tế — không phải một nút "Hoàn thành Level 1" giả. Certification thể hiện các level/kỹ năng đã đạt, hiển thị lại ở Profile.
 
+**Trạng thái triển khai hiện tại:** Danh sách và chi tiết bài tập hiển thị số buổi đạt liên tiếp gần nhất theo kết quả thực tế, tối đa 3 buổi theo điều kiện readiness hiện có. Đây chỉ là tiến độ sẵn sàng; chưa phải bài Skill Test riêng hay chứng nhận, và chưa tự mở level. Tiêu chí bài kiểm tra/chứng nhận và quan hệ giữa chứng nhận với các level cần được chốt trước khi triển khai.
+
 ## 7. Play
 
 Nơi dành cho chơi thực tế, tách biệt hoàn toàn với Drill Session:
@@ -139,7 +141,9 @@ Nơi dành cho chơi thực tế, tách biệt hoàn toàn với Drill Session:
 - Đã có MVP ghi trận 8/9/10 bi theo thể thức race-to-3/5/7/9: lưu tên người chơi/đối thủ, kết quả từng ván, tỷ số, trạng thái trận và lịch sử cục bộ theo tài khoản.
 - Có thể hoàn tác ván vừa ghi, kể cả sau khi trận kết thúc, để sửa nhầm kết quả. Đăng xuất chủ động xóa trận của tài khoản khỏi thiết bị.
 - Đã có ghi cú theo từng ván: người đánh, phá/cú thường/phòng thủ, có bi/trượt/phạm lỗi/scratch, kết quả vị trí bi cái và ghi chú tùy chọn. Có thể hoàn tác cú cuối của ván đang diễn ra.
-- **Còn thiếu:** phân tích sâu chuỗi break, lỗi vị trí và mẫu chiến thuật; chỉnh sửa/xóa trận, giải đấu và đồng bộ đa thiết bị. Kết quả từng cú là ghi nhận thủ công, chưa tự suy luận luật hay đánh giá AI.
+- Có thể sửa thể loại, tên hai người chơi và số ván thắng; kết quả rack/cú đã ghi được giữ nguyên, trạng thái hoàn tất được tính lại theo thể thức mới.
+- Đã có xóa trận với bước xác nhận. Trận bị ẩn cùng tỷ số và cú đánh, đánh dấu đã xóa (`is_deleted`) và đồng bộ lên server, nên lần đồng bộ sau không kéo trận đó về lại và các thiết bị khác của tài khoản cũng ẩn trận.
+- **Còn thiếu:** phân tích sâu chuỗi break/lỗi vị trí/mẫu chiến thuật và giải đấu. Kết quả từng cú là ghi nhận thủ công, chưa tự suy luận luật hay đánh giá AI.
 
 ## 8. Intelligence & Coach
 
@@ -163,9 +167,11 @@ Nơi xem dữ liệu chi tiết — Dashboard chỉ đưa insight quan trọng, 
 - Đã có tổng số buổi theo Drill và Timer, tổng thời gian tập tự do, thời gian tập tự do tuần này và streak.
 - Đã có trung bình kết quả chuẩn hóa theo mục tiêu cho từng nhóm kỹ năng; các buổi thiếu dữ liệu chấm không bị tính thành 0.
 - Đã có xu hướng 5 kết quả chấm gần nhất theo Drill. Giá trị được chuẩn hóa theo mục tiêu riêng của bài để so sánh cùng một Drill qua thời gian, không dùng để so điểm thô giữa các Drill.
+- Khi mở màn ghi kết quả Drill, app tự đo thời lượng bằng đồng hồ đơn điệu tới lúc lưu; thời gian ứng dụng ở nền không tính. Tổng thời lượng đã đo được và số log có thời lượng xuất hiện riêng trong Statistics; log cũ không có thời lượng không bị ước lượng.
+- Đã có biểu đồ hoạt động theo ngày trong tuần hiện tại, kết hợp số buổi Drill/Timer và số trận bắt đầu; hiển thị ngày tập, ngày thi đấu và ngày có cả hai. Đây là xu hướng hoạt động, không phải đánh giá tác động của luyện tập lên kết quả trận.
 - Đã có số trận đã ghi/hoàn tất và tổng trận thắng/thua từ các rack đã nhập; đây là thống kê tỷ số cơ bản, không phải phân tích chất lượng từng cú.
 - Đã có tổng hợp số cú đã ghi, break, safety, trượt, phạm lỗi, scratch và tỷ lệ vị trí thành công từ dữ liệu người dùng nhập.
-- **Còn thiếu:** xu hướng kết hợp Training + Play và phân tích chuỗi/chiến thuật trận. Thời lượng hiện tại chỉ gồm các buổi Timer tự do vì Drill log chưa ghi thời lượng.
+- **Còn thiếu:** phân tích chuỗi/chiến thuật trận. Thời lượng Drill chỉ được đo từ lúc mở màn ghi kết quả đến lúc lưu, không phải cảm biến hoạt động tập thực tế.
 
 ## 10. Profile
 

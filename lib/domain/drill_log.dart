@@ -10,6 +10,7 @@ class DrillLog {
     required this.score,
     this.attempts,
     this.notes,
+    this.durationSec,
   });
 
   final String id;
@@ -18,4 +19,5 @@ class DrillLog {
   final num score;
   final int? attempts;
   final String? notes;
+  final int? durationSec;
 }

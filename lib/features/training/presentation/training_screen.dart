@@ -10,6 +10,7 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
+import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Kết quả lần tập gần nhất của một bài.
@@ -61,6 +62,14 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       result[log.drillId] = ratio == null
           ? const _NotScorable()
           : _Scored(ratio);
+    }
+    return result;
+  }
+
+  Map<String, List<DrillLog>> _logsByDrill(List<DrillLog> logs) {
+    final result = <String, List<DrillLog>>{};
+    for (final log in logs) {
+      result.putIfAbsent(log.drillId, () => <DrillLog>[]).add(log);
     }
     return result;
   }
@@ -159,6 +168,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
             data: (drills) {
               final logs = logsAsync.hasValue ? logsAsync.value! : <DrillLog>[];
               final latest = _latestByDrill(drills, logs);
+              final logsByDrill = _logsByDrill(logs);
               final filtered = _filter == null
                   ? drills
                   : drills.where((d) => d.cat == _filter).toList();
@@ -199,12 +209,25 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                     itemBuilder: (context, index) {
                       final drill = filtered[index];
                       final result = latest[drill.id] ?? const _NeverTrained();
+                      final drillLogs =
+                          logsByDrill[drill.id] ?? const <DrillLog>[];
+                      final passCount = logsAsync.hasValue && drillLogs.isNotEmpty
+                          ? consecutivePassCount(drill, drillLogs)
+                          : null;
 
                       return PcCard(
                         child: ListTile(
                           leading: CircleAvatar(child: Text('${drill.level}')),
                           title: Text(drill.name),
-                          subtitle: Text(drill.unit),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(drill.unit),
+                              if (passCount != null)
+                                Text(Vi.drillReadinessProgress(passCount)),
+                            ],
+                          ),
                           trailing: switch (result) {
                             _NeverTrained() => const Icon(
                               Icons.play_circle_outline,

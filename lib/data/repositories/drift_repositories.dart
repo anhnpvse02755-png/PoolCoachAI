@@ -55,6 +55,9 @@ class DriftDrillLogRepository implements DrillLogRepository {
   /// Ghi vào máy với `syncedAt` rỗng; SyncService tự thấy và đẩy lên.
   @override
   Future<void> add(DrillLog log) async {
+    if (log.durationSec != null && log.durationSec! < 0) {
+      throw ArgumentError.value(log.durationSec, 'durationSec');
+    }
     await _db.into(_db.drillLogRows).insert(toDrillLogRow(log, userId: _userId));
   }
 }

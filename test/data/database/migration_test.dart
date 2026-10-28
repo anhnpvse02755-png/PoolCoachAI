@@ -62,8 +62,10 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
-    expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
+    expect(db.schemaVersion, 13);
+    final legacyLog = (await db.select(db.drillLogRows).get()).single;
+    expect(legacyLog.id, 'cu');
+    expect(legacyLog.durationSec, isNull);
 
     final at = DateTime(2026, 10, 14, 9);
     await db
@@ -139,8 +141,10 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
-    expect((await db.select(db.drillLogRows).get()).single.id, 'cu');
+    expect(db.schemaVersion, 13);
+    final legacyLog = (await db.select(db.drillLogRows).get()).single;
+    expect(legacyLog.id, 'cu');
+    expect(legacyLog.durationSec, isNull);
 
     final at = DateTime(2026, 10, 15, 9);
     await db
@@ -166,6 +170,7 @@ void main() {
     () async {
       final executor = NativeDatabase.memory(
         setup: (raw) {
+          _createOwnedDrillLogTable(raw);
           _createPracticeTables(raw);
           raw.execute(
             "INSERT INTO schedule_slot_rows VALUES ('s1', 0, '19:00', 'Tập ngắm', 'aiming');",
@@ -179,7 +184,7 @@ void main() {
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 12);
+      expect(db.schemaVersion, 13);
       expect((await db.select(db.scheduleSlotRows).get()).single.userId, '');
       expect((await db.select(db.timerSessionRows).get()).single.userId, '');
 
@@ -242,6 +247,7 @@ void main() {
           "('cue-v7', 'u1', 'Cơ cũ', 'playing', 540, NULL, NULL, "
           "'[]', NULL, NULL);",
         );
+        _createOwnedDrillLogTable(raw);
         _createOwnedPracticeTables(raw);
         raw.execute('PRAGMA user_version = 7;');
       },
@@ -249,11 +255,12 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
+    expect(db.schemaVersion, 13);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
     expect(match.userId, 'u1');
     expect(match.shots, '[]');
+    expect(match.isDeleted, isFalse);
     final cue = (await db.select(db.cueEquipmentRows).get()).single;
     expect(cue.id, 'cue-v7');
     expect(cue.name, 'Cơ cũ');
@@ -290,6 +297,7 @@ void main() {
           "('cue-v8', 'u1', 'Cơ cũ', 'playing', 540, NULL, NULL, "
           "'[\"aiming\"]', NULL, NULL);",
         );
+        _createOwnedDrillLogTable(raw);
         _createOwnedPracticeTables(raw);
         raw.execute(
           'CREATE TABLE pool_match_rows ('
@@ -306,7 +314,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
+    expect(db.schemaVersion, 13);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.id, 'cue-v8');
     expect(cue.updatedAt, isNull);
@@ -333,6 +341,7 @@ void main() {
         raw.execute(
           "INSERT INTO timer_session_rows VALUES ('t9', 'u1', 1760400000, 900, NULL, NULL);",
         );
+        _createOwnedDrillLogTable(raw);
         raw.execute(
           'CREATE TABLE cue_equipment_rows ('
           'id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, '
@@ -365,7 +374,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
+    expect(db.schemaVersion, 13);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.shaftDiameterMm, 12.4);
     expect(cue.shaftBrand, isNull);
@@ -373,6 +382,7 @@ void main() {
     expect(cue.buttBrand, isNull);
     final match = (await db.select(db.poolMatchRows).getSingle());
     expect(match.cueId, isNull);
+    expect(match.isDeleted, isFalse);
     expect(match.updatedAt, isNull);
     expect(match.syncedAt, isNull);
     final timer = (await db.select(db.timerSessionRows).getSingle());
@@ -395,17 +405,21 @@ void main() {
         raw.execute(
           "INSERT INTO drill_log_rows VALUES ('v10', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);",
         );
+        _createV12PoolMatchTable(raw);
         raw.execute('PRAGMA user_version = 10;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 12);
+    expect(db.schemaVersion, 13);
     expect((await db.select(db.drillLogRows).get()).single.id, 'v10');
+    expect((await db.select(db.poolMatchRows).get()).single.isDeleted, isFalse);
     expect(await db.select(db.coachAttemptRows).get(), isEmpty);
     final at = DateTime(2026, 10, 21, 9);
-    await db.into(db.coachAttemptRows).insert(
+    await db
+        .into(db.coachAttemptRows)
+        .insert(
           CoachAttemptRowsCompanion.insert(
             id: 'c1',
             userId: 'u1',
@@ -425,24 +439,45 @@ void main() {
     expect(row.syncedAt, isNull);
   });
 
-  test('nâng từ v11 lên v12 chỉ thêm bảng chat Coach, giữ nguyên dữ liệu cũ', () async {
-    final executor = NativeDatabase.memory(setup: (raw) {
-      raw.execute('CREATE TABLE drill_log_rows (id TEXT NOT NULL PRIMARY KEY, drill_id TEXT NOT NULL, date INTEGER NOT NULL, '
-          'score REAL NOT NULL, attempts INTEGER NULL, notes TEXT NULL, user_id TEXT NOT NULL, synced_at INTEGER NULL);');
-      raw.execute("INSERT INTO drill_log_rows VALUES ('v11', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);");
-      raw.execute('PRAGMA user_version = 11;');
-    });
-    final db = AppDatabase.forTesting(executor);
-    addTearDown(db.close);
-    expect(db.schemaVersion, 12);
-    expect((await db.select(db.drillLogRows).get()).single.id, 'v11');
-    expect(await db.select(db.coachChatTurnRows).get(), isEmpty);
-    await db.into(db.coachChatTurnRows).insert(CoachChatTurnRowsCompanion.insert(
-        userId: 'u1', createdAt: DateTime(2026, 10, 22, 9), fromPlayer: true, message: 'Hôm nay tôi nên tập gì?'));
-    final row = (await db.select(db.coachChatTurnRows).get()).single;
-    expect([row.id, row.insufficient], [1, false]);
-  });
+  test(
+    'nâng từ v11 lên v13 giữ dữ liệu và thêm chat Coach cùng thời lượng Drill',
+    () async {
+      final executor = NativeDatabase.memory(
+        setup: (raw) {
+          raw.execute(
+            'CREATE TABLE drill_log_rows (id TEXT NOT NULL PRIMARY KEY, drill_id TEXT NOT NULL, date INTEGER NOT NULL, '
+            'score REAL NOT NULL, attempts INTEGER NULL, notes TEXT NULL, user_id TEXT NOT NULL, synced_at INTEGER NULL);',
+          );
+          raw.execute(
+            "INSERT INTO drill_log_rows VALUES ('v11', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);",
+          );
+          _createV12PoolMatchTable(raw);
+          raw.execute('PRAGMA user_version = 11;');
+        },
+      );
+      final db = AppDatabase.forTesting(executor);
+      addTearDown(db.close);
+      expect(db.schemaVersion, 13);
+      final legacyLog = (await db.select(db.drillLogRows).get()).single;
+      expect(legacyLog.id, 'v11');
+      expect(legacyLog.durationSec, isNull);
+      expect(await db.select(db.coachChatTurnRows).get(), isEmpty);
+      await db
+          .into(db.coachChatTurnRows)
+          .insert(
+            CoachChatTurnRowsCompanion.insert(
+              userId: 'u1',
+              createdAt: DateTime(2026, 10, 22, 9),
+              fromPlayer: true,
+              message: 'Hôm nay tôi nên tập gì?',
+            ),
+          );
+      final row = (await db.select(db.coachChatTurnRows).get()).single;
+      expect([row.id, row.insufficient], [1, false]);
+    },
+  );
 }
+
 void _createPracticeTables(dynamic raw) {
   raw.execute(
     'CREATE TABLE schedule_slot_rows (id TEXT NOT NULL PRIMARY KEY, '
@@ -467,5 +502,32 @@ void _createOwnedPracticeTables(dynamic raw) {
     'CREATE TABLE timer_session_rows (id TEXT NOT NULL PRIMARY KEY, '
     "user_id TEXT NOT NULL DEFAULT '', date INTEGER NOT NULL, "
     'duration_sec INTEGER NOT NULL, cat TEXT NULL, cue_id TEXT NULL);',
+  );
+}
+
+void _createOwnedDrillLogTable(dynamic raw) {
+  raw.execute(
+    'CREATE TABLE drill_log_rows (id TEXT NOT NULL PRIMARY KEY, '
+    'drill_id TEXT NOT NULL, date INTEGER NOT NULL, score REAL NOT NULL, '
+    'attempts INTEGER NULL, notes TEXT NULL, user_id TEXT NOT NULL, '
+    'synced_at INTEGER NULL);',
+  );
+}
+
+/// Bảng trận đấu đúng hình dạng v12 (trước cột xóa mềm), kèm một trận cũ.
+void _createV12PoolMatchTable(dynamic raw) {
+  raw.execute(
+    'CREATE TABLE pool_match_rows ('
+    'id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, '
+    'game_type TEXT NOT NULL, player_name TEXT NOT NULL, '
+    'opponent_name TEXT NOT NULL, target_racks INTEGER NOT NULL, '
+    'rack_winners TEXT NOT NULL, '
+    "shots TEXT NOT NULL DEFAULT '[]', "
+    'started_at INTEGER NOT NULL, completed_at INTEGER NULL, '
+    'cue_id TEXT NULL, updated_at INTEGER NULL, synced_at INTEGER NULL);',
+  );
+  raw.execute(
+    "INSERT INTO pool_match_rows VALUES ('m12', 'u1', 'nineBall', 'An', "
+    "'Bình', 5, '[]', '[]', 1760400000, NULL, NULL, NULL, NULL);",
   );
 }

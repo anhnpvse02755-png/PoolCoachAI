@@ -47,6 +47,7 @@ class SyncService {
   bool _disposed = false;
   Future<SyncOutcome>? _running;
   bool _again = false;
+
   /// Buổi chờ đẩy trên máy, của mọi người — id → chủ của buổi.
   Map<String, String> _seenPending = {};
 
@@ -224,7 +225,7 @@ class SyncService {
     final token = await _tokenFor(userId);
     final items = await _api.get('/items/drill_logs', token: token, query: {
       'limit': '-1',
-      'fields': 'id,drill_id,date,score,attempts,notes',
+      'fields': 'id,drill_id,date,score,attempts,notes,duration_sec',
     }) as List<Object?>;
     _checkAlive();
 
