@@ -98,7 +98,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Nhóm hôm nay, kèm câu vì sao. Lý do không được nuốt:
-            // sáu PickReason ra sáu câu khác nhau ở vi.dart.
+            // bảy PickReason ra bảy câu khác nhau ở vi.dart.
             PcCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +117,11 @@ class HomeScreen extends ConsumerWidget {
                   PcSkillChip(category: rec.cat),
                   const SizedBox(height: 8),
                   Text(
-                    Vi.pickReason(rec.reason, Vi.skill(rec.cat)),
+                    Vi.pickReason(
+                      rec.reason,
+                      Vi.skill(rec.cat),
+                      signal: rec.matchSignal,
+                    ),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],

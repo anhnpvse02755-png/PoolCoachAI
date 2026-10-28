@@ -224,7 +224,11 @@ PlayerIntelligence computePlayerIntelligence({
           buPercent[cat] != null &&
           buPercent[cat]! < PracticeConstants.weakCutoff)
         cat,
-  ]..sort((a, b) => buPercent[a]!.compareTo(buPercent[b]!));
+  ]..sort((a, b) {
+      final byPercent = buPercent[a]!.compareTo(buPercent[b]!);
+      // List.sort không ổn định: bằng điểm thì theo thứ tự nhóm.
+      return byPercent != 0 ? byPercent : a.index.compareTo(b.index);
+    });
 
   final readyDrillIds = <String>[];
   for (final entry in logsByDrill.entries) {

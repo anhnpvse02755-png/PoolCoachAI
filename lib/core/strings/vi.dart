@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart' show SkillSignal, percentOf;
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
@@ -81,12 +82,25 @@ abstract final class Vi {
   /// đây không phải bịa nội dung. Mục 2.1 của tài liệu thiết kế cấm
   /// con số bịa, không cấm câu chữ có tham số.
   ///
-  /// Sáu lý do phải ra sáu câu khác nhau. Dùng chung một câu là lớp
+  /// Bảy lý do phải ra bảy câu khác nhau. Dùng chung một câu là lớp
   /// suy luận nói mà người chơi không nghe được gì.
-  static String pickReason(PickReason reason, String skill) => switch (reason) {
+  ///
+  /// [signal] chỉ dùng cho [PickReason.matchWeakness]: có thì câu nêu số
+  /// trận, số lần hỏng và tỷ lệ; không có thì câu không chứa con số nào.
+  static String pickReason(
+    PickReason reason,
+    String skill, {
+    SkillSignal? signal,
+  }) => switch (reason) {
     PickReason.scheduled => 'Lịch tập hôm nay của bạn là $skill.',
     PickReason.streakAtRisk =>
       'Hai hôm rồi bạn chưa tập. Quay lại nhẹ nhàng với $skill.',
+    PickReason.matchWeakness =>
+      signal == null
+          ? '$skill đang yếu khi thi đấu.'
+          : 'Trong ${signal.matches} trận gần đây, $skill hỏng '
+                '${signal.failures}/${signal.attempts} lần '
+                '(${percentOf(signal.failures, signal.attempts)}%).',
     PickReason.weakest => '$skill đang là nhóm yếu nhất của bạn.',
     PickReason.newcomer => 'Bắt đầu với $skill — nền của mọi cú đánh.',
     PickReason.declining =>
@@ -562,7 +576,7 @@ abstract final class Vi {
   /// Khi nhóm hôm nay đã tập hết bài.
   ///
   /// Không đổi sang bài của nhóm khác: gợi ý phải trung thành với
-  /// nhóm mà sáu luật ưu tiên đã chọn, nói thật là hết bài thì hơn.
+  /// nhóm mà bảy luật ưu tiên đã chọn, nói thật là hết bài thì hơn.
   static const homeDrillAllDone =
       'Hôm nay bạn đã tập hết bài trong nhóm này rồi.';
 

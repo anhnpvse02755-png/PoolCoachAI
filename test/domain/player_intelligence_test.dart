@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../support/match_fixtures.dart';
@@ -107,6 +108,21 @@ void main() {
       expect(pi.weak, [SkillCategory.position, SkillCategory.aiming]);
       expect(pi.weakSources[SkillCategory.position], WeakSource.drills);
       expect(pi.weakSources[SkillCategory.aiming], WeakSource.bu);
+    });
+
+    test('các nhóm yếu theo BU bằng điểm nhau xếp theo thứ tự nhóm', () {
+      final base = buResultGraded(completedAt: DateTime(2026, 10, 10));
+      final allLost = BuResult(
+        testId: base.testId,
+        completedAt: base.completedAt,
+        total: base.total,
+        lost: base.max,
+        max: base.max,
+      );
+      final pi = computePlayerIntelligence(
+          drills: roadmapDrills, logs: const [], latestBu: allLost);
+      expect(pi.buPercent.values.toSet(), {0});
+      expect(pi.weak, SkillCategory.values);
     });
 
     test('không truyền trận, không truyền BU: kết quả như cũ', () {

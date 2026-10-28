@@ -2,7 +2,10 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/knowledge_article.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
@@ -51,6 +54,9 @@ enum PickReason {
   /// Hôm nay và hôm qua đều chưa tập — ưu tiên kéo người chơi quay lại.
   streakAtRisk,
 
+  /// Nhóm yếu khi thi đấu, theo phân tích các trận gần đây.
+  matchWeakness,
+
   /// Nhóm yếu nhất hiện tại.
   weakest,
 
@@ -84,7 +90,7 @@ bool _sameDay(DateTime a, DateTime b) =>
 
 /// Chọn nhóm kỹ năng nên tập hôm nay, kèm lý do.
 ///
-/// Sáu luật xét theo thứ tự, luật khớp đầu tiên thắng — xem
+/// Bảy luật xét theo thứ tự, luật khớp đầu tiên thắng — xem
 /// Claude_desktop/PoolCoachAI_SPEC.md mục 6.1.
 ({SkillCategory cat, PickReason reason}) pickCategoryForToday({
   required PlayerIntelligence pi,
@@ -127,12 +133,17 @@ bool _sameDay(DateTime a, DateTime b) =>
     return (cat: easiest.key, reason: PickReason.streakAtRisk);
   }
 
-  // Luật 3 — có nhóm đang yếu.
+  // Luật 3 — nhóm yếu khi thi đấu (phân tích các trận gần đây).
+  if (pi.matchWeak.isNotEmpty) {
+    return (cat: pi.matchWeak.first.category, reason: PickReason.matchWeakness);
+  }
+
+  // Luật 4 — có nhóm đang yếu.
   if (pi.weak.isNotEmpty) {
     return (cat: pi.weak.first, reason: PickReason.weakest);
   }
 
-  // Luật 4 — người mới.
+  // Luật 5 — người mới.
   if (!pi.hasAnyData) {
     for (final cat in newcomerOrder) {
       if (pi.categories[cat]!.sessionCount == 0) {
@@ -141,14 +152,14 @@ bool _sameDay(DateTime a, DateTime b) =>
     }
   }
 
-  // Luật 5 — có nhóm đang đi xuống.
+  // Luật 6 — có nhóm đang đi xuống.
   for (final cat in SkillCategory.values) {
     if (pi.categories[cat]!.trend == SkillTrend.down) {
       return (cat: cat, reason: PickReason.declining);
     }
   }
 
-  // Luật 6 — luân phiên nhóm lâu chưa đụng tới.
+  // Luật 7 — luân phiên nhóm lâu chưa đụng tới.
   final lastTouched = <SkillCategory, DateTime?>{
     for (final cat in SkillCategory.values) cat: null,
   };
@@ -189,6 +200,7 @@ class TodayRecommendation {
     required this.streak,
     required this.practiceSecondsThisWeek,
     required this.todaySchedule,
+    this.matchSignal,
   });
 
   final SkillCategory cat;
@@ -206,6 +218,10 @@ class TodayRecommendation {
   final int streak;
   final int practiceSecondsThisWeek;
   final List<ScheduleSlot> todaySchedule;
+
+  /// Tín hiệu yếu của nhóm được chọn; khác `null` đúng khi
+  /// [reason] là [PickReason.matchWeakness].
+  final SkillSignal? matchSignal;
 }
 
 /// Số ngày tập liên tiếp tính tới hôm nay.
@@ -264,8 +280,15 @@ TodayRecommendation computeRecommendation({
   required List<TimerSession> timerSessions,
   required List<ScheduleSlot> schedule,
   required DateTime today,
+  List<PoolMatch> matches = const [],
+  BuResult? latestBu,
 }) {
-  final pi = computePlayerIntelligence(drills: drills, logs: logs);
+  final pi = computePlayerIntelligence(
+    drills: drills,
+    logs: logs,
+    matches: matches,
+    latestBu: latestBu,
+  );
 
   final pick = pickCategoryForToday(
     pi: pi,
@@ -315,5 +338,8 @@ TodayRecommendation computeRecommendation({
     todaySchedule: schedule
         .where((slot) => slot.day == today.weekday - 1)
         .toList(growable: false),
+    matchSignal: pick.reason == PickReason.matchWeakness
+        ? pi.matchWeak.first
+        : null,
   );
 }
