@@ -49,13 +49,31 @@ final tournamentGroupsProvider = Provider<AsyncValue<TournamentGroups>>((ref) {
   return AsyncData(groupTournaments(tournaments.value!, today));
 });
 
-final featuredTournamentProvider = Provider<AsyncValue<Tournament?>>((ref) {
+final featuredTournamentProvider = Provider<AsyncValue<FeaturedTournament>>((
+  ref,
+) {
   final tournaments = ref.watch(tournamentsProvider);
   final today = ref.watch(nowProvider)();
-  final blocked = gate<Tournament?>([tournaments]);
+  final blocked = gate<FeaturedTournament>([tournaments]);
   if (blocked != null) return blocked;
   return AsyncData(featuredTournament(tournaments.value!, today));
 });
+
+/// Trạng thái của một giải, lấy từ chính phép chia nhóm: màn chi tiết và danh
+/// sách thấy cùng một trạng thái, không tự tính lại theo giờ khác. Null khi
+/// mã giải không còn.
+final tournamentStatusProvider =
+    Provider.family<AsyncValue<TournamentStatus?>, String>((ref, id) {
+      final groups = ref.watch(tournamentGroupsProvider);
+      return groups.whenData((g) {
+        if (g.dangDienRa.any((t) => t.id == id)) {
+          return TournamentStatus.dangDienRa;
+        }
+        if (g.sapToi.any((t) => t.id == id)) return TournamentStatus.sapToi;
+        if (g.daXong.any((t) => t.id == id)) return TournamentStatus.daXong;
+        return null;
+      });
+    });
 
 final tournamentSummariesProvider =
     Provider<AsyncValue<Map<String, TournamentSummary>>>((ref) {

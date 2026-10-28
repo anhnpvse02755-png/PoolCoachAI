@@ -222,6 +222,27 @@ void main() {
   });
 
   testWidgets(
+    'trạng thái hiển thị lấy từ provider, không tự tính lại theo đồng hồ',
+    (tester) async {
+      // Ngày thật của giải "on" là đã xong; provider ép "sắp tới".
+      await open(
+        tester,
+        testContainer(
+          tournaments: [on],
+          forcedTournamentStatus: {'on': TournamentStatus.sapToi},
+        ),
+        'on',
+      );
+      expect(
+        find.text(Vi.tournamentStatusDates(TournamentStatus.sapToi, on)),
+        findsOneWidget,
+      );
+      // Cùng một trạng thái quyết định nút: sắp tới thì chưa có Bắt đầu trận.
+      expect(find.byKey(const Key('tournament-start-match')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'cơ chưa tải xong: nút Bắt đầu trận tắt, không mở hộp thoại với danh sách '
     'cơ rỗng; có cơ rồi thì bật',
     (tester) async {

@@ -262,6 +262,7 @@ abstract final class Vi {
   // Thành tích là chữ người chơi tự ghi; mọi con số do lib/domain/tournament tính ra.
   static const tournamentsTitle = 'Giải đấu';
   static const tournamentNone = 'Chưa có giải nào';
+  static const tournamentNoneActive = 'Không có giải đang diễn ra hay sắp tới';
   static const tournamentListEmpty =
       'Chưa có giải nào. Thêm giải bạn sắp đánh hoặc đã đánh để ghi trận vào đó.';
   static const tournamentAdd = 'Thêm giải';
@@ -275,7 +276,7 @@ abstract final class Vi {
   static const tournamentPickDate = 'Chọn ngày';
   static const tournamentClearDate = 'Bỏ ngày kết thúc';
   static const tournamentLocation = 'Địa điểm (không bắt buộc)';
-  static const tournamentGameType = 'Thể loại (không bắt buộc)';
+  static const tournamentGameType = 'Loại bi (không bắt buộc)';
   static const tournamentNoGameType = 'Chưa chọn';
   static const tournamentResultNote = 'Thành tích (không bắt buộc)';
   static const tournamentResultHint = 'Ví dụ: Vào vòng 16';

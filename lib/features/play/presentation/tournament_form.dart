@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/pace.dart';
@@ -74,6 +75,18 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
     return hit.isEmpty ? null : Vi.tournamentInputError(hit.first);
   }
 
+  /// Bộ đếm theo ký tự Unicode, cùng đơn vị với [_RuneLimit] và bước kiểm tra
+  /// của lõi (mặc định của Flutter đếm theo ký tự hiển thị).
+  InputCounterWidgetBuilder _counter(
+    TextEditingController controller,
+    int max,
+  ) =>
+      (context, {required currentLength, required isFocused, maxLength}) =>
+          Text(
+            '${controller.text.runes.length}/$max',
+            style: Theme.of(context).textTheme.bodySmall,
+          );
+
   Future<void> _pickDate({required bool isStart}) async {
     final picked = await showDatePicker(
       context: context,
@@ -82,7 +95,7 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
       lastDate: DateTime(2100),
       helpText: Vi.tournamentPickDate,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(
       () => isStart ? _start = dateOnly(picked) : _end = dateOnly(picked),
     );
@@ -148,7 +161,13 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 key: const Key('tournament-name'),
                 controller: _name,
                 decoration: const InputDecoration(labelText: Vi.tournamentName),
-                maxLength: TournamentConstants.nameMaxLength,
+                inputFormatters: [
+                  _RuneLimit(TournamentConstants.nameMaxLength),
+                ],
+                buildCounter: _counter(
+                  _name,
+                  TournamentConstants.nameMaxLength,
+                ),
                 validator: (_) => _errorFor({
                   TournamentInputError.nameRequired,
                   TournamentInputError.nameTooLong,
@@ -185,31 +204,15 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 decoration: const InputDecoration(
                   labelText: Vi.tournamentLocation,
                 ),
-                maxLength: TournamentConstants.locationMaxLength,
+                inputFormatters: [
+                  _RuneLimit(TournamentConstants.locationMaxLength),
+                ],
+                buildCounter: _counter(
+                  _location,
+                  TournamentConstants.locationMaxLength,
+                ),
                 validator: (_) =>
                     _errorFor({TournamentInputError.locationTooLong}),
-              ),
-              TextFormField(
-                key: const Key('tournament-result'),
-                controller: _result,
-                decoration: const InputDecoration(
-                  labelText: Vi.tournamentResultNote,
-                  helperText: Vi.tournamentResultHint,
-                ),
-                maxLength: TournamentConstants.resultNoteMaxLength,
-                validator: (_) =>
-                    _errorFor({TournamentInputError.resultNoteTooLong}),
-              ),
-              TextFormField(
-                key: const Key('tournament-notes'),
-                controller: _notes,
-                decoration: const InputDecoration(
-                  labelText: Vi.tournamentNotes,
-                ),
-                maxLines: 3,
-                maxLength: TournamentConstants.notesMaxLength,
-                validator: (_) =>
-                    _errorFor({TournamentInputError.notesTooLong}),
               ),
               DropdownButtonFormField<PoolGameType?>(
                 key: const Key('tournament-game-type'),
@@ -231,6 +234,40 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 ],
                 onChanged: (v) => setState(() => _gameType = v),
               ),
+              TextFormField(
+                key: const Key('tournament-result'),
+                controller: _result,
+                decoration: const InputDecoration(
+                  labelText: Vi.tournamentResultNote,
+                  helperText: Vi.tournamentResultHint,
+                ),
+                inputFormatters: [
+                  _RuneLimit(TournamentConstants.resultNoteMaxLength),
+                ],
+                buildCounter: _counter(
+                  _result,
+                  TournamentConstants.resultNoteMaxLength,
+                ),
+                validator: (_) =>
+                    _errorFor({TournamentInputError.resultNoteTooLong}),
+              ),
+              TextFormField(
+                key: const Key('tournament-notes'),
+                controller: _notes,
+                decoration: const InputDecoration(
+                  labelText: Vi.tournamentNotes,
+                ),
+                maxLines: 3,
+                inputFormatters: [
+                  _RuneLimit(TournamentConstants.notesMaxLength),
+                ],
+                buildCounter: _counter(
+                  _notes,
+                  TournamentConstants.notesMaxLength,
+                ),
+                validator: (_) =>
+                    _errorFor({TournamentInputError.notesTooLong}),
+              ),
             ],
           ),
         ),
@@ -242,6 +279,28 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
         ),
         FilledButton(onPressed: _save, child: const Text(Vi.tournamentSave)),
       ],
+    );
+  }
+}
+
+/// Cắt chữ nhập vào ở [max] ký tự Unicode (runes), cùng đơn vị với
+/// `tournamentInputErrors`. `maxLength` của Flutter đếm theo ký tự hiển thị nên
+/// chữ gõ dấu tổ hợp lọt qua ô nhưng bị bước kiểm tra từ chối.
+class _RuneLimit extends TextInputFormatter {
+  _RuneLimit(this.max);
+
+  final int max;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.runes.length <= max) return newValue;
+    final text = String.fromCharCodes(newValue.text.runes.take(max));
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

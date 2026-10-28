@@ -152,19 +152,34 @@ void main() {
     expect(g.sapToi.map((t) => t.id), ['up1', 'up2']);
     expect(g.daXong.map((t) => t.id), ['recent', 'old']);
   });
-  test('giải nổi bật: đang diễn ra (bắt đầu sớm nhất), không thì sắp tới gần nhất, không thì null', () {
+  test('giải nổi bật: đang diễn ra (bắt đầu sớm nhất), không thì sắp tới gần nhất, không thì null — kèm đúng trạng thái', () {
+    final first = featuredTournament([
+      ...all,
+      tour('on0', start: tDay(-2), end: tDay(0)),
+    ], tToday);
     expect(
-      featuredTournament([
-        ...all,
-        tour('on0', start: tDay(-2), end: tDay(0)),
-      ], tToday)!.id,
-      'on0',
+      [first.tournament!.id, first.status, first.hasAny],
+      ['on0', TournamentStatus.dangDienRa, true],
     );
+    final second = featuredTournament(all.where((t) => t.id != 'on'), tToday);
     expect(
-      featuredTournament(all.where((t) => t.id != 'on'), tToday)!.id,
-      'up1',
+      [second.tournament!.id, second.status],
+      ['up1', TournamentStatus.sapToi],
     );
-    expect(featuredTournament([tour('old', start: tDay(-20))], tToday), isNull);
+  });
+  test('giải nổi bật: chỉ có giải đã xong thì không có giải nào nổi bật nhưng hasAny là true; không có giải nào thì hasAny là false', () {
+    final onlyDone = featuredTournament([
+      tour('old', start: tDay(-20)),
+    ], tToday);
+    expect(
+      [onlyDone.tournament, onlyDone.status, onlyDone.hasAny],
+      [isNull, isNull, true],
+    );
+    final none = featuredTournament(const <Tournament>[], tToday);
+    expect(
+      [none.tournament, none.status, none.hasAny],
+      [isNull, isNull, false],
+    );
   });
   group('pickableForNewMatch — biên 7 ngày', () {
     test('đã bắt đầu và kết thúc trong 7 ngày gần đây, mới nhất trước', () {

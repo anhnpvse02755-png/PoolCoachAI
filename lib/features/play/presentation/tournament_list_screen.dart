@@ -85,7 +85,7 @@ class _TournamentListScreenState extends ConsumerState<TournamentListScreen> {
             Text(t.name, style: textTheme.titleSmall),
             Text(Vi.tournamentDates(t)),
             if (location != null) Text(location),
-            if (summary != null)
+            if (summary != null && summary.completedMatches > 0)
               Text(
                 Vi.tournamentRecord(summary.matchesWon, summary.matchesLost),
               ),

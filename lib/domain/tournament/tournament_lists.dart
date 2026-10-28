@@ -47,12 +47,33 @@ TournamentGroups groupTournaments(Iterable<Tournament> ts, DateTime today) {
   );
 }
 
+/// Giải nổi bật cùng trạng thái của nó (tính cùng một lần với việc chọn giải,
+/// để màn hình không tự tính lại với một "hôm nay" khác). [hasAny] là có giải
+/// nào chưa xóa không, để phân biệt "chưa có giải" với "chỉ có giải đã xong".
+typedef FeaturedTournament = ({
+  Tournament? tournament,
+  TournamentStatus? status,
+  bool hasAny,
+});
+
 /// Giải nổi bật: giải đang diễn ra đầu tiên, không thì giải sắp tới đầu tiên.
-Tournament? featuredTournament(Iterable<Tournament> ts, DateTime today) {
+FeaturedTournament featuredTournament(Iterable<Tournament> ts, DateTime today) {
   final g = groupTournaments(ts, today);
-  if (g.dangDienRa.isNotEmpty) return g.dangDienRa.first;
-  if (g.sapToi.isNotEmpty) return g.sapToi.first;
-  return null;
+  if (g.dangDienRa.isNotEmpty) {
+    return (
+      tournament: g.dangDienRa.first,
+      status: TournamentStatus.dangDienRa,
+      hasAny: true,
+    );
+  }
+  if (g.sapToi.isNotEmpty) {
+    return (
+      tournament: g.sapToi.first,
+      status: TournamentStatus.sapToi,
+      hasAny: true,
+    );
+  }
+  return (tournament: null, status: null, hasAny: g.daXong.isNotEmpty);
 }
 
 /// Giải được chọn khi bắt đầu trận mới: đã bắt đầu và ngày cuối chưa quá

@@ -5,7 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/tournament/tournament_lists.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_play_card.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/features/play/presentation/tournament_list_screen.dart';
 
@@ -102,6 +105,64 @@ void main() {
       find.text(Vi.tournamentStatusDates(TournamentStatus.sapToi, upcoming)),
       findsOneWidget,
     );
+  });
+
+  group('thẻ Play dùng giải và trạng thái do provider đưa ra', () {
+    final real = DateTime.now();
+    final t = Tournament(
+      id: 'o',
+      name: 'Giải X',
+      startDate: DateTime(real.year, real.month, real.day),
+    );
+
+    Future<void> pumpCard(
+      WidgetTester tester,
+      FeaturedTournament featured,
+    ) async {
+      final c = ProviderContainer(
+        overrides: [
+          featuredTournamentProvider.overrideWithValue(AsyncData(featured)),
+        ],
+      );
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: Scaffold(body: TournamentPlayCard())),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('trạng thái lấy từ provider, không tính lại theo đồng hồ', (
+      tester,
+    ) async {
+      // Ngày thật của giải là "đang diễn ra"; provider nói "sắp tới".
+      await pumpCard(tester, (
+        tournament: t,
+        status: TournamentStatus.sapToi,
+        hasAny: true,
+      ));
+      expect(
+        find.text(Vi.tournamentStatusDates(TournamentStatus.sapToi, t)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'chỉ có giải đã xong: câu riêng, không phải "Chưa có giải nào"',
+      (tester) async {
+        await pumpCard(tester, (tournament: null, status: null, hasAny: true));
+        expect(find.text(Vi.tournamentNoneActive), findsOneWidget);
+        expect(find.text(Vi.tournamentNone), findsNothing);
+      },
+    );
+
+    testWidgets('không có giải nào: Chưa có giải nào', (tester) async {
+      await pumpCard(tester, (tournament: null, status: null, hasAny: false));
+      expect(find.text(Vi.tournamentNone), findsOneWidget);
+      expect(find.text(Vi.tournamentNoneActive), findsNothing);
+    });
   });
 
   testWidgets('thẻ Play: lỗi dữ liệu giải thì báo lỗi', (tester) async {
@@ -288,6 +349,64 @@ void main() {
     await tester.tap(find.byKey(const Key('tournament-clear-end')));
     await tester.pumpAndSettle();
     expect(endRowText(), findsOneWidget);
+  });
+
+  testWidgets('form giải: thứ tự ô theo spec và nhãn "Loại bi"', (
+    tester,
+  ) async {
+    await openForm(tester);
+    double y(String key) => tester.getTopLeft(find.byKey(Key(key))).dy;
+    final order = [
+      'tournament-name',
+      'tournament-start',
+      'tournament-end',
+      'tournament-location',
+      'tournament-game-type',
+      'tournament-result',
+      'tournament-notes',
+    ];
+    for (var i = 0; i + 1 < order.length; i++) {
+      expect(y(order[i]) < y(order[i + 1]), isTrue, reason: order[i]);
+    }
+    expect(find.text(Vi.tournamentGameType), findsOneWidget);
+    expect(Vi.tournamentGameType, startsWith('Loại bi'));
+  });
+
+  testWidgets(
+    'giới hạn độ dài tính theo ký tự Unicode như bước kiểm tra: tên gõ dấu '
+    'tổ hợp vẫn lưu được',
+    (tester) async {
+      final db = await openForm(tester);
+      // 'é' tổ hợp là hai ký tự Unicode nhưng một ký tự hiển thị.
+      await tester.enterText(
+        find.byKey(const Key('tournament-name')),
+        'é' * 80,
+      );
+      await tester.tap(find.text(Vi.tournamentSave));
+      await tester.pumpAndSettle();
+      final rows = await db.select(db.tournamentRows).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.name.runes.length, TournamentConstants.nameMaxLength);
+      expect(
+        find.text(Vi.tournamentInputError(TournamentInputError.nameTooLong)),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('giải chưa có trận hoàn tất: không hiện "Thắng 0 – thua 0"', (
+    tester,
+  ) async {
+    await openAt(
+      tester,
+      Routes.tournaments,
+      testContainer(
+        tournaments: [Tournament(id: 'o', name: 'Đang', startDate: day(0))],
+        matches: [tMatch('p', tournamentId: 'o', won: 1, lost: 0, target: 3)],
+      ),
+    );
+    expect(find.text('Đang'), findsOneWidget);
+    expect(find.text(Vi.tournamentRecord(0, 0)), findsNothing);
   });
 
   testWidgets('360×640 chữ lớn 1.5: Play, danh sách và form không tràn', (

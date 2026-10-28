@@ -320,7 +320,10 @@ class _TournamentDetailScreenState
   Widget _body(TournamentView view) {
     final textTheme = Theme.of(context).textTheme;
     final t = view.tournament;
-    final status = tournamentStatus(t, ref.watch(nowProvider)());
+    final status = ref.watch(tournamentStatusProvider(t.id)).value;
+    if (status == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final goal = ref.watch(tournamentGoalStateProvider(t.id)).value;
     final canStart = ref.watch(startMatchInputsProvider).hasValue;
     return ListView(

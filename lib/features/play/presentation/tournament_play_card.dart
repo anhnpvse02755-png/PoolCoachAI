@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
-import 'package:poolcoachai/domain/tournament/tournament.dart';
 
 /// Thẻ "Giải đấu" đầu màn Thi đấu: giải đang diễn ra, không có thì giải sắp
-/// tới gần nhất. Bấm để mở danh sách.
+/// tới gần nhất, kèm trạng thái do provider đưa ra. Bấm để mở danh sách.
 class TournamentPlayCard extends ConsumerWidget {
   const TournamentPlayCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final featured = ref.watch(featuredTournamentProvider);
-    final today = ref.watch(nowProvider)();
     final textTheme = Theme.of(context).textTheme;
     return PcCard(
       key: const Key('play-tournament-card'),
@@ -37,15 +34,20 @@ class TournamentPlayCard extends ConsumerWidget {
           ...featured.when(
             loading: () => const <Widget>[],
             error: (_, _) => const [Text(Vi.tournamentDataError)],
-            data: (t) => t == null
-                ? const [Text(Vi.tournamentNone)]
-                : [
-                    const SizedBox(height: 8),
-                    Text(t.name, style: textTheme.titleSmall),
-                    Text(
-                      Vi.tournamentStatusDates(tournamentStatus(t, today), t),
-                    ),
-                  ],
+            data: (f) {
+              final t = f.tournament;
+              final status = f.status;
+              if (t == null || status == null) {
+                return [
+                  Text(f.hasAny ? Vi.tournamentNoneActive : Vi.tournamentNone),
+                ];
+              }
+              return [
+                const SizedBox(height: 8),
+                Text(t.name, style: textTheme.titleSmall),
+                Text(Vi.tournamentStatusDates(status, t)),
+              ];
+            },
           ),
         ],
       ),

@@ -118,9 +118,16 @@ ProviderContainer testContainer({
   List<Tournament>? tournaments,
   AsyncValue<List<Tournament>>? tournamentsAsync,
   AsyncValue<GoalRecord?>? goalAsync,
+  Map<String, TournamentStatus>? forcedTournamentStatus,
 }) {
   return ProviderContainer(
     overrides: [
+      // Cho test chứng minh màn hình dùng trạng thái do provider đưa ra, không
+      // tự tính lại: ép trạng thái khác với ngày thật của giải.
+      if (forcedTournamentStatus != null)
+        tournamentStatusProvider.overrideWith(
+          (ref, id) => AsyncData(forcedTournamentStatus[id]),
+        ),
       coachAttemptsProvider.overrideWith(
         (ref) => Stream.value(coachAttempts ?? const <CoachAttempt>[]),
       ),

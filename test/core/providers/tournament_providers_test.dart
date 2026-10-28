@@ -71,7 +71,16 @@ void main() {
       ],
     );
     await settle();
-    expect(c.read(featuredTournamentProvider).value, on);
+    expect(c.read(featuredTournamentProvider).value, (
+      tournament: on,
+      status: TournamentStatus.dangDienRa,
+      hasAny: true,
+    ));
+    expect(
+      c.read(tournamentStatusProvider('up')).value,
+      TournamentStatus.sapToi,
+    );
+    expect(c.read(tournamentStatusProvider('zz')).value, isNull);
     expect(c.read(tournamentsByIdProvider).value!.keys, {'on', 'up'});
     expect(c.read(tournamentGroupsProvider).value!.sapToi, [up]);
     expect(c.read(tournamentSummariesProvider).value!['on']!.matchesWon, 1);
@@ -135,8 +144,9 @@ void main() {
         c.read(tournamentComparisonProvider).hasError,
         c.read(linkedTournamentProvider).hasError,
         c.read(tournamentGoalStateProvider('up')).hasError,
+        c.read(tournamentStatusProvider('up')).hasError,
       ],
-      [true, true, true, true, true],
+      [true, true, true, true, true, true],
     );
   });
 
@@ -171,8 +181,9 @@ void main() {
           c.read(tournamentsByIdProvider).value,
           c.read(featuredTournamentProvider).value,
           c.read(linkedTournamentProvider).value,
+          c.read(tournamentStatusProvider('on')).isLoading,
         ],
-        [true, null, null, null],
+        [true, null, null, null, true],
       );
     },
   );
