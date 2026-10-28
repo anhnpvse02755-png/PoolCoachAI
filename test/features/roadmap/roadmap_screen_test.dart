@@ -403,7 +403,7 @@ void main() {
               PlayerRank(
                 rank: Rank.d,
                 source: RankSource.verified,
-                buScore: 110,
+                buScore: 130,
                 testId: 't1',
                 onboardingState: OnboardingState.done,
                 updatedAt: testToday,
@@ -416,7 +416,7 @@ void main() {
         buResult: BuResult(
           testId: 't1',
           completedAt: testToday,
-          total: 120,
+          total: 130,
           lost: const {'S9': 6},
         ),
       );
@@ -433,6 +433,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(Vi.goalPickTitle), findsOneWidget);
       expect(find.text(Vi.skill(SkillCategory.nhayBi)), findsOneWidget);
+      expect(find.text(Vi.skill(SkillCategory.matXe)), findsOneWidget);
+      // chạm nút chưa đổi gì: mục tiêu cũ vẫn nguyên cho tới khi chọn nhóm
+      expect(
+        (await db.select(db.playerGoalRows).getSingle()).kind,
+        GoalKind.lenHang.name,
+      );
       await tester.tap(find.text(Vi.skill(SkillCategory.nhayBi)));
       await tester.pumpAndSettle();
       final row = await db.select(db.playerGoalRows).getSingle();

@@ -86,6 +86,14 @@ void main() {
     expect(Vi.roadmapS9Pick, contains('mục tiêu'));
   });
 
+  testWidgets('bước S9 không có onPickSkill: có dòng hướng dẫn, không có nút', (
+    tester,
+  ) async {
+    await pumpTile(tester, s9Step());
+    expect(find.text(Vi.roadmapS9Hint), findsOneWidget);
+    expect(find.text(Vi.roadmapS9Pick), findsNothing);
+  });
+
   testWidgets('bước nhóm thường: không có dòng S9', (tester) async {
     await pumpTile(
       tester,

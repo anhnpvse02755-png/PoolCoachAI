@@ -28,9 +28,9 @@ class _RoadmapScreenState extends ConsumerState<RoadmapScreen> {
   bool _openSkills = false;
 
   void _leavePicker() => setState(() {
-        _changing = false;
-        _openSkills = false;
-      });
+    _changing = false;
+    _openSkills = false;
+  });
 
   @override
   Widget build(BuildContext context) {
