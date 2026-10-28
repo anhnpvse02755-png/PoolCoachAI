@@ -44,6 +44,8 @@ class PoolMatch {
     this.shots = const [],
     this.completedAt,
     this.cueId,
+    this.tournamentId,
+    this.roundLabel,
   });
 
   final String id;
@@ -59,6 +61,12 @@ class PoolMatch {
   /// Cây cơ người chơi dùng trong trận; null là không ghi cơ. Giữ nguyên cả
   /// khi cơ bị xóa sau đó.
   final String? cueId;
+
+  /// Giải đấu của trận; null là trận thường. Giữ nguyên cả khi giải bị xóa mềm.
+  final String? tournamentId;
+
+  /// Vòng đấu trong giải (ví dụ bán kết); giữ nguyên cả khi giải bị xóa mềm.
+  final String? roundLabel;
 
   int get playerScore =>
       rackWinners.where((winner) => winner == RackWinner.player).length;

@@ -12,6 +12,7 @@ import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 
 import 'roadmap_fixtures.dart';
 import 'skill_test_fixtures.dart';
@@ -125,6 +126,27 @@ ProviderContainer richContainer() => testContainer(
       skillCategories: [SkillCategory.aiming],
     ),
   ],
+  tournaments: [
+    Tournament(
+      id: 't1',
+      name:
+          'Giải Vô địch Bida Pool 9 bi Mở rộng Thành phố Hồ Chí Minh lần thứ XII',
+      startDate: testToday.subtract(const Duration(days: 1)),
+      endDate: testToday.add(const Duration(days: 1)),
+      location: 'Câu lạc bộ Bida Ngôi Sao, 123 Nguyễn Văn Linh, Quận 7',
+      gameType: PoolGameType.nineBall,
+      resultNote: 'Vào vòng 16 sau trận căng thẳng với hạt giống số 1',
+      notes:
+          'Giải mở rộng dành cho mọi trình độ, thi đấu loại trực tiếp sau vòng '
+          'bảng, mỗi trận thắng trước năm ván, có trọng tài, lệ phí hai trăm '
+          'nghìn đồng, nhớ mang cơ riêng và đến sớm ba mươi phút để bốc thăm.',
+    ),
+    Tournament(
+      id: 't2',
+      name: 'Giải Cúp Mùa Đông',
+      startDate: testToday.add(const Duration(days: 10)),
+    ),
+  ],
   matches: [
     // stats_screen_test.dart, đổi tên người chơi cho dài và thêm cơ.
     PoolMatch(
@@ -154,6 +176,8 @@ ProviderContainer richContainer() => testContainer(
       startedAt: testToday,
       completedAt: testToday,
       cueId: 'cue-long',
+      tournamentId: 't1',
+      roundLabel: 'Tứ kết',
     ),
     // Một trận đang đánh dở.
     PoolMatch(

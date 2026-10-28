@@ -10,6 +10,11 @@ abstract final class Routes {
   static const profile = '/profile';
   static const equipment = '$profile/equipment';
 
+  /// Giải đấu — trong nhánh Thi đấu, không thêm tab.
+  static const tournaments = '$play/tournaments';
+  static const tournamentPattern = '$play/tournaments/:id';
+  static String tournament(String id) => '$play/tournaments/$id';
+
   // Mở đè lên shell
   static const coach = '/coach';
   static const notifications = '/notifications';
@@ -112,6 +117,8 @@ abstract final class Routes {
   static const all = <String>[
     ...tabs,
     equipment,
+    tournaments,
+    tournamentPattern,
     coach,
     coachSituation,
     coachLibrary,

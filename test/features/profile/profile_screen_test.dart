@@ -156,6 +156,7 @@ void main() {
       ..routes['GET /items/pool_matches'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/timer_sessions'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/schedule_slots'] = ((_) => FakeDirectus.ok([]))
+      ..routes['GET /items/tournaments'] = ((_) => FakeDirectus.ok([]))
       ..routes['GET /items/cue_equipment'] = ((_) => FakeDirectus.ok([]))
       ..routes['POST /items/cue_equipment'] = ((req) =>
           FakeDirectus.ok(jsonDecode(req.body)));

@@ -136,6 +136,12 @@ class PoolMatchRows extends Table {
   /// Cây cơ dùng trong trận. Giữ nguyên cả khi cơ bị xóa mềm.
   TextColumn get cueId => text().nullable()();
 
+  /// Giải mà trận thuộc về (spec giải đấu §4.2); giữ nguyên cả khi giải bị xóa mềm.
+  TextColumn get tournamentId => text().nullable()();
+
+  /// Nhãn vòng do người chơi gõ, ví dụ "Tứ kết".
+  TextColumn get roundLabel => text().nullable()();
+
   /// Lúc sửa gần nhất (ghi rack, cú đánh...); bản mới hơn thắng khi đồng bộ.
   DateTimeColumn get updatedAt => dateTime().nullable()();
 
@@ -143,6 +149,30 @@ class PoolMatchRows extends Table {
   DateTimeColumn get syncedAt => dateTime().nullable()();
 
   /// Xóa mềm: dòng ở lại để đồng bộ báo máy khác, mọi truy vấn đọc bỏ qua nó.
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// ─── Giải đấu ───────────────────────────────────────────────────────────────
+
+/// Giải người chơi tự ghi; xóa mềm, bản sửa mới nhất thắng khi đồng bộ (spec giải đấu §4.1).
+class TournamentRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text()();
+  TextColumn get name => text()();
+  DateTimeColumn get startDate => dateTime()();
+  DateTimeColumn get endDate => dateTime().nullable()();
+  TextColumn get location => text().nullable()();
+
+  /// `PoolGameType.name`; tên lạ (máy mới hơn) đọc ra là không có.
+  TextColumn get gameType => text().nullable()();
+  TextColumn get resultNote => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
@@ -296,6 +326,9 @@ class PlayerGoalRows extends Table {
 
   /// `Rank.name` của hạng đích Lên hạng; null = hạng kế tiếp.
   TextColumn get targetRank => text().nullable()();
+
+  /// Giải được nối với mục tiêu Chuẩn bị giải (spec giải đấu §4.3).
+  TextColumn get tournamentId => text().nullable()();
   DateTimeColumn get createdAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get syncedAt => dateTime().nullable()();
@@ -391,6 +424,7 @@ class CoachChatTurnRows extends Table {
     PlayerGoalRows,
     AchievementRows,
     PoolMatchRows,
+    TournamentRows,
     CoachAttemptRows,
     CoachChatTurnRows,
   ],
@@ -402,7 +436,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -489,6 +523,17 @@ class AppDatabase extends _$AppDatabase {
       if (from < 15) {
         // Chỉ thêm bảng (spec Skill Test): không đụng dữ liệu cũ.
         await m.createTable(skillTestRows);
+      }
+      if (from < 16) {
+        // spec giải đấu §4: thêm bảng giải, thêm cột rỗng được; không đụng dữ liệu cũ.
+        await m.createTable(tournamentRows);
+        if (from >= 7) {
+          await m.addColumn(poolMatchRows, poolMatchRows.tournamentId);
+          await m.addColumn(poolMatchRows, poolMatchRows.roundLabel);
+        }
+        if (from >= 4) {
+          await m.addColumn(playerGoalRows, playerGoalRows.tournamentId);
+        }
       }
     },
   );

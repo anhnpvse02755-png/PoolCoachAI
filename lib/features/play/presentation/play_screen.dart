@@ -1,10 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
@@ -12,7 +11,12 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
+import 'package:poolcoachai/domain/tournament/tournament_lists.dart';
+import 'package:poolcoachai/domain/tournament/tournament_results.dart';
 import 'package:poolcoachai/features/play/presentation/match_analysis_sheet.dart';
+import 'package:poolcoachai/features/play/presentation/match_dialogs.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_play_card.dart';
 import 'package:uuid/uuid.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
@@ -26,158 +30,24 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   bool _mutating = false;
 
   Future<void> _startMatch() async {
-    final formKey = GlobalKey<FormState>();
-    var playerName = '';
-    var opponentName = '';
-    var gameType = PoolGameType.nineBall;
-    var targetRacks = 5;
     final cues = ref.read(cueEquipmentProvider).value ?? const <CueEquipment>[];
-    String? cueId = defaultMatchCueId(
-      matches: ref.read(matchesProvider).value ?? const <PoolMatch>[],
-      knownCueIds: {for (final cue in cues) cue.id},
-    );
-    final create = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          // Máy ngang, bàn phím mở: hộp thoại chỉ còn ~150 px. Tiêu đề
-          // cuộn cùng ô nhập, chỉ hàng nút đứng yên trên bàn phím.
-          scrollable: true,
-          title: const Text(Vi.matchStart),
-          content: SizedBox(
-            width: 400,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<PoolGameType>(
-                    key: const Key('match-game-type'),
-                    initialValue: gameType,
-                    decoration: const InputDecoration(
-                      labelText: Vi.matchGameType,
-                    ),
-                    items: PoolGameType.values
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(Vi.matchGameTypeName(type)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) setDialogState(() => gameType = value);
-                    },
-                  ),
-                  TextFormField(
-                    key: const Key('match-player-name'),
-                    initialValue: playerName,
-                    decoration: const InputDecoration(
-                      labelText: Vi.matchPlayerName,
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                    onSaved: (value) => playerName = value?.trim() ?? '',
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? Vi.matchNameRequired
-                        : null,
-                  ),
-                  TextFormField(
-                    key: const Key('match-opponent-name'),
-                    initialValue: opponentName,
-                    decoration: const InputDecoration(
-                      labelText: Vi.matchOpponentName,
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                    onSaved: (value) => opponentName = value?.trim() ?? '',
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? Vi.matchNameRequired
-                        : null,
-                  ),
-                  DropdownButtonFormField<int>(
-                    key: const Key('match-target'),
-                    initialValue: targetRacks,
-                    decoration: const InputDecoration(
-                      labelText: Vi.matchTarget,
-                    ),
-                    items: const [3, 5, 7, 9]
-                        .map(
-                          (target) => DropdownMenuItem(
-                            value: target,
-                            child: Text(Vi.matchRaceTo(target)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() => targetRacks = value);
-                      }
-                    },
-                  ),
-                  if (cues.isNotEmpty)
-                    DropdownButtonFormField<String?>(
-                      key: const Key('match-cue'),
-                      initialValue: cueId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: Vi.matchCue),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text(Vi.timerNoCue),
-                        ),
-                        ...cues.map(
-                          (cue) => DropdownMenuItem<String?>(
-                            value: cue.id,
-                            child: Text(
-                              '${cue.name} · ${Vi.equipmentTypeName(cue.type)}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) => setDialogState(() => cueId = value),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text(Vi.scheduleKeep),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  formKey.currentState!.save();
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text(Vi.matchStartAction),
-            ),
-          ],
-        ),
+    final byId = ref.read(tournamentsByIdProvider).value ?? const {};
+    final form = await showStartMatchDialog(
+      context,
+      cues: cues,
+      defaultCueId: defaultMatchCueId(
+        matches: ref.read(matchesProvider).value ?? const <PoolMatch>[],
+        knownCueIds: {for (final cue in cues) cue.id},
       ),
+      tournaments: pickableForNewMatch(byId.values, ref.read(nowProvider)()),
     );
 
-    if (create != true || !mounted) {
+    if (form == null || !mounted) {
       return;
     }
     setState(() => _mutating = true);
     try {
-      await ref
-          .read(matchRepositoryProvider)
-          .start(
-            PoolMatch(
-              id: const Uuid().v4(),
-              gameType: gameType,
-              playerName: playerName,
-              opponentName: opponentName,
-              targetRacks: targetRacks,
-              rackWinners: const [],
-              startedAt: ref.read(nowProvider)(),
-              cueId: cueId,
-            ),
-          );
+      await startMatchFromForm(ref, form);
     } catch (error) {
       debugPrint('Pool match start failed: $error');
       if (mounted) _showMessage(Vi.matchStartFailed);
@@ -418,105 +288,13 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   }
 
   Future<void> _editMatch(PoolMatch match) async {
-    final formKey = GlobalKey<FormState>();
-    var gameType = match.gameType;
-    var targetRacks = match.targetRacks;
-    var playerName = match.playerName;
-    var opponentName = match.opponentName;
-    final leaderWins = math.max(match.playerScore, match.opponentScore);
-    final save = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        title: const Text(Vi.matchEditTitle),
-        content: SizedBox(
-          width: 400,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<PoolGameType>(
-                  key: const Key('edit-match-game-type'),
-                  initialValue: gameType,
-                  decoration: const InputDecoration(labelText: Vi.matchGameType),
-                  items: PoolGameType.values
-                      .map(
-                        (type) => DropdownMenuItem(
-                          value: type,
-                          child: Text(Vi.matchGameTypeName(type)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) gameType = value;
-                  },
-                ),
-                TextFormField(
-                  key: const Key('edit-match-player-name'),
-                  initialValue: playerName,
-                  decoration: const InputDecoration(
-                    labelText: Vi.matchPlayerName,
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  onSaved: (value) => playerName = value?.trim() ?? '',
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? Vi.matchNameRequired
-                      : null,
-                ),
-                TextFormField(
-                  key: const Key('edit-match-opponent-name'),
-                  initialValue: opponentName,
-                  decoration: const InputDecoration(
-                    labelText: Vi.matchOpponentName,
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  onSaved: (value) => opponentName = value?.trim() ?? '',
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? Vi.matchNameRequired
-                      : null,
-                ),
-                DropdownButtonFormField<int>(
-                  key: const Key('edit-match-target'),
-                  initialValue: targetRacks,
-                  decoration: const InputDecoration(labelText: Vi.matchTarget),
-                  items: const [3, 5, 7, 9]
-                      .map(
-                        (target) => DropdownMenuItem(
-                          value: target,
-                          child: Text(Vi.matchRaceTo(target)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) targetRacks = value;
-                  },
-                  validator: (value) => value != null && value < leaderWins
-                      ? Vi.matchTargetBelowLeader(leaderWins)
-                      : null,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text(Vi.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                formKey.currentState!.save();
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text(Vi.matchSaveDetails),
-          ),
-        ],
-      ),
+    final byId = ref.read(tournamentsByIdProvider).value ?? const {};
+    final form = await showEditMatchDialog(
+      context,
+      match: match,
+      tournaments: pickableForEdit(byId.values),
     );
-    if (save != true || !mounted) return;
+    if (form == null || !mounted) return;
 
     setState(() => _mutating = true);
     try {
@@ -524,10 +302,12 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           .read(matchRepositoryProvider)
           .updateDetails(
             matchId: match.id,
-            gameType: gameType,
-            playerName: playerName,
-            opponentName: opponentName,
-            targetRacks: targetRacks,
+            gameType: form.gameType,
+            playerName: form.playerName,
+            opponentName: form.opponentName,
+            targetRacks: form.targetRacks,
+            tournamentId: form.tournamentId,
+            roundLabel: form.roundLabel,
           );
     } catch (error) {
       debugPrint('Pool match details update failed: $error');
@@ -542,7 +322,12 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _matchCard(PoolMatch match, Map<String, String> cueNames) {
+  Widget _matchCard(
+    PoolMatch match,
+    Map<String, String> cueNames,
+    Map<String, Tournament> tournamentsById,
+  ) {
+    final tournament = tournamentOf(match, tournamentsById);
     final score = Vi.matchScore(
       match.playerName,
       match.playerScore,
@@ -594,6 +379,11 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             ),
             const SizedBox(height: 8),
             Text(score, style: Theme.of(context).textTheme.titleLarge),
+            if (tournament != null)
+              Text(
+                Vi.matchTournamentLabel(tournament.name, match.roundLabel),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             if (match.cueId != null)
               Text(
                 Vi.matchCueLine(
@@ -707,6 +497,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         cue.id: cue.name,
     };
 
+    final tournamentsById =
+        ref.watch(tournamentsByIdProvider).value ??
+        const <String, Tournament>{};
+
     return PcRootScaffold(
       title: Vi.playTitle,
       body: matchesAsync.when(
@@ -719,6 +513,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         data: (matches) => ListView(
           padding: const EdgeInsets.all(12),
           children: [
+            const TournamentPlayCard(),
+            const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: _mutating ? null : _startMatch,
               icon: const Icon(Icons.add),
@@ -732,7 +528,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 body: Vi.matchEmpty,
               )
             else
-              ...matches.map((match) => _matchCard(match, cueNames)),
+              ...matches.map(
+                (match) => _matchCard(match, cueNames, tournamentsById),
+              ),
           ],
         ),
       ),

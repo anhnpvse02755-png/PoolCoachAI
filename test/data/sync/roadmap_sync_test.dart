@@ -117,6 +117,23 @@ void main() {
     expect((await db.select(db.playerGoalRows).getSingle()).syncedAt, now);
   });
 
+  test('đẩy mục tiêu chuẩn bị giải kèm tournament_id', () async {
+    serve();
+    await local(GoalRecord(updatedAt: newer, goal: PlayerGoal(goalId: 'g', kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2), createdAt: newer, tournamentId: 't1')));
+    await build().syncNow();
+    expect(FakeDirectus.body(server.sent('POST', '/items/player_goals').single)['tournament_id'], 't1');
+  });
+
+  test('PATCH mục tiêu gửi tournament_id null để xoá liên kết cũ trên máy chủ', () async {
+    final stale = GoalRecord(updatedAt: older, goal: PlayerGoal(goalId: 'g', kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2), createdAt: older, tournamentId: 't1'));
+    serve(goals: [remote(stale)]);
+    await local(skill(SkillCategory.kick, newer));
+    await build().syncNow();
+    final body = FakeDirectus.body(server.sent('PATCH', '/items/player_goals/u1').single);
+    expect(body.containsKey('tournament_id'), isTrue);
+    expect(body['tournament_id'], isNull);
+  });
+
   test('thành tích chưa đồng bộ được gửi lên; trùng trên máy chủ vẫn coi là đã đồng bộ', () async {
     serve();
     var first = true;

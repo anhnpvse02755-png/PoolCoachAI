@@ -26,11 +26,15 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/certification_summary.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
+import 'package:poolcoachai/domain/tournament/tournament_goal.dart';
+import 'package:poolcoachai/domain/tournament/tournament_results.dart';
 
 import '../support/match_fixtures.dart';
 import '../support/roadmap_fixtures.dart';
 import '../support/skill_test_fixtures.dart';
 import '../support/test_data.dart';
+import '../support/tournament_fixtures.dart';
 
 final _today = DateTime(2026, 9, 17);
 
@@ -531,4 +535,76 @@ void main() {
       },
     );
   });
+
+  group(
+    'Giải đấu bám dữ liệu, không viết cứng (spec 2026-10-28 giải đấu mục 7)',
+    () {
+      test('tổng kết giải đổi theo trận', () {
+        String lines(List<PoolMatch> ms) {
+          final s = summarizeMatches(ms);
+          return [
+            Vi.tournamentRecord(s.matchesWon, s.matchesLost),
+            Vi.tournamentRacks(s.racksWon, s.racksLost),
+            Vi.tournamentRackRate(s.rackWinPercent!),
+          ].join('|');
+        }
+
+        expect(
+          lines([tMatch('a', won: 3, lost: 1)]),
+          isNot(
+            lines([tMatch('a', won: 1, lost: 3), tMatch('b', won: 3, lost: 2)]),
+          ),
+        );
+      });
+
+      test('dòng so sánh đổi theo dữ liệu, kể cả khi thiếu mẫu', () {
+        final live = [tour('t', start: tDay(-1))];
+        String line(List<PoolMatch> ms) {
+          final c = compareTournamentPlay(ms, live);
+          return c.enough
+              ? Vi.tournamentCompare(
+                  c.inTournaments.rackWinPercent!,
+                  c.inTournaments.completedMatches,
+                  c.regular.rackWinPercent!,
+                  c.regular.completedMatches,
+                )
+              : Vi.tournamentCompareNotEnough;
+        }
+
+        List<PoolMatch> inT(int lost) => [
+          for (var i = 0; i < 3; i++)
+            tMatch('t$i', tournamentId: 't', won: 3, lost: lost),
+        ];
+        List<PoolMatch> reg(int lost) => [
+          for (var i = 0; i < 3; i++) tMatch('r$i', won: 3, lost: lost),
+        ];
+        expect({
+          line(const []),
+          line([...inT(0), ...reg(1)]),
+          line([...inT(2), ...reg(0)]),
+        }, hasLength(3));
+      });
+
+      test(
+        'tiêu đề Lộ trình đổi theo giải nối, về tiêu đề cũ khi giải bị xóa',
+        () {
+          final goal = prepGoal(tDay(5), tournamentId: 'up');
+          final r = Roadmap(goal: goal, steps: const []);
+          String title(List<Tournament> live) => Vi.roadmapHeadline(
+            r,
+            tournamentName: linkedTournament(goal, live)?.name,
+          );
+          expect({
+            title([tour('up', start: tDay(5), name: 'Cúp A')]),
+            title([tour('up', start: tDay(5), name: 'Cúp B')]),
+            title(const []),
+          }, hasLength(3));
+          expect(
+            title(const []),
+            'Chuẩn bị giải ngày ${Vi.shortDate(tDay(5))}',
+          );
+        },
+      );
+    },
+  );
 }

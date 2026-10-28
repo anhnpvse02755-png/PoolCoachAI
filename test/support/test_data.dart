@@ -19,8 +19,13 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/match_repository.dart';
+import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
+import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
@@ -90,8 +95,10 @@ ProviderContainer testContainer({
   List<TimerSession>? timerSessions,
   List<ScheduleSlot>? schedule,
   List<CueEquipment>? equipment,
+  Stream<List<CueEquipment>>? equipmentStream,
   List<PoolMatch>? matches,
   Stream<List<PoolMatch>>? matchesStream,
+  AsyncValue<List<PoolMatch>>? matchesAsync,
   DateTime? now,
   AuthRepository? auth,
   PlayerRank? rank,
@@ -111,9 +118,19 @@ ProviderContainer testContainer({
   AsyncValue<CoachContext>? coachContext,
   List<SkillTest>? skillTests,
   AsyncValue<List<SkillTest>>? skillTestsAsync,
+  List<Tournament>? tournaments,
+  AsyncValue<List<Tournament>>? tournamentsAsync,
+  AsyncValue<GoalRecord?>? goalAsync,
+  Map<String, TournamentStatus>? forcedTournamentStatus,
 }) {
   return ProviderContainer(
     overrides: [
+      // Cho test chứng minh màn hình dùng trạng thái do provider đưa ra, không
+      // tự tính lại: ép trạng thái khác với ngày thật của giải.
+      if (forcedTournamentStatus != null)
+        tournamentStatusProvider.overrideWith(
+          (ref, id) => AsyncData(forcedTournamentStatus[id]),
+        ),
       coachAttemptsProvider.overrideWith(
         (ref) => Stream.value(coachAttempts ?? const <CoachAttempt>[]),
       ),
@@ -148,11 +165,19 @@ ProviderContainer testContainer({
         (ref) => Stream.value(schedule ?? const <ScheduleSlot>[]),
       ),
       cueEquipmentProvider.overrideWith(
-        (ref) => Stream.value(equipment ?? const <CueEquipment>[]),
+        (ref) =>
+            equipmentStream ??
+            Stream.value(equipment ?? const <CueEquipment>[]),
       ),
-      matchesProvider.overrideWith(
-        (ref) => matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
-      ),
+      // `matchesAsync` thắng `matchesStream` và `matches`: dựng thẳng một
+      // AsyncValue (lỗi, hoặc đang tải lại còn giá trị cũ).
+      if (matchesAsync != null)
+        matchesProvider.overrideWithValue(matchesAsync)
+      else
+        matchesProvider.overrideWith(
+          (ref) =>
+              matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
+        ),
       authRepositoryProvider.overrideWithValue(
         auth ?? FakeAuthRepository.signedIn(),
       ),
@@ -161,7 +186,12 @@ ProviderContainer testContainer({
         (ref) => buTestsStream ?? Stream.value(tests ?? const <BuTest>[]),
       ),
       activeTestProvider.overrideWith((ref) => Stream.value(activeTest)),
-      goalProvider.overrideWith((ref) => Stream.value(goal)),
+      // `goalAsync` thắng `goal`: dựng thẳng một AsyncValue (đang tải lại còn
+      // mục tiêu cũ) mà một Stream bình thường không tạo được.
+      if (goalAsync != null)
+        goalProvider.overrideWithValue(goalAsync)
+      else
+        goalProvider.overrideWith((ref) => Stream.value(goal)),
       achievementsProvider.overrideWith(
         (ref) => Stream.value(achievements ?? const <Achievement>[]),
       ),
@@ -171,6 +201,13 @@ ProviderContainer testContainer({
       else
         skillTestsProvider.overrideWith(
           (ref) => Stream.value(skillTests ?? const <SkillTest>[]),
+        ),
+      // `tournamentsAsync` thắng `tournaments`, như `skillTestsAsync`.
+      if (tournamentsAsync != null)
+        tournamentsProvider.overrideWithValue(tournamentsAsync)
+      else
+        tournamentsProvider.overrideWith(
+          (ref) => Stream.value(tournaments ?? const <Tournament>[]),
         ),
       if (buResult != null)
         latestBuResultProvider.overrideWithValue(
@@ -215,6 +252,8 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
 /// Như [testContainer] nhưng hạng và bài kiểm tra đọc từ [db] thật (SQLite
 /// trong bộ nhớ) — cho widget test cần ghi rồi đọc lại.
 ///
+/// [tournamentRepo], [roadmapRepo], [matchRepo] thay kho tương ứng (ví dụ kho
+/// ghi xong rồi mới trả về chậm, hoặc kho luôn ném).
 /// [rankLag] làm stream hạng trễ như Drift trên web (chạy trong worker):
 /// dòng vừa ghi tới màn hình sau một nhịp.
 ProviderContainer dbContainer(
@@ -225,9 +264,24 @@ ProviderContainer dbContainer(
   Duration? rankLag,
   List<DrillLog>? logs,
   List<Drill>? drills,
+  TournamentRepository Function(AppDatabase db)? tournamentRepo,
+  RoadmapRepository Function(AppDatabase db)? roadmapRepo,
+  MatchRepository Function(AppDatabase db)? matchRepo,
 }) {
   return ProviderContainer(
     overrides: [
+      if (roadmapRepo != null)
+        roadmapRepositoryProvider.overrideWith(
+          (ref) => roadmapRepo(ref.watch(appDatabaseProvider)),
+        ),
+      if (matchRepo != null)
+        matchRepositoryProvider.overrideWith(
+          (ref) => matchRepo(ref.watch(appDatabaseProvider)),
+        ),
+      if (tournamentRepo != null)
+        tournamentRepositoryProvider.overrideWith(
+          (ref) => tournamentRepo(ref.watch(appDatabaseProvider)),
+        ),
       if (rankLag != null)
         playerRankProvider.overrideWith((ref) {
           final repo = ref.watch(assessmentRepositoryProvider);

@@ -17,6 +17,7 @@ final class PlayerGoal {
     this.category,
     this.eventDate,
     this.targetRank,
+    this.tournamentId,
   })  : assert(kind != GoalKind.thuanThucKyNang || category != null,
             'thuần thục kỹ năng cần một nhóm'),
         assert(kind != GoalKind.chuanBiGiai || eventDate != null,
@@ -34,6 +35,10 @@ final class PlayerGoal {
   /// Hạng đích của Lên hạng; null = hạng kế tiếp (hành vi cũ).
   final Rank? targetRank;
 
+  /// Giải đấu mà mục tiêu Chuẩn bị giải trỏ tới. Lưu nguyên văn, không assert:
+  /// bản cũ có thể để sót giá trị; chỉ dùng qua `linkedTournament`.
+  final String? tournamentId;
+
   @override
   bool operator ==(Object other) =>
       other is PlayerGoal &&
@@ -42,13 +47,14 @@ final class PlayerGoal {
       other.category == category &&
       other.eventDate == eventDate &&
       other.createdAt == createdAt &&
-      other.targetRank == targetRank;
+      other.targetRank == targetRank &&
+      other.tournamentId == tournamentId;
 
   @override
-  int get hashCode => Object.hash(goalId, kind, category, eventDate, createdAt, targetRank);
+  int get hashCode => Object.hash(goalId, kind, category, eventDate, createdAt, targetRank, tournamentId);
 
   @override
-  String toString() => 'PlayerGoal($goalId, $kind, $category, $eventDate, $createdAt, $targetRank)';
+  String toString() => 'PlayerGoal($goalId, $kind, $category, $eventDate, $createdAt, $targetRank, $tournamentId)';
 }
 
 /// Dòng mục tiêu của một tài khoản. [goal] null nghĩa là người chơi đã bỏ

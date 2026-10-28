@@ -6,25 +6,27 @@ import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
 /// Thẻ "Phân tích trận gần đây" trên màn Thống kê; thuần, không đọc provider.
 /// Dòng nào có mẫu số 0 thì không vẽ, để không bao giờ hiện 0%, NaN hay null.
 class MatchAnalysisCard extends StatelessWidget {
-  const MatchAnalysisCard({required this.analysis, super.key});
+  const MatchAnalysisCard({
+    required this.analysis,
+    this.title = Vi.statsMatchAnalysisTitle,
+    super.key,
+  });
 
   final MatchAnalysis analysis;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final a = analysis;
-    final title = Text(
-      Vi.statsMatchAnalysisTitle,
-      style: theme.textTheme.titleMedium,
-    );
+    final heading = Text(title, style: theme.textTheme.titleMedium);
 
     if (a.playerShots == 0) {
       return PcCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            title,
+            heading,
             const SizedBox(height: 8),
             const Text(Vi.statsMatchAnalysisEmpty),
           ],
@@ -78,7 +80,7 @@ class MatchAnalysisCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          title,
+          heading,
           const SizedBox(height: 8),
           for (final line in lines)
             Padding(

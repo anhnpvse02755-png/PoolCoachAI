@@ -4,13 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/drift_match_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/data/repositories/match_repository.dart';
+import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
 
 import '../../support/layout_sweep.dart';
@@ -35,6 +38,8 @@ class _FailingMatchRepository implements MatchRepository {
     required String playerName,
     required String opponentName,
     required int targetRacks,
+    required String? tournamentId,
+    required String? roundLabel,
   }) => Future.error(StateError('lỗi giả lập khi sửa trận'));
 
   @override
@@ -246,7 +251,10 @@ void main() {
     expect(match.playerName, 'An mới');
     expect(match.opponentName, 'Bình mới');
     expect(match.rackWinners, contains('player'));
-    expect(find.text(Vi.matchScore('An mới', 1, 0, 'Bình mới')), findsOneWidget);
+    expect(
+      find.text(Vi.matchScore('An mới', 1, 0, 'Bình mới')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -289,6 +297,9 @@ void main() {
         cueEquipmentProvider.overrideWith(
           (ref) => Stream.value(const <CueEquipment>[]),
         ),
+        tournamentsProvider.overrideWith(
+          (ref) => Stream.value(const <Tournament>[]),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -328,6 +339,9 @@ void main() {
         ),
         cueEquipmentProvider.overrideWith(
           (ref) => Stream.value(const <CueEquipment>[]),
+        ),
+        tournamentsProvider.overrideWith(
+          (ref) => Stream.value(const <Tournament>[]),
         ),
       ],
     );
@@ -473,6 +487,8 @@ void main() {
         // bật lên sau, như khi chạm vào ô ghi chú.
         applyScreen(tester, const Size(740, 360));
         await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text(Vi.matchRecordShot));
+        await tester.pumpAndSettle();
         await tester.tap(find.text(Vi.matchRecordShot));
         await tester.pumpAndSettle();
         tester.view.viewInsets = const FakeViewPadding(bottom: 160);
@@ -580,5 +596,390 @@ void main() {
       );
       expect((await db.select(db.poolMatchRows).get()).single.cueId, 'c1');
     });
+  });
+
+  group('giải đấu trong form trận', () {
+    late AppDatabase db;
+    late ProviderContainer container;
+    const longName =
+        'Giải Vô địch Bida Pool 9 bi Mở rộng Thành phố Hồ Chí Minh lần thứ XII';
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      container = dbContainer(db);
+    });
+    tearDown(() async {
+      container.dispose();
+      await db.close();
+    });
+
+    Future<void> addTournament(
+      String id,
+      String name, {
+      required DateTime start,
+      DateTime? end,
+      PoolGameType? gameType,
+    }) =>
+        TournamentRepository(
+          db,
+          userId: 'u1',
+          now: () => testToday,
+          newId: () => id,
+        ).create(
+          TournamentDraft(
+            name: name,
+            startDate: start,
+            endDate: end,
+            gameType: gameType,
+          ),
+        );
+
+    Future<void> pumpPlay(WidgetTester tester) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: PlayScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openStart(WidgetTester tester) async {
+      await pumpPlay(tester);
+      await tester.tap(find.text(Vi.matchStart));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('match-player-name')), 'An');
+      await tester.enterText(
+        find.byKey(const Key('match-opponent-name')),
+        'Bình',
+      );
+    }
+
+    Future<void> pick(WidgetTester tester, Key field, String item) async {
+      await tester.ensureVisible(find.byKey(field));
+      await tester.tap(find.byKey(field));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(item).last);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> startMatchIn(String id, {String? tournamentId}) =>
+        DriftMatchRepository(db, userId: 'u1', now: () => testToday).start(
+          PoolMatch(
+            id: id,
+            gameType: PoolGameType.nineBall,
+            playerName: 'An',
+            opponentName: 'Bình',
+            targetRacks: 3,
+            rackWinners: const [],
+            startedAt: testToday,
+            tournamentId: tournamentId,
+            roundLabel: tournamentId == null ? null : 'Tứ kết',
+          ),
+        );
+
+    testWidgets(
+      'chọn giải và vòng gợi ý: lưu vào trận, thẻ hiện tên giải và vòng',
+      (tester) async {
+        await addTournament('t1', 'Giải Q1', start: testToday);
+        await openStart(tester);
+        expect(find.byKey(const Key('match-round')), findsNothing);
+        await pick(tester, const Key('match-tournament'), 'Giải Q1');
+        await tester.ensureVisible(find.byKey(const Key('match-round-2')));
+        await tester.tap(find.byKey(const Key('match-round-2')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(Vi.matchStartAction));
+        await tester.pumpAndSettle();
+        final r = await db.select(db.poolMatchRows).getSingle();
+        expect([r.tournamentId, r.roundLabel], ['t1', 'Tứ kết']);
+        expect(
+          find.text(Vi.matchTournamentLabel('Giải Q1', 'Tứ kết')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('chỉ giải đã bắt đầu và kết thúc trong 7 ngày gần đây', (
+      tester,
+    ) async {
+      await addTournament(
+        'up',
+        'Giải ngày mai',
+        start: testToday.add(const Duration(days: 1)),
+      );
+      await addTournament(
+        'e8',
+        'Xong 8 ngày',
+        start: testToday.subtract(const Duration(days: 8)),
+      );
+      await addTournament(
+        'e7',
+        'Xong 7 ngày',
+        start: testToday.subtract(const Duration(days: 7)),
+      );
+      await openStart(tester);
+      await tester.tap(find.byKey(const Key('match-tournament')));
+      await tester.pumpAndSettle();
+      expect(
+        [
+          find.text('Xong 7 ngày').evaluate().isEmpty,
+          find.text('Xong 8 ngày').evaluate().isEmpty,
+          // Thẻ Giải đấu trên Play đã nêu giải sắp tới này đúng một lần;
+          // trong danh sách chọn nó không được xuất hiện thêm.
+          find.text('Giải ngày mai').evaluate().length == 1,
+        ],
+        [false, true, true],
+      );
+    });
+
+    testWidgets('không có giải chọn được thì không có ô Giải đấu', (
+      tester,
+    ) async {
+      await openStart(tester);
+      expect(find.byKey(const Key('match-tournament')), findsNothing);
+    });
+
+    testWidgets('chọn giải có loại bi thì điền sẵn loại bi', (tester) async {
+      await addTournament(
+        't1',
+        'Giải 10 bi',
+        start: testToday,
+        gameType: PoolGameType.tenBall,
+      );
+      await openStart(tester);
+      await pick(tester, const Key('match-tournament'), 'Giải 10 bi');
+      await tester.tap(find.text(Vi.matchStartAction));
+      await tester.pumpAndSettle();
+      expect(
+        (await db.select(db.poolMatchRows).getSingle()).gameType,
+        'tenBall',
+      );
+    });
+
+    testWidgets('sửa trận: chuyển sang giải khác rồi bỏ giải', (tester) async {
+      await addTournament('t1', 'Giải Một', start: testToday);
+      await addTournament('t2', 'Giải Hai', start: testToday);
+      await startMatchIn('m1', tournamentId: 't1');
+      await pumpPlay(tester);
+      expect(
+        find.text(Vi.matchTournamentLabel('Giải Một', 'Tứ kết')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('edit-match-m1')));
+      await tester.pumpAndSettle();
+      await pick(tester, const Key('edit-match-tournament'), 'Giải Hai');
+      await tester.tap(find.text(Vi.matchSaveDetails));
+      await tester.pumpAndSettle();
+      var r = await db.select(db.poolMatchRows).getSingle();
+      expect([r.tournamentId, r.roundLabel], ['t2', 'Tứ kết']);
+
+      await tester.tap(find.byKey(const Key('edit-match-m1')));
+      await tester.pumpAndSettle();
+      await pick(
+        tester,
+        const Key('edit-match-tournament'),
+        Vi.matchNoTournament,
+      );
+      expect(find.byKey(const Key('edit-match-round')), findsNothing);
+      await tester.tap(find.text(Vi.matchSaveDetails));
+      await tester.pumpAndSettle();
+      r = await db.select(db.poolMatchRows).getSingle();
+      expect([r.tournamentId, r.roundLabel], [null, null]);
+    });
+
+    testWidgets(
+      'trận của giải đã xóa: hiện như trận thường, sửa không lỗi và vẫn giữ '
+      'tournament_id',
+      (tester) async {
+        await addTournament('gone', 'Giải đã xóa', start: testToday);
+        await startMatchIn('m1', tournamentId: 'gone');
+        await TournamentRepository(
+          db,
+          userId: 'u1',
+          now: () => testToday,
+          newId: () => 'x',
+        ).remove('gone');
+        await pumpPlay(tester);
+        expect(find.textContaining('Giải đã xóa'), findsNothing);
+        await tester.tap(find.byKey(const Key('edit-match-m1')));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.enterText(
+          find.byKey(const Key('edit-match-opponent-name')),
+          'Cường',
+        );
+        await tester.tap(find.text(Vi.matchSaveDetails));
+        await tester.pumpAndSettle();
+        final r = await db.select(db.poolMatchRows).getSingle();
+        expect(
+          [r.opponentName, r.tournamentId, r.roundLabel],
+          ['Cường', 'gone', 'Tứ kết'],
+        );
+      },
+    );
+
+    testWidgets(
+      'bỏ giải ở form bắt đầu xóa luôn vòng đã gõ; chọn giải lại thì ô vòng trống',
+      (tester) async {
+        await addTournament('t1', 'Giải Q1', start: testToday);
+        await openStart(tester);
+        await pick(tester, const Key('match-tournament'), 'Giải Q1');
+        await tester.enterText(find.byKey(const Key('match-round')), 'Vòng 3');
+        await pick(tester, const Key('match-tournament'), Vi.matchNoTournament);
+        expect(find.byKey(const Key('match-round')), findsNothing);
+        await pick(tester, const Key('match-tournament'), 'Giải Q1');
+        expect(
+          tester
+              .widget<TextFormField>(find.byKey(const Key('match-round')))
+              .controller!
+              .text,
+          isEmpty,
+        );
+        await tester.tap(find.text(Vi.matchStartAction));
+        await tester.pumpAndSettle();
+        final r = await db.select(db.poolMatchRows).getSingle();
+        expect([r.tournamentId, r.roundLabel], ['t1', null]);
+      },
+    );
+
+    testWidgets(
+      'sửa trận: bỏ giải rồi chọn lại giải thì ô vòng trống, không sống lại '
+      'vòng cũ',
+      (tester) async {
+        await addTournament('t1', 'Giải Một', start: testToday);
+        await startMatchIn('m1', tournamentId: 't1');
+        await pumpPlay(tester);
+        await tester.tap(find.byKey(const Key('edit-match-m1')));
+        await tester.pumpAndSettle();
+        await pick(
+          tester,
+          const Key('edit-match-tournament'),
+          Vi.matchNoTournament,
+        );
+        await pick(tester, const Key('edit-match-tournament'), 'Giải Một');
+        expect(
+          tester
+              .widget<TextFormField>(find.byKey(const Key('edit-match-round')))
+              .controller!
+              .text,
+          isEmpty,
+        );
+      },
+    );
+
+    testWidgets(
+      'sửa trận của giải đã xóa: ô giải hiện "Không thuộc giải nào", không có '
+      'ô vòng; chạm rồi chọn lại "không giải" thì xóa cả giải lẫn vòng',
+      (tester) async {
+        await addTournament('gone', 'Giải đã xóa', start: testToday);
+        await addTournament('live', 'Giải còn', start: testToday);
+        await startMatchIn('m1', tournamentId: 'gone');
+        await TournamentRepository(
+          db,
+          userId: 'u1',
+          now: () => testToday,
+          newId: () => 'x',
+        ).remove('gone');
+        await pumpPlay(tester);
+        await tester.tap(find.byKey(const Key('edit-match-m1')));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('edit-match-tournament')),
+            matching: find.text(Vi.matchNoTournament),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('edit-match-round')), findsNothing);
+        await pick(tester, const Key('edit-match-tournament'), 'Giải còn');
+        await pick(
+          tester,
+          const Key('edit-match-tournament'),
+          Vi.matchNoTournament,
+        );
+        await tester.tap(find.text(Vi.matchSaveDetails));
+        await tester.pumpAndSettle();
+        final r = await db.select(db.poolMatchRows).getSingle();
+        expect([r.tournamentId, r.roundLabel], [null, null]);
+      },
+    );
+
+    testWidgets(
+      'tên giải dài hiện tới hai dòng ở ô đã chọn và trong danh sách chọn',
+      (tester) async {
+        await addTournament('t1', longName, start: testToday);
+        await openStart(tester);
+        await pick(tester, const Key('match-tournament'), longName);
+        Text shown() => tester.widget<Text>(
+          find.descendant(
+            of: find.byKey(const Key('match-tournament')),
+            matching: find.text(longName),
+          ),
+        );
+        expect(shown().maxLines, 2);
+        await tester.tap(find.byKey(const Key('match-tournament')));
+        await tester.pumpAndSettle();
+        final menu = tester.widget<Text>(find.text(longName).last);
+        expect(menu.maxLines, 2);
+      },
+    );
+
+    testWidgets(
+      'điện thoại dọc, chữ 1.5: hộp thoại bắt đầu trận có giải không tràn, '
+      'cuộn tới mọi ô',
+      (tester) async {
+        applyScreen(tester, const Size(360, 640), textScale: 1.5);
+        await addTournament('t1', longName, start: testToday);
+        await openStart(tester);
+        await pick(tester, const Key('match-tournament'), longName);
+        await expectDialogFitsAboveKeyboard(
+          tester,
+          screenHeight: 640,
+          keyboard: 0,
+        );
+        expect(find.byKey(const Key('match-round')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'điện thoại dọc, chữ 1.5: hộp thoại sửa trận có giải không tràn, '
+      'cuộn tới mọi ô',
+      (tester) async {
+        applyScreen(tester, const Size(360, 640), textScale: 1.5);
+        await addTournament('t1', longName, start: testToday);
+        await startMatchIn('m1', tournamentId: 't1');
+        await pumpPlay(tester);
+        await tester.ensureVisible(find.byKey(const Key('edit-match-m1')));
+        await tester.tap(find.byKey(const Key('edit-match-m1')));
+        await tester.pumpAndSettle();
+        await expectDialogFitsAboveKeyboard(
+          tester,
+          screenHeight: 640,
+          keyboard: 0,
+        );
+        expect(find.byKey(const Key('edit-match-round')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'điện thoại ngang, bàn phím mở: hộp thoại có ô giải và vòng cuộn được, '
+      'nút Bắt đầu trên bàn phím',
+      (tester) async {
+        await addTournament('t1', longName, start: testToday);
+        await openStart(tester);
+        await pick(tester, const Key('match-tournament'), longName);
+        applyScreen(tester, const Size(740, 360));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+        await tester.pumpAndSettle();
+        await expectDialogFitsAboveKeyboard(
+          tester,
+          screenHeight: 360,
+          keyboard: 160,
+        );
+        await scrollThroughAll(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

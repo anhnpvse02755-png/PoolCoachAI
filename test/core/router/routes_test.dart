@@ -17,6 +17,8 @@ void main() {
       expect(Routes.all, [
         ...Routes.tabs,
         Routes.equipment,
+        Routes.tournaments,
+        Routes.tournamentPattern,
         Routes.coach,
         Routes.coachSituation,
         Routes.coachLibrary,
@@ -45,6 +47,15 @@ void main() {
 
     test('Kế hoạch dọn bàn nằm trong nhánh Luyện tập', () {
       expect(Routes.planner, '${Routes.training}/planner');
+    });
+
+    test('Giải đấu nằm trong nhánh Thi đấu', () {
+      expect(Routes.tournaments, '${Routes.play}/tournaments');
+      expect(Routes.tournament('t3'), '/play/tournaments/t3');
+      expect(
+        Routes.tournament('x'),
+        Routes.tournamentPattern.replaceAll(':id', 'x'),
+      );
     });
 
     test('Lộ trình nằm trong nhánh Luyện tập', () {

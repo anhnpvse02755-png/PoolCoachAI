@@ -300,6 +300,8 @@ await ensureCollection(
     nullable('target_rank', 'string'),
     nullable('created_at', 'timestamp'),
     required('updated_at', 'timestamp'),
+    // Giải gắn với mục tiêu chuẩn bị giải; chuỗi thường, không phải quan hệ.
+    nullable('tournament_id', 'string'),
   ],
 );
 await ensureCollection('achievements', 'Thành tích Lộ trình — chỉ thêm', [
@@ -377,6 +379,9 @@ await ensureCollection('pool_matches', 'Trận đấu của người chơi, gồ
   required('started_at', 'timestamp'),
   nullable('completed_at', 'timestamp'),
   required('updated_at', 'timestamp'),
+  // Giải và vòng của trận: chuỗi thường như cue_id, không phải quan hệ.
+  nullable('tournament_id', 'string'),
+  nullable('round_label', 'string'),
   // Có default false vì bảng đã có trận trên server: thêm cột NOT NULL không
   // default vào bảng có dữ liệu sẽ lỗi trên Postgres.
   { field: 'is_deleted', type: 'boolean', schema: { is_nullable: false, default_value: false } },
@@ -394,6 +399,21 @@ await ensureCollection('schedule_slots', 'Khung giờ trong lịch tập hằng 
   required('time', 'string'),
   required('label', 'string'),
   nullable('cat', 'string'),
+  required('updated_at', 'timestamp'),
+  required('is_deleted', 'boolean'),
+]);
+// Giải đấu người chơi tự ghi: xóa mềm, bản sửa mới nhất thắng. start_date và
+// end_date là kiểu `date` (YYYY-MM-DD theo ngày địa phương), không phải timestamp.
+await ensureCollection('tournaments', 'Giải người chơi tự ghi — xóa mềm, bản sửa mới nhất thắng', [
+  pk,
+  required('name', 'string'),
+  required('start_date', 'date'),
+  nullable('end_date', 'date'),
+  nullable('location', 'string'),
+  nullable('game_type', 'string'),
+  nullable('result_note', 'string'),
+  nullable('notes', 'text'),
+  required('created_at', 'timestamp'),
   required('updated_at', 'timestamp'),
   required('is_deleted', 'boolean'),
 ]);
@@ -520,7 +540,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'create',
-    fields: ['id', 'goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank'],
+    fields: ['id', 'goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
     permissions: {},
     validation: { id: { _eq: '$CURRENT_USER' } },
   },
@@ -528,7 +548,7 @@ const desiredPermissions = [
   {
     collection: 'player_goals',
     action: 'update',
-    fields: ['goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank'],
+    fields: ['goal_id', 'kind', 'category', 'event_date', 'created_at', 'updated_at', 'target_rank', 'tournament_id'],
     permissions: { user_created: self },
     validation: {},
   },
@@ -587,7 +607,7 @@ const desiredPermissions = [
     collection: 'pool_matches',
     action: 'create',
     fields: ['id', 'game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
-      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted'],
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted', 'tournament_id', 'round_label'],
     permissions: {},
     validation: {},
   },
@@ -596,7 +616,7 @@ const desiredPermissions = [
     collection: 'pool_matches',
     action: 'update',
     fields: ['game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
-      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted'],
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted', 'tournament_id', 'round_label'],
     permissions: { user_created: self },
     validation: {},
   },
@@ -622,6 +642,22 @@ const desiredPermissions = [
     collection: 'schedule_slots',
     action: 'update',
     fields: ['day', 'time', 'label', 'cat', 'updated_at', 'is_deleted'],
+    permissions: { user_created: self },
+    validation: {},
+  },
+  // Giải đấu: tạo, đọc, sửa dòng của mình; xóa chỉ bằng tombstone, không có quyền delete.
+  {
+    collection: 'tournaments',
+    action: 'create',
+    fields: ['id', 'name', 'start_date', 'end_date', 'location', 'game_type', 'result_note', 'notes', 'created_at', 'updated_at', 'is_deleted'],
+    permissions: {},
+    validation: {},
+  },
+  { collection: 'tournaments', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'tournaments',
+    action: 'update',
+    fields: ['name', 'start_date', 'end_date', 'location', 'game_type', 'result_note', 'notes', 'created_at', 'updated_at', 'is_deleted'],
     permissions: { user_created: self },
     validation: {},
   },

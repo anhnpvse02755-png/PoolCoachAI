@@ -35,6 +35,7 @@ class RoadmapRepository {
     SkillCategory? category,
     DateTime? eventDate,
     Rank? targetRank,
+    String? tournamentId,
   }) {
     final now = _now();
     return _write(
@@ -49,9 +50,30 @@ class RoadmapRepository {
               : null,
           targetRank: kind == GoalKind.lenHang ? targetRank : null,
           createdAt: now,
+          tournamentId: kind == GoalKind.chuanBiGiai ? tournamentId : null,
         ),
       ),
     );
+  }
+
+  /// Gắn giải vào mục tiêu Chuẩn bị giải hiện có (đã đúng ngày giải): không
+  /// đổi `goalId` hay `createdAt`, không tính lại từ đầu. Mục tiêu không phải
+  /// Chuẩn bị giải thì ném, để khỏi gắn nhầm.
+  Future<void> linkTournament(String tournamentId) async {
+    final changed =
+        await (_db.update(_db.playerGoalRows)..where(
+              (t) =>
+                  t.userId.equals(_userId) &
+                  t.kind.equals(GoalKind.chuanBiGiai.name),
+            ))
+            .write(
+              PlayerGoalRowsCompanion(
+                tournamentId: Value(tournamentId),
+                updatedAt: Value(_now()),
+                syncedAt: const Value(null),
+              ),
+            );
+    if (changed == 0) throw StateError('Không có mục tiêu Chuẩn bị giải');
   }
 
   Future<void> clearGoal() => _write(GoalRecord(updatedAt: _now()));
