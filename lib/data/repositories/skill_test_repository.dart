@@ -75,10 +75,11 @@ class SkillTestRepository {
       )..where((t) => t.userId.equals(_userId))).get();
       // Buổi tập đọc trong cùng giao dịch với cổng: không tin danh sách từ
       // người gọi, và không có khe hở giữa kiểm tra và ghi.
-      final logRows = await (_db.select(_db.drillLogRows)
-            ..where((t) => t.userId.equals(_userId))
-            ..orderBy([(t) => OrderingTerm.asc(t.date)]))
-          .get();
+      final logRows =
+          await (_db.select(_db.drillLogRows)
+                ..where((t) => t.userId.equals(_userId))
+                ..orderBy([(t) => OrderingTerm.asc(t.date)]))
+              .get();
       final gate = skillTestGate(
         drill: drill,
         drills: drills,

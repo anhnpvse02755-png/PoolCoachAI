@@ -34,7 +34,9 @@ void main() {
   ) async {
     await pumpSection(
       tester,
-      testContainer(logs: threePasses('d1', before: testToday).skip(1).toList()),
+      testContainer(
+        logs: threePasses('d1', before: testToday).skip(1).toList(),
+      ),
     );
     expect(find.text(Vi.certificationEmpty), findsOneWidget);
     expect(
@@ -92,14 +94,22 @@ void main() {
     expect(find.textContaining('80%'), findsNothing);
   });
 
-  testWidgets('mỗi chứng nhận nêu cỡ bàn và kết quả của lần đạt', (tester) async {
+  testWidgets('mỗi chứng nhận nêu cỡ bàn và kết quả của lần đạt', (
+    tester,
+  ) async {
     await pumpSection(
       tester,
       testContainer(skillTests: [passedTest('d1', 1, testToday)]),
     );
     expect(
-      find.text(Vi.certificationEvidence(
-        TableSize.nineFootPlus, 9, 10, 'lần trúng / 10')),
+      find.text(
+        Vi.certificationEvidence(
+          TableSize.nineFootPlus,
+          9,
+          10,
+          'lần trúng / 10',
+        ),
+      ),
       findsOneWidget,
     );
   });
@@ -114,7 +124,11 @@ void main() {
     router.go(Routes.profile);
     await tester.pumpAndSettle();
     final hint = find.text(Vi.homeSkillTestReady('Đường thẳng cơ bản', 0));
-    await tester.dragUntilVisible(hint, find.byType(ListView), const Offset(0, -150));
+    await tester.dragUntilVisible(
+      hint,
+      find.byType(ListView),
+      const Offset(0, -150),
+    );
     expect(find.textContaining('Gần sẵn sàng nhất'), findsNothing);
     await tester.tap(hint);
     await tester.pumpAndSettle();
@@ -134,7 +148,11 @@ void main() {
     router.go(Routes.profile);
     await tester.pumpAndSettle();
     final hint = find.text(Vi.certificationClosest('Đường thẳng cơ bản', 2));
-    await tester.dragUntilVisible(hint, find.byType(ListView), const Offset(0, -150));
+    await tester.dragUntilVisible(
+      hint,
+      find.byType(ListView),
+      const Offset(0, -150),
+    );
     await tester.tap(hint);
     await tester.pumpAndSettle();
     expect(
@@ -167,9 +185,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: c,
-        child: const MaterialApp(
-          home: Scaffold(body: CertificationSection()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: CertificationSection())),
       ),
     );
     await tester.pump();
@@ -195,7 +211,9 @@ void main() {
     );
   });
 
-  testWidgets('360×640 chữ lớn: Hồ sơ có chứng nhận không tràn', (tester) async {
+  testWidgets('360×640 chữ lớn: Hồ sơ có chứng nhận không tràn', (
+    tester,
+  ) async {
     applyScreen(tester, const Size(360, 640), textScale: 2.0);
     final router = await pumpRoutedApp(
       tester,

@@ -54,22 +54,29 @@ CertificationSummary certificationSummary({
         if (certs[d.id] != null) (drill: d, certification: certs[d.id]!),
     ];
     if (entries.isEmpty) continue;
-    groups.add(CertificationGroup(
-      cat: cat,
-      entries: entries,
-      complete: entries.length == inCat.length,
-    ));
+    groups.add(
+      CertificationGroup(
+        cat: cat,
+        entries: entries,
+        complete: entries.length == inCat.length,
+      ),
+    );
   }
 
   ReadyHint? closest;
   final ordered = [...drills]..sort(_byLevelThenId);
   for (final d in ordered) {
-    final gate = skillTestGate(drill: d, drills: drills, logs: logs, tests: tests);
-    if (gate is AlreadyCertified || gate is NeedLowerLevel) continue;
-    final count = consecutivePassCount(
-      d,
-      [for (final l in logs) if (l.drillId == d.id) l],
+    final gate = skillTestGate(
+      drill: d,
+      drills: drills,
+      logs: logs,
+      tests: tests,
     );
+    if (gate is AlreadyCertified || gate is NeedLowerLevel) continue;
+    final count = consecutivePassCount(d, [
+      for (final l in logs)
+        if (l.drillId == d.id) l,
+    ]);
     if (count < 1) continue;
     // Duyệt theo (cấp, id) nên chỉ thay khi nhiều buổi hơn hẳn.
     if (closest == null || count > closest.passCount) {

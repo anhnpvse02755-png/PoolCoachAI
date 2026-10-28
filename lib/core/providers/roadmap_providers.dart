@@ -79,7 +79,15 @@ final roadmapProvider = Provider<AsyncValue<Roadmap?>>((ref) {
   final tests = ref.watch(buTestsProvider);
   final result = ref.watch(latestBuResultProvider);
   final matches = ref.watch(matchesProvider);
-  final blocked = gate<Roadmap?>([goal, rank, drills, logs, tests, result, matches]);
+  final blocked = gate<Roadmap?>([
+    goal,
+    rank,
+    drills,
+    logs,
+    tests,
+    result,
+    matches,
+  ]);
   if (blocked != null) return blocked;
 
   final currentGoal = goal.value?.goal;

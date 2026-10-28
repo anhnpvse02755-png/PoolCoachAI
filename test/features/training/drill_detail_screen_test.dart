@@ -93,8 +93,9 @@ void main() {
     expect(find.text(Vi.drillReadinessProgress(1)), findsOneWidget);
   });
 
-  testWidgets('hiện khi đã đạt chuỗi yêu cầu, không tự cấp chứng nhận',
-      (tester) async {
+  testWidgets('hiện khi đã đạt chuỗi yêu cầu, không tự cấp chứng nhận', (
+    tester,
+  ) async {
     await openDrill(
       tester,
       'd1',
@@ -122,8 +123,9 @@ void main() {
     expect(find.text(Vi.drillHistoryTitle), findsNothing);
   });
 
-  testWidgets('đã tập thì lịch sử hiện tỉ lệ đạt, không phải điểm thô',
-      (tester) async {
+  testWidgets('đã tập thì lịch sử hiện tỉ lệ đạt, không phải điểm thô', (
+    tester,
+  ) async {
     await openDrill(
       tester,
       'd1',
@@ -160,8 +162,9 @@ void main() {
     expect(find.text(Vi.drillRatioUnknown), findsOneWidget);
   });
 
-  testWidgets('bấm bắt đầu tập thì sang màn buổi tập của đúng bài đó',
-      (tester) async {
+  testWidgets('bấm bắt đầu tập thì sang màn buổi tập của đúng bài đó', (
+    tester,
+  ) async {
     await openDrill(tester, 'd1');
 
     await tester.tap(find.text(Vi.drillStartAction));
@@ -171,8 +174,9 @@ void main() {
     expect(find.text(Vi.sessionTitle('Đường thẳng cơ bản')), findsOneWidget);
   });
 
-  testWidgets('id không tồn tại thì ra trạng thái rỗng, không màn trắng',
-      (tester) async {
+  testWidgets('id không tồn tại thì ra trạng thái rỗng, không màn trắng', (
+    tester,
+  ) async {
     await openDrill(tester, 'khong-co-that');
 
     expect(find.byType(PcEmptyState), findsOneWidget);
@@ -189,115 +193,168 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('đủ 3 buổi đạt: có nút Làm bài kiểm tra, bấm thì mở màn kiểm tra',
-      (tester) async {
-    await openDrill(tester, 'd1', logs: threePasses('d1', before: testToday));
-    final button = find.widgetWithText(FilledButton, Vi.skillTestOpen);
-    await reveal(tester, button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(find.byType(SkillTestScreen), findsOneWidget);
-  });
+  testWidgets(
+    'đủ 3 buổi đạt: có nút Làm bài kiểm tra, bấm thì mở màn kiểm tra',
+    (tester) async {
+      await openDrill(tester, 'd1', logs: threePasses('d1', before: testToday));
+      final button = find.widgetWithText(FilledButton, Vi.skillTestOpen);
+      await reveal(tester, button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.byType(SkillTestScreen), findsOneWidget);
+    },
+  );
 
-  testWidgets('thiếu buổi đạt: không có nút, nói còn thiếu mấy buổi',
-      (tester) async {
-    await openDrill(tester, 'd1',
-        logs: threePasses('d1', before: testToday).skip(1).toList());
+  testWidgets('thiếu buổi đạt: không có nút, nói còn thiếu mấy buổi', (
+    tester,
+  ) async {
+    await openDrill(
+      tester,
+      'd1',
+      logs: threePasses('d1', before: testToday).skip(1).toList(),
+    );
     final reason = find.text(
-        Vi.skillTestGateLine(const NeedStreak(1), nameOf: (id) => id));
+      Vi.skillTestGateLine(const NeedStreak(1), nameOf: (id) => id),
+    );
     await reveal(tester, reason);
     expect(reason, findsOneWidget);
     expect(find.widgetWithText(FilledButton, Vi.skillTestOpen), findsNothing);
   });
 
-  testWidgets('cấp cao hơn: nêu tên bài cấp thấp hơn cần chứng nhận',
-      (tester) async {
+  testWidgets('cấp cao hơn: nêu tên bài cấp thấp hơn cần chứng nhận', (
+    tester,
+  ) async {
     const d2 = Drill(
-        id: 'd2',
-        cat: SkillCategory.aiming,
-        name: 'Bi ảo',
-        level: 3,
-        unit: 'lần trúng / 15',
-        passThreshold: 0.6,
-        goal: 'g',
-        steps: ['Bước 1']);
-    await openDrill(tester, 'd2',
-        drills: [...testDrills, d2],
-        logs: threePasses('d2', before: testToday));
-    final reason = find.text(Vi.skillTestGateLine(const NeedLowerLevel(['d1']),
-        nameOf: (_) => 'Đường thẳng cơ bản'));
+      id: 'd2',
+      cat: SkillCategory.aiming,
+      name: 'Bi ảo',
+      level: 3,
+      unit: 'lần trúng / 15',
+      passThreshold: 0.6,
+      goal: 'g',
+      steps: ['Bước 1'],
+    );
+    await openDrill(
+      tester,
+      'd2',
+      drills: [...testDrills, d2],
+      logs: threePasses('d2', before: testToday),
+    );
+    final reason = find.text(
+      Vi.skillTestGateLine(
+        const NeedLowerLevel(['d1']),
+        nameOf: (_) => 'Đường thẳng cơ bản',
+      ),
+    );
     await reveal(tester, reason);
     expect(reason, findsOneWidget);
   });
 
   testWidgets(
-      'đã chứng nhận, 5 buổi gần nhất đều trượt: ngày chứng nhận và Phong độ gần đây chưa đạt',
-      (tester) async {
-    final certifiedAt = testToday.subtract(const Duration(days: 6));
-    await openDrill(tester, 'd1',
+    'đã chứng nhận, 5 buổi gần nhất đều trượt: ngày chứng nhận và Phong độ gần đây chưa đạt',
+    (tester) async {
+      final certifiedAt = testToday.subtract(const Duration(days: 6));
+      await openDrill(
+        tester,
+        'd1',
         logs: [
-          ...threePasses('d1',
-              before: testToday.subtract(const Duration(days: 10))),
+          ...threePasses(
+            'd1',
+            before: testToday.subtract(const Duration(days: 10)),
+          ),
           for (var i = 5; i >= 1; i--)
             stLog('d1', 5, testToday.subtract(Duration(days: i))),
         ],
-        skillTests: [passedTest('d1', 1, certifiedAt)]);
-    final certified = find.text(Vi.skillTestGateLine(
-        AlreadyCertified(certifiedAt),
-        nameOf: (id) => id));
-    await reveal(tester, certified);
-    expect(certified, findsOneWidget);
-    expect(find.text(Vi.skillTestFormSlipped), findsOneWidget);
-  });
+        skillTests: [passedTest('d1', 1, certifiedAt)],
+      );
+      final certified = find.text(
+        Vi.skillTestGateLine(AlreadyCertified(certifiedAt), nameOf: (id) => id),
+      );
+      await reveal(tester, certified);
+      expect(certified, findsOneWidget);
+      expect(find.text(Vi.skillTestFormSlipped), findsOneWidget);
+    },
+  );
 
-  testWidgets('đã chứng nhận, phong độ ổn: không có dòng Phong độ gần đây chưa đạt',
-      (tester) async {
-    final certifiedAt = testToday.subtract(const Duration(days: 6));
-    await openDrill(tester, 'd1',
+  testWidgets(
+    'đã chứng nhận, phong độ ổn: không có dòng Phong độ gần đây chưa đạt',
+    (tester) async {
+      final certifiedAt = testToday.subtract(const Duration(days: 6));
+      await openDrill(
+        tester,
+        'd1',
         logs: threePasses('d1', before: testToday),
-        skillTests: [passedTest('d1', 1, certifiedAt)]);
-    final certified = find.text(Vi.skillTestGateLine(
-        AlreadyCertified(certifiedAt),
-        nameOf: (id) => id));
-    await reveal(tester, certified);
-    expect(certified, findsOneWidget);
-    expect(find.text(Vi.skillTestFormSlipped), findsNothing);
-  });
+        skillTests: [passedTest('d1', 1, certifiedAt)],
+      );
+      final certified = find.text(
+        Vi.skillTestGateLine(AlreadyCertified(certifiedAt), nameOf: (id) => id),
+      );
+      await reveal(tester, certified);
+      expect(certified, findsOneWidget);
+      expect(find.text(Vi.skillTestFormSlipped), findsNothing);
+    },
+  );
 
-  testWidgets('đã chứng nhận: thẻ nêu cỡ bàn, kết quả và tiêu chí của lần đạt',
-      (tester) async {
-    final certifiedAt = testToday.subtract(const Duration(days: 6));
-    await openDrill(tester, 'd1',
+  testWidgets(
+    'đã chứng nhận: thẻ nêu cỡ bàn, kết quả và tiêu chí của lần đạt',
+    (tester) async {
+      final certifiedAt = testToday.subtract(const Duration(days: 6));
+      await openDrill(
+        tester,
+        'd1',
         logs: threePasses('d1', before: testToday),
-        skillTests: [passedTest('d1', 1, certifiedAt)]);
-    final evidence = find.text(Vi.certificationEvidence(
-        TableSize.nineFootPlus, 9, 10, 'lần trúng / 10'));
-    await reveal(tester, evidence);
-    expect(evidence, findsOneWidget);
-    expect(find.text(Vi.criterionSnapshot(0.8, null, 'lần trúng / 10')!),
-        findsOneWidget);
-  });
+        skillTests: [passedTest('d1', 1, certifiedAt)],
+      );
+      final evidence = find.text(
+        Vi.certificationEvidence(
+          TableSize.nineFootPlus,
+          9,
+          10,
+          'lần trúng / 10',
+        ),
+      );
+      await reveal(tester, evidence);
+      expect(evidence, findsOneWidget);
+      expect(
+        find.text(Vi.criterionSnapshot(0.8, null, 'lần trúng / 10')!),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('chưa chứng nhận dù trượt phong độ: không có dòng phong độ',
-      (tester) async {
-    await openDrill(tester, 'd1', logs: [
-      for (var i = 5; i >= 1; i--)
-        stLog('d1', 5, testToday.subtract(Duration(days: i))),
-    ]);
+  testWidgets('chưa chứng nhận dù trượt phong độ: không có dòng phong độ', (
+    tester,
+  ) async {
+    await openDrill(
+      tester,
+      'd1',
+      logs: [
+        for (var i = 5; i >= 1; i--)
+          stLog('d1', 5, testToday.subtract(Duration(days: i))),
+      ],
+    );
     await reveal(tester, find.text(Vi.skillTestCardTitle));
     expect(find.text(Vi.skillTestFormSlipped), findsNothing);
   });
 
-  testWidgets('lỗi tải bài kiểm tra: nói thẳng là chưa tải được, không có nút',
-      (tester) async {
-    await openDrill(tester, 'd1',
+  testWidgets(
+    'lỗi tải bài kiểm tra: nói thẳng là chưa tải được, không có nút',
+    (tester) async {
+      await openDrill(
+        tester,
+        'd1',
         logs: threePasses('d1', before: testToday),
-        skillTestsAsync: const AsyncError<List<SkillTest>>('x', StackTrace.empty));
-    final err = find.text(Vi.skillTestDataError);
-    await reveal(tester, err);
-    expect(err, findsOneWidget);
-    expect(find.widgetWithText(FilledButton, Vi.skillTestOpen), findsNothing);
-  });
+        skillTestsAsync: const AsyncError<List<SkillTest>>(
+          'x',
+          StackTrace.empty,
+        ),
+      );
+      final err = find.text(Vi.skillTestDataError);
+      await reveal(tester, err);
+      expect(err, findsOneWidget);
+      expect(find.widgetWithText(FilledButton, Vi.skillTestOpen), findsNothing);
+    },
+  );
 
   testWidgets('đang tải bài kiểm tra: thẻ gọn, không có nút', (tester) async {
     final router = createAppRouter(auth: signedInGate());

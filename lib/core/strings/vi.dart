@@ -14,9 +14,11 @@ import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/rank_rules.dart';
 import 'package:poolcoachai/domain/auth.dart';
-import 'package:poolcoachai/domain/match_analysis/match_analysis.dart' show SkillSignal, percentOf;
+import 'package:poolcoachai/domain/match_analysis/match_analysis.dart'
+    show SkillSignal, percentOf;
 import 'package:poolcoachai/domain/planner/miss_advice.dart';
-import 'package:poolcoachai/domain/roadmap/rank_check.dart' show RankCheckBasis, RankCheckDirection, RankCheckSignal;
+import 'package:poolcoachai/domain/roadmap/rank_check.dart'
+    show RankCheckBasis, RankCheckDirection, RankCheckSignal;
 import 'package:poolcoachai/domain/planner/plan_step.dart';
 import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
@@ -749,6 +751,7 @@ abstract final class Vi {
   static const certificationNoProgress = 'Chưa bài nào có buổi đạt liên tiếp.';
   static String certificationEntry(String drillName, int level, DateTime at) =>
       '$drillName — cấp $level — ${shortDate(at)}';
+
   /// Điều kiện đo của lần đạt: cỡ bàn và kết quả (đếm cú hoặc theo đơn vị).
   static String certificationEvidence(
     TableSize size,
@@ -817,7 +820,8 @@ abstract final class Vi {
       'Số lần đạt không được lớn hơn số lần thử',
     SkillTestInputError.attemptsRequired => sessionAttemptsRequired,
     SkillTestInputError.attemptsInvalid => sessionAttemptsInvalid,
-    SkillTestInputError.attemptsNotAllowed => 'Bài này không chấm theo số lần thử',
+    SkillTestInputError.attemptsNotAllowed =>
+      'Bài này không chấm theo số lần thử',
   };
 
   /// Xác nhận sau khi lưu, kèm tỉ lệ đạt của chính buổi vừa ghi.
@@ -1031,8 +1035,14 @@ abstract final class Vi {
   /// thì nối thêm đúng câu áp phê mẫu SAWS mà Coach dùng ([sawsSpinAdvice]);
   /// không còn vế "điểm ngắm cần lệch" hay "ngắm lệch đi" (chủ sản phẩm chốt
   /// Q5, 21/10/2026). Dòng nào cũng kết bằng dấu chấm.
-  static String simSquirt(double deg, [SideSpin? spin, int? bhePercent, SawsSpeed? speed]) {
-    final base = 'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°.';
+  static String simSquirt(
+    double deg, [
+    SideSpin? spin,
+    int? bhePercent,
+    SawsSpeed? speed,
+  ]) {
+    final base =
+        'Bi cái bị lệch do áp phê khoảng ${_rounded(deg.abs(), 0.5)}°.';
     final side = spin?.side;
     if (side == null || bhePercent == null || speed == null) return base;
     return '$base ${sawsSpinAdvice(side, spin!.tips, bhePercent, speed)}';
@@ -1049,7 +1059,12 @@ abstract final class Vi {
   /// Câu áp phê mẫu SAWS của chủ sản phẩm (05/10/2026): số đầu cơ, "ngắm
   /// như đánh tâm bi", % BHE / FHE và chữ chỉ lực. Một hàm cho cả màn Mô
   /// phỏng, Kế hoạch dọn bàn và Coach. Không có số độ, không có "ngắm lệch".
-  static String sawsSpinAdvice(SpinSide side, double tips, int bhePercent, SawsSpeed speed) =>
+  static String sawsSpinAdvice(
+    SpinSide side,
+    double tips,
+    int bhePercent,
+    SawsSpeed speed,
+  ) =>
       'Cú này cần áp phê ${_side(side)} ${simTips(tips)} đầu cơ. '
       'Hãy ngắm như đánh tâm bi, bù trừ áp phê bằng $bhePercent% BHE, '
       '${100 - bhePercent}% FHE với lực ${sawsSpeedWord(speed)}.';
@@ -2043,7 +2058,8 @@ abstract final class Vi {
   static const coachStart = 'Bắt đầu';
   static const coachLibraryLink = 'Thư viện tình huống ›';
   static const coachLibraryTitle = 'Thư viện tình huống';
-  static String coachLibraryCaption(String id, int k, int n) => 'Tình huống $k/$n · $id';
+  static String coachLibraryCaption(String id, int k, int n) =>
+      'Tình huống $k/$n · $id';
   static String coachLibrarySource(String source) => 'Nguồn: $source';
   static const coachLibraryEnd = 'Hết thư viện.';
 
@@ -2062,26 +2078,34 @@ abstract final class Vi {
   static String coachChatRemaining(int n) => 'Còn $n lượt hỏi hôm nay';
   static const coachChatQuotaOut = 'Hết lượt hỏi hôm nay, mai hỏi tiếp.';
   static const coachChatRetry = 'Thử lại';
-  static const coachChatDisclaimer = 'Huấn luyện viên AI chỉ diễn giải số liệu của bạn và có thể sai.';
+  static const coachChatDisclaimer =
+      'Huấn luyện viên AI chỉ diễn giải số liệu của bạn và có thể sai.';
 
-  static const coachChatClearBody = 'Xoá mọi tin nhắn với huấn luyện viên trên máy này? Không lấy lại được.';
+  static const coachChatClearBody =
+      'Xoá mọi tin nhắn với huấn luyện viên trên máy này? Không lấy lại được.';
   static const coachChatClearYes = 'Xoá';
   static const coachChatInputHint = 'Hỏi về việc tập của bạn';
   static const coachChatSend = 'Gửi';
-  static const coachChatInsufficientHint = 'Ghi thêm buổi tập, trận đấu hoặc tình huống Coach rồi hỏi lại.';
+  static const coachChatInsufficientHint =
+      'Ghi thêm buổi tập, trận đấu hoặc tình huống Coach rồi hỏi lại.';
   static const coachChatError = 'Chưa gửi được câu hỏi.';
-  static const coachChatContextError = 'Chưa đọc được số liệu tập luyện của bạn, nên chưa hỏi được.';
+  static const coachChatContextError =
+      'Chưa đọc được số liệu tập luyện của bạn, nên chưa hỏi được.';
   static const coachChatFromPlayer = 'Bạn';
   static const coachChatFromCoach = 'Huấn luyện viên';
 
   static const coachRecTitle = 'Nên luyện gì';
 
-  static String coachRecReason(CoachTopicReason reason, CoachTopic topic) => switch (reason) {
-    CoachTopicReason.sameAsToday => 'Cùng nhóm với gợi ý hôm nay: ${coachTopic(topic)}.',
-    CoachTopicReason.weakest => '${coachTopic(topic)} là nhóm yếu nhất có tình huống để luyện.',
-    CoachTopicReason.matchWeakness => '${coachTopic(topic)} đang yếu trong các trận gần đây.',
-    CoachTopicReason.lowest => 'Bắt đầu với ${coachTopic(topic)}.',
-  };
+  static String coachRecReason(CoachTopicReason reason, CoachTopic topic) =>
+      switch (reason) {
+        CoachTopicReason.sameAsToday =>
+          'Cùng nhóm với gợi ý hôm nay: ${coachTopic(topic)}.',
+        CoachTopicReason.weakest =>
+          '${coachTopic(topic)} là nhóm yếu nhất có tình huống để luyện.',
+        CoachTopicReason.matchWeakness =>
+          '${coachTopic(topic)} đang yếu trong các trận gần đây.',
+        CoachTopicReason.lowest => 'Bắt đầu với ${coachTopic(topic)}.',
+      };
 
   static String coachTopicUnsupported(SkillCategory cat) =>
       'Chưa có tình huống cho nhóm ${skill(cat)}.';
@@ -2089,8 +2113,11 @@ abstract final class Vi {
       'Giải được $solved/$total tình huống gần nhất mà không xem đáp án.';
   static String coachRecNotEnough(int n, int min) =>
       'Mới làm $n tình huống — cần $min để nhận xét.';
-  static String coachRecRecurring(CoachFaultGroup group, int count, int total) =>
-      'Lỗi lặp lại: ${coachFaultGroup(group)} ($count/$total lần gần nhất).';
+  static String coachRecRecurring(
+    CoachFaultGroup group,
+    int count,
+    int total,
+  ) => 'Lỗi lặp lại: ${coachFaultGroup(group)} ($count/$total lần gần nhất).';
 
   static String coachFaultGroup(CoachFaultGroup g) => switch (g) {
     CoachFaultGroup.pocketChoice => 'chọn lỗ',
@@ -2104,10 +2131,12 @@ abstract final class Vi {
   static const coachRecToolSimulator = 'Tập chọn lỗ với Mô phỏng góc cắt';
   static const coachRecToolPlanner = 'Xem đường bi cái với Kế hoạch dọn bàn';
   static String coachRecToolArticle(String title) => 'Đọc: $title';
-  static String coachRecPractice(CoachTopic topic) => 'Luyện tình huống ${coachTopic(topic)}';
+  static String coachRecPractice(CoachTopic topic) =>
+      'Luyện tình huống ${coachTopic(topic)}';
 
   // Màn tình huống.
-  static String coachSituationTitle(CoachTopic topic) => 'Tình huống — ${coachTopic(topic)}';
+  static String coachSituationTitle(CoachTopic topic) =>
+      'Tình huống — ${coachTopic(topic)}';
   static String coachPrompt(int ball) =>
       'Tới lượt bạn. Bi phải chạm: bi $ball. Bạn đánh thế nào?';
   static const coachChoicePot = 'Ăn bi';
@@ -2123,11 +2152,13 @@ abstract final class Vi {
       'Xem đáp án ngay? Tình huống này sẽ tính là chưa tự giải.';
   static const coachShowAnswerYes = 'Xem';
   static const coachShowAnswerNo = 'Tự làm tiếp';
-  static const coachSameAnswer = 'Bạn vừa chọn đúng cú này — thử đổi một thông số.';
+  static const coachSameAnswer =
+      'Bạn vừa chọn đúng cú này — thử đổi một thông số.';
   static const coachNext = 'Tình huống mới';
   static String coachGenerateFailed(CoachTopic topic) =>
       'Chưa tạo được tình huống ${coachTopic(topic)} mới — đây là một tình huống trong thư viện.';
-  static String coachNoSituation(CoachTopic topic) => 'Chưa có tình huống ${coachTopic(topic)}.';
+  static String coachNoSituation(CoachTopic topic) =>
+      'Chưa có tình huống ${coachTopic(topic)}.';
   static const coachModelNote =
       'Chấm theo mô phỏng và cách chấm của Kế hoạch dọn bàn — bàn thật có thể khác.';
   static String coachTableSummary(int count, int ball) =>
@@ -2136,17 +2167,19 @@ abstract final class Vi {
 
   // Kết luận.
   static String coachVerdict(CoachVerdict v) => switch (v.outcome) {
-    CoachOutcome.best => 'Đạt — đúng cú tốt nhất theo cách chấm của Kế hoạch dọn bàn.',
-    CoachOutcome.equivalent => 'Đạt — gần bằng cú tốt nhất, chênh trong mức cho phép.',
-    CoachOutcome.better => v.noPlannerPot
-        ? 'Đạt — Kế hoạch dọn bàn không tìm được cú ăn ở lỗ dễ nhất; '
-              'theo mô phỏng, cú của bạn vào lỗ.'
-        : 'Đạt — Kế hoạch dọn bàn chỉ xét lỗ có góc cắt dễ nhất; '
-              'cú của bạn được chấm tốt hơn cú đó.',
+    CoachOutcome.best =>
+      'Đạt — đúng cú tốt nhất theo cách chấm của Kế hoạch dọn bàn.',
+    CoachOutcome.equivalent =>
+      'Đạt — gần bằng cú tốt nhất, chênh trong mức cho phép.',
+    CoachOutcome.better =>
+      v.noPlannerPot
+          ? 'Đạt — Kế hoạch dọn bàn không tìm được cú ăn ở lỗ dễ nhất; '
+                'theo mô phỏng, cú của bạn vào lỗ.'
+          : 'Đạt — Kế hoạch dọn bàn chỉ xét lỗ có góc cắt dễ nhất; '
+                'cú của bạn được chấm tốt hơn cú đó.',
     CoachOutcome.wrong => 'Chưa đạt.',
     CoachOutcome.undecided => switch (v.undecided!) {
-      CoachUndecidedReason.timeout =>
-        'Chưa đủ dữ liệu để chấm: không mô phỏng được cú bạn chọn. Lần này không tính.',
+      CoachUndecidedReason.timeout => 'Chưa đủ dữ liệu để chấm: không mô phỏng được cú bạn chọn. Lần này không tính.',
       CoachUndecidedReason.potVsSafety =>
         'Chưa đủ dữ liệu để chấm: có cú ăn nhưng vị trí sau đó không tốt, '
             'và Kế hoạch dọn bàn không so cú ăn với cú thủ.',
@@ -2157,7 +2190,8 @@ abstract final class Vi {
   static String coachHintOne(HintOne h) => switch (h) {
     HintPathBlocked(:final ball, :final pocket) =>
       'Từ bi cái, có đường thông tới bi ảo để đưa bi $ball vào lỗ ${simPocket(pocket)} không?',
-    HintTooThin(:final pocket) => 'Cắt vào lỗ ${simPocket(pocket)} có quá mỏng không?',
+    HintTooThin(:final pocket) =>
+      'Cắt vào lỗ ${simPocket(pocket)} có quá mỏng không?',
     HintGhostOff(:final pocket) =>
       'Bi ảo cho lỗ ${simPocket(pocket)} nằm ở đâu — bi cái có tới được chỗ đó không?',
     HintScratch(:final pocket) =>
@@ -2165,13 +2199,13 @@ abstract final class Vi {
           'Chuyện gì xảy ra ở lỗ ${simPocket(pocket)}?',
     HintMissed(:final ball, :final pocket) =>
       'Với cú này, bi $ball có vào lỗ ${simPocket(pocket)} không?',
-    HintBlocker(:final blocker) => 'Đường đi của cú này có lọt qua bi $blocker không?',
+    HintBlocker(:final blocker) =>
+      'Đường đi của cú này có lọt qua bi $blocker không?',
     HintNoNext(:final next) =>
       'Bi cái dừng ở vòng trắng. Từ đó, bi $next còn lỗ nào đánh được không?',
     HintPosition(:final next) =>
       'Bi cái dừng ở vòng trắng. Từ đó, đánh bi $next vào lỗ nào được, và có dễ không?',
-    HintSimpler() =>
-      'Bi cái tới được vị trí — có cách nào ít xoáy hơn hoặc lực nhẹ hơn mà vẫn tới đó không?',
+    HintSimpler() => 'Bi cái tới được vị trí — có cách nào ít xoáy hơn hoặc lực nhẹ hơn mà vẫn tới đó không?',
     HintShouldPot(:final ball) =>
       'Bi $ball thật sự không có lỗ nào đánh được sao? Nhìn lại từng lỗ trước khi chọn phòng thủ.',
   };
@@ -2180,13 +2214,15 @@ abstract final class Vi {
   static String coachHintTwo(HintTwo h) => switch (h) {
     Hint2Pocket(:final ball) => 'Thử lỗ khác cho bi $ball.',
     Hint2NoSpin() => 'Thử không áp phê.',
-    Hint2NeedSpin() => 'Không áp phê thì không cú nào ổn ở lỗ này — thử áp phê.',
+    Hint2NeedSpin() =>
+      'Không áp phê thì không cú nào ổn ở lỗ này — thử áp phê.',
     Hint2Spin() => 'Giữ lỗ và kiểu đánh, thử đổi áp phê.',
     Hint2Stroke() => 'Giữ lỗ này, thử đổi kiểu đánh.',
     Hint2PowerLess() => 'Giữ lỗ và kiểu đánh, thử lực nhẹ hơn.',
     Hint2PowerMore() => 'Giữ lỗ và kiểu đánh, thử lực mạnh hơn.',
     Hint2Pot(:final ball) => 'Bi $ball có cú ăn được — thử chọn Ăn bi.',
-    Hint2Safety(:final ball) => 'Bi $ball không có cú ăn chắc chắn — cân nhắc phòng thủ.',
+    Hint2Safety(:final ball) =>
+      'Bi $ball không có cú ăn chắc chắn — cân nhắc phòng thủ.',
   };
 
   static String coachHint2Zone(int next) =>
@@ -2195,11 +2231,17 @@ abstract final class Vi {
   // Đáp án.
   static const coachRevealTitle = 'Đáp án';
   static const coachSolutionTitle = 'Lời giải';
-  static String coachRevealShot(int ball, Pocket pocket, Stroke stroke, double power) =>
+  static String coachRevealShot(
+    int ball,
+    Pocket pocket,
+    Stroke stroke,
+    double power,
+  ) =>
       'Bi $ball vào lỗ ${simPocket(pocket)} — ${simStroke(stroke)}, lực ${power.round()}%.';
 
   /// Câu áp phê của đáp án: đúng câu mẫu SAWS của chủ sản phẩm.
-  static String coachRevealSpin(RevealSpin s) => sawsSpinAdvice(s.side, s.tips, s.bhe, s.speed);
+  static String coachRevealSpin(RevealSpin s) =>
+      sawsSpinAdvice(s.side, s.tips, s.bhe, s.speed);
 
   static const coachRevealWhy = 'Vì sao';
 
@@ -2216,7 +2258,8 @@ abstract final class Vi {
       'Cú của bạn: bi cái dừng ở vùng ${coachZoneWord(zone)} cho bi $next.',
     ReasonYourScratch(:final pocket) =>
       'Cú của bạn: bi cái rơi lỗ ${simPocket(pocket)} (chết cái).',
-    ReasonYourBlocked(:final blocker) => 'Cú của bạn: đường bi đi qua bi $blocker.',
+    ReasonYourBlocked(:final blocker) =>
+      'Cú của bạn: đường bi đi qua bi $blocker.',
     ReasonYourMissed(:final ball, :final pocket) =>
       'Cú của bạn: bi $ball không vào lỗ ${simPocket(pocket)}.',
     ReasonYourNoNext(:final next) =>

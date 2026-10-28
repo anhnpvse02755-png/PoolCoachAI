@@ -81,7 +81,9 @@ void main() {
     );
   });
 
-  Future<void> seedRankH(AppDatabase db) => db.into(db.playerRankRows).insert(
+  Future<void> seedRankH(AppDatabase db) => db
+      .into(db.playerRankRows)
+      .insert(
         toPlayerRankRow(
           PlayerRank(
             rank: Rank.h,
@@ -124,11 +126,20 @@ void main() {
     expect(find.text('Lên hạng: H → G'), findsOneWidget);
   });
 
-  testWidgets('mục tiêu lên 2 hạng: màn lộ trình vẽ bước mốc hạng không lỗi', (tester) async {
+  testWidgets('mục tiêu lên 2 hạng: màn lộ trình vẽ bước mốc hạng không lỗi', (
+    tester,
+  ) async {
     await open(
       tester,
       testContainer(
-        goal: goal(PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.f)),
+        goal: goal(
+          PlayerGoal(
+            goalId: 'g',
+            kind: GoalKind.lenHang,
+            createdAt: at,
+            targetRank: Rank.f,
+          ),
+        ),
         rank: PlayerRank(
           rank: Rank.h,
           source: RankSource.estimated,
@@ -143,7 +154,10 @@ void main() {
       200,
       scrollable: roadmapList,
     );
-    expect(find.text('Đạt ${buFloor(Rank.g)} điểm BU là lên hạng G.'), findsOneWidget);
+    expect(
+      find.text('Đạt ${buFloor(Rank.g)} điểm BU là lên hạng G.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -259,13 +273,31 @@ void main() {
       tester,
       testContainer(
         goal: goal(
-          PlayerGoal(goalId: 'g', kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick, createdAt: at),
+          PlayerGoal(
+            goalId: 'g',
+            kind: GoalKind.thuanThucKyNang,
+            category: SkillCategory.kick,
+            createdAt: at,
+          ),
         ),
-        achievements: [Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: at)],
+        achievements: [
+          Achievement(
+            kind: AchievementKind.chungNhan,
+            refId: 'd1',
+            achievedAt: at,
+          ),
+        ],
       ),
     );
-    final text = Vi.achievement(AchievementKind.chungNhan, 'Đường thẳng cơ bản');
-    await tester.scrollUntilVisible(find.text(text), 200, scrollable: roadmapList);
+    final text = Vi.achievement(
+      AchievementKind.chungNhan,
+      'Đường thẳng cơ bản',
+    );
+    await tester.scrollUntilVisible(
+      find.text(text),
+      200,
+      scrollable: roadmapList,
+    );
     expect(find.text(text), findsOneWidget);
   });
 
@@ -320,23 +352,26 @@ void main() {
     expect(find.text(Vi.roadmapMissedTitle), findsOneWidget);
   });
 
-  testWidgets('danh sách trận lỗi: Lộ trình báo lỗi đọc dữ liệu, không quay mãi', (
-    tester,
-  ) async {
-    await open(
-      tester,
-      testContainer(
-        goal: goal(PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at)),
-        rank: PlayerRank(
-          rank: Rank.h,
-          source: RankSource.estimated,
-          onboardingState: OnboardingState.done,
-          updatedAt: at,
+  testWidgets(
+    'danh sách trận lỗi: Lộ trình báo lỗi đọc dữ liệu, không quay mãi',
+    (tester) async {
+      await open(
+        tester,
+        testContainer(
+          goal: goal(
+            PlayerGoal(goalId: 'g', kind: GoalKind.lenHang, createdAt: at),
+          ),
+          rank: PlayerRank(
+            rank: Rank.h,
+            source: RankSource.estimated,
+            onboardingState: OnboardingState.done,
+            updatedAt: at,
+          ),
+          matchesStream: Stream.error(StateError('matches offline')),
         ),
-        matchesStream: Stream.error(StateError('matches offline')),
-      ),
-    );
-    expect(find.text(Vi.dataErrorTitle), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-  });
+      );
+      expect(find.text(Vi.dataErrorTitle), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    },
+  );
 }

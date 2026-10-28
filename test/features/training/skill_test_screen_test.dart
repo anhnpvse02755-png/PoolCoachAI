@@ -90,53 +90,64 @@ void main() {
     await tapText(tester, Vi.skillTestSubmit);
   }
 
-  testWidgets('chuẩn bị hiện điều kiện đo: kích thước bàn, các bước, tiêu chí', (
-    tester,
-  ) async {
-    await open(tester);
-    expect(find.text(Vi.skillTestTitle('Đường thẳng cơ bản')), findsOneWidget);
-    for (final s in TableSize.values) {
-      expect(find.text(Vi.buTableSize(s)), findsOneWidget);
-    }
-    expect(find.text('Bước 1'), findsOneWidget);
-    expect(find.text(Vi.skillTestCriterion(testDrills.single)), findsOneWidget);
-  });
+  testWidgets(
+    'chuẩn bị hiện điều kiện đo: kích thước bàn, các bước, tiêu chí',
+    (tester) async {
+      await open(tester);
+      expect(
+        find.text(Vi.skillTestTitle('Đường thẳng cơ bản')),
+        findsOneWidget,
+      );
+      for (final s in TableSize.values) {
+        expect(find.text(Vi.buTableSize(s)), findsOneWidget);
+      }
+      expect(find.text('Bước 1'), findsOneWidget);
+      expect(
+        find.text(Vi.skillTestCriterion(testDrills.single)),
+        findsOneWidget,
+      );
+    },
+  );
 
   // Review Focus 1: sau khi nộp, cổng thành AlreadyCertified mà kết quả vẫn ở lại.
-  testWidgets('đạt: chứng nhận kèm ngày, không có cấp tiếp theo; một dòng đủ cột', (
-    tester,
-  ) async {
-    await open(tester);
-    await start(tester, size: TableSize.eightFoot);
-    await enter(tester, '9', '10');
-    expect(
-      find.text(Vi.skillTestPassed('Đường thẳng cơ bản', 1)),
-      findsOneWidget,
-    );
-    expect(find.text(Vi.shortDate(testToday)), findsOneWidget);
-    expect(find.text(Vi.skillTestNoNextLevel), findsOneWidget);
-    expect(
-      find.text(
-        Vi.skillTestGateLine(AlreadyCertified(testToday), nameOf: (id) => id),
-      ),
-      findsNothing,
-    );
-    expect(find.text('Chấm theo tiêu chí: từ 80% số lần thử'), findsOneWidget);
-    final r = (await db.select(db.skillTestRows).get()).single;
-    expect(
-      [
-        r.drillId,
-        r.drillLevel,
-        r.tableSize,
-        r.score,
-        r.attempts,
-        r.passed,
-        r.startedAt,
-        r.completedAt,
-      ],
-      ['d1', 1, 'eightFoot', 9.0, 10, true, testToday, testToday],
-    );
-  });
+  testWidgets(
+    'đạt: chứng nhận kèm ngày, không có cấp tiếp theo; một dòng đủ cột',
+    (tester) async {
+      await open(tester);
+      await start(tester, size: TableSize.eightFoot);
+      await enter(tester, '9', '10');
+      expect(
+        find.text(Vi.skillTestPassed('Đường thẳng cơ bản', 1)),
+        findsOneWidget,
+      );
+      expect(find.text(Vi.shortDate(testToday)), findsOneWidget);
+      expect(find.text(Vi.skillTestNoNextLevel), findsOneWidget);
+      expect(
+        find.text(
+          Vi.skillTestGateLine(AlreadyCertified(testToday), nameOf: (id) => id),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.text('Chấm theo tiêu chí: từ 80% số lần thử'),
+        findsOneWidget,
+      );
+      final r = (await db.select(db.skillTestRows).get()).single;
+      expect(
+        [
+          r.drillId,
+          r.drillLevel,
+          r.tableSize,
+          r.score,
+          r.attempts,
+          r.passed,
+          r.startedAt,
+          r.completedAt,
+        ],
+        ['d1', 1, 'eightFoot', 9.0, 10, true, testToday, testToday],
+      );
+    },
+  );
 
   testWidgets('trượt: Chưa đạt 7/8, lời khuyên tại bàn và luật làm lại', (
     tester,
@@ -243,27 +254,27 @@ void main() {
     expect(find.byType(DrillDetailScreen), findsOneWidget);
     final rows = await db.select(db.skillTestRows).get();
     expect(rows, hasLength(1));
-    expect([rows.single.cancelledAt, rows.single.score, rows.single.passed], [
-      testToday,
-      null,
-      null,
-    ]);
+    expect(
+      [rows.single.cancelledAt, rows.single.score, rows.single.passed],
+      [testToday, null, null],
+    );
   });
 
-  testWidgets('đang nhập, bấm quay lại rồi bỏ qua hộp thoại: ở lại, không ghi', (
-    tester,
-  ) async {
-    await open(tester, pushed: true);
-    await start(tester);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(Vi.skillTestKeepGoing));
-    await tester.pumpAndSettle();
-    expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
-    expect(find.byType(SkillTestScreen), findsOneWidget);
-    expect(find.text(Vi.skillTestSubmit), findsOneWidget);
-    expect(await db.select(db.skillTestRows).get(), isEmpty);
-  });
+  testWidgets(
+    'đang nhập, bấm quay lại rồi bỏ qua hộp thoại: ở lại, không ghi',
+    (tester) async {
+      await open(tester, pushed: true);
+      await start(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Vi.skillTestKeepGoing));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
+      expect(find.byType(SkillTestScreen), findsOneWidget);
+      expect(find.text(Vi.skillTestSubmit), findsOneWidget);
+      expect(await db.select(db.skillTestRows).get(), isEmpty);
+    },
+  );
 
   testWidgets('chuẩn bị, bấm quay lại: thoát bình thường, không ghi', (
     tester,
@@ -276,19 +287,23 @@ void main() {
     expect(await db.select(db.skillTestRows).get(), isEmpty);
   });
 
-  testWidgets('đã có kết quả, bấm quay lại: thoát bình thường, không thêm dòng', (
-    tester,
-  ) async {
-    await open(tester, pushed: true);
-    await start(tester);
-    await enter(tester, '9', '10');
-    expect(find.text(Vi.skillTestPassed('Đường thẳng cơ bản', 1)), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
-    expect(find.byType(DrillDetailScreen), findsOneWidget);
-    expect(await db.select(db.skillTestRows).get(), hasLength(1));
-  });
+  testWidgets(
+    'đã có kết quả, bấm quay lại: thoát bình thường, không thêm dòng',
+    (tester) async {
+      await open(tester, pushed: true);
+      await start(tester);
+      await enter(tester, '9', '10');
+      expect(
+        find.text(Vi.skillTestPassed('Đường thẳng cơ bản', 1)),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.skillTestCancelConfirmTitle), findsNothing);
+      expect(find.byType(DrillDetailScreen), findsOneWidget);
+      expect(await db.select(db.skillTestRows).get(), hasLength(1));
+    },
+  );
 
   // S12: dấu phẩy thập phân.
   final target = stDrill('t2', SkillCategory.safety, 2, target: 25);
@@ -332,18 +347,19 @@ void main() {
     expect((await db.select(db.skillTestRows).get()).single.score, 27.5);
   });
 
-  testWidgets('bài theo số lần thử: số lần đạt "7,5" bị từ chối vì không nguyên', (
-    tester,
-  ) async {
-    await open(tester);
-    await start(tester);
-    await enter(tester, '7,5', '10');
-    expect(
-      find.text(Vi.skillTestInputError(SkillTestInputError.scoreNotWhole)),
-      findsOneWidget,
-    );
-    expect(await db.select(db.skillTestRows).get(), isEmpty);
-  });
+  testWidgets(
+    'bài theo số lần thử: số lần đạt "7,5" bị từ chối vì không nguyên',
+    (tester) async {
+      await open(tester);
+      await start(tester);
+      await enter(tester, '7,5', '10');
+      expect(
+        find.text(Vi.skillTestInputError(SkillTestInputError.scoreNotWhole)),
+        findsOneWidget,
+      );
+      expect(await db.select(db.skillTestRows).get(), isEmpty);
+    },
+  );
 
   testWidgets('bài theo số lần thử: số lần thử "10,5" bị từ chối', (
     tester,

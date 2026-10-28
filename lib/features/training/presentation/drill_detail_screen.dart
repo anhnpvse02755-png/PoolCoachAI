@@ -109,10 +109,7 @@ class DrillDetailScreen extends ConsumerWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 12,
-                        child: Text('${entry.$1 + 1}'),
-                      ),
+                      CircleAvatar(radius: 12, child: Text('${entry.$1 + 1}')),
                       const SizedBox(width: 8),
                       Expanded(child: Text(entry.$2)),
                     ],
@@ -153,9 +150,9 @@ class DrillDetailScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                ...history.reversed.take(_historyLength).map(
-                      (log) => _HistoryRow(drill: drill, log: log),
-                    ),
+                ...history.reversed
+                    .take(_historyLength)
+                    .map((log) => _HistoryRow(drill: drill, log: log)),
                 const SizedBox(height: 16),
               ],
               FilledButton.icon(
@@ -218,9 +215,7 @@ class _HistoryRow extends StatelessWidget {
       dense: true,
       leading: const Icon(Icons.history),
       title: Text(
-        ratio == null
-            ? Vi.drillRatioUnknown
-            : Vi.drillRatioPercent(ratio),
+        ratio == null ? Vi.drillRatioUnknown : Vi.drillRatioPercent(ratio),
       ),
       subtitle: Text(Vi.shortDate(log.date)),
     );

@@ -127,9 +127,8 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(Vi.sessionSaveFailed)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text(Vi.sessionSaveFailed)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -147,15 +146,13 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
         startedAt: _startedAt!,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(Vi.skillTestCancelled)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text(Vi.skillTestCancelled)));
       context.go(Routes.drill(widget.drillId));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(Vi.sessionSaveFailed)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text(Vi.sessionSaveFailed)));
       setState(() => _busy = false);
     }
   }
@@ -368,11 +365,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
       return Vi.sessionAttemptsRequired;
     }
     final attempts = int.tryParse(value);
-    final error = checkSkillTestInput(
-      drill,
-      score: 0,
-      attempts: attempts ?? 0,
-    );
+    final error = checkSkillTestInput(drill, score: 0, attempts: attempts ?? 0);
     return switch (error) {
       SkillTestInputError.attemptsRequired ||
       SkillTestInputError.attemptsInvalid => Vi.skillTestInputError(error!),

@@ -129,9 +129,8 @@ GoRouter createAppRouter({
                 ),
                 GoRoute(
                   path: 'skill-test/:id',
-                  builder: (context, state) => SkillTestScreen(
-                    drillId: state.pathParameters['id']!,
-                  ),
+                  builder: (context, state) =>
+                      SkillTestScreen(drillId: state.pathParameters['id']!),
                 ),
               ],
             ),

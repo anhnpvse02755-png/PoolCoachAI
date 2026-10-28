@@ -36,9 +36,7 @@ class SkillTestCard extends ConsumerWidget {
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            Vi.skillTestGateLine(gate, nameOf: (id) => names[id] ?? id),
-          ),
+          Text(Vi.skillTestGateLine(gate, nameOf: (id) => names[id] ?? id)),
           if (gate is SkillTestOpen) ...[
             const SizedBox(height: 12),
             FilledButton(
@@ -48,7 +46,11 @@ class SkillTestCard extends ConsumerWidget {
           ],
           if (gate is AlreadyCertified && cert != null) ...[
             // Tiêu chí và điều kiện đo lấy từ lần đạt, không phải bài hiện tại.
-            if (Vi.criterionSnapshot(cert.passThreshold, cert.target, drill.unit)
+            if (Vi.criterionSnapshot(
+                  cert.passThreshold,
+                  cert.target,
+                  drill.unit,
+                )
                 case final criterion?)
               Text(criterion, style: theme.textTheme.bodySmall),
             Text(

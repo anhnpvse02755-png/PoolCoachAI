@@ -128,8 +128,11 @@ ProviderContainer testContainer({
       if (coachChatTurnsAsync != null)
         coachChatTurnsProvider.overrideWithValue(coachChatTurnsAsync)
       else if (coachChatTurns != null)
-        coachChatTurnsProvider.overrideWith((ref) => Stream.value(coachChatTurns)),
-      if (coachContext != null) coachContextProvider.overrideWithValue(coachContext),
+        coachChatTurnsProvider.overrideWith(
+          (ref) => Stream.value(coachChatTurns),
+        ),
+      if (coachContext != null)
+        coachContextProvider.overrideWithValue(coachContext),
       nowProvider.overrideWithValue(() => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith(

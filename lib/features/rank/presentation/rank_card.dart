@@ -27,7 +27,9 @@ class RankCard extends ConsumerWidget {
     final now = ref.watch(nowProvider)();
     BuTest? last;
     for (final t in tests) {
-      if (t.isCompleted && (last == null || t.completedAt!.isAfter(last.completedAt!))) last = t;
+      if (t.isCompleted &&
+          (last == null || t.completedAt!.isAfter(last.completedAt!)))
+        last = t;
     }
     final from = retestAvailableFrom(tests);
     final hasRank = rank?.rank != null;
@@ -40,13 +42,21 @@ class RankCard extends ConsumerWidget {
           if (hasRank) RankBadgeLine(rank: rank!) else const Text(Vi.rankNone),
           if (rank?.warningRank != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(Vi.rankWarning(rank!.warningRank!),
-                style: const TextStyle(color: AppColors.warning)),
+            Text(
+              Vi.rankWarning(rank!.warningRank!),
+              style: const TextStyle(color: AppColors.warning),
+            ),
           ],
           const RankCheckLine(),
           if (last != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(Vi.rankLastTest(last.completedAt!, last.totalScore!, last.resultRank!)),
+            Text(
+              Vi.rankLastTest(
+                last.completedAt!,
+                last.totalScore!,
+                last.resultRank!,
+              ),
+            ),
           ],
           if (from != null && now.isBefore(from)) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -98,15 +108,26 @@ class TestHistoryList extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(Vi.rankHistoryTitle, style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          Vi.rankHistoryTitle,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         if (tests.isEmpty) const Text(Vi.rankHistoryEmpty),
         for (final t in tests)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(t.isCompleted ? Icons.verified_outlined : Icons.cancel_outlined),
-            title: Text(t.isCompleted
-                ? Vi.rankHistoryCompleted(t.completedAt!, t.totalScore!, t.resultRank!)
-                : Vi.rankHistoryCancelled(t.cancelledAt!)),
+            leading: Icon(
+              t.isCompleted ? Icons.verified_outlined : Icons.cancel_outlined,
+            ),
+            title: Text(
+              t.isCompleted
+                  ? Vi.rankHistoryCompleted(
+                      t.completedAt!,
+                      t.totalScore!,
+                      t.resultRank!,
+                    )
+                  : Vi.rankHistoryCancelled(t.cancelledAt!),
+            ),
           ),
       ],
     );
@@ -172,8 +193,14 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
         final texts = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(Vi.homeRankCardTitle, style: Theme.of(context).textTheme.titleSmall),
-            Text(Vi.homeRankCardBody, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              Vi.homeRankCardTitle,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            Text(
+              Vi.homeRankCardBody,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         );
         final button = FilledButton(
@@ -194,7 +221,8 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
         label.dispose();
         const buttonPadding = 48.0;
         const minTextWidth = 72.0;
-        final fitsInRow = labelWidth + buttonPadding + AppSpacing.sm + minTextWidth <=
+        final fitsInRow =
+            labelWidth + buttonPadding + AppSpacing.sm + minTextWidth <=
             box.maxWidth;
         if (fitsInRow) {
           return Row(
@@ -214,6 +242,7 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
           ],
         );
       },
-    );;
+    );
+    ;
   }
 }

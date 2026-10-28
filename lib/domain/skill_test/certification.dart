@@ -71,7 +71,9 @@ bool _earlier(SkillTest a, SkillTest b) {
 
 /// Các bài cùng nhóm ở cấp nhỏ nhất lớn hơn cấp của [drill], xếp theo id.
 List<Drill> nextLevelDrills(Drill drill, List<Drill> drills) {
-  final higher = drills.where((d) => d.cat == drill.cat && d.level > drill.level);
+  final higher = drills.where(
+    (d) => d.cat == drill.cat && d.level > drill.level,
+  );
   if (higher.isEmpty) return const [];
   final next = higher.map((d) => d.level).reduce((a, b) => a < b ? a : b);
   return higher.where((d) => d.level == next).toList()

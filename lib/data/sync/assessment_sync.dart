@@ -116,7 +116,8 @@ class AssessmentSyncService {
     void failed() {
       // Đã lấy được hạng trong lượt này thì giữ kết quả đó: việc kéo bài
       // kiểm tra hỏng sau đó không làm onboarding đổi ý.
-      if (!rankFetched && _stillSignedInAs(userId)) _onRankFetch(userId, RankFetch.failed);
+      if (!rankFetched && _stillSignedInAs(userId))
+        _onRankFetch(userId, RankFetch.failed);
     }
 
     try {
@@ -152,9 +153,9 @@ class AssessmentSyncService {
   }
 
   bool _stillSignedInAs(String userId) => switch (_auth.current) {
-        SignedIn(userId: final id) => id == userId,
-        SignedOut() => false,
-      };
+    SignedIn(userId: final id) => id == userId,
+    SignedOut() => false,
+  };
 
   Future<String> _tokenFor(String userId) async {
     final token = await _auth.accessToken();
@@ -166,7 +167,11 @@ class AssessmentSyncService {
     if (_disposed) throw const _Stopped();
   }
 
-  Future<void> _create(String path, Map<String, Object?> body, String userId) async {
+  Future<void> _create(
+    String path,
+    Map<String, Object?> body,
+    String userId,
+  ) async {
     final token = await _tokenFor(userId);
     try {
       await _api.post(path, token: token, body: body);
@@ -180,23 +185,27 @@ class AssessmentSyncService {
   /// (D10 của kế hoạch). Kết quả trước, lần kiểm tra sau: lần đã đánh dấu
   /// đồng bộ thì chắc chắn đủ kết quả trên server.
   Future<void> _pushFinishedTests(String userId) async {
-    final tests = await (_db.select(_db.buTestRows)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.syncedAt.isNull() &
-              (t.completedAt.isNotNull() | t.cancelledAt.isNotNull()))
-          ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
-        .get();
+    final tests =
+        await (_db.select(_db.buTestRows)
+              ..where(
+                (t) =>
+                    t.userId.equals(userId) &
+                    t.syncedAt.isNull() &
+                    (t.completedAt.isNotNull() | t.cancelledAt.isNotNull()),
+              )
+              ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
+            .get();
     for (final test in tests) {
       if (_rejected.contains(test.id)) continue;
       _checkAlive();
       try {
-        final results = await (_db.select(_db.buDrillResultRows)
-              ..where((r) => r.testId.equals(test.id) & r.syncedAt.isNull()))
-            .get();
+        final results = await (_db.select(
+          _db.buDrillResultRows,
+        )..where((r) => r.testId.equals(test.id) & r.syncedAt.isNull())).get();
         for (final r in results) {
           await _create('/items/bu_drill_results', toRemoteResult(r), userId);
-          await (_db.update(_db.buDrillResultRows)..where((x) => x.id.equals(r.id)))
+          await (_db.update(_db.buDrillResultRows)
+                ..where((x) => x.id.equals(r.id)))
               .write(BuDrillResultRowsCompanion(syncedAt: Value(_now())));
         }
         await _create('/items/bu_tests', toRemoteTest(test), userId);
@@ -215,10 +224,11 @@ class AssessmentSyncService {
   /// Lần Skill Test đã xong (đạt, trượt hoặc huỷ) lên server. Chỉ thêm: máy
   /// chủ không cho sửa hay xoá, id đã có thì coi là đã lên.
   Future<void> _pushSkillTests(String userId) async {
-    final rows = await (_db.select(_db.skillTestRows)
-          ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
-        .get();
+    final rows =
+        await (_db.select(_db.skillTestRows)
+              ..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
+            .get();
     for (final row in rows) {
       if (_rejected.contains(row.id)) continue;
       _checkAlive();
@@ -240,29 +250,37 @@ class AssessmentSyncService {
   /// ghi bản thắng về phía còn thiếu. Trả về server có dòng hạng hay không.
   Future<bool> _syncRank(String userId) async {
     final token = await _tokenFor(userId);
-    final items = await _api.get('/items/player_ranks',
-        token: token, query: {'limit': '1', 'fields': remoteRankFields}) as List<Object?>;
+    final items = await _api.get(
+      '/items/player_ranks',
+      token: token,
+      query: {'limit': '1', 'fields': remoteRankFields},
+    ) as List<Object?>;
     _checkAlive();
     if (!_stillSignedInAs(userId)) throw const _UserChanged();
-    final remoteJson = items.isEmpty ? null : items.first! as Map<String, Object?>;
+    final remoteJson = items.isEmpty
+        ? null
+        : items.first! as Map<String, Object?>;
     final remote = remoteJson == null ? null : rankFromRemote(remoteJson);
 
-    var localRow = await (_db.select(_db.playerRankRows)
-          ..where((t) => t.userId.equals(userId)))
-        .getSingleOrNull();
+    var localRow = await (_db.select(
+      _db.playerRankRows,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
     final local = localRow == null ? null : toPlayerRank(localRow);
     final picked = mergeRank(local, remote);
     if (picked == null) return false;
-    final winner = warnOfLowerTest(picked, identical(picked, remote) ? local : remote);
+    final winner = warnOfLowerTest(
+      picked,
+      identical(picked, remote) ? local : remote,
+    );
 
     if (!identical(winner, picked)) {
       // Bản gộp mới: hạng của bên thắng + cảnh báo từ lần kiểm chứng thấp
       // hơn bên thua (D4, chủ sản phẩm chọn). Ghi xuống máy như một thay đổi
       // chưa đồng bộ rồi đẩy lên như mọi thay đổi khác.
       final wrote = await _db.transaction(() async {
-        final fresh = await (_db.select(_db.playerRankRows)
-              ..where((t) => t.userId.equals(userId)))
-            .getSingleOrNull();
+        final fresh = await (_db.select(
+          _db.playerRankRows,
+        )..where((t) => t.userId.equals(userId))).getSingleOrNull();
         // Người chơi vừa đổi hạng trên máy trong lúc chờ server: lượt sau
         // xét lại từ đầu, không ghi đè mù.
         if (fresh?.updatedAt != localRow?.updatedAt) return false;
@@ -275,20 +293,26 @@ class AssessmentSyncService {
         _again = true;
         return remoteJson != null;
       }
-      localRow = await (_db.select(_db.playerRankRows)
-            ..where((t) => t.userId.equals(userId)))
-          .getSingle();
+      localRow = await (_db.select(
+        _db.playerRankRows,
+      )..where((t) => t.userId.equals(userId))).getSingle();
     } else if (identical(winner, remote)) {
       // Gộp lại trong transaction: người chơi vừa đổi hạng trên máy trong
       // lúc chờ server thì bản mới đó được xét lại, không bị ghi đè mù.
       await _db.transaction(() async {
-        final fresh = await (_db.select(_db.playerRankRows)
-              ..where((t) => t.userId.equals(userId)))
-            .getSingleOrNull();
-        final again = mergeRank(fresh == null ? null : toPlayerRank(fresh), remote);
+        final fresh = await (_db.select(
+          _db.playerRankRows,
+        )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+        final again = mergeRank(
+          fresh == null ? null : toPlayerRank(fresh),
+          remote,
+        );
         if (identical(again, remote)) {
-          await _db.into(_db.playerRankRows).insertOnConflictUpdate(
-              toPlayerRankRow(remote!, userId: userId, syncedAt: _now()));
+          await _db
+              .into(_db.playerRankRows)
+              .insertOnConflictUpdate(
+                toPlayerRankRow(remote!, userId: userId, syncedAt: _now()),
+              );
         }
       });
       return true;
@@ -305,8 +329,9 @@ class AssessmentSyncService {
       await _api.patch('/items/player_ranks/$userId', token: t, body: body);
       _checkAlive();
     }
-    await (_db.update(_db.playerRankRows)
-          ..where((r) => r.userId.equals(userId) & r.updatedAt.equals(row.updatedAt)))
+    await (_db.update(_db.playerRankRows)..where(
+          (r) => r.userId.equals(userId) & r.updatedAt.equals(row.updatedAt),
+        ))
         .write(PlayerRankRowsCompanion(syncedAt: Value(_now())));
     return remoteJson != null;
   }
@@ -314,23 +339,37 @@ class AssessmentSyncService {
   /// Lần kiểm tra trên server đều đã xong và không đổi nữa: ghi đè an toàn.
   Future<void> _pullTests(String userId) async {
     final token = await _tokenFor(userId);
-    final tests = await _api.get('/items/bu_tests',
-        token: token, query: {'limit': '-1', 'fields': remoteTestFields}) as List<Object?>;
-    final results = await _api.get('/items/bu_drill_results',
-        token: token, query: {'limit': '-1', 'fields': remoteResultFields}) as List<Object?>;
+    final tests = await _api.get(
+      '/items/bu_tests',
+      token: token,
+      query: {'limit': '-1', 'fields': remoteTestFields},
+    ) as List<Object?>;
+    final results = await _api.get(
+      '/items/bu_drill_results',
+      token: token,
+      query: {'limit': '-1', 'fields': remoteResultFields},
+    ) as List<Object?>;
     _checkAlive();
     if (!_stillSignedInAs(userId)) throw const _UserChanged();
     final at = _now();
     await _db.batch((batch) {
       for (final t in tests) {
-        batch.insert(_db.buTestRows,
-            fromRemoteTest(t! as Map<String, Object?>, userId: userId, syncedAt: at),
-            mode: InsertMode.insertOrReplace);
+        batch.insert(
+          _db.buTestRows,
+          fromRemoteTest(
+            t! as Map<String, Object?>,
+            userId: userId,
+            syncedAt: at,
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
       }
       for (final r in results) {
-        batch.insert(_db.buDrillResultRows,
-            fromRemoteResult(r! as Map<String, Object?>, syncedAt: at),
-            mode: InsertMode.insertOrReplace);
+        batch.insert(
+          _db.buDrillResultRows,
+          fromRemoteResult(r! as Map<String, Object?>, syncedAt: at),
+          mode: InsertMode.insertOrReplace,
+        );
       }
     });
   }
@@ -339,9 +378,11 @@ class AssessmentSyncService {
   /// chủ không dùng được (dữ liệu lạ) bị bỏ, không làm hỏng cả lượt.
   Future<void> _pullSkillTests(String userId) async {
     final token = await _tokenFor(userId);
-    final items = await _api.get('/items/skill_tests',
-        token: token,
-        query: {'limit': '-1', 'fields': remoteSkillTestFields}) as List<Object?>;
+    final items = await _api.get(
+      '/items/skill_tests',
+      token: token,
+      query: {'limit': '-1', 'fields': remoteSkillTestFields},
+    ) as List<Object?>;
     _checkAlive();
     if (!_stillSignedInAs(userId)) throw const _UserChanged();
     final at = _now();

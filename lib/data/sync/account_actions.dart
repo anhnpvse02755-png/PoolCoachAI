@@ -151,10 +151,9 @@ Future<int> pendingCoachCount(AppDatabase db, String userId) async {
 }
 
 Future<int> pendingCueEquipmentCount(AppDatabase db, String userId) async {
-  final rows = await (db.select(db.cueEquipmentRows)..where(
-        (t) => t.userId.equals(userId) & t.syncedAt.isNull(),
-      ))
-      .get();
+  final rows = await (db.select(
+    db.cueEquipmentRows,
+  )..where((t) => t.userId.equals(userId) & t.syncedAt.isNull())).get();
   return rows.length;
 }
 

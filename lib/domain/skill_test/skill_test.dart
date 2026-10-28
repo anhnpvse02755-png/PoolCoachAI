@@ -38,18 +38,18 @@ final class SkillTest {
     this.notes,
     this.passThreshold,
     this.target,
-  })  : assert(
-          passThreshold == null || target == null,
-          'SkillTest takes passThreshold or target, never both',
-        ),
-        assert(
-          completedAt == null ||
-              cancelledAt != null ||
-              score == null ||
-              passThreshold != null ||
-              target != null,
-          'A completed SkillTest with a result needs passThreshold or target',
-        );
+  }) : assert(
+         passThreshold == null || target == null,
+         'SkillTest takes passThreshold or target, never both',
+       ),
+       assert(
+         completedAt == null ||
+             cancelledAt != null ||
+             score == null ||
+             passThreshold != null ||
+             target != null,
+         'A completed SkillTest with a result needs passThreshold or target',
+       );
 
   final String id;
   final String drillId;
@@ -101,20 +101,20 @@ final class SkillTest {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        drillId,
-        drillLevel,
-        tableSize,
-        startedAt,
-        completedAt,
-        cancelledAt,
-        score,
-        attempts,
-        passed,
-        notes,
-        passThreshold,
-        target,
-      );
+    id,
+    drillId,
+    drillLevel,
+    tableSize,
+    startedAt,
+    completedAt,
+    cancelledAt,
+    score,
+    attempts,
+    passed,
+    notes,
+    passThreshold,
+    target,
+  );
 }
 
 enum SkillTestInputError {

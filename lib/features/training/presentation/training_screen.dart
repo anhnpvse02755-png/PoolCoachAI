@@ -82,7 +82,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
     // Chỉ tin nguồn đã qua cổng: đang tải hay lỗi thì không gắn huy hiệu nào.
     final certifications = ref.watch(certificationsProvider);
     final certifiedIds = switch (certifications) {
-      AsyncData(:final value) when !certifications.isLoading => value.keys.toSet(),
+      AsyncData(:final value) when !certifications.isLoading =>
+        value.keys.toSet(),
       _ => const <String>{},
     };
 
@@ -218,7 +219,8 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                       final result = latest[drill.id] ?? const _NeverTrained();
                       final drillLogs =
                           logsByDrill[drill.id] ?? const <DrillLog>[];
-                      final passCount = logsAsync.hasValue && drillLogs.isNotEmpty
+                      final passCount =
+                          logsAsync.hasValue && drillLogs.isNotEmpty
                           ? consecutivePassCount(drill, drillLogs)
                           : null;
 

@@ -64,61 +64,64 @@ final class SkillTestDrillState {
   }
 }
 
-final certificationsProvider =
-    Provider<AsyncValue<Map<String, Certification>>>((ref) {
-  final tests = ref.watch(skillTestsProvider);
-  final blocked = gate<Map<String, Certification>>([tests]);
-  if (blocked != null) return blocked;
-  return AsyncData(certificationsOf(tests.value!));
-});
+final certificationsProvider = Provider<AsyncValue<Map<String, Certification>>>(
+  (ref) {
+    final tests = ref.watch(skillTestsProvider);
+    final blocked = gate<Map<String, Certification>>([tests]);
+    if (blocked != null) return blocked;
+    return AsyncData(certificationsOf(tests.value!));
+  },
+);
 
 /// Null khi mã bài không có trong thư viện.
 final skillTestGateProvider =
     Provider.family<AsyncValue<SkillTestDrillState?>, String>((ref, drillId) {
-  final drills = ref.watch(drillsProvider);
-  final logs = ref.watch(drillLogsProvider);
-  final tests = ref.watch(skillTestsProvider);
-  final blocked = gate<SkillTestDrillState?>([drills, logs, tests]);
-  if (blocked != null) return blocked;
+      final drills = ref.watch(drillsProvider);
+      final logs = ref.watch(drillLogsProvider);
+      final tests = ref.watch(skillTestsProvider);
+      final blocked = gate<SkillTestDrillState?>([drills, logs, tests]);
+      if (blocked != null) return blocked;
 
-  final drill = drills.value!.where((d) => d.id == drillId).firstOrNull;
-  if (drill == null) return const AsyncData(null);
-  final own = [
-    for (final l in logs.value!)
-      if (l.drillId == drillId) l,
-  ];
-  final result = skillTestGate(
-    drill: drill,
-    drills: drills.value!,
-    logs: logs.value!,
-    tests: tests.value!,
-  );
-  return AsyncData(
-    SkillTestDrillState(
-      drill: drill,
-      gate: result,
-      formSlipped: result is AlreadyCertified && recentFormSlipped(drill, own),
-      drills: drills.value!,
-      logs: own,
-    ),
-  );
-});
+      final drill = drills.value!.where((d) => d.id == drillId).firstOrNull;
+      if (drill == null) return const AsyncData(null);
+      final own = [
+        for (final l in logs.value!)
+          if (l.drillId == drillId) l,
+      ];
+      final result = skillTestGate(
+        drill: drill,
+        drills: drills.value!,
+        logs: logs.value!,
+        tests: tests.value!,
+      );
+      return AsyncData(
+        SkillTestDrillState(
+          drill: drill,
+          gate: result,
+          formSlipped:
+              result is AlreadyCertified && recentFormSlipped(drill, own),
+          drills: drills.value!,
+          logs: own,
+        ),
+      );
+    });
 
-final certificationSummaryProvider =
-    Provider<AsyncValue<CertificationSummary>>((ref) {
-  final drills = ref.watch(drillsProvider);
-  final logs = ref.watch(drillLogsProvider);
-  final tests = ref.watch(skillTestsProvider);
-  final blocked = gate<CertificationSummary>([drills, logs, tests]);
-  if (blocked != null) return blocked;
-  return AsyncData(
-    certificationSummary(
-      drills: drills.value!,
-      logs: logs.value!,
-      tests: tests.value!,
-    ),
-  );
-});
+final certificationSummaryProvider = Provider<AsyncValue<CertificationSummary>>(
+  (ref) {
+    final drills = ref.watch(drillsProvider);
+    final logs = ref.watch(drillLogsProvider);
+    final tests = ref.watch(skillTestsProvider);
+    final blocked = gate<CertificationSummary>([drills, logs, tests]);
+    if (blocked != null) return blocked;
+    return AsyncData(
+      certificationSummary(
+        drills: drills.value!,
+        logs: logs.value!,
+        tests: tests.value!,
+      ),
+    );
+  },
+);
 
 final testableDrillIdsProvider = Provider<AsyncValue<List<String>>>((ref) {
   final drills = ref.watch(drillsProvider);

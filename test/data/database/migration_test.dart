@@ -510,7 +510,9 @@ void main() {
   test('tạo mới ở v14 ghi và đọc được hạng đích', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
-    await db.into(db.playerGoalRows).insert(
+    await db
+        .into(db.playerGoalRows)
+        .insert(
           PlayerGoalRowsCompanion.insert(
             userId: 'u1',
             updatedAt: DateTime(2026, 10, 28),
@@ -522,31 +524,58 @@ void main() {
     expect(row.targetRank, 'd');
   });
 
-  test('nâng từ v14 lên v15 thêm bảng lần kiểm tra kỹ năng, giữ nguyên thành tích', () async {
-    final executor = NativeDatabase.memory(setup: (raw) {
-      _createV14AchievementTable(raw);
-      raw.execute("INSERT INTO achievement_rows VALUES ('ach1', 'u1', 'chuoiNgay', '7', 1760400000, NULL);");
-      raw.execute('PRAGMA user_version = 14;');
-    });
-    final db = AppDatabase.forTesting(executor);
-    addTearDown(db.close);
-    expect(db.schemaVersion, 15);
-    final kept = (await db.select(db.achievementRows).get()).single;
-    expect([kept.id, kept.kind, kept.refId, kept.syncedAt], ['ach1', 'chuoiNgay', '7', null]);
-    expect(await db.select(db.skillTestRows).get(), isEmpty);
-    final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.read<int>('user_version'), 15);
-    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, DateTime(2026, 10, 28, 10)), userId: 'u1'));
-    final row = await db.select(db.skillTestRows).getSingle();
-    expect([row.passed, row.passThreshold, row.target], [true, 0.8, null]);
-  });
+  test(
+    'nâng từ v14 lên v15 thêm bảng lần kiểm tra kỹ năng, giữ nguyên thành tích',
+    () async {
+      final executor = NativeDatabase.memory(
+        setup: (raw) {
+          _createV14AchievementTable(raw);
+          raw.execute(
+            "INSERT INTO achievement_rows VALUES ('ach1', 'u1', 'chuoiNgay', '7', 1760400000, NULL);",
+          );
+          raw.execute('PRAGMA user_version = 14;');
+        },
+      );
+      final db = AppDatabase.forTesting(executor);
+      addTearDown(db.close);
+      expect(db.schemaVersion, 15);
+      final kept = (await db.select(db.achievementRows).get()).single;
+      expect(
+        [kept.id, kept.kind, kept.refId, kept.syncedAt],
+        ['ach1', 'chuoiNgay', '7', null],
+      );
+      expect(await db.select(db.skillTestRows).get(), isEmpty);
+      final version = await db.customSelect('PRAGMA user_version').getSingle();
+      expect(version.read<int>('user_version'), 15);
+      await db
+          .into(db.skillTestRows)
+          .insert(
+            toSkillTestRow(
+              passedTest('a1', 1, DateTime(2026, 10, 28, 10)),
+              userId: 'u1',
+            ),
+          );
+      final row = await db.select(db.skillTestRows).getSingle();
+      expect([row.passed, row.passThreshold, row.target], [true, 0.8, null]);
+    },
+  );
 
   test('tạo mới ở v15 ghi và đọc được lần kiểm tra kỹ năng đã huỷ', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
-    await db.into(db.skillTestRows).insert(toSkillTestRow(cancelledTest('a1', 1, DateTime(2026, 10, 28, 10)), userId: 'u1'));
+    await db
+        .into(db.skillTestRows)
+        .insert(
+          toSkillTestRow(
+            cancelledTest('a1', 1, DateTime(2026, 10, 28, 10)),
+            userId: 'u1',
+          ),
+        );
     final row = await db.select(db.skillTestRows).getSingle();
-    expect([row.cancelledAt, row.completedAt, row.score, row.passed], [DateTime(2026, 10, 28, 10), null, null, null]);
+    expect(
+      [row.cancelledAt, row.completedAt, row.score, row.passed],
+      [DateTime(2026, 10, 28, 10), null, null, null],
+    );
   });
 }
 
@@ -616,7 +645,9 @@ void _createV13PlayerGoalTable(dynamic raw) {
 
 /// Bảng thành tích đúng hình dạng v14 (có từ v4).
 void _createV14AchievementTable(dynamic raw) {
-  raw.execute('CREATE TABLE achievement_rows (id TEXT NOT NULL, user_id TEXT NOT NULL, kind TEXT NOT NULL, '
-      'ref_id TEXT NOT NULL, achieved_at INTEGER NOT NULL, synced_at INTEGER NULL, '
-      'PRIMARY KEY (id), UNIQUE (user_id, kind, ref_id));');
+  raw.execute(
+    'CREATE TABLE achievement_rows (id TEXT NOT NULL, user_id TEXT NOT NULL, kind TEXT NOT NULL, '
+    'ref_id TEXT NOT NULL, achieved_at INTEGER NOT NULL, synced_at INTEGER NULL, '
+    'PRIMARY KEY (id), UNIQUE (user_id, kind, ref_id));',
+  );
 }

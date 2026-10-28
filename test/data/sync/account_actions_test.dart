@@ -92,72 +92,81 @@ void main() {
     },
   );
 
-  test(
-    'đếm trận, buổi tập tự do và lịch chưa đồng bộ của đúng tài khoản, bỏ dòng mồ côi',
-    () async {
-      final at = DateTime(2026, 10, 21);
-      await db.into(db.poolMatchRows).insert(
-        PoolMatchRowsCompanion.insert(
-          id: 'm1',
-          userId: 'u1',
-          gameType: 'nineBall',
-          playerName: 'An',
-          opponentName: 'Bình',
-          targetRacks: 3,
-          rackWinners: '[]',
-          startedAt: at,
-        ),
-      );
-      await db.into(db.poolMatchRows).insert(
-        PoolMatchRowsCompanion.insert(
-          id: 'm-synced',
-          userId: 'u1',
-          gameType: 'nineBall',
-          playerName: 'An',
-          opponentName: 'Bình',
-          targetRacks: 3,
-          rackWinners: '[]',
-          startedAt: at,
-          syncedAt: Value(at),
-        ),
-      );
-      await db.into(db.timerSessionRows).insert(
-        TimerSessionRowsCompanion.insert(
-          id: 't1',
-          userId: const Value('u1'),
-          date: at,
-          durationSec: 60,
-        ),
-      );
-      await db.into(db.timerSessionRows).insert(
-        TimerSessionRowsCompanion.insert(
-          id: 't-orphan',
-          date: at,
-          durationSec: 60,
-        ),
-      );
-      await db.into(db.scheduleSlotRows).insert(
-        ScheduleSlotRowsCompanion.insert(
-          id: 's1',
-          userId: const Value('u1'),
-          day: 0,
-          time: '19:00',
-          label: 'Tập',
-        ),
-      );
-      await db.into(db.scheduleSlotRows).insert(
-        ScheduleSlotRowsCompanion.insert(
-          id: 's-u2',
-          userId: const Value('u2'),
-          day: 0,
-          time: '19:00',
-          label: 'Người khác',
-        ),
-      );
+  test('đếm trận, buổi tập tự do và lịch chưa đồng bộ của đúng tài khoản, bỏ dòng mồ côi', () async {
+    final at = DateTime(2026, 10, 21);
+    await db
+        .into(db.poolMatchRows)
+        .insert(
+          PoolMatchRowsCompanion.insert(
+            id: 'm1',
+            userId: 'u1',
+            gameType: 'nineBall',
+            playerName: 'An',
+            opponentName: 'Bình',
+            targetRacks: 3,
+            rackWinners: '[]',
+            startedAt: at,
+          ),
+        );
+    await db
+        .into(db.poolMatchRows)
+        .insert(
+          PoolMatchRowsCompanion.insert(
+            id: 'm-synced',
+            userId: 'u1',
+            gameType: 'nineBall',
+            playerName: 'An',
+            opponentName: 'Bình',
+            targetRacks: 3,
+            rackWinners: '[]',
+            startedAt: at,
+            syncedAt: Value(at),
+          ),
+        );
+    await db
+        .into(db.timerSessionRows)
+        .insert(
+          TimerSessionRowsCompanion.insert(
+            id: 't1',
+            userId: const Value('u1'),
+            date: at,
+            durationSec: 60,
+          ),
+        );
+    await db
+        .into(db.timerSessionRows)
+        .insert(
+          TimerSessionRowsCompanion.insert(
+            id: 't-orphan',
+            date: at,
+            durationSec: 60,
+          ),
+        );
+    await db
+        .into(db.scheduleSlotRows)
+        .insert(
+          ScheduleSlotRowsCompanion.insert(
+            id: 's1',
+            userId: const Value('u1'),
+            day: 0,
+            time: '19:00',
+            label: 'Tập',
+          ),
+        );
+    await db
+        .into(db.scheduleSlotRows)
+        .insert(
+          ScheduleSlotRowsCompanion.insert(
+            id: 's-u2',
+            userId: const Value('u2'),
+            day: 0,
+            time: '19:00',
+            label: 'Người khác',
+          ),
+        );
 
-      expect(await pendingPracticeCount(db, 'u1'), 3);
-    },
-  );
+    expect(await pendingPracticeCount(db, 'u1'), 3);
+  });
 
   test('bấm Đăng xuất thì xoá buổi của người đó, giữ của người khác', () async {
     final auth = FakeAuthRepository.signedIn(userId: 'u1');
@@ -242,7 +251,12 @@ void main() {
           ),
         );
 
-    await signOutAndForget(db: db, auth: auth, userId: 'u1', forgetChatInFlight: (_) {});
+    await signOutAndForget(
+      db: db,
+      auth: auth,
+      userId: 'u1',
+      forgetChatInFlight: (_) {},
+    );
 
     final left = await db.select(db.drillLogRows).get();
     expect(left.map((r) => r.id), ['c']);
@@ -304,7 +318,12 @@ void main() {
       await pumpEventQueue();
       expect(server.sent('GET', '/items/drill_logs'), hasLength(1));
 
-      final signingOut = signOutAndForget(db: db, auth: auth, userId: 'u1', forgetChatInFlight: (_) {});
+      final signingOut = signOutAndForget(
+        db: db,
+        auth: auth,
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+      );
       await pumpEventQueue();
       pullGate.complete(); // server trả dữ liệu của người vừa đăng xuất
       await pass;
@@ -487,22 +506,70 @@ void main() {
         answeredAt: at,
       );
     }
-    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
-    expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), ['u2', 'u2']);
+    await signOutAndForget(
+      db: db,
+      auth: FakeAuthRepository.signedIn(),
+      userId: 'u1',
+      forgetChatInFlight: (_) {},
+    );
+    expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), [
+      'u2',
+      'u2',
+    ]);
   });
 
-  test('đăng xuất xoá lần kiểm tra kỹ năng của người đó, giữ của người khác', () async {
-    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u1'), userId: 'u1'));
-    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u2'), userId: 'u2'));
-    await signOutAndForget(db: db, auth: FakeAuthRepository.signedIn(), userId: 'u1', forgetChatInFlight: (_) {});
-    expect((await db.select(db.skillTestRows).get()).map((r) => r.id), ['st-u2']);
-  });
+  test(
+    'đăng xuất xoá lần kiểm tra kỹ năng của người đó, giữ của người khác',
+    () async {
+      await db
+          .into(db.skillTestRows)
+          .insert(
+            toSkillTestRow(
+              passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u1'),
+              userId: 'u1',
+            ),
+          );
+      await db
+          .into(db.skillTestRows)
+          .insert(
+            toSkillTestRow(
+              passedTest('a1', 1, DateTime(2026, 10, 28, 10), id: 'st-u2'),
+              userId: 'u2',
+            ),
+          );
+      await signOutAndForget(
+        db: db,
+        auth: FakeAuthRepository.signedIn(),
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+      );
+      expect((await db.select(db.skillTestRows).get()).map((r) => r.id), [
+        'st-u2',
+      ]);
+    },
+  );
 
   test('lần kiểm tra kỹ năng chưa đồng bộ tính vào phần đánh giá', () async {
     final at = DateTime(2026, 10, 28, 10);
-    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, at, id: 'cho'), userId: 'u1'));
-    await db.into(db.skillTestRows).insert(toSkillTestRow(failedTest('a1', 1, at, id: 'da'), userId: 'u1', syncedAt: at));
-    await db.into(db.skillTestRows).insert(toSkillTestRow(passedTest('a1', 1, at, id: 'khac'), userId: 'u2'));
+    await db
+        .into(db.skillTestRows)
+        .insert(
+          toSkillTestRow(passedTest('a1', 1, at, id: 'cho'), userId: 'u1'),
+        );
+    await db
+        .into(db.skillTestRows)
+        .insert(
+          toSkillTestRow(
+            failedTest('a1', 1, at, id: 'da'),
+            userId: 'u1',
+            syncedAt: at,
+          ),
+        );
+    await db
+        .into(db.skillTestRows)
+        .insert(
+          toSkillTestRow(passedTest('a1', 1, at, id: 'khac'), userId: 'u2'),
+        );
     expect(await pendingAssessmentCount(db, 'u1'), 1);
   });
 }

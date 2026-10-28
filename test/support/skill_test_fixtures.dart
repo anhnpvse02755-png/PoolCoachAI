@@ -14,18 +14,17 @@ Drill stDrill(
   int level, {
   double? passThreshold = 0.8,
   num? target,
-}) =>
-    Drill(
-      id: id,
-      cat: cat,
-      name: 'Bai $id',
-      level: level,
-      unit: target == null ? 'lan / 10' : 'cm',
-      goal: 'g',
-      steps: const [],
-      passThreshold: target == null ? passThreshold : null,
-      target: target,
-    );
+}) => Drill(
+  id: id,
+  cat: cat,
+  name: 'Bai $id',
+  level: level,
+  unit: target == null ? 'lan / 10' : 'cm',
+  goal: 'g',
+  steps: const [],
+  passThreshold: target == null ? passThreshold : null,
+  target: target,
+);
 
 final stDrills = <Drill>[
   stDrill('a1', SkillCategory.aiming, 1),
@@ -76,7 +75,9 @@ SkillTest _finished(
     tableSize: tableSize,
     startedAt: at.subtract(const Duration(minutes: 20)),
     completedAt: at,
-    score: drill.usesAttempts ? score : (passed ? drill.target! : drill.target! - 5),
+    score: drill.usesAttempts
+        ? score
+        : (passed ? drill.target! : drill.target! - 5),
     attempts: drill.usesAttempts ? 10 : null,
     passed: passed,
     passThreshold: drill.passThreshold,
@@ -90,8 +91,7 @@ SkillTest passedTest(
   DateTime at, {
   String? id,
   TableSize tableSize = TableSize.nineFootPlus,
-}) =>
-    _finished('pass', drillId, level, at, id, tableSize, 9, true);
+}) => _finished('pass', drillId, level, at, id, tableSize, 9, true);
 
 SkillTest failedTest(
   String drillId,
@@ -99,14 +99,13 @@ SkillTest failedTest(
   DateTime at, {
   String? id,
   TableSize tableSize = TableSize.nineFootPlus,
-}) =>
-    _finished('fail', drillId, level, at, id, tableSize, 5, false);
+}) => _finished('fail', drillId, level, at, id, tableSize, 5, false);
 
 SkillTest cancelledTest(String drillId, int level, DateTime at) => SkillTest(
-      id: 'cancel-$drillId-${at.toIso8601String()}',
-      drillId: drillId,
-      drillLevel: level,
-      tableSize: TableSize.nineFootPlus,
-      startedAt: at.subtract(const Duration(minutes: 5)),
-      cancelledAt: at,
-    );
+  id: 'cancel-$drillId-${at.toIso8601String()}',
+  drillId: drillId,
+  drillLevel: level,
+  tableSize: TableSize.nineFootPlus,
+  startedAt: at.subtract(const Duration(minutes: 5)),
+  cancelledAt: at,
+);

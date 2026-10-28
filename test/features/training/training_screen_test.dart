@@ -68,14 +68,20 @@ void main() {
   );
 
   testWidgets('bài đã chứng nhận có huy hiệu Đã chứng nhận', (tester) async {
-    await openTraining(tester, const [],
-        skillTests: [passedTest('d1', 1, testToday)]);
+    await openTraining(
+      tester,
+      const [],
+      skillTests: [passedTest('d1', 1, testToday)],
+    );
     expect(find.text(Vi.certifiedBadge), findsOneWidget);
   });
 
   testWidgets('bài trượt kiểm tra không có huy hiệu', (tester) async {
-    await openTraining(tester, const [],
-        skillTests: [failedTest('d1', 1, testToday)]);
+    await openTraining(
+      tester,
+      const [],
+      skillTests: [failedTest('d1', 1, testToday)],
+    );
     expect(find.text(Vi.certifiedBadge), findsNothing);
   });
 

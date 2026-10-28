@@ -15,7 +15,11 @@ enum AchievementKind { xongBuoc, duDieuKienLenCap, chuoiNgay, chungNhan }
 const streakMilestones = <int>[7, 14, 30, 60, 100];
 
 final class Achievement {
-  const Achievement({required this.kind, required this.refId, required this.achievedAt});
+  const Achievement({
+    required this.kind,
+    required this.refId,
+    required this.achievedAt,
+  });
 
   final AchievementKind kind;
   final String refId;
@@ -26,7 +30,10 @@ final class Achievement {
 
   @override
   bool operator ==(Object other) =>
-      other is Achievement && other.kind == kind && other.refId == refId && other.achievedAt == achievedAt;
+      other is Achievement &&
+      other.kind == kind &&
+      other.refId == refId &&
+      other.achievedAt == achievedAt;
 
   @override
   int get hashCode => Object.hash(kind, refId, achievedAt);
@@ -52,11 +59,13 @@ List<Achievement> newAchievements({
   final out = <Achievement>[];
   void add(AchievementKind kind, String refId, DateTime at) {
     final a = Achievement(kind: kind, refId: refId, achievedAt: at);
-    if (!existing.contains(a.key) && !out.any((o) => o.key == a.key)) out.add(a);
+    if (!existing.contains(a.key) && !out.any((o) => o.key == a.key))
+      out.add(a);
   }
 
   for (final d in drills) {
-    if (facts.drillReady(d)) add(AchievementKind.duDieuKienLenCap, d.id, facts.lastLogOf(d.id)!);
+    if (facts.drillReady(d))
+      add(AchievementKind.duDieuKienLenCap, d.id, facts.lastLogOf(d.id)!);
   }
 
   if (goal != null) {

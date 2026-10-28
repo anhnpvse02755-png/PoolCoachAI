@@ -46,16 +46,19 @@ SkillTestGate skillTestGate({
   final own = certs[drill.id];
   if (own != null) return AlreadyCertified(own.certifiedAt);
 
-  final lower = drills
-      .where((d) =>
-          d.cat == drill.cat &&
-          d.level < drill.level &&
-          !certs.containsKey(d.id))
-      .toList()
-    ..sort((a, b) {
-      final byLevel = a.level.compareTo(b.level);
-      return byLevel != 0 ? byLevel : a.id.compareTo(b.id);
-    });
+  final lower =
+      drills
+          .where(
+            (d) =>
+                d.cat == drill.cat &&
+                d.level < drill.level &&
+                !certs.containsKey(d.id),
+          )
+          .toList()
+        ..sort((a, b) {
+          final byLevel = a.level.compareTo(b.level);
+          return byLevel != 0 ? byLevel : a.id.compareTo(b.id);
+        });
   if (lower.isNotEmpty) return NeedLowerLevel([for (final d in lower) d.id]);
 
   final own0 = logs.where((l) => l.drillId == drill.id).toList();
@@ -85,14 +88,15 @@ List<String> testableDrillIds({
   required List<DrillLog> logs,
   required List<SkillTest> tests,
 }) {
-  final open = [
-    for (final d in drills)
-      if (skillTestGate(drill: d, drills: drills, logs: logs, tests: tests)
-          is SkillTestOpen)
-        d,
-  ]..sort((a, b) {
-      final byLevel = a.level.compareTo(b.level);
-      return byLevel != 0 ? byLevel : a.id.compareTo(b.id);
-    });
+  final open =
+      [
+        for (final d in drills)
+          if (skillTestGate(drill: d, drills: drills, logs: logs, tests: tests)
+              is SkillTestOpen)
+            d,
+      ]..sort((a, b) {
+        final byLevel = a.level.compareTo(b.level);
+        return byLevel != 0 ? byLevel : a.id.compareTo(b.id);
+      });
   return [for (final d in open) d.id];
 }

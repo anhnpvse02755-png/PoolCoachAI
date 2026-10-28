@@ -13,8 +13,12 @@ void main() {
   var clock = DateTime(2026, 10, 15, 9);
   var ids = 0;
 
-  RoadmapRepository repo(String userId) =>
-      RoadmapRepository(db, userId: userId, now: () => clock, newId: () => 'g${++ids}');
+  RoadmapRepository repo(String userId) => RoadmapRepository(
+    db,
+    userId: userId,
+    now: () => clock,
+    newId: () => 'g${++ids}',
+  );
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -24,7 +28,8 @@ void main() {
   tearDown(() => db.close());
 
   test('đặt mục tiêu ghi xuống Drift, chưa đồng bộ', () async {
-    await repo('u1').setGoal(kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick);
+    await repo('u1')
+        .setGoal(kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick);
     final g = await repo('u1').watchGoal().first;
     expect(g!.goal!.kind, GoalKind.thuanThucKyNang);
     expect(g.goal!.category, SkillCategory.kick);
@@ -35,16 +40,23 @@ void main() {
   test('đổi mục tiêu ra id mới và ngày tạo mới', () async {
     await repo('u1').setGoal(kind: GoalKind.lenHang);
     clock = DateTime(2026, 10, 16, 9);
-    await repo('u1').setGoal(kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2, 18));
+    await repo(
+      'u1',
+    ).setGoal(kind: GoalKind.chuanBiGiai, eventDate: DateTime(2026, 11, 2, 18));
     final g = (await repo('u1').watchGoal().first)!.goal!;
     expect(g.goalId, 'g2');
     expect(g.createdAt, clock);
-    expect(g.eventDate, DateTime(2026, 11, 2), reason: 'ngày giải chỉ giữ ngày');
+    expect(
+      g.eventDate,
+      DateTime(2026, 11, 2),
+      reason: 'ngày giải chỉ giữ ngày',
+    );
   });
 
   test('đổi từ Thuần thục sang Lên hạng thì không còn nhóm cũ', () async {
     // Ghi đè một dòng có cột null: cột cũ phải về null, không được giữ lại.
-    await repo('u1').setGoal(kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick);
+    await repo('u1')
+        .setGoal(kind: GoalKind.thuanThucKyNang, category: SkillCategory.kick);
     await repo('u1').setGoal(kind: GoalKind.lenHang);
     expect((await db.select(db.playerGoalRows).getSingle()).category, isNull);
   });
@@ -59,43 +71,83 @@ void main() {
   });
 
   test('ghi thành tích hai lần chỉ còn một dòng; mới nhất trước', () async {
-    final a = Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10));
-    final b = Achievement(kind: AchievementKind.duDieuKienLenCap, refId: 'd1', achievedAt: DateTime(2026, 10, 12));
+    final a = Achievement(
+      kind: AchievementKind.chuoiNgay,
+      refId: '7',
+      achievedAt: DateTime(2026, 10, 10),
+    );
+    final b = Achievement(
+      kind: AchievementKind.duDieuKienLenCap,
+      refId: 'd1',
+      achievedAt: DateTime(2026, 10, 12),
+    );
     await repo('u1').recordAchievements([a]);
     await repo('u1').recordAchievements([a, b]);
     expect(await repo('u1').watchAchievements().first, [b, a]);
   });
 
-  test('chứng nhận ghi xuống đã đánh dấu đồng bộ; loại khác vẫn chờ (S13)', () async {
-    await repo('u1').recordAchievements([
-      Achievement(kind: AchievementKind.chungNhan, refId: 'd1', achievedAt: DateTime(2026, 10, 10)),
-    ]);
-    expect(await pendingRoadmapCount(db, 'u1'), 0);
-    await repo('u1').recordAchievements([
-      Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10)),
-    ]);
-    expect(await pendingRoadmapCount(db, 'u1'), 1);
-  });
+  test(
+    'chứng nhận ghi xuống đã đánh dấu đồng bộ; loại khác vẫn chờ (S13)',
+    () async {
+      await repo('u1').recordAchievements([
+        Achievement(
+          kind: AchievementKind.chungNhan,
+          refId: 'd1',
+          achievedAt: DateTime(2026, 10, 10),
+        ),
+      ]);
+      expect(await pendingRoadmapCount(db, 'u1'), 0);
+      await repo('u1').recordAchievements([
+        Achievement(
+          kind: AchievementKind.chuoiNgay,
+          refId: '7',
+          achievedAt: DateTime(2026, 10, 10),
+        ),
+      ]);
+      expect(await pendingRoadmapCount(db, 'u1'), 1);
+    },
+  );
 
   test('dòng thành tích có loại lạ bị bỏ qua, các dòng khác vẫn ra', () async {
-    final a = Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10));
+    final a = Achievement(
+      kind: AchievementKind.chuoiNgay,
+      refId: '7',
+      achievedAt: DateTime(2026, 10, 10),
+    );
     await repo('u1').recordAchievements([a]);
-    await db.into(db.achievementRows).insert(AchievementRow(
-        id: 'x', userId: 'u1', kind: 'zzz', refId: 'r', achievedAt: DateTime(2026, 10, 11)));
+    await db
+        .into(db.achievementRows)
+        .insert(
+          AchievementRow(
+            id: 'x',
+            userId: 'u1',
+            kind: 'zzz',
+            refId: 'r',
+            achievedAt: DateTime(2026, 10, 11),
+          ),
+        );
     expect(await repo('u1').watchAchievements().first, [a]);
   });
 
   test('mục tiêu và thành tích tách theo người', () async {
     await repo('u1').setGoal(kind: GoalKind.lenHang);
-    await repo('u1').recordAchievements(
-        [Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10))]);
+    await repo('u1').recordAchievements([
+      Achievement(
+        kind: AchievementKind.chuoiNgay,
+        refId: '7',
+        achievedAt: DateTime(2026, 10, 10),
+      ),
+    ]);
     expect(await repo('u2').watchGoal().first, isNull);
     expect(await repo('u2').watchAchievements().first, isEmpty);
   });
 
   test('hạng đích chỉ lưu cho Lên hạng', () async {
     await repo('u1').setGoal(
-        kind: GoalKind.chuanBiGiai, targetRank: Rank.d, eventDate: DateTime(2026, 11, 2));
+      kind: GoalKind.chuanBiGiai,
+      targetRank: Rank.d,
+      eventDate: DateTime(2026, 11, 2),
+    );
     expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);
 
     await repo('u1').setGoal(kind: GoalKind.lenHang, targetRank: Rank.d);

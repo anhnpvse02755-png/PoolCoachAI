@@ -59,11 +59,7 @@ void main() {
   test('cấp trùng: p3 cần cả hai bài cấp 2, liệt kê theo (cấp, id)', () {
     expect(g('p3', logs: threePasses('p3')), needLower(['p2a', 'p2b']));
     expect(
-      g(
-        'p3',
-        logs: threePasses('p3'),
-        tests: [passedTest('p2a', 2, stToday)],
-      ),
+      g('p3', logs: threePasses('p3'), tests: [passedTest('p2a', 2, stToday)]),
       needLower(['p2b']),
     );
     expect(
@@ -90,11 +86,7 @@ void main() {
   test('vừa trượt, chưa tập thêm: phải tập ít nhất 1 buổi', () {
     final failedAt = stToday.subtract(const Duration(hours: 2));
     expect(
-      g(
-        'a1',
-        logs: threePasses('a1'),
-        tests: [failedTest('a1', 1, failedAt)],
-      ),
+      g('a1', logs: threePasses('a1'), tests: [failedTest('a1', 1, failedAt)]),
       isA<NeedPracticeAfterFail>().having(
         (x) => x.failedAt,
         'failedAt',
@@ -111,11 +103,7 @@ void main() {
         logs: threePasses('a1'),
         tests: [failedTest('a1', 1, newer), failedTest('a1', 1, older)],
       ),
-      isA<NeedPracticeAfterFail>().having(
-        (x) => x.failedAt,
-        'failedAt',
-        newer,
-      ),
+      isA<NeedPracticeAfterFail>().having((x) => x.failedAt, 'failedAt', newer),
     );
   });
   test('trượt rồi tập thêm một buổi đạt: mở lại', () {
@@ -214,19 +202,22 @@ void main() {
           ),
         };
     for (final e in fixtures.entries) {
-      test('${e.key}: đúng danh sách (cấp, id), là tập con của readyDrillIds', () {
-        final testable = testableDrillIds(
-          drills: stDrills,
-          logs: e.value.logs,
-          tests: e.value.tests,
-        );
-        expect(testable, e.value.testable);
-        final ready = computePlayerIntelligence(
-          drills: stDrills,
-          logs: e.value.logs,
-        ).readyDrillIds;
-        expect(ready.toSet().containsAll(testable), isTrue);
-      });
+      test(
+        '${e.key}: đúng danh sách (cấp, id), là tập con của readyDrillIds',
+        () {
+          final testable = testableDrillIds(
+            drills: stDrills,
+            logs: e.value.logs,
+            tests: e.value.tests,
+          );
+          expect(testable, e.value.testable);
+          final ready = computePlayerIntelligence(
+            drills: stDrills,
+            logs: e.value.logs,
+          ).readyDrillIds;
+          expect(ready.toSet().containsAll(testable), isTrue);
+        },
+      );
     }
     test('bộ 1: readyDrillIds gồm a1, a3, p2a còn testable không có a3', () {
       final logs = fixtures.values.first.logs;

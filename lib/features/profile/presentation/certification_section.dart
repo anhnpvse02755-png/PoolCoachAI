@@ -46,7 +46,10 @@ class CertificationSection extends ConsumerWidget {
                 child: Text(
                   closest.ready
                       ? Vi.homeSkillTestReady(closest.drill.name, 0)
-                      : Vi.certificationClosest(closest.drill.name, closest.passCount),
+                      : Vi.certificationClosest(
+                          closest.drill.name,
+                          closest.passCount,
+                        ),
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -79,11 +82,13 @@ class _GroupView extends StatelessWidget {
           ],
           for (final e in group.entries) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(Vi.certificationEntry(
-              e.drill.name,
-              e.certification.drillLevel,
-              e.certification.certifiedAt,
-            )),
+            Text(
+              Vi.certificationEntry(
+                e.drill.name,
+                e.certification.drillLevel,
+                e.certification.certifiedAt,
+              ),
+            ),
             // Tiêu chí lấy từ ảnh chụp lúc chấm, không phải bài hiện tại.
             if (Vi.criterionSnapshot(
                   e.certification.passThreshold,

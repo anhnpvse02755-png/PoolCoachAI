@@ -35,37 +35,37 @@ ProviderContainer make({
 }
 
 void main() {
-  test('a1 đủ 3 buổi đạt: cổng mở, có trong danh sách sẵn sàng kiểm tra',
-      () async {
-    final c = make(logs: threePasses('a1'));
-    await settle();
-    final state = c.read(skillTestGateProvider('a1')).value!;
-    expect(state.gate, isA<SkillTestOpen>());
-    expect(state.formSlipped, isFalse);
-    expect(state.drill.id, 'a1');
-    expect(state.logs, hasLength(3));
-    expect(c.read(testableDrillIdsProvider).value, ['a1']);
-  });
-
   test(
-    'đã chứng nhận: cổng báo đã chứng nhận, danh sách sẵn sàng rỗng, có trong chứng nhận',
+    'a1 đủ 3 buổi đạt: cổng mở, có trong danh sách sẵn sàng kiểm tra',
     () async {
-      final c = make(
-        logs: threePasses('a1'),
-        tests: [passedTest('a1', 1, stToday)],
-      );
+      final c = make(logs: threePasses('a1'));
       await settle();
-      expect(c.read(skillTestGateProvider('a1')).value!.gate,
-          isA<AlreadyCertified>());
-      expect(c.read(testableDrillIdsProvider).value, isEmpty);
-      expect(c.read(certificationsProvider).value!.keys, ['a1']);
-      final summary = c.read(certificationSummaryProvider).value!;
-      expect(
-        summary.groups.expand((g) => g.entries).map((e) => e.drill.id),
-        ['a1'],
-      );
+      final state = c.read(skillTestGateProvider('a1')).value!;
+      expect(state.gate, isA<SkillTestOpen>());
+      expect(state.formSlipped, isFalse);
+      expect(state.drill.id, 'a1');
+      expect(state.logs, hasLength(3));
+      expect(c.read(testableDrillIdsProvider).value, ['a1']);
     },
   );
+
+  test('đã chứng nhận: cổng báo đã chứng nhận, danh sách sẵn sàng rỗng, có trong chứng nhận', () async {
+    final c = make(
+      logs: threePasses('a1'),
+      tests: [passedTest('a1', 1, stToday)],
+    );
+    await settle();
+    expect(
+      c.read(skillTestGateProvider('a1')).value!.gate,
+      isA<AlreadyCertified>(),
+    );
+    expect(c.read(testableDrillIdsProvider).value, isEmpty);
+    expect(c.read(certificationsProvider).value!.keys, ['a1']);
+    final summary = c.read(certificationSummaryProvider).value!;
+    expect(summary.groups.expand((g) => g.entries).map((e) => e.drill.id), [
+      'a1',
+    ]);
+  });
 
   test('cổng cấp thấp: giá trị mang đủ bài để gọi tên bài còn thiếu', () async {
     final c = make(logs: threePasses('a3'), drillId: 'a3');
@@ -106,38 +106,45 @@ void main() {
     expect([v.hasValue, v.value], [true, null]);
   });
 
-  test('nguồn lần kiểm tra lỗi: mọi provider thành lỗi, không quay mãi',
-      () async {
-    final c = make(
-      logs: threePasses('a1'),
-      asyncTests:
-          AsyncError<List<SkillTest>>(StateError('hỏng'), StackTrace.empty),
-    );
-    await settle();
-    expect([
-      c.read(skillTestGateProvider('a1')).hasError,
-      c.read(certificationsProvider).hasError,
-      c.read(certificationSummaryProvider).hasError,
-      c.read(testableDrillIdsProvider).hasError,
-    ], [true, true, true, true]);
-    expect(c.read(certificationsProvider).error, isA<StateError>());
-  });
-
   test(
-    'đang tải lại còn chứng nhận của người trước: là đang tải, không dùng giá trị cũ',
+    'nguồn lần kiểm tra lỗi: mọi provider thành lỗi, không quay mãi',
     () async {
-      // ignore: invalid_use_of_internal_member
-      final stale = const AsyncLoading<List<SkillTest>>().copyWithPrevious(
-        AsyncData<List<SkillTest>>([passedTest('a1', 1, stToday)]),
+      final c = make(
+        logs: threePasses('a1'),
+        asyncTests: AsyncError<List<SkillTest>>(
+          StateError('hỏng'),
+          StackTrace.empty,
+        ),
       );
-      final c = make(logs: threePasses('a1'), asyncTests: stale);
       await settle();
-      expect([
+      expect(
+        [
+          c.read(skillTestGateProvider('a1')).hasError,
+          c.read(certificationsProvider).hasError,
+          c.read(certificationSummaryProvider).hasError,
+          c.read(testableDrillIdsProvider).hasError,
+        ],
+        [true, true, true, true],
+      );
+      expect(c.read(certificationsProvider).error, isA<StateError>());
+    },
+  );
+
+  test('đang tải lại còn chứng nhận của người trước: là đang tải, không dùng giá trị cũ', () async {
+    // ignore: invalid_use_of_internal_member
+    final stale = const AsyncLoading<List<SkillTest>>().copyWithPrevious(
+      AsyncData<List<SkillTest>>([passedTest('a1', 1, stToday)]),
+    );
+    final c = make(logs: threePasses('a1'), asyncTests: stale);
+    await settle();
+    expect(
+      [
         c.read(skillTestGateProvider('a1')).isLoading,
         c.read(certificationsProvider).isLoading,
         c.read(certificationSummaryProvider).isLoading,
         c.read(testableDrillIdsProvider).isLoading,
-      ], [true, true, true, true]);
-    },
-  );
+      ],
+      [true, true, true, true],
+    );
+  });
 }
