@@ -12,6 +12,7 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/skill_test/certification.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
@@ -301,6 +302,10 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
                   : Vi.sessionScoreLabelTarget,
               hintText: drill.usesAttempts
                   ? Vi.sessionScoreHintAttempts
+                  : drillProvenanceOf(drill.id) != null
+                  ? Vi.sessionScoreHintShots(
+                      drillProvenanceOf(drill.id)!.shots,
+                    )
                   : Vi.sessionScoreHintTarget,
               suffixText: drill.unit,
             ),
@@ -355,7 +360,8 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
     return switch (error) {
       SkillTestInputError.scoreInvalid ||
       SkillTestInputError.scoreNotWhole ||
-      SkillTestInputError.scoreAboveAttempts => Vi.skillTestInputError(error!),
+      SkillTestInputError.scoreAboveAttempts ||
+      SkillTestInputError.scoreAboveShots => Vi.skillTestInputError(error!),
       _ => null,
     };
   }

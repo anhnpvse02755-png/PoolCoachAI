@@ -14,6 +14,7 @@ import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test_gate.dart';
@@ -345,6 +346,56 @@ void main() {
     );
     await tapText(tester, Vi.skillTestSubmit);
     expect((await db.select(db.skillTestRows).get()).single.score, 27.5);
+  });
+
+  // Bài BU đếm theo cú: điểm là số cú thành công, không vượt số cú.
+  final buShots = drillProvenanceOf('d11')!.shots;
+  final buDrill = stDrill('d11', SkillCategory.aiming, 1, target: buShots);
+  List<DrillLog> buLogs() => [
+    for (final d in [3, 2, 1])
+      stLog(
+        'd11',
+        buShots,
+        testToday.subtract(Duration(days: d)),
+        attempts: null,
+      ),
+  ];
+
+  testWidgets('bài BU: gợi ý điểm là số cú, không phải "VD: 22.5"', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      drillId: 'd11',
+      drills: [...testDrills, buDrill],
+      logs: buLogs(),
+    );
+    await start(tester);
+    expect(find.text(Vi.sessionScoreHintShots(buShots)), findsOneWidget);
+    expect(find.text(Vi.sessionScoreHintTarget), findsNothing);
+  });
+
+  testWidgets('bài BU: điểm vượt số cú bị từ chối, đủ số cú được lưu', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      drillId: 'd11',
+      drills: [...testDrills, buDrill],
+      logs: buLogs(),
+    );
+    await start(tester);
+    final field = find.widgetWithText(TextFormField, Vi.sessionScoreLabelTarget);
+    await tester.enterText(field, '${buShots + 1}');
+    await tapText(tester, Vi.skillTestSubmit);
+    expect(
+      find.text(Vi.skillTestInputError(SkillTestInputError.scoreAboveShots)),
+      findsOneWidget,
+    );
+    expect(await db.select(db.skillTestRows).get(), isEmpty);
+    await tester.enterText(field, '$buShots');
+    await tapText(tester, Vi.skillTestSubmit);
+    expect((await db.select(db.skillTestRows).get()).single.score, buShots);
   });
 
   testWidgets(

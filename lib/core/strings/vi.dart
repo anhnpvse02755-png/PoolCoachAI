@@ -1,5 +1,6 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/coach/coach_recommendation.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
@@ -818,6 +819,9 @@ abstract final class Vi {
   static const sessionScoreLabelTarget = 'Kết quả';
   static const sessionScoreHintAttempts = 'VD: 7';
   static const sessionScoreHintTarget = 'VD: 22.5';
+
+  /// Gợi ý điểm của bài BU: lấy số cú của chính bài.
+  static String sessionScoreHintShots(int shots) => 'VD: $shots';
   static const sessionAttemptsLabel = 'Số lần thử';
   static const sessionAttemptsHint = 'VD: 10';
   static const sessionNotesLabel = 'Ghi chú (tùy chọn)';
@@ -938,6 +942,16 @@ abstract final class Vi {
     SkillTestInputError.attemptsInvalid => sessionAttemptsInvalid,
     SkillTestInputError.attemptsNotAllowed =>
       'Bài này không chấm theo số lần thử',
+    SkillTestInputError.scoreAboveShots => shotScoreError(
+      ShotScoreError.aboveShots,
+    ),
+  };
+
+  /// Lỗi điểm của bài BU đếm theo cú.
+  static String shotScoreError(ShotScoreError e) => switch (e) {
+    ShotScoreError.notWhole => 'Số cú thành công phải là số nguyên',
+    ShotScoreError.aboveShots =>
+      'Số cú thành công không được lớn hơn số cú của bài',
   };
 
   /// Xác nhận sau khi lưu, kèm tỉ lệ đạt của chính buổi vừa ghi.

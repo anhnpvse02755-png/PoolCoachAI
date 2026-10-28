@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 
@@ -246,6 +247,27 @@ void main() {
     test('không có ảnh chụp thì không chấm được', () {
       expect(skillTestVerdict(cancelledTest('a1', 1, stToday)), isNull);
       expect(skillTestPassMark(cancelledTest('a1', 1, stToday)), isNull);
+    });
+  });
+
+  group('checkSkillTestInput — bài BU đếm theo cú', () {
+    final shots = drillProvenanceOf('d11')!.shots;
+    final d = stDrill('d11', SkillCategory.aiming, 1, target: shots);
+    test('quá số cú và số lẻ bị từ chối, đủ số cú qua', () {
+      expect(
+        checkSkillTestInput(d, score: shots + 1),
+        SkillTestInputError.scoreAboveShots,
+      );
+      expect(
+        checkSkillTestInput(d, score: shots - 0.5),
+        SkillTestInputError.scoreNotWhole,
+      );
+      expect(checkSkillTestInput(d, score: shots), isNull);
+      expect(checkSkillTestInput(d, score: 0), isNull);
+      expect(
+        checkSkillTestInput(d, score: -1),
+        SkillTestInputError.scoreInvalid,
+      );
     });
   });
 }
