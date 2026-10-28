@@ -161,7 +161,7 @@ abstract final class Vi {
   static const matchShotMade = 'Có bi';
   static const matchShotMissed = 'Trượt';
   static const matchShotFoul = 'Phạm lỗi';
-  static const matchShotScratch = 'Scratch';
+  static const matchShotScratch = 'Chết cái';
   static const matchCompleted = 'Đã kết thúc';
   static const matchInProgress = 'Đang diễn ra';
   static const matchNameRequired = 'Nhập tên của cả hai người chơi.';
@@ -309,7 +309,7 @@ abstract final class Vi {
   static const statsSafeties = 'Cú phòng thủ';
   static const statsMisses = 'Cú trượt';
   static const statsFouls = 'Lỗi';
-  static const statsScratches = 'Scratch';
+  static const statsScratches = 'Chết cái';
   static const statsPositionSuccess = 'Vị trí bi cái đạt ý đồ';
   static const statsNoShotRecords = 'Chưa có dữ liệu cú đánh.';
   static const statsSkills = 'Tiến bộ theo nhóm kỹ năng';
@@ -320,8 +320,67 @@ abstract final class Vi {
   static const statsNoTraining =
       'Hoàn thành bài tập hoặc lưu buổi tập tự do để bắt đầu thống kê.';
   static const statsTargetAverage = 'Trung bình mục tiêu';
-  static const statsMatchAnalysisNotAvailable =
-      'Phân tích cú đánh, break, safety và vị trí sẽ có khi ghi nhận chi tiết từng cú.';
+  static const statsMatchAnalysisTitle = 'Phân tích trận gần đây';
+  static String statsMatchAnalysisBasis(int matches, int fullRacks) =>
+      'Dựa trên $matches trận, $fullRacks ván ghi đủ';
+  static const statsMatchAnalysisEmpty =
+      'Chưa có trận hoàn tất nào có ghi cú. Ghi cú trong trận để xem phân tích.';
+  static String statsBreakLine(
+    int shots,
+    int madePercent,
+    int dry,
+    int fouls,
+    int scratches,
+  ) =>
+      'Phá: $shots cú · vào bi $madePercent% · phá khô $dry · phạm lỗi $fouls · chết cái $scratches';
+  static String statsBreakAndRun(int breakAndRuns, int racksBroken) =>
+      'Phá-và-dọn: $breakAndRuns/$racksBroken ván bạn phá';
+  static String statsRunOuts(int n) => 'Dọn bàn: $n ván';
+  static String statsOffense(int missed, int shots, int percent) =>
+      'Tấn công: trượt $missed/$shots cú thường ($percent%)';
+  static String statsPositionMiss(int failed, int assessed, int percent) =>
+      'Điều bi hỏng: $failed/$assessed cú có ghi vị trí ($percent%)';
+
+  /// Mỗi nửa chỉ hiện khi mẫu số của nó lớn hơn 0; cả hai bằng 0 thì rỗng.
+  static String statsPositionFollowUp(
+    int afterFailed,
+    int nextFailed,
+    int afterGood,
+    int nextGood,
+  ) {
+    final parts = [
+      if (nextFailed > 0) '$afterFailed/$nextFailed sau điều bi hỏng',
+      if (nextGood > 0) '$afterGood/$nextGood sau điều bi tốt',
+    ];
+    return parts.isEmpty ? '' : 'Trượt cú kế tiếp: ${parts.join(', ')}';
+  }
+
+  /// Mỗi nửa chỉ hiện khi mẫu số của nó lớn hơn 0; cả hai bằng 0 thì rỗng.
+  static String statsSafety(
+    int successful,
+    int assessed,
+    int safetyTurnovers,
+    int proactive,
+  ) {
+    final parts = [
+      if (assessed > 0) 'thành công $successful/$assessed',
+      if (proactive > 0)
+        '$safetyTurnovers/$proactive lần mất lượt chủ động là phòng thủ',
+    ];
+    return parts.isEmpty ? '' : 'Phòng thủ: ${parts.join(' · ')}';
+  }
+
+  static String statsErrors(int fouls, int scratches, int shots) =>
+      'Phạm lỗi $fouls, chết cái $scratches trên $shots cú';
+  static const statsMatchWeakTitle = 'Nhóm yếu khi thi đấu';
+  static String statsMatchWeak(
+    String skill,
+    int failures,
+    int attempts,
+    int percent,
+  ) => '$skill: hỏng $failures/$attempts lần ($percent%)';
+  static const statsMatchWeakNone =
+      'Chưa đủ dữ liệu để kết luận (cần ít nhất ${MatchAnalysisConstants.minMatches} trận và ${MatchAnalysisConstants.minAttempts} lần thử mỗi nhóm).';
   static String statsMatchCount(int recorded, int completed) =>
       '$recorded ($completed)';
   static String statsPositionCount(int success, int assessed) =>
