@@ -24,6 +24,7 @@ import 'package:poolcoachai/domain/planner/planner_constants.dart';
 import 'package:poolcoachai/domain/planner/safety_shot.dart';
 import 'package:poolcoachai/domain/planner/table_setup.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
@@ -200,6 +201,20 @@ abstract final class Vi {
     int opponentScore,
     String opponent,
   ) => '$player $playerScore – $opponentScore $opponent';
+  static const matchTournament = 'Giải đấu';
+  static const matchNoTournament = 'Không thuộc giải nào';
+  static const matchRound = 'Vòng (không bắt buộc)';
+  static const tournamentRoundSuggestions = <String>[
+    'Vòng loại',
+    'Vòng bảng',
+    'Tứ kết',
+    'Bán kết',
+    'Chung kết',
+  ];
+  static const matchRoundTooLong =
+      'Vòng tối đa ${TournamentConstants.roundLabelMaxLength} ký tự.';
+  static String matchTournamentLabel(String name, String? round) =>
+      round == null ? name : '$name · $round';
   // --- Phân tích trận (spec 2026-10-28) ---
   static const matchAnalysisOpen = 'Phân tích trận';
   static String matchAnalysisRacks(int withShots, int full) =>
