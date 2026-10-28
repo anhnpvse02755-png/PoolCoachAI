@@ -101,7 +101,7 @@ Sai bất kỳ điều kiện nào thì bỏ qua liên kết và hiển thị nh
 ## 5. Luồng người chơi
 
 1. **Play** có thẻ **"Giải đấu"** ở đầu màn hình.
-   - Thẻ hiện giải đang diễn ra; nếu không có thì giải sắp tới gần nhất; nếu không có nữa thì "Chưa có giải nào".
+   - Thẻ hiện giải đang diễn ra; nếu không có thì giải sắp tới gần nhất; nếu không có nữa thì "Không có giải đang diễn ra hay sắp tới" khi chỉ còn giải đã xong, hoặc "Chưa có giải nào" khi chưa ghi giải nào (sửa sau review cuối).
    - Bấm vào thẻ mở danh sách giải `/play/tournaments`.
 2. **Danh sách giải** `/play/tournaments`:
    - Chia ba nhóm: Đang diễn ra, Sắp tới, Đã xong. Giải sắp tới xếp theo ngày gần nhất trước, giải đã xong theo ngày mới nhất trước.
