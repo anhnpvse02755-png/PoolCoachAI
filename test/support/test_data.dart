@@ -19,6 +19,8 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/core/providers/tournament_providers.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
@@ -111,6 +113,9 @@ ProviderContainer testContainer({
   AsyncValue<CoachContext>? coachContext,
   List<SkillTest>? skillTests,
   AsyncValue<List<SkillTest>>? skillTestsAsync,
+  List<Tournament>? tournaments,
+  AsyncValue<List<Tournament>>? tournamentsAsync,
+  AsyncValue<GoalRecord?>? goalAsync,
 }) {
   return ProviderContainer(
     overrides: [
@@ -161,7 +166,12 @@ ProviderContainer testContainer({
         (ref) => buTestsStream ?? Stream.value(tests ?? const <BuTest>[]),
       ),
       activeTestProvider.overrideWith((ref) => Stream.value(activeTest)),
-      goalProvider.overrideWith((ref) => Stream.value(goal)),
+      // `goalAsync` thắng `goal`: dựng thẳng một AsyncValue (đang tải lại còn
+      // mục tiêu cũ) mà một Stream bình thường không tạo được.
+      if (goalAsync != null)
+        goalProvider.overrideWithValue(goalAsync)
+      else
+        goalProvider.overrideWith((ref) => Stream.value(goal)),
       achievementsProvider.overrideWith(
         (ref) => Stream.value(achievements ?? const <Achievement>[]),
       ),
@@ -171,6 +181,13 @@ ProviderContainer testContainer({
       else
         skillTestsProvider.overrideWith(
           (ref) => Stream.value(skillTests ?? const <SkillTest>[]),
+        ),
+      // `tournamentsAsync` thắng `tournaments`, như `skillTestsAsync`.
+      if (tournamentsAsync != null)
+        tournamentsProvider.overrideWithValue(tournamentsAsync)
+      else
+        tournamentsProvider.overrideWith(
+          (ref) => Stream.value(tournaments ?? const <Tournament>[]),
         ),
       if (buResult != null)
         latestBuResultProvider.overrideWithValue(
