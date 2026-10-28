@@ -161,4 +161,28 @@ void main() {
     expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);
     expect((await repo('u1').watchGoal().first)!.goal!.targetRank, isNull);
   });
+
+  test(
+    'chuẩn bị giải lưu tournament_id; đổi sang mục tiêu khác thì xoá',
+    () async {
+      await repo('u1').setGoal(
+        kind: GoalKind.chuanBiGiai,
+        eventDate: DateTime(2026, 11, 2),
+        tournamentId: 't1',
+      );
+      expect(
+        (await db.select(db.playerGoalRows).getSingle()).tournamentId,
+        't1',
+      );
+      await repo('u1').setGoal(
+        kind: GoalKind.thuanThucKyNang,
+        category: SkillCategory.kick,
+        tournamentId: 't1',
+      );
+      expect(
+        (await db.select(db.playerGoalRows).getSingle()).tournamentId,
+        isNull,
+      );
+    },
+  );
 }

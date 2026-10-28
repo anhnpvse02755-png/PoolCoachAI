@@ -3,6 +3,7 @@ import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/match_codec.dart';
 import 'package:poolcoachai/data/repositories/match_repository.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/tournament/tournament.dart';
 
 class DriftMatchRepository implements MatchRepository {
   DriftMatchRepository(
@@ -42,6 +43,12 @@ class DriftMatchRepository implements MatchRepository {
       throw ArgumentError('Trận mới không được có kết quả rack');
     }
 
+    if (!roundLabelValid(match.roundLabel)) {
+      throw ArgumentError.value(match.roundLabel, 'roundLabel');
+    }
+    final tournamentId = match.tournamentId;
+    if (tournamentId != null) await _requireLiveTournament(tournamentId);
+
     final cueId = match.cueId;
     if (cueId != null) {
       final cue =
@@ -75,7 +82,12 @@ class DriftMatchRepository implements MatchRepository {
     required String playerName,
     required String opponentName,
     required int targetRacks,
+    required String? tournamentId,
+    required String? roundLabel,
   }) async {
+    if (!roundLabelValid(roundLabel)) {
+      throw ArgumentError.value(roundLabel, 'roundLabel');
+    }
     if (playerName.trim().isEmpty || opponentName.trim().isEmpty) {
       throw ArgumentError('Trận đấu cần tên của cả hai người chơi');
     }
@@ -86,16 +98,23 @@ class DriftMatchRepository implements MatchRepository {
     await _db.transaction(() async {
       final match = await _ownedMatch(matchId, allowCompleted: true);
       final winners = decodeMatchWinners(match.rackWinners);
-      final playerWins =
-          winners.where((winner) => winner == RackWinner.player).length;
-      final opponentWins =
-          winners.where((winner) => winner == RackWinner.opponent).length;
+      final playerWins = winners
+          .where((winner) => winner == RackWinner.player)
+          .length;
+      final opponentWins = winners
+          .where((winner) => winner == RackWinner.opponent)
+          .length;
       if (targetRacks < playerWins || targetRacks < opponentWins) {
         throw ArgumentError.value(
           targetRacks,
           'targetRacks',
           'Không được nhỏ hơn số ván người đang dẫn trước đã thắng',
         );
+      }
+      // Giữ nguyên giải hiện có (kể cả đã xóa) thì được; đổi sang giải khác
+      // thì giải đó phải còn và thuộc đúng người.
+      if (tournamentId != null && tournamentId != match.tournamentId) {
+        await _requireLiveTournament(tournamentId);
       }
       final complete = playerWins >= targetRacks || opponentWins >= targetRacks;
       final updatedAt = _now();
@@ -108,6 +127,10 @@ class DriftMatchRepository implements MatchRepository {
               playerName: Value(playerName.trim()),
               opponentName: Value(opponentName.trim()),
               targetRacks: Value(targetRacks),
+              tournamentId: Value(tournamentId),
+              roundLabel: Value(
+                tournamentId == null ? null : trimmedOrNull(roundLabel),
+              ),
               completedAt: Value(
                 complete ? (match.completedAt ?? updatedAt) : null,
               ),
@@ -267,18 +290,31 @@ class DriftMatchRepository implements MatchRepository {
     });
   }
 
+  Future<void> _requireLiveTournament(String id) async {
+    final tournament =
+        await (_db.select(_db.tournamentRows)..where(
+              (row) =>
+                  row.id.equals(id) &
+                  row.userId.equals(_userId) &
+                  row.isDeleted.equals(false),
+            ))
+            .getSingleOrNull();
+    if (tournament == null) {
+      throw StateError('Giải đấu không tồn tại hoặc không thuộc tài khoản này');
+    }
+  }
+
   Future<PoolMatchRow> _ownedMatch(
     String id, {
     bool allowCompleted = false,
   }) async {
     final match =
-        await (_db.select(_db.poolMatchRows)
-              ..where(
-                (row) =>
-                    row.id.equals(id) &
-                    row.userId.equals(_userId) &
-                    row.isDeleted.equals(false),
-              ))
+        await (_db.select(_db.poolMatchRows)..where(
+              (row) =>
+                  row.id.equals(id) &
+                  row.userId.equals(_userId) &
+                  row.isDeleted.equals(false),
+            ))
             .getSingleOrNull();
     if (match == null) {
       throw StateError('Trận đấu không tồn tại hoặc không thuộc tài khoản này');
@@ -304,6 +340,8 @@ class DriftMatchRepository implements MatchRepository {
     shots: decodeMatchShots(row.shots),
     completedAt: row.completedAt,
     cueId: row.cueId,
+    tournamentId: row.tournamentId,
+    roundLabel: row.roundLabel,
   );
 
   PoolMatchRowsCompanion _toCompanion(
@@ -321,6 +359,10 @@ class DriftMatchRepository implements MatchRepository {
     startedAt: match.startedAt,
     completedAt: Value(match.completedAt),
     cueId: Value(match.cueId),
+    tournamentId: Value(match.tournamentId),
+    roundLabel: Value(
+      match.tournamentId == null ? null : trimmedOrNull(match.roundLabel),
+    ),
     updatedAt: Value(updatedAt),
   );
 }

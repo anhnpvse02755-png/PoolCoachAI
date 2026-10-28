@@ -226,4 +226,32 @@ void main() {
     ).copyWith(targetRank: const Value('xyz'));
     expect(toGoalRecord(row).goal!.targetRank, isNull);
   });
+
+  test('mục tiêu nối giải đi Drift và Directus rồi về nguyên vẹn', () {
+    final linked = GoalRecord(
+      updatedAt: at,
+      goal: PlayerGoal(
+        goalId: 'g9',
+        kind: GoalKind.chuanBiGiai,
+        eventDate: DateTime(2026, 11, 2),
+        createdAt: at,
+        tournamentId: 't1',
+      ),
+    );
+    expect(toGoalRecord(toGoalRow(linked, userId: 'u1')), linked);
+    final json = toRemoteGoal(toGoalRow(linked, userId: 'u1'));
+    expect(json['tournament_id'], 't1');
+    expect(goalFromRemote(json), linked);
+  });
+
+  test(
+    'luôn gửi khoá tournament_id, kể cả null, để xoá liên kết cũ trên máy chủ',
+    () {
+      expect(
+        toRemoteGoal(toGoalRow(goal, userId: 'u1')),
+        containsPair('tournament_id', null),
+      );
+      expect(remoteGoalFields.split(','), contains('tournament_id'));
+    },
+  );
 }

@@ -53,48 +53,50 @@ void main() {
   );
 
   group('matches', () {
-    test('uploads a pending match with racks, shots and cue, then marks it synced', () async {
-      await matches().start(match('m1'));
-      await matches().recordShot(
-        'm1',
-        MatchShot(
-          id: 's1',
-          rackNumber: 1,
-          shotNumber: 1,
-          shooter: RackWinner.player,
-          type: MatchShotType.breakShot,
-          outcome: MatchShotOutcome.made,
-          recordedAt: DateTime.utc(2026, 10, 21, 8, 1),
-        ),
-      );
-      await matches().recordRack('m1', RackWinner.player);
-      Map<String, Object?>? uploaded;
-      server.routes['POST /items/pool_matches'] = (request) {
-        uploaded = FakeDirectus.body(request);
-        return FakeDirectus.ok({'id': 'm1'});
-      };
+    test(
+      'uploads a pending match with racks, shots and cue, then marks it synced',
+      () async {
+        await matches().start(match('m1'));
+        await matches().recordShot(
+          'm1',
+          MatchShot(
+            id: 's1',
+            rackNumber: 1,
+            shotNumber: 1,
+            shooter: RackWinner.player,
+            type: MatchShotType.breakShot,
+            outcome: MatchShotOutcome.made,
+            recordedAt: DateTime.utc(2026, 10, 21, 8, 1),
+          ),
+        );
+        await matches().recordRack('m1', RackWinner.player);
+        Map<String, Object?>? uploaded;
+        server.routes['POST /items/pool_matches'] = (request) {
+          uploaded = FakeDirectus.body(request);
+          return FakeDirectus.ok({'id': 'm1'});
+        };
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(uploaded, containsPair('id', 'm1'));
-      expect(uploaded!.containsKey('user_created'), isFalse);
-      expect(uploaded, containsPair('game_type', 'nineBall'));
-      expect(uploaded, containsPair('target_racks', 3));
-      expect(uploaded?['rack_winners'], ['player']);
-      expect((uploaded?['shots'] as List).single['type'], 'breakShot');
-      expect(uploaded?['cue_id'], isNull);
-      expect((uploaded?['updated_at'] as String).endsWith('Z'), isTrue);
-      expect(
-        (await db.select(db.poolMatchRows).get()).single.syncedAt,
-        isNotNull,
-      );
-    });
+        expect(uploaded, containsPair('id', 'm1'));
+        expect(uploaded!.containsKey('user_created'), isFalse);
+        expect(uploaded, containsPair('game_type', 'nineBall'));
+        expect(uploaded, containsPair('target_racks', 3));
+        expect(uploaded?['rack_winners'], ['player']);
+        expect((uploaded?['shots'] as List).single['type'], 'breakShot');
+        expect(uploaded?['cue_id'], isNull);
+        expect((uploaded?['updated_at'] as String).endsWith('Z'), isTrue);
+        expect(
+          (await db.select(db.poolMatchRows).get()).single.syncedAt,
+          isNotNull,
+        );
+      },
+    );
 
     test('keeps the cue id of a deleted cue when uploading', () async {
       await matches().start(match('m1'));
-      await (db.update(db.poolMatchRows)).write(
-        const PoolMatchRowsCompanion(cueId: Value('gone')),
-      );
+      await (db.update(db.poolMatchRows))
+          .write(const PoolMatchRowsCompanion(cueId: Value('gone')));
       Map<String, Object?>? uploaded;
       server.routes['POST /items/pool_matches'] = (request) {
         uploaded = FakeDirectus.body(request);
@@ -106,26 +108,29 @@ void main() {
       expect(uploaded?['cue_id'], 'gone');
     });
 
-    test('patches an existing remote match only when the local one is newer', () async {
-      await matches().start(match('m1'));
-      await matches().start(match('m2'));
-      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
-        _remoteMatch('m1', updatedAt: now.subtract(const Duration(hours: 1))),
-        _remoteMatch('m2', updatedAt: now.add(const Duration(hours: 1))),
-      ]);
-      Map<String, Object?>? patched;
-      server.routes['PATCH /items/pool_matches/m1'] = (request) {
-        patched = FakeDirectus.body(request);
-        return FakeDirectus.ok({'id': 'm1'});
-      };
+    test(
+      'patches an existing remote match only when the local one is newer',
+      () async {
+        await matches().start(match('m1'));
+        await matches().start(match('m2'));
+        server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+          _remoteMatch('m1', updatedAt: now.subtract(const Duration(hours: 1))),
+          _remoteMatch('m2', updatedAt: now.add(const Duration(hours: 1))),
+        ]);
+        Map<String, Object?>? patched;
+        server.routes['PATCH /items/pool_matches/m1'] = (request) {
+          patched = FakeDirectus.body(request);
+          return FakeDirectus.ok({'id': 'm1'});
+        };
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(patched, isNotNull);
-      expect(patched!.containsKey('id'), isFalse);
-      expect(server.sent('POST', '/items/pool_matches'), isEmpty);
-      expect(server.sent('PATCH', '/items/pool_matches/m2'), isEmpty);
-    });
+        expect(patched, isNotNull);
+        expect(patched!.containsKey('id'), isFalse);
+        expect(server.sent('POST', '/items/pool_matches'), isEmpty);
+        expect(server.sent('PATCH', '/items/pool_matches/m2'), isEmpty);
+      },
+    );
 
     test('a newer remote match replaces the local copy', () async {
       await matches().start(match('m1'));
@@ -188,59 +193,64 @@ void main() {
       expect(await svc.syncNow(), SyncOutcome.done);
 
       expect(server.sent('POST', '/items/pool_matches'), hasLength(1));
-      expect(
-        (await db.select(db.poolMatchRows).get()).single.syncedAt,
-        isNull,
-      );
+      expect((await db.select(db.poolMatchRows).get()).single.syncedAt, isNull);
     });
 
     test('never uploads another account\'s match', () async {
-      await DriftMatchRepository(db, userId: 'u2', now: () => now)
-          .start(match('theirs'));
+      await DriftMatchRepository(
+        db,
+        userId: 'u2',
+        now: () => now,
+      ).start(match('theirs'));
 
       expect(await service().syncNow(), SyncOutcome.done);
 
       expect(server.sent('POST', '/items/pool_matches'), isEmpty);
     });
 
-    test('an edit is pushed and a stale remote copy does not overwrite it', () async {
-      await matches().start(match('m1'));
-      await db.update(db.poolMatchRows).write(
-        PoolMatchRowsCompanion(syncedAt: Value(now)),
-      );
-      await DriftMatchRepository(
-        db,
-        userId: 'u1',
-        now: () => now.add(const Duration(hours: 2)),
-      ).updateDetails(
-        matchId: 'm1',
-        gameType: PoolGameType.tenBall,
-        playerName: 'An mới',
-        opponentName: 'Bình',
-        targetRacks: 5,
-      );
-      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
-        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
-      ]);
-      Map<String, Object?>? patched;
-      server.routes['PATCH /items/pool_matches/m1'] = (request) {
-        patched = FakeDirectus.body(request);
-        return FakeDirectus.ok({'id': 'm1'});
-      };
+    test(
+      'an edit is pushed and a stale remote copy does not overwrite it',
+      () async {
+        await matches().start(match('m1'));
+        await db
+            .update(db.poolMatchRows)
+            .write(PoolMatchRowsCompanion(syncedAt: Value(now)));
+        await DriftMatchRepository(
+          db,
+          userId: 'u1',
+          now: () => now.add(const Duration(hours: 2)),
+        ).updateDetails(
+          matchId: 'm1',
+          gameType: PoolGameType.tenBall,
+          playerName: 'An mới',
+          opponentName: 'Bình',
+          targetRacks: 5,
+          tournamentId: null,
+          roundLabel: null,
+        );
+        server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+          _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+        ]);
+        Map<String, Object?>? patched;
+        server.routes['PATCH /items/pool_matches/m1'] = (request) {
+          patched = FakeDirectus.body(request);
+          return FakeDirectus.ok({'id': 'm1'});
+        };
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(patched?['player_name'], 'An mới');
-      expect(patched?['target_racks'], 5);
-      expect(patched?['is_deleted'], false);
-      expect((await matches().watchAll().first).single.playerName, 'An mới');
-    });
+        expect(patched?['player_name'], 'An mới');
+        expect(patched?['target_racks'], 5);
+        expect(patched?['is_deleted'], false);
+        expect((await matches().watchAll().first).single.playerName, 'An mới');
+      },
+    );
 
     test('a deleted match is pushed as a tombstone and stays hidden', () async {
       await matches().start(match('m1'));
-      await db.update(db.poolMatchRows).write(
-        PoolMatchRowsCompanion(syncedAt: Value(now)),
-      );
+      await db
+          .update(db.poolMatchRows)
+          .write(PoolMatchRowsCompanion(syncedAt: Value(now)));
       await DriftMatchRepository(
         db,
         userId: 'u1',
@@ -282,85 +292,102 @@ void main() {
       expect(rows.every((row) => row.isDeleted), isTrue);
     });
 
-    test('a newer remote live match wins over an older local tombstone', () async {
-      await matches().start(match('m1'));
-      await matches().remove('m1');
-      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
-        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
-      ]);
+    test(
+      'a newer remote live match wins over an older local tombstone',
+      () async {
+        await matches().start(match('m1'));
+        await matches().remove('m1');
+        server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+          _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+        ]);
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(await matches().watchAll().first, hasLength(1));
-    });
+        expect(await matches().watchAll().first, hasLength(1));
+      },
+    );
 
-    test('an older remote live match does not revive a newer local tombstone', () async {
-      await matches().start(match('m1'));
-      await DriftMatchRepository(
-        db,
-        userId: 'u1',
-        now: () => now.add(const Duration(hours: 2)),
-      ).remove('m1');
-      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
-        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
-      ]);
-      server.routes['PATCH /items/pool_matches/m1'] = (_) =>
-          FakeDirectus.ok({'id': 'm1'});
+    test(
+      'an older remote live match does not revive a newer local tombstone',
+      () async {
+        await matches().start(match('m1'));
+        await DriftMatchRepository(
+          db,
+          userId: 'u1',
+          now: () => now.add(const Duration(hours: 2)),
+        ).remove('m1');
+        server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+          _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+        ]);
+        server.routes['PATCH /items/pool_matches/m1'] = (_) =>
+            FakeDirectus.ok({'id': 'm1'});
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(await matches().watchAll().first, isEmpty);
-    });
+        expect(await matches().watchAll().first, isEmpty);
+      },
+    );
   });
 
   group('timer sessions', () {
-    test('uploads own sessions only and never the orphan rows without an owner', () async {
-      await DriftTimerSessionRepository(db, userId: 'u1').add(
-        TimerSession(
-          id: 't1',
-          date: DateTime.utc(2026, 10, 21, 7),
-          durationSec: 900,
-          cat: SkillCategory.aiming,
-        ),
-      );
-      await db.into(db.timerSessionRows).insert(
-        TimerSessionRowsCompanion.insert(
-          id: 'orphan',
-          date: DateTime.utc(2026, 10, 1),
-          durationSec: 60,
-        ),
-      );
-      await db.into(db.timerSessionRows).insert(
-        TimerSessionRowsCompanion.insert(
-          id: 'other',
-          userId: const Value('u2'),
-          date: DateTime.utc(2026, 10, 1),
-          durationSec: 60,
-        ),
-      );
-      final uploaded = <Map<String, Object?>>[];
-      server.routes['POST /items/timer_sessions'] = (request) {
-        uploaded.add(FakeDirectus.body(request));
-        return FakeDirectus.ok({'id': 't1'});
-      };
+    test(
+      'uploads own sessions only and never the orphan rows without an owner',
+      () async {
+        await DriftTimerSessionRepository(db, userId: 'u1').add(
+          TimerSession(
+            id: 't1',
+            date: DateTime.utc(2026, 10, 21, 7),
+            durationSec: 900,
+            cat: SkillCategory.aiming,
+          ),
+        );
+        await db
+            .into(db.timerSessionRows)
+            .insert(
+              TimerSessionRowsCompanion.insert(
+                id: 'orphan',
+                date: DateTime.utc(2026, 10, 1),
+                durationSec: 60,
+              ),
+            );
+        await db
+            .into(db.timerSessionRows)
+            .insert(
+              TimerSessionRowsCompanion.insert(
+                id: 'other',
+                userId: const Value('u2'),
+                date: DateTime.utc(2026, 10, 1),
+                durationSec: 60,
+              ),
+            );
+        final uploaded = <Map<String, Object?>>[];
+        server.routes['POST /items/timer_sessions'] = (request) {
+          uploaded.add(FakeDirectus.body(request));
+          return FakeDirectus.ok({'id': 't1'});
+        };
 
-      expect(await service().syncNow(), SyncOutcome.done);
+        expect(await service().syncNow(), SyncOutcome.done);
 
-      expect(uploaded, hasLength(1));
-      expect(uploaded.single, containsPair('id', 't1'));
-      expect(uploaded.single, containsPair('duration_sec', 900));
-      expect(uploaded.single, containsPair('cat', 'aiming'));
-      final rows = {
-        for (final r in await db.select(db.timerSessionRows).get()) r.id: r,
-      };
-      expect(rows['t1']!.syncedAt, isNotNull);
-      expect(rows['orphan']!.syncedAt, isNull);
-      expect(rows['other']!.syncedAt, isNull);
-    });
+        expect(uploaded, hasLength(1));
+        expect(uploaded.single, containsPair('id', 't1'));
+        expect(uploaded.single, containsPair('duration_sec', 900));
+        expect(uploaded.single, containsPair('cat', 'aiming'));
+        final rows = {
+          for (final r in await db.select(db.timerSessionRows).get()) r.id: r,
+        };
+        expect(rows['t1']!.syncedAt, isNotNull);
+        expect(rows['orphan']!.syncedAt, isNull);
+        expect(rows['other']!.syncedAt, isNull);
+      },
+    );
 
     test('a duplicate id counts as already uploaded', () async {
       await DriftTimerSessionRepository(db, userId: 'u1').add(
-        TimerSession(id: 't1', date: DateTime.utc(2026, 10, 21), durationSec: 60),
+        TimerSession(
+          id: 't1',
+          date: DateTime.utc(2026, 10, 21),
+          durationSec: 60,
+        ),
       );
       server.routes['POST /items/timer_sessions'] = (_) =>
           FakeDirectus.error(400, 'RECORD_NOT_UNIQUE');
@@ -375,7 +402,11 @@ void main() {
 
     test('pulls sessions add-only and never overwrites a local one', () async {
       await DriftTimerSessionRepository(db, userId: 'u1').add(
-        TimerSession(id: 't1', date: DateTime.utc(2026, 10, 21), durationSec: 60),
+        TimerSession(
+          id: 't1',
+          date: DateTime.utc(2026, 10, 21),
+          durationSec: 60,
+        ),
       );
       server.routes['POST /items/timer_sessions'] = (_) =>
           FakeDirectus.ok({'id': 't1'});
@@ -458,8 +489,9 @@ void main() {
     });
 
     test('downloads a slot made on another device', () async {
-      server.routes['GET /items/schedule_slots'] = (_) =>
-          FakeDirectus.ok([_remoteSlot('s2', label: 'Từ máy khác', cat: 'safety')]);
+      server.routes['GET /items/schedule_slots'] = (_) => FakeDirectus.ok([
+        _remoteSlot('s2', label: 'Từ máy khác', cat: 'safety'),
+      ]);
 
       expect(await service().syncNow(), SyncOutcome.done);
 
@@ -469,14 +501,16 @@ void main() {
     });
 
     test('does not upload orphan slots without an owner', () async {
-      await db.into(db.scheduleSlotRows).insert(
-        ScheduleSlotRowsCompanion.insert(
-          id: 'orphan',
-          day: 1,
-          time: '10:00',
-          label: 'Mồ côi',
-        ),
-      );
+      await db
+          .into(db.scheduleSlotRows)
+          .insert(
+            ScheduleSlotRowsCompanion.insert(
+              id: 'orphan',
+              day: 1,
+              time: '10:00',
+              label: 'Mồ côi',
+            ),
+          );
 
       expect(await service().syncNow(), SyncOutcome.done);
 
@@ -519,10 +553,7 @@ void main() {
     server.offline = true;
 
     expect(await service().syncNow(), SyncOutcome.offline);
-    expect(
-      (await db.select(db.poolMatchRows).get()).single.syncedAt,
-      isNull,
-    );
+    expect((await db.select(db.poolMatchRows).get()).single.syncedAt, isNull);
   });
 }
 

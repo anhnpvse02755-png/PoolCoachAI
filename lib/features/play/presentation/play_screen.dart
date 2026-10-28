@@ -439,7 +439,9 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 DropdownButtonFormField<PoolGameType>(
                   key: const Key('edit-match-game-type'),
                   initialValue: gameType,
-                  decoration: const InputDecoration(labelText: Vi.matchGameType),
+                  decoration: const InputDecoration(
+                    labelText: Vi.matchGameType,
+                  ),
                   items: PoolGameType.values
                       .map(
                         (type) => DropdownMenuItem(
@@ -528,6 +530,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             playerName: playerName,
             opponentName: opponentName,
             targetRacks: targetRacks,
+            tournamentId: match.tournamentId,
+            roundLabel: match.roundLabel,
           );
     } catch (error) {
       debugPrint('Pool match details update failed: $error');

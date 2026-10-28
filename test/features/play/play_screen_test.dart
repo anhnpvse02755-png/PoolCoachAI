@@ -35,6 +35,8 @@ class _FailingMatchRepository implements MatchRepository {
     required String playerName,
     required String opponentName,
     required int targetRacks,
+    required String? tournamentId,
+    required String? roundLabel,
   }) => Future.error(StateError('lỗi giả lập khi sửa trận'));
 
   @override
@@ -246,7 +248,10 @@ void main() {
     expect(match.playerName, 'An mới');
     expect(match.opponentName, 'Bình mới');
     expect(match.rackWinners, contains('player'));
-    expect(find.text(Vi.matchScore('An mới', 1, 0, 'Bình mới')), findsOneWidget);
+    expect(
+      find.text(Vi.matchScore('An mới', 1, 0, 'Bình mới')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

@@ -26,6 +26,7 @@ GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
           eventDate: r.eventDate,
           createdAt: r.createdAt!,
           targetRank: _rankOrNull(r.targetRank),
+          tournamentId: r.tournamentId,
         ),
 );
 
@@ -41,12 +42,13 @@ PlayerGoalRow toGoalRow(
   eventDate: g.goal?.eventDate,
   createdAt: g.goal?.createdAt,
   targetRank: g.goal?.targetRank?.name,
+  tournamentId: g.goal?.tournamentId,
   updatedAt: g.updatedAt,
   syncedAt: syncedAt,
 );
 
 const remoteGoalFields =
-    'id,goal_id,kind,category,event_date,created_at,updated_at,target_rank';
+    'id,goal_id,kind,category,event_date,created_at,updated_at,target_rank,tournament_id';
 
 /// Dòng mục tiêu cho `POST /items/player_goals` (id là id người dùng, R1).
 Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
@@ -56,6 +58,7 @@ Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
   'category': r.category,
   'event_date': _iso(r.eventDate),
   'target_rank': r.targetRank,
+  'tournament_id': r.tournamentId,
   'created_at': _iso(r.createdAt),
   'updated_at': _iso(r.updatedAt),
 };
@@ -77,6 +80,7 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
               j['kind'] == GoalKind.lenHang.name && j['target_rank'] != null
               ? _rankOrNull(j['target_rank'] as String?)
               : null,
+          tournamentId: j['tournament_id'] as String?,
         ),
 );
 

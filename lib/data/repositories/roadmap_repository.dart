@@ -35,6 +35,7 @@ class RoadmapRepository {
     SkillCategory? category,
     DateTime? eventDate,
     Rank? targetRank,
+    String? tournamentId,
   }) {
     final now = _now();
     return _write(
@@ -49,6 +50,7 @@ class RoadmapRepository {
               : null,
           targetRank: kind == GoalKind.lenHang ? targetRank : null,
           createdAt: now,
+          tournamentId: kind == GoalKind.chuanBiGiai ? tournamentId : null,
         ),
       ),
     );

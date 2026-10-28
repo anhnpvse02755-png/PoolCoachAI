@@ -9,6 +9,8 @@ abstract interface class MatchRepository {
     required String playerName,
     required String opponentName,
     required int targetRacks,
+    required String? tournamentId,
+    required String? roundLabel,
   });
   Future<void> remove(String matchId);
   Future<void> recordRack(String matchId, RackWinner winner);
@@ -34,6 +36,8 @@ class SignedOutMatchRepository implements MatchRepository {
     required String playerName,
     required String opponentName,
     required int targetRacks,
+    required String? tournamentId,
+    required String? roundLabel,
   }) => Future.error(
     StateError('Chưa đăng nhập thì không sửa thông tin trận đấu được'),
   );
