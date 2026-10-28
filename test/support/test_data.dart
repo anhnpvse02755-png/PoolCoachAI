@@ -96,6 +96,7 @@ ProviderContainer testContainer({
   Stream<List<CueEquipment>>? equipmentStream,
   List<PoolMatch>? matches,
   Stream<List<PoolMatch>>? matchesStream,
+  AsyncValue<List<PoolMatch>>? matchesAsync,
   DateTime? now,
   AuthRepository? auth,
   PlayerRank? rank,
@@ -166,9 +167,15 @@ ProviderContainer testContainer({
             equipmentStream ??
             Stream.value(equipment ?? const <CueEquipment>[]),
       ),
-      matchesProvider.overrideWith(
-        (ref) => matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
-      ),
+      // `matchesAsync` thắng `matchesStream` và `matches`: dựng thẳng một
+      // AsyncValue (lỗi, hoặc đang tải lại còn giá trị cũ).
+      if (matchesAsync != null)
+        matchesProvider.overrideWithValue(matchesAsync)
+      else
+        matchesProvider.overrideWith(
+          (ref) =>
+              matchesStream ?? Stream.value(matches ?? const <PoolMatch>[]),
+        ),
       authRepositoryProvider.overrideWithValue(
         auth ?? FakeAuthRepository.signedIn(),
       ),

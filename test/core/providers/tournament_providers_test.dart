@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/domain/tournament/tournament_goal.dart';
 
@@ -33,6 +34,7 @@ ProviderContainer make({
   GoalRecord? goal,
   AsyncValue<List<Tournament>>? async,
   AsyncValue<GoalRecord?>? goalAsync,
+  AsyncValue<List<PoolMatch>>? matchesAsync,
 }) {
   final c = testContainer(
     tournaments: ts,
@@ -40,6 +42,7 @@ ProviderContainer make({
     goal: goal,
     tournamentsAsync: async,
     goalAsync: goalAsync,
+    matchesAsync: matchesAsync,
     now: tToday,
   );
   addTearDown(c.dispose);
@@ -193,7 +196,10 @@ void main() {
     // ignore: invalid_use_of_internal_member
     final stale = const AsyncLoading<GoalRecord?>().copyWithPrevious(
       AsyncData<GoalRecord?>(
-        GoalRecord(updatedAt: tToday, goal: prepGoal(tDay(5))),
+        GoalRecord(
+          updatedAt: tToday,
+          goal: prepGoal(tDay(5), tournamentId: 'up'),
+        ),
       ),
     );
     final c = make(ts: [up], goalAsync: stale);
@@ -252,6 +258,85 @@ void main() {
       expect(c.read(tournamentGoalStateProvider('u1-giai')).value, isNull);
     },
   );
+
+  test('nguồn trận lỗi: tổng kết, so sánh, trang giải và đầu vào bắt đầu trận '
+      'thành lỗi, không quay mãi', () async {
+    final c = make(
+      ts: [on],
+      matchesAsync: AsyncError<List<PoolMatch>>(
+        StateError('hỏng'),
+        StackTrace.empty,
+      ),
+    );
+    c.listen(startMatchInputsProvider, (_, _) {});
+    await settle();
+    expect(
+      [
+        c.read(tournamentSummariesProvider).hasError,
+        c.read(tournamentComparisonProvider).hasError,
+        c.read(tournamentViewProvider('on')).hasError,
+        c.read(startMatchInputsProvider).hasError,
+        // Không phụ thuộc trận: vẫn dùng được.
+        c.read(tournamentGroupsProvider).hasValue,
+      ],
+      [true, true, true, true, true],
+    );
+  });
+
+  test('đang tải lại còn trận của người trước: là đang tải, không lộ tổng kết '
+      'cũ', () async {
+    // ignore: invalid_use_of_internal_member
+    final stale = const AsyncLoading<List<PoolMatch>>().copyWithPrevious(
+      AsyncData<List<PoolMatch>>([tMatch('a', tournamentId: 'on')]),
+    );
+    final c = make(ts: [on], matchesAsync: stale);
+    c.listen(startMatchInputsProvider, (_, _) {});
+    await settle();
+    expect(
+      [
+        c.read(tournamentSummariesProvider),
+        c.read(tournamentComparisonProvider),
+        c.read(tournamentViewProvider('on')),
+        c.read(startMatchInputsProvider),
+      ].map((v) => [v.isLoading, v.value]),
+      everyElement([true, null]),
+    );
+  });
+
+  test(
+    'mã giải không có: trang giải là dữ liệu null, không phải lỗi hay tải',
+    () async {
+      final c = make(ts: [on]);
+      c.listen(tournamentViewProvider('missing'), (_, _) {});
+      await settle();
+      final v = c.read(tournamentViewProvider('missing'));
+      expect(
+        [v.hasValue, v.isLoading, v.hasError, v.value],
+        [true, false, false, null],
+      );
+    },
+  );
+
+  test('mục tiêu cũ còn tournament_id nhưng sai loại: không có liên kết và '
+      'trạng thái nút là mục tiêu khác', () async {
+    final stale = PlayerGoal(
+      goalId: 'g',
+      kind: GoalKind.thuanThucKyNang,
+      category: SkillCategory.aiming,
+      createdAt: tToday,
+      tournamentId: 'up',
+    );
+    final c = make(
+      ts: [up],
+      goal: GoalRecord(updatedAt: tToday, goal: stale),
+    );
+    await settle();
+    expect(c.read(linkedTournamentProvider).value, isNull);
+    expect(c.read(tournamentGoalStateProvider('up')).value, (
+      state: TournamentGoalState.otherGoal,
+      currentKind: GoalKind.thuanThucKyNang,
+    ));
+  });
 
   group('startMatchInputsProvider (qua cổng)', () {
     test('đủ nguồn: cơ, trận và giải', () async {
