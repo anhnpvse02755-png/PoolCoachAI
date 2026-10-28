@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/domain/tournament/tournament_lists.dart';
 
@@ -209,4 +210,84 @@ void main() {
       'old',
     ]),
   );
+
+  group('độ dài tính theo ký tự Unicode và khoảng trắng', () {
+    test('80 ký tự ngoài BMP hợp lệ, 81 là nameTooLong', () {
+      expect(tournamentInputErrors(draft(name: '😀' * 80)), isEmpty);
+      expect(tournamentInputErrors(draft(name: '😀' * 81)), {
+        TournamentInputError.nameTooLong,
+      });
+    });
+    test('chữ tuỳ chọn đúng giới hạn, có khoảng trắng quanh, vẫn hợp lệ', () {
+      expect(
+        tournamentInputErrors(
+          draft(
+            location: '  ${'a' * 120}  ',
+            result: ' ${'b' * 120} ',
+            notes: '\n${'c' * 500}\n',
+          ),
+        ),
+        isEmpty,
+      );
+      expect(
+        tournamentInputErrors(
+          draft(location: 'a' * 121, result: 'b' * 121, notes: 'c' * 501),
+        ),
+        {
+          TournamentInputError.locationTooLong,
+          TournamentInputError.resultNoteTooLong,
+          TournamentInputError.notesTooLong,
+        },
+      );
+    });
+    test('chữ tuỳ chọn chỉ có khoảng trắng được chấp nhận', () {
+      expect(
+        tournamentInputErrors(
+          draft(location: '   ', result: ' ', notes: '\n\t'),
+        ),
+        isEmpty,
+      );
+    });
+  });
+  group('Tournament ==/hashCode', () {
+    Tournament base({
+      String id = 'a',
+      String name = 'n',
+      DateTime? start,
+      DateTime? end,
+      String? location,
+      PoolGameType? gameType,
+      String? resultNote,
+      String? notes,
+    }) => Tournament(
+      id: id,
+      name: name,
+      startDate: start ?? tDay(0),
+      endDate: end,
+      location: location,
+      gameType: gameType,
+      resultNote: resultNote,
+      notes: notes,
+    );
+    test('trường giống hệt thì bằng nhau và cùng hashCode', () {
+      expect(base(), base());
+      expect(base().hashCode, base().hashCode);
+    });
+    test('khác đúng một trường thì khác', () {
+      final others = [
+        base(id: 'b'),
+        base(name: 'm'),
+        base(start: tDay(1)),
+        base(end: tDay(2)),
+        base(location: 'x'),
+        base(gameType: PoolGameType.nineBall),
+        base(resultNote: 'x'),
+        base(notes: 'x'),
+      ];
+      for (final o in others) {
+        expect(o == base(), isFalse);
+        expect(o.hashCode == base().hashCode, isFalse);
+      }
+    });
+  });
 }
