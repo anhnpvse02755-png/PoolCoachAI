@@ -28,6 +28,7 @@ void main() {
           date: DateTime(2026, 9, 20 + i),
           score: 8 + i,
           attempts: 10,
+          durationSec: i == 0 ? 300 : null,
         ),
     ],
     timerSessions: [
@@ -86,8 +87,18 @@ void main() {
     expect(find.text(Vi.statsOverview), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
     expect(find.text('1 giờ 0 phút'), findsNWidgets(2));
+    expect(find.text(Vi.statsDrillDurationValue(300, 1)), findsOneWidget);
     expect(find.text(Vi.statsMatchCount(1, 1)), findsOneWidget);
     expect(find.text('1 / 0'), findsOneWidget);
+    expect(find.text(Vi.statsCombinedSummary(3, 1, 2, 1)), findsOneWidget);
+    expect(
+      find.text(Vi.statsCombinedDayLabel(DateTime.monday)),
+      findsOneWidget,
+    );
+    expect(
+      find.text(Vi.statsCombinedDayLabel(DateTime.tuesday)),
+      findsOneWidget,
+    );
     await tester.scrollUntilVisible(
       find.text(Vi.statsMatchDetails),
       250,
@@ -359,8 +370,9 @@ void main() {
       const rows = [
         [Vi.statsTotalSessions, Vi.statsDrillSessions],
         [Vi.statsTimerSessions, Vi.statsTimerTotal],
-        [Vi.statsTimerWeek, Vi.statsStreak],
-        [Vi.statsRecordedMatches, Vi.statsMatchWinsLosses],
+        [Vi.statsDrillDurationTotal, Vi.statsTimerWeek],
+        [Vi.statsStreak, Vi.statsRecordedMatches],
+        [Vi.statsMatchWinsLosses, Vi.statsRecordedShots],
       ];
       for (final row in rows) {
         final tallest = row.map(natural).reduce(math.max);

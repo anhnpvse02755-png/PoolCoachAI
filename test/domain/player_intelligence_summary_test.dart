@@ -130,6 +130,57 @@ void main() {
   });
 
   group('isReadyForLevelUp', () {
+    test('đếm chuỗi đạt gần nhất và dừng ở buổi chưa đạt', () {
+      expect(
+        consecutivePassCount(_d1, [
+          _log('d1', 1, 10, 10),
+          _log('d1', 2, 5, 10),
+          _log('d1', 3, 8, 10),
+          _log('d1', 4, 10, 10),
+        ]),
+        2,
+      );
+    });
+
+    test('chuỗi được giới hạn ở số buổi cần thiết', () {
+      expect(
+        consecutivePassCount(_d1, [
+          _log('d1', 1, 10, 10),
+          _log('d1', 2, 10, 10),
+          _log('d1', 3, 10, 10),
+          _log('d1', 4, 10, 10),
+        ]),
+        3,
+      );
+    });
+
+    test('thời điểm và ID xác định buổi mới nhất khi đầu vào không có thứ tự', () {
+      expect(
+        consecutivePassCount(_d1, [
+          _log('d1', 3, 10, 10),
+          _log('d1', 1, 10, 10),
+          _log('d1', 2, 5, 10),
+        ]),
+        1,
+      );
+    });
+
+    test('log không chấm được làm đứt chuỗi đạt', () {
+      expect(
+        consecutivePassCount(_d1, [
+          _log('d1', 1, 10, 10),
+          _log('d1', 2, 10, 10),
+          DrillLog(
+            id: 'd1-3',
+            drillId: 'd1',
+            date: DateTime(2026, 9, 3),
+            score: 10,
+          ),
+        ]),
+        0,
+      );
+    });
+
     test('chưa đủ số buổi liên tiếp thì chưa sẵn sàng', () {
       expect(
         isReadyForLevelUp(_d1, [_log('d1', 1, 10, 10), _log('d1', 2, 10, 10)]),

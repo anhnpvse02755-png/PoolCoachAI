@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
@@ -383,6 +385,157 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
   }
 
+  Future<void> _removeMatch(PoolMatch match) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(Vi.matchDeleteTitle),
+        content: const Text(Vi.matchDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(Vi.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(Vi.matchDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _mutating = true);
+    try {
+      await ref.read(matchRepositoryProvider).remove(match.id);
+    } catch (error) {
+      debugPrint('Pool match deletion failed: $error');
+      if (mounted) _showMessage(Vi.matchDeleteFailed);
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
+  Future<void> _editMatch(PoolMatch match) async {
+    final formKey = GlobalKey<FormState>();
+    var gameType = match.gameType;
+    var targetRacks = match.targetRacks;
+    var playerName = match.playerName;
+    var opponentName = match.opponentName;
+    final leaderWins = math.max(match.playerScore, match.opponentScore);
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
+        title: const Text(Vi.matchEditTitle),
+        content: SizedBox(
+          width: 400,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<PoolGameType>(
+                  key: const Key('edit-match-game-type'),
+                  initialValue: gameType,
+                  decoration: const InputDecoration(labelText: Vi.matchGameType),
+                  items: PoolGameType.values
+                      .map(
+                        (type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(Vi.matchGameTypeName(type)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) gameType = value;
+                  },
+                ),
+                TextFormField(
+                  key: const Key('edit-match-player-name'),
+                  initialValue: playerName,
+                  decoration: const InputDecoration(
+                    labelText: Vi.matchPlayerName,
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  onSaved: (value) => playerName = value?.trim() ?? '',
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? Vi.matchNameRequired
+                      : null,
+                ),
+                TextFormField(
+                  key: const Key('edit-match-opponent-name'),
+                  initialValue: opponentName,
+                  decoration: const InputDecoration(
+                    labelText: Vi.matchOpponentName,
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  onSaved: (value) => opponentName = value?.trim() ?? '',
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? Vi.matchNameRequired
+                      : null,
+                ),
+                DropdownButtonFormField<int>(
+                  key: const Key('edit-match-target'),
+                  initialValue: targetRacks,
+                  decoration: const InputDecoration(labelText: Vi.matchTarget),
+                  items: const [3, 5, 7, 9]
+                      .map(
+                        (target) => DropdownMenuItem(
+                          value: target,
+                          child: Text(Vi.matchRaceTo(target)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) targetRacks = value;
+                  },
+                  validator: (value) => value != null && value < leaderWins
+                      ? Vi.matchTargetBelowLeader(leaderWins)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text(Vi.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                formKey.currentState!.save();
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            child: const Text(Vi.matchSaveDetails),
+          ),
+        ],
+      ),
+    );
+    if (save != true || !mounted) return;
+
+    setState(() => _mutating = true);
+    try {
+      await ref
+          .read(matchRepositoryProvider)
+          .updateDetails(
+            matchId: match.id,
+            gameType: gameType,
+            playerName: playerName,
+            opponentName: opponentName,
+            targetRacks: targetRacks,
+          );
+    } catch (error) {
+      debugPrint('Pool match details update failed: $error');
+      if (mounted) _showMessage(Vi.matchEditFailed);
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -412,7 +565,30 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                Text(match.isComplete ? Vi.matchCompleted : Vi.matchInProgress),
+                Flexible(
+                  child: Text(
+                    match.isComplete ? Vi.matchCompleted : Vi.matchInProgress,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  key: Key('edit-match-${match.id}'),
+                  tooltip: Vi.matchEdit,
+                  onPressed: _mutating ? null : () => _editMatch(match),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  key: Key('delete-match-${match.id}'),
+                  tooltip: Vi.matchDelete,
+                  onPressed: _mutating ? null : () => _removeMatch(match),
+                  icon: const Icon(Icons.delete_outline),
+                ),
               ],
             ),
             const SizedBox(height: 8),

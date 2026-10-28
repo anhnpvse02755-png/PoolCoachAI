@@ -17,7 +17,7 @@ const _slotsPath = '/items/schedule_slots';
 
 const poolMatchRemoteFields =
     'id,user_created,game_type,player_name,opponent_name,target_racks,'
-    'rack_winners,shots,cue_id,started_at,completed_at,updated_at';
+    'rack_winners,shots,cue_id,started_at,completed_at,updated_at,is_deleted';
 const timerSessionRemoteFields =
     'id,user_created,date,duration_sec,cat,cue_id';
 const scheduleSlotRemoteFields =
@@ -227,6 +227,7 @@ class PracticeSyncService {
           'started_at': row.startedAt.toUtc().toIso8601String(),
           'completed_at': row.completedAt?.toUtc().toIso8601String(),
           'updated_at': sentAt.toUtc().toIso8601String(),
+          'is_deleted': row.isDeleted,
         },
         rejectedKey: key,
         userId: userId,
@@ -238,7 +239,8 @@ class PracticeSyncService {
         )..where((r) => r.id.equals(row.id))).getSingleOrNull();
         if (current == null ||
             current.userId != row.userId ||
-            current.updatedAt != row.updatedAt) {
+            current.updatedAt != row.updatedAt ||
+            current.isDeleted != row.isDeleted) {
           return;
         }
         await (_db.update(
@@ -317,6 +319,7 @@ class PracticeSyncService {
       startedAt: Value(_date(item, 'started_at').toLocal()),
       completedAt: Value(_nullableDate(item, 'completed_at')),
       updatedAt: Value(_date(item, 'updated_at')),
+      isDeleted: Value(item['is_deleted'] == true),
       syncedAt: Value(syncedAt),
     );
   }
@@ -587,7 +590,8 @@ class PracticeSyncService {
   }
 
   String _matchRevision(PoolMatchRow row) =>
-      '${row.userId}:${row.updatedAt?.toIso8601String() ?? "unversioned"}';
+      '${row.userId}:${row.updatedAt?.toIso8601String() ?? "unversioned"}:'
+      '${row.isDeleted}';
 
   String _slotRevision(ScheduleSlotRow row) =>
       '${row.userId}:${row.updatedAt?.toIso8601String() ?? "unversioned"}:'

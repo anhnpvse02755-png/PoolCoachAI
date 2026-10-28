@@ -79,6 +79,13 @@ class StatsScreen extends ConsumerWidget {
                 value: Vi.statsDuration(statistics.totalTimerSeconds),
               ),
               _MetricCard(
+                label: Vi.statsDrillDurationTotal,
+                value: Vi.statsDrillDurationValue(
+                  statistics.totalDrillSeconds,
+                  statistics.timedDrillSessionCount,
+                ),
+              ),
+              _MetricCard(
                 label: Vi.statsTimerWeek,
                 value: Vi.statsDuration(statistics.timerSecondsThisWeek),
               ),
@@ -103,6 +110,8 @@ class StatsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _CombinedTrainingPlayCard(stats: statistics.combinedTrainingPlay),
           const SizedBox(height: 8),
           PcCard(
             child: Column(
@@ -234,6 +243,154 @@ class StatsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _CombinedTrainingPlayCard extends StatelessWidget {
+  const _CombinedTrainingPlayCard({required this.stats});
+
+  final CombinedTrainingPlayStatistics stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCount = stats.days.fold<int>(
+      1,
+      (maxValue, day) => [
+        maxValue,
+        day.trainingSessions,
+        day.matches,
+      ].reduce((a, b) => a > b ? a : b),
+    );
+    final colors = Theme.of(context).colorScheme;
+    return PcCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            Vi.statsCombinedTitle,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            Vi.statsCombinedSummary(
+              stats.trainingSessionCount,
+              stats.matchCount,
+              stats.activeDays,
+              stats.sharedDays,
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (stats.trainingSessionCount + stats.matchCount == 0) ...[
+            const SizedBox(height: 8),
+            const Text(Vi.statsCombinedEmpty),
+          ] else ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 88,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final day in stats.days)
+                    Expanded(
+                      child: Semantics(
+                        label: Vi.statsCombinedDaySemantics(
+                          day.date.weekday,
+                          day.trainingSessions,
+                          day.matches,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _ActivityBar(
+                                    count: day.trainingSessions,
+                                    maxCount: maxCount,
+                                    color: colors.primary,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  _ActivityBar(
+                                    count: day.matches,
+                                    maxCount: maxCount,
+                                    color: colors.tertiary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(Vi.statsCombinedDayLabel(day.date.weekday)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: [
+                _ActivityLegend(
+                  color: colors.primary,
+                  label: Vi.statsCombinedTraining,
+                ),
+                _ActivityLegend(
+                  color: colors.tertiary,
+                  label: Vi.statsCombinedPlay,
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityBar extends StatelessWidget {
+  const _ActivityBar({
+    required this.count,
+    required this.maxCount,
+    required this.color,
+  });
+
+  final int count;
+  final int maxCount;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 8,
+    height: count == 0 ? 2 : 8 + 34 * count / maxCount,
+    decoration: BoxDecoration(
+      color: count == 0 ? color.withValues(alpha: 0.18) : color,
+      borderRadius: BorderRadius.circular(4),
+    ),
+  );
+}
+
+class _ActivityLegend extends StatelessWidget {
+  const _ActivityLegend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
+    ],
+  );
 }
 
 class _CueWinRateCard extends StatelessWidget {

@@ -114,6 +114,7 @@ if (!hasCollection) {
       { field: 'score', type: 'float', schema: { is_nullable: false } },
       { field: 'attempts', type: 'integer', schema: { is_nullable: true } },
       { field: 'notes', type: 'text', schema: { is_nullable: true } },
+      { field: 'duration_sec', type: 'integer', schema: { is_nullable: true } },
       {
         field: 'user_created',
         type: 'uuid',
@@ -129,6 +130,24 @@ if (!hasCollection) {
     ],
   }, token);
   console.log('Tạo collection drill_logs');
+}
+
+const hasDrillDuration = await api(
+  'GET',
+  '/fields/drill_logs/duration_sec',
+  undefined,
+  token,
+).then(
+  () => true,
+  (e) => (e.status === 403 || e.status === 404 ? false : Promise.reject(e)),
+);
+if (!hasDrillDuration) {
+  await api('POST', '/fields/drill_logs', {
+    field: 'duration_sec',
+    type: 'integer',
+    schema: { is_nullable: true },
+  }, token);
+  console.log('Tạo trường drill_logs.duration_sec');
 }
 
 const hasRelation = await api('GET', '/relations/drill_logs/user_created', undefined, token).then(
@@ -326,8 +345,8 @@ await ensureCollection('cue_equipment', 'Hồ sơ cơ và lịch bảo dưỡng 
 ]);
 
 // Trận đấu (kèm rack và cú đánh như app lưu), buổi tập tự do và lịch tập tuần.
-// pool_matches và schedule_slots: bản sửa mới nhất thắng (updated_at); lịch xóa
-// bằng tombstone. timer_sessions: chỉ thêm. cue_id là chuỗi thường, không phải
+// pool_matches và schedule_slots: bản sửa mới nhất thắng (updated_at); trận và
+// lịch xóa bằng tombstone (is_deleted). timer_sessions: chỉ thêm. cue_id là chuỗi thường, không phải
 // quan hệ: trận và buổi tập giữ cue_id cả khi cơ đã bị xóa mềm.
 await ensureCollection('pool_matches', 'Trận đấu của người chơi, gồm rack và cú đánh', [
   pk,
@@ -341,6 +360,9 @@ await ensureCollection('pool_matches', 'Trận đấu của người chơi, gồ
   required('started_at', 'timestamp'),
   nullable('completed_at', 'timestamp'),
   required('updated_at', 'timestamp'),
+  // Có default false vì bảng đã có trận trên server: thêm cột NOT NULL không
+  // default vào bảng có dữ liệu sẽ lỗi trên Postgres.
+  { field: 'is_deleted', type: 'boolean', schema: { is_nullable: false, default_value: false } },
 ]);
 await ensureCollection('timer_sessions', 'Buổi tập tự do đo bằng đồng hồ — chỉ thêm', [
   pk,
@@ -407,7 +429,7 @@ const desiredPermissions = [
   {
     collection: 'drill_logs',
     action: 'create',
-    fields: ['id', 'drill_id', 'date', 'score', 'attempts', 'notes'],
+    fields: ['id', 'drill_id', 'date', 'score', 'attempts', 'notes', 'duration_sec'],
     permissions: {},
     validation: {},
   },
@@ -531,12 +553,12 @@ const desiredPermissions = [
     permissions: { user_created: self },
     validation: {},
   },
-  // Trận đấu: sửa được (rack, cú đánh); không xoá.
+  // Trận đấu: sửa được (rack, cú đánh); xóa chỉ bằng tombstone is_deleted.
   {
     collection: 'pool_matches',
     action: 'create',
     fields: ['id', 'game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
-      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at'],
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted'],
     permissions: {},
     validation: {},
   },
@@ -545,7 +567,7 @@ const desiredPermissions = [
     collection: 'pool_matches',
     action: 'update',
     fields: ['game_type', 'player_name', 'opponent_name', 'target_racks', 'rack_winners',
-      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at'],
+      'shots', 'cue_id', 'started_at', 'completed_at', 'updated_at', 'is_deleted'],
     permissions: { user_created: self },
     validation: {},
   },

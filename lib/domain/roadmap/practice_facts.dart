@@ -1,6 +1,5 @@
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
-import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
@@ -52,13 +51,7 @@ final class PracticeFacts {
   /// Số buổi đạt liên tiếp gần nhất, tối đa [PracticeConstants.readyStreak].
   int passStreak(Drill? d) {
     if (d == null) return 0;
-    var n = 0;
-    for (final log in logsOf(d.id).reversed) {
-      final ratio = drillRatio(d, log);
-      if (ratio == null || ratio < 1) break;
-      if (++n == PracticeConstants.readyStreak) break;
-    }
-    return n;
+    return consecutivePassCount(d, logsOf(d.id));
   }
 
   /// Bước nhóm xong: từ 75 **và** bài của bước đủ điều kiện lên cấp (mục 4.4).

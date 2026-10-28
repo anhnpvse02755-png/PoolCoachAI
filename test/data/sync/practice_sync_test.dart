@@ -202,6 +202,115 @@ void main() {
 
       expect(server.sent('POST', '/items/pool_matches'), isEmpty);
     });
+
+    test('an edit is pushed and a stale remote copy does not overwrite it', () async {
+      await matches().start(match('m1'));
+      await db.update(db.poolMatchRows).write(
+        PoolMatchRowsCompanion(syncedAt: Value(now)),
+      );
+      await DriftMatchRepository(
+        db,
+        userId: 'u1',
+        now: () => now.add(const Duration(hours: 2)),
+      ).updateDetails(
+        matchId: 'm1',
+        gameType: PoolGameType.tenBall,
+        playerName: 'An mới',
+        opponentName: 'Bình',
+        targetRacks: 5,
+      );
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+      ]);
+      Map<String, Object?>? patched;
+      server.routes['PATCH /items/pool_matches/m1'] = (request) {
+        patched = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 'm1'});
+      };
+
+      expect(await service().syncNow(), SyncOutcome.done);
+
+      expect(patched?['player_name'], 'An mới');
+      expect(patched?['target_racks'], 5);
+      expect(patched?['is_deleted'], false);
+      expect((await matches().watchAll().first).single.playerName, 'An mới');
+    });
+
+    test('a deleted match is pushed as a tombstone and stays hidden', () async {
+      await matches().start(match('m1'));
+      await db.update(db.poolMatchRows).write(
+        PoolMatchRowsCompanion(syncedAt: Value(now)),
+      );
+      await DriftMatchRepository(
+        db,
+        userId: 'u1',
+        now: () => now.add(const Duration(hours: 2)),
+      ).remove('m1');
+      server.routes['GET /items/pool_matches'] = (_) =>
+          FakeDirectus.ok([_remoteMatch('m1', updatedAt: now)]);
+      Map<String, Object?>? patched;
+      server.routes['PATCH /items/pool_matches/m1'] = (request) {
+        patched = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 'm1'});
+      };
+
+      expect(await service().syncNow(), SyncOutcome.done);
+
+      expect(patched?['is_deleted'], true);
+      expect(await matches().watchAll().first, isEmpty);
+      final row = (await db.select(db.poolMatchRows).get()).single;
+      expect(row.isDeleted, isTrue);
+      expect(row.syncedAt, isNotNull);
+    });
+
+    test('a pulled tombstone is stored hidden', () async {
+      await matches().start(match('m1'));
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        _remoteMatch(
+          'm1',
+          updatedAt: now.add(const Duration(hours: 1)),
+          isDeleted: true,
+        ),
+        _remoteMatch('m2', isDeleted: true),
+      ]);
+
+      expect(await service().syncNow(), SyncOutcome.done);
+
+      expect(await matches().watchAll().first, isEmpty);
+      final rows = await db.select(db.poolMatchRows).get();
+      expect(rows, hasLength(2));
+      expect(rows.every((row) => row.isDeleted), isTrue);
+    });
+
+    test('a newer remote live match wins over an older local tombstone', () async {
+      await matches().start(match('m1'));
+      await matches().remove('m1');
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+      ]);
+
+      expect(await service().syncNow(), SyncOutcome.done);
+
+      expect(await matches().watchAll().first, hasLength(1));
+    });
+
+    test('an older remote live match does not revive a newer local tombstone', () async {
+      await matches().start(match('m1'));
+      await DriftMatchRepository(
+        db,
+        userId: 'u1',
+        now: () => now.add(const Duration(hours: 2)),
+      ).remove('m1');
+      server.routes['GET /items/pool_matches'] = (_) => FakeDirectus.ok([
+        _remoteMatch('m1', updatedAt: now.add(const Duration(hours: 1))),
+      ]);
+      server.routes['PATCH /items/pool_matches/m1'] = (_) =>
+          FakeDirectus.ok({'id': 'm1'});
+
+      expect(await service().syncNow(), SyncOutcome.done);
+
+      expect(await matches().watchAll().first, isEmpty);
+    });
   });
 
   group('timer sessions', () {
@@ -423,9 +532,11 @@ Map<String, Object?> _remoteMatch(
   DateTime? updatedAt,
   List<String> rackWinners = const [],
   String? cueId,
+  bool isDeleted = false,
 }) => {
   'id': id,
   'user_created': owner,
+  'is_deleted': isDeleted,
   'game_type': 'nineBall',
   'player_name': 'An',
   'opponent_name': 'Bình',

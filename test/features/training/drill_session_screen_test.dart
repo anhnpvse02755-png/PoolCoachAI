@@ -12,6 +12,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
+
 import '../../support/fake_auth.dart';
 import '../../support/test_data.dart';
 
@@ -57,30 +58,31 @@ void main() {
   }
 
   Future<void> fill(WidgetTester tester, String label, String value) async {
-    await tester.enterText(
-      find.widgetWithText(TextFormField, label),
-      value,
-    );
+    await tester.enterText(find.widgetWithText(TextFormField, label), value);
   }
 
-  testWidgets('bài chấm theo tỉ lệ thì hỏi cả kết quả lẫn số lần thử',
-      (tester) async {
+  testWidgets('bài chấm theo tỉ lệ thì hỏi cả kết quả lẫn số lần thử', (
+    tester,
+  ) async {
     await openSession(tester, 'd1');
 
     expect(find.text(Vi.sessionScoreLabelAttempts), findsOneWidget);
     expect(find.text(Vi.sessionAttemptsLabel), findsOneWidget);
   });
 
-  testWidgets('bài chấm theo mục tiêu tuyệt đối thì không hỏi số lần thử',
-      (tester) async {
+  testWidgets('bài chấm theo mục tiêu tuyệt đối thì không hỏi số lần thử', (
+    tester,
+  ) async {
     await openSession(tester, 'd4');
 
     expect(find.text(Vi.sessionScoreLabelTarget), findsOneWidget);
     expect(find.text(Vi.sessionAttemptsLabel), findsNothing);
+    expect(find.text(Vi.sessionDurationRecordedAutomatically), findsOneWidget);
   });
 
-  testWidgets('bỏ trống kết quả thì chặn tại nút lưu, không ghi gì xuống',
-      (tester) async {
+  testWidgets('bỏ trống kết quả thì chặn tại nút lưu, không ghi gì xuống', (
+    tester,
+  ) async {
     final (db, _) = await openSession(tester, 'd1');
 
     await tester.tap(find.text(Vi.sessionSaveAction));
@@ -90,8 +92,9 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
   });
 
-  testWidgets('thiếu số lần thử ở bài chấm theo tỉ lệ thì chặn',
-      (tester) async {
+  testWidgets('thiếu số lần thử ở bài chấm theo tỉ lệ thì chặn', (
+    tester,
+  ) async {
     final (db, _) = await openSession(tester, 'd1');
 
     await fill(tester, Vi.sessionScoreLabelAttempts, '7');
@@ -102,7 +105,9 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
   });
 
-  testWidgets('số lần thử bằng 0 thì chặn, không để chia cho 0', (tester) async {
+  testWidgets('số lần thử bằng 0 thì chặn, không để chia cho 0', (
+    tester,
+  ) async {
     final (db, _) = await openSession(tester, 'd1');
 
     await fill(tester, Vi.sessionScoreLabelAttempts, '7');
@@ -130,9 +135,10 @@ void main() {
     });
   }
 
-  testWidgets('lưu xong nói ngay buổi này đạt bao nhiêu phần mục tiêu',
-      (tester) async {
-    await openSession(tester, 'd1');
+  testWidgets('lưu xong nói ngay buổi này đạt bao nhiêu phần mục tiêu', (
+    tester,
+  ) async {
+    final (db, _) = await openSession(tester, 'd1');
 
     await fill(tester, Vi.sessionScoreLabelAttempts, '9');
     await fill(tester, Vi.sessionAttemptsLabel, '10');
@@ -141,10 +147,14 @@ void main() {
 
     // d1 đạt khi trúng 8 trên 10 → trúng 9 là 113% mục tiêu.
     expect(find.text(Vi.sessionSavedRatio('113%')), findsOneWidget);
+    final saved = (await db.select(db.drillLogRows).get()).single;
+    expect(saved.durationSec, isNotNull);
+    expect(saved.durationSec, greaterThanOrEqualTo(0));
   });
 
-  testWidgets('hai buổi tập ghi liên tiếp ra hai log riêng, không đè nhau',
-      (tester) async {
+  testWidgets('hai buổi tập ghi liên tiếp ra hai log riêng, không đè nhau', (
+    tester,
+  ) async {
     final (db, router) = await openSession(tester, 'd1');
 
     for (final score in ['7', '9']) {
@@ -172,7 +182,11 @@ void main() {
     final id = (await db.select(db.drillLogRows).get()).single.id;
     expect(
       id,
-      matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+      matches(
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+        ),
+      ),
     );
   });
 }

@@ -27,11 +27,46 @@ class DrillTrainingTrend {
   final List<double> targetRatios;
 }
 
+class WeeklyTrainingPlayDay {
+  const WeeklyTrainingPlayDay({
+    required this.date,
+    required this.trainingSessions,
+    required this.matches,
+  });
+
+  final DateTime date;
+  final int trainingSessions;
+  final int matches;
+}
+
+class CombinedTrainingPlayStatistics {
+  const CombinedTrainingPlayStatistics({
+    required this.days,
+    required this.trainingSessionCount,
+    required this.matchCount,
+    required this.trainingDays,
+    required this.playDays,
+    required this.sharedDays,
+  });
+
+  final List<WeeklyTrainingPlayDay> days;
+  final int trainingSessionCount;
+  final int matchCount;
+  final int trainingDays;
+  final int playDays;
+  final int sharedDays;
+
+  int get activeDays =>
+      days.where((day) => day.trainingSessions > 0 || day.matches > 0).length;
+}
+
 class TrainingStatistics {
   const TrainingStatistics({
     required this.drillSessionCount,
     required this.timerSessionCount,
     required this.totalTimerSeconds,
+    required this.totalDrillSeconds,
+    required this.timedDrillSessionCount,
     required this.timerSecondsThisWeek,
     required this.streakDays,
     required this.recordedMatchCount,
@@ -48,11 +83,14 @@ class TrainingStatistics {
     required this.assessedPositions,
     required this.skills,
     required this.drillTrends,
+    required this.combinedTrainingPlay,
   });
 
   final int drillSessionCount;
   final int timerSessionCount;
   final int totalTimerSeconds;
+  final int totalDrillSeconds;
+  final int timedDrillSessionCount;
   final int timerSecondsThisWeek;
   final int streakDays;
   final int recordedMatchCount;
@@ -69,6 +107,7 @@ class TrainingStatistics {
   final int assessedPositions;
   final List<SkillTrainingStatistics> skills;
   final List<DrillTrainingTrend> drillTrends;
+  final CombinedTrainingPlayStatistics combinedTrainingPlay;
 
   int get totalSessionCount => drillSessionCount + timerSessionCount;
 }
@@ -129,6 +168,12 @@ TrainingStatistics computeTrainingStatistics({
   }
   drillTrends.sort((a, b) => a.drill.name.compareTo(b.drill.name));
   final shots = matches.expand((match) => match.shots);
+  final combinedTrainingPlay = _combinedTrainingPlay(
+    logs: logs,
+    timerSessions: timerSessions,
+    matches: matches,
+    today: today,
+  );
 
   return TrainingStatistics(
     drillSessionCount: logs.length,
@@ -137,6 +182,11 @@ TrainingStatistics computeTrainingStatistics({
       0,
       (total, session) => total + session.durationSec,
     ),
+    totalDrillSeconds: logs.fold(
+      0,
+      (total, log) => total + (log.durationSec ?? 0),
+    ),
+    timedDrillSessionCount: logs.where((log) => log.durationSec != null).length,
     timerSecondsThisWeek: freePracticeSecondsThisWeek(
       timerSessions: timerSessions,
       today: today,
@@ -184,6 +234,70 @@ TrainingStatistics computeTrainingStatistics({
         .length,
     skills: skills,
     drillTrends: drillTrends,
+    combinedTrainingPlay: combinedTrainingPlay,
+  );
+}
+
+CombinedTrainingPlayStatistics _combinedTrainingPlay({
+  required List<DrillLog> logs,
+  required List<TimerSession> timerSessions,
+  required List<PoolMatch> matches,
+  required DateTime today,
+}) {
+  final todayDate = DateTime(today.year, today.month, today.day);
+  final monday = todayDate.subtract(Duration(days: todayDate.weekday - 1));
+  final days = [
+    for (
+      var date = monday;
+      !date.isAfter(todayDate);
+      date = date.add(const Duration(days: 1))
+    )
+      WeeklyTrainingPlayDay(date: date, trainingSessions: 0, matches: 0),
+  ];
+  final trainingCounts = {for (final day in days) day.date: 0};
+  final matchCounts = {for (final day in days) day.date: 0};
+
+  void addTraining(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    if (trainingCounts.containsKey(day)) {
+      trainingCounts[day] = trainingCounts[day]! + 1;
+    }
+  }
+
+  void addMatch(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    if (matchCounts.containsKey(day)) {
+      matchCounts[day] = matchCounts[day]! + 1;
+    }
+  }
+
+  for (final log in logs) {
+    addTraining(log.date);
+  }
+  for (final session in timerSessions) {
+    addTraining(session.date);
+  }
+  for (final match in matches) {
+    addMatch(match.startedAt);
+  }
+
+  final populatedDays = [
+    for (final day in days)
+      WeeklyTrainingPlayDay(
+        date: day.date,
+        trainingSessions: trainingCounts[day.date]!,
+        matches: matchCounts[day.date]!,
+      ),
+  ];
+  return CombinedTrainingPlayStatistics(
+    days: populatedDays,
+    trainingSessionCount: trainingCounts.values.fold(0, (a, b) => a + b),
+    matchCount: matchCounts.values.fold(0, (a, b) => a + b),
+    trainingDays: populatedDays.where((day) => day.trainingSessions > 0).length,
+    playDays: populatedDays.where((day) => day.matches > 0).length,
+    sharedDays: populatedDays
+        .where((day) => day.trainingSessions > 0 && day.matches > 0)
+        .length,
   );
 }
 

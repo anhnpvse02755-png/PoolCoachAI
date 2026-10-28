@@ -125,13 +125,26 @@ class PlayerIntelligence {
 /// tiêu. Đây là cổng cho Skill Test ở giai đoạn sau: người chơi **không**
 /// được tự bấm "hoàn thành cấp" để mở cấp kế tiếp.
 bool isReadyForLevelUp(Drill drill, List<DrillLog> logsOldestFirst) {
-  if (logsOldestFirst.length < PracticeConstants.readyStreak) return false;
+  return consecutivePassCount(drill, logsOldestFirst) >=
+      PracticeConstants.readyStreak;
+}
 
-  final lastN = logsOldestFirst
-      .sublist(logsOldestFirst.length - PracticeConstants.readyStreak)
-      .map((log) => drillRatio(drill, log));
-
-  return lastN.every((ratio) => ratio != null && ratio >= 1);
+/// Số buổi đạt liên tiếp mới nhất, tối đa số buổi cần để mở cấp.
+///
+/// Thời điểm buổi tập quyết định thứ tự; ID phá hòa khi trùng thời điểm.
+int consecutivePassCount(Drill drill, List<DrillLog> logs) {
+  final ordered = [...logs]..sort((a, b) {
+    final byDate = a.date.compareTo(b.date);
+    return byDate != 0 ? byDate : a.id.compareTo(b.id);
+  });
+  var count = 0;
+  for (final log in ordered.reversed) {
+    final ratio = drillRatio(drill, log);
+    if (ratio == null || ratio < 1) break;
+    count++;
+    if (count == PracticeConstants.readyStreak) break;
+  }
+  return count;
 }
 
 /// Tính toàn bộ bức tranh trình độ từ danh sách bài tập và bản ghi.

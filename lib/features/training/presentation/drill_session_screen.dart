@@ -23,15 +23,35 @@ class DrillSessionScreen extends ConsumerStatefulWidget {
   ConsumerState<DrillSessionScreen> createState() => _DrillSessionScreenState();
 }
 
-class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
+class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _scoreController = TextEditingController();
   final _attemptsController = TextEditingController();
   final _notesController = TextEditingController();
+  final _sessionStopwatch = Stopwatch();
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _sessionStopwatch.start();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (!_sessionStopwatch.isRunning) _sessionStopwatch.start();
+    } else if (_sessionStopwatch.isRunning) {
+      _sessionStopwatch.stop();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionStopwatch.stop();
     _scoreController.dispose();
     _attemptsController.dispose();
     _notesController.dispose();
@@ -60,6 +80,7 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
         score: num.parse(_scoreController.text),
         attempts: attempts,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        durationSec: _sessionStopwatch.elapsed.inSeconds,
       );
 
       await ref.read(drillLogRepositoryProvider).add(log);
@@ -133,6 +154,8 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen> {
                     drill.goal,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
+                  const SizedBox(height: 8),
+                  const Text(Vi.sessionDurationRecordedAutomatically),
                   const SizedBox(height: 24),
                   TextFormField(
                     controller: _scoreController,

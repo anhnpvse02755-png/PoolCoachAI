@@ -58,7 +58,7 @@ try {
 
   // ─── Quyền trên drill_logs ─────────────────────────────────────────────
   const logId = randomUUID();
-  const log = { id: logId, drill_id: 'd1', date: '2026-09-23T03:00:00.000Z', score: 7, attempts: 10, notes: null };
+  const log = { id: logId, drill_id: 'd1', date: '2026-09-23T03:00:00.000Z', score: 7, attempts: 10, notes: null, duration_sec: 300 };
   const created = await call('POST', '/items/drill_logs', log, a.access_token);
   created.status === 200 ? ok('A tạo được buổi tập') : fail(`A tạo buổi tập → ${created.status} ${created.code}`);
 
@@ -68,6 +68,8 @@ try {
 
   const aList = await call('GET', '/items/drill_logs?fields=id,user_created', undefined, a.access_token);
   aList.data?.length === 1 ? ok('A đọc được đúng một buổi của mình') : fail(`A đọc được ${aList.data?.length} buổi`);
+  const withDuration = await call('GET', `/items/drill_logs/${logId}?fields=id,duration_sec`, undefined, a.access_token);
+  withDuration.data?.duration_sec === 300 ? ok('thời lượng Drill được lưu và đọc lại') : fail(`thời lượng Drill = ${withDuration.data?.duration_sec ?? '(thiếu)'}`);
   const bList = await call('GET', '/items/drill_logs', undefined, b.access_token);
   bList.data?.length === 0 ? ok('B không thấy buổi của A') : fail(`B thấy ${bList.data?.length} buổi`);
   const anon = await call('GET', '/items/drill_logs');
@@ -314,6 +316,7 @@ try {
       started_at: '2026-10-21T08:00:00.000Z',
       completed_at: null,
       updated_at: '2026-10-21T08:05:00.000Z',
+      is_deleted: false,
     };
     const mMade = await call('POST', '/items/pool_matches', matchBody, a.access_token);
     mMade.status === 200 || mMade.status === 201
@@ -341,6 +344,24 @@ try {
     mPatch.status === 200
       ? ok('A cập nhật được trận của mình')
       : fail(`A cập nhật trận → ${mPatch.status} ${mPatch.code}`);
+    const mTomb = await call(
+      'PATCH',
+      `/items/pool_matches/${matchId}`,
+      { is_deleted: true, updated_at: '2026-10-21T08:20:00.000Z' },
+      a.access_token,
+    );
+    mTomb.status === 200
+      ? ok('A xóa mềm được trận bằng is_deleted')
+      : fail(`A xóa mềm trận → ${mTomb.status} ${mTomb.code}`);
+    const mTombRead = await call(
+      'GET',
+      `/items/pool_matches/${matchId}?fields=id,is_deleted`,
+      undefined,
+      a.access_token,
+    );
+    mTombRead.data?.is_deleted === true
+      ? ok('tombstone của trận được lưu (is_deleted = true)')
+      : fail(`tombstone trận sai: ${JSON.stringify(mTombRead.data)}`);
     const bMatchPatch = await call(
       'PATCH',
       `/items/pool_matches/${matchId}`,

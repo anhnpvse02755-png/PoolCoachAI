@@ -374,26 +374,26 @@ Thứ tự trên là cách nhóm ý tưởng để triển khai, không phải k
 
 ## 17. Đối chiếu với dự án hiện tại
 
-Trạng thái dưới đây là **ảnh chụp mã nguồn và tài liệu trong repository tại ngày 20/10/2026**, không phải cam kết sản phẩm. “Đã có” nghĩa là có một phần triển khai; không mặc nhiên có đủ mọi yêu cầu mô tả ở trên.
+Trạng thái dưới đây là **ảnh chụp mã nguồn và tài liệu trong repository tại ngày 27/10/2026**, không phải cam kết sản phẩm. “Đã có” nghĩa là có một phần triển khai; không mặc nhiên có đủ mọi yêu cầu mô tả ở trên.
 
 | Khu vực | Tình trạng dự án | Khoảng cách đáng chú ý |
 |---|---|---|
 | Nền tảng/điều hướng | Flutter, giao diện tiếng Việt, năm tab chính; web build tồn tại | Android/iOS và trải nghiệm thực tế cần tiếp tục kiểm tra trên thiết bị |
 | Đánh giá/hạng | Có onboarding, câu hỏi, bài kiểm tra BU, lịch sử và đồng bộ hạng | Cần đối chiếu nghiệp vụ/UX khi mở rộng mục tiêu và kiểm tra kỹ năng |
-| Training/Drill | Có thư viện seed, lọc sáu nhóm, chi tiết bài, ghi kết quả thủ công và lịch sử | Chưa thấy luồng camera; cần rà soát Recording Preparation, ghi từng cú, level progression và Skill Test riêng |
+| Training/Drill | Có thư viện seed, lọc sáu nhóm, chi tiết bài, ghi kết quả thủ công/lịch sử; chi tiết bài hiển thị chuỗi buổi đạt gần nhất | Chưa có luồng camera và Recording Preparation; chưa có Skill Test/chứng nhận riêng hoặc tự mở level (tiêu chí cần chốt) |
 | Knowledge | Có nội dung seed, trang đọc và liên kết Drill | Có thể mở rộng bộ nội dung và cách tìm/lọc |
-| Intelligence/Home | Có tính toán xác định cho năng lực/gợi ý và Home có nội dung dựa trên dữ liệu | Recommendation hiện truyền danh sách lịch và timer rỗng; chưa được nối với lịch/đồng hồ lưu trữ |
+| Intelligence/Home | Có tính toán xác định cho năng lực/gợi ý; Home hiện lịch hôm nay, streak, thời lượng tập tuần và bước Lộ trình | Tiếp tục kiểm chứng trên thiết bị thật; không suy rộng từ dữ liệu tập luyện sang kết luận trận đấu |
 | Mô phỏng góc cắt | Có màn và lõi hình học/vật lý | Cần tiếp tục kiểm chứng độ chính xác thực tế; đây là mô phỏng, không phải camera/physics đầy đủ |
 | Kế hoạch dọn bàn | Có lõi Planner và màn nhập bàn/từng bước | Cần phân biệt rõ kết quả Planner với dữ liệu trận/rack thực tế |
-| Coach tình huống/Chat | Màn Coach đang là trạng thái xây dựng | Chưa có hỏi gợi mở nhiều lần, Chat LLM hay phân tích theo hồ sơ |
-| Lộ trình cá nhân | Có thiết kế/kế hoạch roadmap và Recommendation cơ bản | Chưa xác minh có luồng đặt mục tiêu 3/6/9 tháng, ngày thi đấu và roadmap hoàn chỉnh trong UI |
-| Đồng hồ/lịch tập | Có kiểu dữ liệu và bảng cơ sở dữ liệu | Chưa có luồng UI/repository tích hợp đầy đủ; recommendation hiện chưa dùng dữ liệu này |
-| Play/ghi trận/rack | Màn Play đang là trạng thái xây dựng | Chưa có ghi trận, lịch sử rack hoặc đánh giá chạy rack |
-| Statistics | Màn Stats đang là trạng thái xây dựng | Chưa có biểu đồ/tổng hợp luyện tập và chơi thực tế |
-| Equipment/cơ | Có ý tưởng và thiết kế trong tài liệu dự án | Chưa xác minh có quản lý cơ và lịch bảo dưỡng trong ứng dụng hiện tại |
-| Notifications | Màn đang là trạng thái xây dựng | Chưa có nhắc lịch, bảo dưỡng, recommendation hoặc streak |
+| Coach tình huống/Chat | Có Coach tình huống và Hỏi huấn luyện viên; câu trả lời chat qua dịch vụ trung gian, được lọc theo dữ liệu người chơi | Chat không phân tích tình huống bàn bi; cần triển khai/vận hành dịch vụ theo runbook trước khi xác nhận khả dụng trên production |
+| Lộ trình cá nhân | Có giao diện đặt mục tiêu (lên hạng, thuần thục kỹ năng, chuẩn bị giải), suy ra các bước từ dữ liệu thật và đồng bộ mục tiêu/thành tích | Ngày dự kiến chỉ hiện khi đủ dữ liệu; tiếp tục kiểm chứng với người chơi thật |
+| Đồng hồ/lịch tập | Có màn hình, repository lưu cục bộ và đồng bộ; lịch hôm nay ảnh hưởng gợi ý, buổi đồng hồ tính vào streak và tổng thời lượng tuần | Tiếp tục kiểm chứng hành vi offline và đồng bộ trên nhiều thiết bị |
+| Play/ghi trận/rack | Có ghi trận, kết quả từng rack, ghi nhận cú đánh thủ công, sửa thông tin trận và xóa trận có xác nhận; trận đồng bộ theo tài khoản, trận đã xóa được đánh dấu và đồng bộ để không hiện lại | Chưa có giải đấu hay Camera/Vision; cần phân biệt dữ liệu người chơi tự ghi với kết quả được xác minh tự động |
+| Statistics | Có tổng hợp buổi tập, thời lượng Drill/Timer, streak, kết quả trận, chỉ số cú đánh/điều bi và biểu đồ số buổi tập/trận theo ngày trong tuần hiện tại | Thời lượng Drill là thời gian màn ghi kết quả mở (không tính app ở nền), không phải đo hoạt động thực tế; không coi hoạt động cùng ngày là quan hệ nhân quả hay đánh giá chạy rack |
+| Equipment/cơ | Có quản lý thông tin cơ, lịch bảo dưỡng, nhắc bảo dưỡng và đồng bộ | Tiếp tục kiểm chứng thông báo trên từng nền tảng |
+| Notifications | Có màn hình và thiết lập thông báo; hỗ trợ nhắc bảo dưỡng cục bộ | Chưa có thông báo thông minh cho recommendation hoặc streak |
 | Tài khoản/đồng bộ | Có auth, lưu cục bộ và đồng bộ một số dữ liệu | Cần tiếp tục mở rộng các loại dữ liệu cần đồng bộ; ứng dụng cần giữ trải nghiệm offline |
-| Vision/AI | Có nguyên tắc kiến trúc và hướng thiết kế | Không nên coi là chức năng đã triển khai; cần kiểm chứng trước khi đưa vào sản phẩm |
+| Vision/AI | Có nguyên tắc kiến trúc và hướng thiết kế | Chưa triển khai; cần chốt tiêu chuẩn độ chính xác và bước người chơi xác nhận/sửa trước khi ảnh hưởng dữ liệu đánh giá |
 
 Nguồn đối chiếu chính: `README.md`, `PRD_PoolCoachAI.md`, tài liệu thiết kế trong `docs/superpowers/specs/`, cùng mã trong `lib/`. Khi trạng thái mã thay đổi, cập nhật bảng này thay vì biến trạng thái triển khai thành yêu cầu sản phẩm.
 

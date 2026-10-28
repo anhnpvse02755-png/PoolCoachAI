@@ -84,8 +84,13 @@ VPS có 2 vCPU và 8 GB RAM; lúc thiết kế đang dùng 1.3 GB, tải 0.05. P
 | `score` | float | |
 | `attempts` | integer, nullable | |
 | `notes` | text, nullable | |
+| `duration_sec` | integer, nullable | Thời lượng tính khi màn ghi kết quả Drill mở; thời gian app ở nền không tính. Log lịch sử không có giá trị này vẫn hợp lệ |
 | `user_created` | Directus tự điền | Chủ của buổi tập. App không gửi trường này, và không thể giả mạo |
 | `date_created` | Directus tự điền | |
+
+Collection đã có từ trước được nâng bằng `deploy/directus/bootstrap.mjs`; cần chạy lại bootstrap khi triển khai client dùng `duration_sec`.
+
+`pool_matches` cũng có thêm `is_deleted` (boolean, mặc định `false`). Xóa trận trên app là xóa mềm: app đặt `is_deleted = true`, tăng `updated_at` và đẩy lên như mọi bản sửa khác; bản mới nhất thắng theo `updated_at`, giống cue/equipment. Player không có quyền DELETE trên `pool_matches`. Phải chạy bootstrap trước khi phát hành client gửi `is_deleted`.
 
 Bài tập và bài đọc **không lên server**. Chúng vẫn là seed cục bộ, upsert mỗi lần mở app như Phase 1.
 

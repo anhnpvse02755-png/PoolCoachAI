@@ -12,6 +12,8 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/knowledge_lookup.dart';
+import 'package:poolcoachai/domain/player_intelligence.dart';
+import 'package:poolcoachai/domain/practice_constants.dart';
 
 /// Chi tiết một bài tập — mục 6.3 của thiết kế.
 class DrillDetailScreen extends ConsumerWidget {
@@ -135,6 +137,10 @@ class DrillDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+              if (logsAsync.hasValue) ...[
+                const SizedBox(height: 16),
+                _ReadinessCard(drill: drill, logs: history),
+              ],
               const SizedBox(height: 24),
               // Lịch sử hiện tỉ lệ đạt mục tiêu, không phải điểm thô:
               // "9" một mình không nói lên bài đó cần trúng mấy trên
@@ -159,6 +165,39 @@ class DrillDetailScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ReadinessCard extends StatelessWidget {
+  const _ReadinessCard({required this.drill, required this.logs});
+
+  final Drill drill;
+  final List<DrillLog> logs;
+
+  @override
+  Widget build(BuildContext context) {
+    final passCount = consecutivePassCount(drill, logs);
+    const requiredCount = PracticeConstants.readyStreak;
+
+    return PcCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            Vi.drillReadinessTitle,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: passCount / requiredCount),
+          const SizedBox(height: 8),
+          Text(Vi.drillReadinessProgress(passCount)),
+          if (passCount == requiredCount) ...[
+            const SizedBox(height: 4),
+            const Text(Vi.drillReadinessQualified),
+          ],
+        ],
+      ),
     );
   }
 }
