@@ -1,5 +1,11 @@
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
+
+/// Toàn bộ bài tập khởi tạo: mười bài gốc và chín bài nâng cao d11–d19.
+final seedDrills = <Drill>[..._baseDrills, ..._buDrills];
 
 /// Mười bài tập khởi tạo.
 ///
@@ -7,7 +13,7 @@ import 'package:poolcoachai/domain/skill_category.dart';
 /// **thuật ngữ thì không**. Prototype viết trước đợt chủ sản phẩm sửa
 /// từ vựng, nên chép nguyên văn sẽ kéo lại toàn bộ từ sai. Test trong
 /// `test/data/seed_test.dart` làm hỏng build nếu một từ cũ quay lại.
-const seedDrills = <Drill>[
+const _baseDrills = <Drill>[
   Drill(
     id: 'd1',
     cat: SkillCategory.aiming,
@@ -170,4 +176,89 @@ const seedDrills = <Drill>[
       'Ghi số bi hoàn thành đúng kỹ thuật trong thời gian.',
     ],
   ),
+];
+
+/// Bài nâng cao mượn bố cục BU. Số cú và cấp suy từ [drillProvenance]
+/// (phiếu điểm BU), không viết tay.
+Drill _buShotDrill(
+  String id,
+  SkillCategory cat, {
+  required String goal,
+  required List<String> Function(int shots) steps,
+}) {
+  final p = drillProvenance[id]!;
+  final n = p.shots;
+  return Drill(
+    id: id,
+    cat: cat,
+    name: '${Vi.skill(cat)} — bậc ${Vi.buVersionName(p.version)}',
+    level: p.level,
+    unit: 'cú thành công / $n',
+    target: n,
+    goal: goal,
+    steps: [Vi.buDrillSetup(p.buDrillId, p.version), ...steps(n)],
+  );
+}
+
+bool _isDoctorate(String id) =>
+    drillProvenance[id]!.version == ExamIIVersion.doctorate;
+
+String _s9Scoring(String id) => _isDoctorate(id)
+    ? 'Mỗi cú bi cái vào lỗ góc (chết cái) mà không chạm bi chướng ngại được 1 điểm. '
+          'Ghi số cú thành công.'
+    : 'Mỗi cú ăn được bi treo miệng lỗ được 1 điểm; chết cái vẫn tính. '
+          'Ghi số cú thành công.';
+
+Drill _dungCo(String id) => _buShotDrill(
+  id,
+  SkillCategory.dungCo,
+  goal:
+      'Dựng cơ (nâng đuôi cơ) để ăn bi khi bi cái áp sát băng hoặc áp sát bi '
+      'chướng ngại, không chết cái.',
+  steps: (n) => [
+    'Bậc này có $n cú, mỗi cú một vị trí bi cái. Xem vị trí từng cú trên sơ đồ BU của bài.',
+    'Dựng cơ là nâng đuôi cơ lên khi đánh. Ở bài này bi cái luôn áp sát băng hoặc áp sát bi chướng ngại.',
+    'Mỗi cú ăn bi mà không chết cái được 1 điểm. Ghi số cú thành công.',
+  ],
+);
+
+Drill _nhayBi(String id) => _buShotDrill(
+  id,
+  SkillCategory.nhayBi,
+  goal: _isDoctorate(id)
+      ? 'Nhảy bi qua bi chướng ngại và đưa bi cái vào lỗ góc (chết cái), chỉ dùng nhảy bi.'
+      : 'Nhảy bi qua bi chướng ngại rồi ăn bi treo miệng lỗ góc, chỉ dùng nhảy bi.',
+  steps: (n) => [
+    'Đánh $n cú trên cùng bố cục này. Bài này chỉ dùng nhảy bi, không dùng mát xê.',
+    'Ngắm vào điểm nằm giữa tâm bi cái và điểm bi cái chạm nỉ.',
+    'Cần nhảy cao và ngắn thì nâng cơ cao; cần nhảy xa hơn thì đánh mạnh hơn và bớt nâng cơ.',
+    if (!_isDoctorate(id))
+      'Cú nhảy bi hay chạm bi mục tiêu dày hơn dự tính, vì bi cái còn đang nảy lúc chạm bi.',
+    'Lỗi hay gặp: đâm cơ quá thẳng xuống làm bi cái không nhảy mà trượt cơ; đánh quá mạnh làm mất kiểm soát hướng bi cái sau khi bi tiếp đất. Cách sửa: tập nâng cơ từ thấp lên cao dần, tìm độ nâng thấp nhất vẫn đủ để bi cái nhảy qua bi chướng ngại.',
+    'Nhảy bi dễ làm rách nỉ nếu sai kỹ thuật; chỉ nên luyện trên bàn tập hoặc nỉ cũ.',
+    'Nhiều giải giới hạn hoặc cấm cơ nhảy chuyên dụng; xem luật trước khi dùng.',
+    _s9Scoring(id),
+  ],
+);
+
+Drill _matXe(String id) => _buShotDrill(
+  id,
+  SkillCategory.matXe,
+  goal: _isDoctorate(id)
+      ? 'Mát xê cho bi cái đi cong vòng qua bi chướng ngại và vào lỗ góc (chết cái), chỉ dùng mát xê.'
+      : 'Mát xê cho bi cái đi cong vòng qua bi chướng ngại rồi ăn bi treo miệng lỗ góc, chỉ dùng mát xê.',
+  steps: (n) => [
+    'Đánh $n cú trên cùng bố cục này. Bài này chỉ dùng mát xê, không dùng nhảy bi.',
+    'Mát xê làm bi cái đi theo đường cong, né được bi chướng ngại mà không cần chạm băng; bi cái còn cong tiếp được sau khi chạm bi.',
+    'Ngắm điểm chạm lệch tâm bi cái về phía muốn bi cái cong tới.',
+    'Lỗi hay gặp: nâng cơ quá ít hoặc quá nhiều làm bi cái đi sai đường cong; đẩy cơ quá chậm làm bi cái không đủ xoáy để cong rõ. Cách sửa: bắt đầu với mát xê nhẹ, nâng cơ ít, rồi mới tăng dần.',
+    'Mát xê dễ làm rách nỉ nếu làm sai; luyện trên bàn hoặc nỉ không quan trọng cho tới khi thành thạo.',
+    _s9Scoring(id),
+  ],
+);
+
+final _buDrills = <Drill>[
+  for (final id in ['d11', 'd12', 'd13']) _dungCo(id),
+  for (final id in ['d14', 'd15', 'd16']) _nhayBi(id),
+  for (final id in ['d17', 'd18', 'd19']) _matXe(id),
 ];

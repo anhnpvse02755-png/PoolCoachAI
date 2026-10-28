@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:poolcoachai/data/database/category_compat.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/match_codec.dart';
 import 'package:poolcoachai/data/database/tournament_converters.dart';
@@ -22,9 +23,9 @@ const poolMatchRemoteFields =
     'rack_winners,shots,cue_id,started_at,completed_at,updated_at,is_deleted,'
     'tournament_id,round_label';
 const timerSessionRemoteFields =
-    'id,user_created,date,duration_sec,cat,cue_id';
+    'id,user_created,date,duration_sec,cat,cat_ext,cue_id';
 const scheduleSlotRemoteFields =
-    'id,user_created,day,time,label,cat,updated_at,is_deleted';
+    'id,user_created,day,time,label,cat,cat_ext,cat_ext_at,updated_at,is_deleted';
 
 /// Mã Directus khi `POST` một id đã có: đã lên từ lần trước, hoặc máy khác
 /// của cùng người đã ghi cùng bản ghi.
@@ -366,7 +367,10 @@ class PracticeSyncService {
           'id': row.id,
           'date': row.date.toUtc().toIso8601String(),
           'duration_sec': row.durationSec,
-          'cat': row.cat,
+          // Tên nhóm nâng cao chỉ đi trong cat_ext; bản đã phát hành ném khi
+          // gặp tên lạ ở cat.
+          'cat': splitCategoryName(row.cat).legacy,
+          'cat_ext': splitCategoryName(row.cat).ext,
           'cue_id': row.cueId,
         },
         rejectedKey: key,
@@ -391,6 +395,7 @@ class PracticeSyncService {
       if (cat != null && !SkillCategory.values.any((c) => c.name == cat)) {
         throw const FormatException('Nhóm kỹ năng từ server không hợp lệ');
       }
+      final joinedCat = joinCategoryName(cat, item['cat_ext']);
       final date = _date(item, 'date').toLocal();
       final cueId = _nullableString(item, 'cue_id');
       await _db.transaction(() async {
@@ -413,7 +418,7 @@ class PracticeSyncService {
             userId: Value(userId),
             date: date,
             durationSec: duration,
-            cat: Value(cat),
+            cat: Value(joinedCat),
             cueId: Value(cueId),
             syncedAt: Value(receivedAt),
           ),
@@ -454,7 +459,14 @@ class PracticeSyncService {
           'day': row.day,
           'time': row.time,
           'label': row.label,
-          'cat': row.cat,
+          'cat': splitCategoryName(row.cat).legacy,
+          'cat_ext': splitCategoryName(row.cat).ext,
+          // Dấu thời gian của cat_ext: bằng updated_at khi bản mới ghi. Bản cũ
+          // sửa dòng thì updated_at đổi mà trường này đứng yên, nên bản mới
+          // biết cat_ext đã cũ (xem phần kéo bên dưới).
+          'cat_ext_at': splitCategoryName(row.cat).ext == null
+              ? null
+              : sentAt.toUtc().toIso8601String(),
           'updated_at': sentAt.toUtc().toIso8601String(),
           'is_deleted': row.isDeleted,
         },
@@ -503,6 +515,17 @@ class PracticeSyncService {
         throw const FormatException('Lịch tập từ server không hợp lệ');
       }
       final remoteUpdatedAt = _date(item, 'updated_at');
+      // Chỉ tin cat_ext khi cat_ext_at == updated_at, tức là chính bản mới
+      // ghi lần sửa cuối. Bản cũ sửa dòng (kể cả chỉ đổi tên) gửi cat theo
+      // những gì nó thấy, nên dòng đó mang đúng nhóm bản cũ hiển thị.
+      final extAt = item['cat_ext_at'];
+      final extTrusted =
+          extAt is String &&
+          DateTime.parse(extAt).toUtc().isAtSameMomentAs(remoteUpdatedAt);
+      final joinedCat = joinCategoryName(
+        cat,
+        extTrusted ? item['cat_ext'] : null,
+      );
       await _db.transaction(() async {
         final local = await (_db.select(
           _db.scheduleSlotRows,
@@ -523,7 +546,7 @@ class PracticeSyncService {
             day: Value(day),
             time: Value(time),
             label: Value(label),
-            cat: Value(cat),
+            cat: Value(joinedCat),
             updatedAt: Value(remoteUpdatedAt),
             syncedAt: Value(receivedAt),
             isDeleted: Value(deleted),

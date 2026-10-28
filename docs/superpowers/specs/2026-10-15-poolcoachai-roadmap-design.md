@@ -50,6 +50,8 @@ Hàm thuần Dart trong `lib/domain/roadmap/`, không import Flutter.
 6. Chưa có bài BU hoàn chỉnh (hạng ước tính / tự khai, hoặc Exam II đang hoãn mà chưa có bài hoàn chỉnh nào trước đó) → các nhóm có độ thuần thục < 75 hoặc chưa đo được, xếp từ yếu nhất lên.
 7. Bước cuối luôn là `lamBaiBu`: mở từ `retestAvailableFrom` (mốc 14 ngày đã có); chưa từng làm thì mở ngay.
 
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
+
 ### 4.2 Thuần thục kỹ năng
 
 Mỗi bài tập trong nhóm đã chọn là một bước `baiTap`, xếp theo cấp tăng dần. Bước `baiTap` xong khi bài đó `isReadyForLevelUp`. Mục tiêu xong khi nhóm đạt tiêu chí §4.4.
@@ -95,6 +97,8 @@ Thứ tự bước như §4.1 bước 3–6 (có BU thì theo điểm mất, kh�
 | S10 | Phá | breakShot |
 
 Lý do: mỗi bài xếp theo cái BU chấm điểm (bi vào → aiming; chỗ bi cái dừng → position). F8 và S4 chấm cả hai, xếp position. S8, S9 không khớp nhóm nào: tập ngắm không giúp dựng cơ hay nhảy bi, nên không giao bài sai mục đích. Bảng nằm trong `lib/domain/roadmap/bu_category_map.dart`, ghim bằng test.
+
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
 
 ## 6. Dữ liệu và đồng bộ
 
@@ -142,6 +146,8 @@ Chỉ repository gọi được thao tác ghi thành tích; test kiến trúc ch
 - `no_fabrication_test`: câu lý do đổi khi số liệu vào đổi.
 - Dữ liệu: migration 3 → 4 giữ dữ liệu cũ; repository; đồng bộ (`mergeGoal`, xóa mục tiêu, thành tích trùng).
 - Giao diện: widget test màn Lộ trình và chọn mục tiêu; smoke test route mới; kịch bản Chrome `tool/e2e/roadmap.mjs` (chọn mục tiêu → thấy bước → ghi một buổi tập → lộ trình đổi → đổi mục tiêu → máy thứ hai thấy cùng mục tiêu), chạy trên bản cục bộ và trang thật.
+
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
 
 ## 10. Ngoài phạm vi
 

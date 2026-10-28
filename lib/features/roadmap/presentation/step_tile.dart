@@ -12,12 +12,19 @@ class StepTile extends StatelessWidget {
     required this.step,
     required this.drill,
     required this.today,
+    this.onPickSkill,
     super.key,
   });
 
   final RoadmapStep step;
   final Drill? drill;
   final DateTime today;
+
+  /// Mở bộ chọn nhóm Thuần thục khi bước Tập lại có S9.
+  final VoidCallback? onPickSkill;
+
+  bool get _isS9 =>
+      step.kind == StepKind.buLe && step.buDrillIds.contains('S9');
 
   /// Ngày được làm bài BU tiếp: bước BU cuối và các mốc hạng dùng chung một cổng.
   DateTime? get _gate => switch (step.reason) {
@@ -96,6 +103,16 @@ class StepTile extends StatelessWidget {
               Text(
                 Vi.estimateLine(estimate),
                 style: theme.textTheme.bodySmall,
+              ),
+            if (_isS9)
+              Text(Vi.roadmapS9Hint, style: theme.textTheme.bodySmall),
+            if (_isS9 && onPickSkill != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: onPickSkill,
+                  child: const Text(Vi.roadmapS9Pick),
+                ),
               ),
             if (action != null)
               Align(

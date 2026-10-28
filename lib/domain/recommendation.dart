@@ -75,7 +75,8 @@ enum PickReason {
 /// Phải phủ hết [SkillCategory.values]: luật người mới duyệt danh sách
 /// này để tìm nhóm đầu tiên chưa có dữ liệu, thiếu một nhóm là luật đó
 /// lặng lẽ rơi xuống luật sau. Cân bi đứng cuối cùng với A băng vì cả
-/// hai đều là bài phản băng, khó hơn bốn nhóm còn lại.
+/// hai đều là bài phản băng, khó hơn bốn nhóm còn lại. Ba nhóm nâng cao
+/// đứng cuối và chỉ được xét khi đã có buổi tập (spec 2026-10-29 §3).
 const newcomerOrder = <SkillCategory>[
   SkillCategory.aiming,
   SkillCategory.position,
@@ -83,6 +84,9 @@ const newcomerOrder = <SkillCategory>[
   SkillCategory.safety,
   SkillCategory.kick,
   SkillCategory.bank,
+  SkillCategory.dungCo,
+  SkillCategory.nhayBi,
+  SkillCategory.matXe,
 ];
 
 bool _sameDay(DateTime a, DateTime b) =>
@@ -123,11 +127,13 @@ bool _sameDay(DateTime a, DateTime b) =>
   // Luật 2 — sắp mất streak.
   if (!activeTodayOrYesterday && activeDates.isNotEmpty) {
     final counts = <SkillCategory, int>{
-      for (final cat in SkillCategory.values) cat: 0,
+      for (final cat in SkillCategory.values)
+        if (pi.inScope(cat)) cat: 0,
     };
     for (final log in logs) {
       final drill = drillById[log.drillId];
-      if (drill != null) counts[drill.cat] = counts[drill.cat]! + 1;
+      final n = drill == null ? null : counts[drill.cat];
+      if (drill != null && n != null) counts[drill.cat] = n + 1;
     }
     final easiest = counts.entries.reduce((a, b) => b.value < a.value ? b : a);
     return (cat: easiest.key, reason: PickReason.streakAtRisk);
@@ -146,7 +152,7 @@ bool _sameDay(DateTime a, DateTime b) =>
   // Luật 5 — người mới.
   if (!pi.hasAnyData) {
     for (final cat in newcomerOrder) {
-      if (pi.categories[cat]!.sessionCount == 0) {
+      if (pi.inScope(cat) && pi.categories[cat]!.sessionCount == 0) {
         return (cat: cat, reason: PickReason.newcomer);
       }
     }
@@ -172,9 +178,10 @@ bool _sameDay(DateTime a, DateTime b) =>
     }
   }
 
-  var oldest = SkillCategory.values.first;
+  final inScope = SkillCategory.values.where(pi.inScope).toList();
+  var oldest = inScope.first;
   DateTime? oldestDate;
-  for (final cat in SkillCategory.values) {
+  for (final cat in inScope) {
     final date = lastTouched[cat];
     if (date == null) return (cat: cat, reason: PickReason.rotation);
     if (oldestDate == null || date.isBefore(oldestDate)) {

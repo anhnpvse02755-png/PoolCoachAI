@@ -9,7 +9,9 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/features/training/presentation/score_hint.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:uuid/uuid.dart';
 
@@ -163,9 +165,7 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
                       labelText: drill.usesAttempts
                           ? Vi.sessionScoreLabelAttempts
                           : Vi.sessionScoreLabelTarget,
-                      hintText: drill.usesAttempts
-                          ? Vi.sessionScoreHintAttempts
-                          : Vi.sessionScoreHintTarget,
+                      hintText: scoreHintFor(drill),
                       suffixText: drill.unit,
                     ),
                     keyboardType:
@@ -181,6 +181,8 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
                       if (parsed == null || !parsed.isFinite || parsed < 0) {
                         return Vi.sessionScoreInvalid;
                       }
+                      final shotError = checkShotScore(drill, parsed);
+                      if (shotError != null) return Vi.shotScoreError(shotError);
                       return null;
                     },
                   ),

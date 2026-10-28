@@ -96,7 +96,7 @@ void main() {
       final drills = await DriftDrillRepository(db).watchAll().first;
       final articles = await DriftKnowledgeRepository(db).watchAll().first;
 
-      expect(drills.length, 10);
+      expect(drills.length, 19);
       expect(articles.length, 6);
       expect(drills.every((d) => d.steps.isNotEmpty), isTrue);
     });

@@ -65,6 +65,72 @@ void main() {
     },
   );
 
+  test(
+    'cơ có Ngắm bi và Nhảy bi: skill_categories [aiming], skill_categories_ext [nhayBi]',
+    () async {
+      await repository().save(
+        const CueEquipment(
+          id: 'cue-1',
+          name: 'Cơ hai nhóm',
+          type: CueType.playing,
+          skillCategories: [SkillCategory.aiming, SkillCategory.nhayBi],
+        ),
+      );
+      Map<String, Object?>? uploaded;
+      server.routes['POST /items/cue_equipment'] = (request) {
+        uploaded = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 'cue-1'});
+      };
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect(uploaded?['skill_categories'], ['aiming']);
+      expect(uploaded?['skill_categories_ext'], ['nhayBi']);
+      expect(cueEquipmentRemoteFields.split(','), contains('skill_categories_ext'));
+    },
+  );
+
+  test('cơ chỉ có nhóm nâng cao: skill_categories [] và ext đủ', () async {
+    await repository().save(
+      const CueEquipment(
+        id: 'cue-1',
+        name: 'Cơ nhảy',
+        type: CueType.playing,
+        skillCategories: [SkillCategory.matXe],
+      ),
+    );
+    Map<String, Object?>? uploaded;
+    server.routes['POST /items/cue_equipment'] = (request) {
+      uploaded = FakeDirectus.body(request);
+      return FakeDirectus.ok({'id': 'cue-1'});
+    };
+    expect(await service().syncNow(), SyncOutcome.done);
+    expect(uploaded?['skill_categories'], <Object?>[]);
+    expect(uploaded?['skill_categories_ext'], ['matXe']);
+  });
+
+  test(
+    'bản cũ sửa kỹ năng thành [position], ext vẫn [nhayBi]: máy mới có [position, nhayBi]',
+    () async {
+      server.routes['GET /items/cue_equipment'] = (_) => FakeDirectus.ok([
+        {
+          ..._remoteCue(id: 'cue-1'),
+          'skill_categories': ['position'],
+          'skill_categories_ext': ['nhayBi', 'nhomTuongLai'],
+        },
+      ]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      final cue = (await repository().watchAll().first).single;
+      expect(cue.skillCategories, [SkillCategory.position, SkillCategory.nhayBi]);
+    },
+  );
+
+  test('skill_categories_ext sai kiểu: đồng bộ thất bại, không lưu cơ', () async {
+    server.routes['GET /items/cue_equipment'] = (_) => FakeDirectus.ok([
+      {..._remoteCue(id: 'cue-1'), 'skill_categories_ext': 'nhayBi'},
+    ]);
+    expect(await service().syncNow(), SyncOutcome.failed);
+    expect(await db.select(db.cueEquipmentRows).get(), isEmpty);
+  });
+
   test('downloads only the current user cue and stores it as synced', () async {
     server.routes['GET /items/cue_equipment'] = (_) =>
         FakeDirectus.ok([_remoteCue(id: 'from-server')]);

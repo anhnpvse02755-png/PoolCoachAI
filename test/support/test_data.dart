@@ -267,9 +267,12 @@ ProviderContainer dbContainer(
   TournamentRepository Function(AppDatabase db)? tournamentRepo,
   RoadmapRepository Function(AppDatabase db)? roadmapRepo,
   MatchRepository Function(AppDatabase db)? matchRepo,
+  BuResult? buResult,
 }) {
   return ProviderContainer(
     overrides: [
+      if (buResult != null)
+        latestBuResultProvider.overrideWithValue(AsyncData(buResult)),
       if (roadmapRepo != null)
         roadmapRepositoryProvider.overrideWith(
           (ref) => roadmapRepo(ref.watch(appDatabaseProvider)),

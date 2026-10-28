@@ -114,8 +114,12 @@ void main() {
     expect(find.text('Đường thẳng cơ bản'), findsOneWidget);
     expect(find.text(Vi.statsPercent(113)), findsOneWidget);
     expect(find.text(Vi.statsRecentResults([100, 113, 125])), findsOneWidget);
-    await tester.ensureVisible(
-      find.text(Vi.statsMatchAnalysisTitle, skipOffstage: false),
+    // Chín nhóm kỹ năng làm danh sách dài hơn: thẻ phân tích trận đã trôi
+    // khỏi vùng dựng sẵn, nên cuộn ngược lại tới nó.
+    await tester.scrollUntilVisible(
+      find.text(Vi.statsMatchAnalysisTitle),
+      -250,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     expect(find.text(Vi.statsMatchAnalysisTitle), findsOneWidget);

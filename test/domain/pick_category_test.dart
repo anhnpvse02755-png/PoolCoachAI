@@ -61,7 +61,73 @@ final _drills = [
   );
 }
 
+const _advDrill = Drill(
+  name: 'Bài x1',
+  id: 'x1',
+  cat: SkillCategory.dungCo,
+  level: 1,
+  unit: 'u',
+  goal: 'g',
+  steps: [],
+  target: 3,
+);
+
 void main() {
+  group('nhóm nâng cao', () {
+    ({SkillCategory cat, PickReason reason}) pickWith(
+        List<Drill> drills, List<DrillLog> logs) {
+      final pi = computePlayerIntelligence(drills: drills, logs: logs);
+      return pickCategoryForToday(
+        pi: pi,
+        drills: drills,
+        logs: logs,
+        timerSessions: const [],
+        schedule: const [],
+        today: _today,
+      );
+    }
+
+    final basicLogs = [
+      for (final (i, id) in ['aim1', 'pos1', 'brk1', 'saf1', 'kic1', 'ban1'].indexed)
+        _log(id, _today.subtract(Duration(days: 1, hours: -i)), 9),
+    ];
+
+    test('thứ tự làm quen phủ chín nhóm, ba nhóm nâng cao đứng cuối', () {
+      expect(newcomerOrder.toSet(), SkillCategory.values.toSet());
+      expect(newcomerOrder.skip(6),
+          [SkillCategory.dungCo, SkillCategory.nhayBi, SkillCategory.matXe]);
+    });
+
+    test('đã tập đủ sáu nhóm cơ bản, chưa tập nhóm nâng cao: luân phiên không chọn nhóm nâng cao', () {
+      final r = pickWith([..._drills, _advDrill], basicLogs);
+      expect(r.reason, PickReason.rotation);
+      expect(r.cat.isAdvanced, isFalse);
+    });
+
+    test('sắp mất streak: không chọn nhóm nâng cao chưa tập', () {
+      // Cả sáu nhóm cơ bản đều có log (cách đây 5 ngày) nên nhóm nâng cao
+      // (đếm 0) sẽ thắng nếu luật 2 không bỏ nó ra.
+      final old = [
+        for (final (i, id) in ['aim1', 'pos1', 'brk1', 'saf1', 'kic1', 'ban1'].indexed)
+          _log(id, _today.subtract(Duration(days: 5, hours: -i)), 9),
+      ];
+      final r = pickWith([..._drills, _advDrill], old);
+      expect(r.reason, PickReason.streakAtRisk);
+      expect(r.cat.isAdvanced, isFalse);
+    });
+
+    test('có một buổi Dựng cơ lâu nhất: luân phiên chọn Dựng cơ', () {
+      final logs = [
+        _log('x1', _today.subtract(const Duration(days: 20)), 2),
+        for (final (i, id) in ['aim1', 'pos1', 'brk1', 'saf1', 'kic1', 'ban1'].indexed)
+          _log(id, _today.subtract(Duration(days: 1, hours: -i)), 9),
+      ];
+      final r = pickWith([..._drills, _advDrill], logs);
+      expect(r.reason, PickReason.rotation);
+      expect(r.cat, SkillCategory.dungCo);
+    });
+  });
+
   group('pickCategoryForToday', () {
     group('yếu trong trận', () {
       final yesterday = _today.subtract(const Duration(days: 1));

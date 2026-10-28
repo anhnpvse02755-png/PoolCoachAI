@@ -10,7 +10,12 @@ CoachTopic? coachTopicOf(SkillCategory cat) => switch (cat) {
       SkillCategory.position => CoachTopic.position,
       SkillCategory.safety => CoachTopic.safety,
       SkillCategory.kick => CoachTopic.kick,
-      SkillCategory.breakShot || SkillCategory.bank => null,
+      SkillCategory.breakShot ||
+      SkillCategory.bank ||
+      SkillCategory.dungCo ||
+      SkillCategory.nhayBi ||
+      SkillCategory.matXe =>
+        null,
     };
 
 SkillCategory categoryOf(CoachTopic topic) => switch (topic) {

@@ -1,3 +1,5 @@
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+
 /// Hằng số đường dẫn của toàn app.
 ///
 /// Không widget nào được viết chuỗi đường dẫn thẳng — luôn đi qua đây.
@@ -68,6 +70,10 @@ abstract final class Routes {
 
   /// Một sơ đồ theo thứ tự của `allLayouts()` — để chụp từng sơ đồ trên Chrome.
   static String rankLayoutAt(int i) => '$rankLayouts?i=$i';
+
+  /// Sơ đồ của một bài BU ở một bậc — mở từ chi tiết bài tập.
+  static String rankLayoutsOf(String drillId, ExamIIVersion v) =>
+      '$rankLayouts?drill=$drillId&v=${v.name}';
 
   /// Làm bài kiểm tra BU — mở đè lên shell (spec mục 7.1).
   static const rankTest = '/rank/test';

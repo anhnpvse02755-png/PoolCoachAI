@@ -1,5 +1,6 @@
 import 'package:poolcoachai/domain/assessment/bu_exams.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/coach/coach_recommendation.dart';
 import 'package:poolcoachai/domain/coach/coach_stats.dart';
 import 'package:poolcoachai/domain/coach/coach_topic.dart';
@@ -82,6 +83,9 @@ abstract final class Vi {
     SkillCategory.safety => 'Phòng thủ',
     SkillCategory.kick => 'A băng',
     SkillCategory.bank => 'Cân bi',
+    SkillCategory.dungCo => 'Dựng cơ',
+    SkillCategory.nhayBi => 'Nhảy bi',
+    SkillCategory.matXe => 'Mát xê',
   };
 
   /// Câu giải thích vì sao hôm nay lại là nhóm kỹ năng này.
@@ -796,6 +800,22 @@ abstract final class Vi {
   static String drillLevel(int level) => 'Cấp $level';
   static String drillUnitLabel(String unit) => 'Đơn vị: $unit';
   static const drillStepsTitle = 'Các bước thực hiện';
+
+  /// Dòng nguồn của bài nâng cao. Dựng cơ chỉ dẫn BU: chưa có mẹo kỹ thuật
+  /// có nguồn cho nhóm này nên không viện dẫn Từ điển.
+  static String drillSource(SkillCategory cat, DrillProvenance p) =>
+      'Nguồn: Billiard University Exam II, ${p.buDrillId}, bậc ${buVersionName(p.version)}'
+      '${switch (cat) {
+        SkillCategory.nhayBi => '; mẹo theo Dr. Dave Alciatore; lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 17.',
+        SkillCategory.matXe => '; mẹo theo Dr. Dave Alciatore; cách ngắm, lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 18.',
+        _ => '.',
+      }}';
+  static const drillClothWarning =
+      'Nên luyện trên bàn tập hoặc nỉ cũ, dễ làm rách nỉ.';
+  static const drillNoSourcedTips =
+      'Chưa có mẹo kỹ thuật có nguồn cho dựng cơ.';
+  static const drillOpenBuLayouts = 'Xem sơ đồ BU';
+  static String sessionScoreHintRange(int n) => 'Từ 0 đến $n';
   static const drillHistoryTitle = 'Lịch sử tập';
   static const drillReadinessTitle = 'Tiến độ buổi đạt liên tiếp';
   static String drillReadinessProgress(int count) =>
@@ -938,6 +958,16 @@ abstract final class Vi {
     SkillTestInputError.attemptsInvalid => sessionAttemptsInvalid,
     SkillTestInputError.attemptsNotAllowed =>
       'Bài này không chấm theo số lần thử',
+    SkillTestInputError.scoreAboveShots => shotScoreError(
+      ShotScoreError.aboveShots,
+    ),
+  };
+
+  /// Lỗi điểm của bài BU đếm theo cú.
+  static String shotScoreError(ShotScoreError e) => switch (e) {
+    ShotScoreError.notWhole => 'Số cú thành công phải là số nguyên',
+    ShotScoreError.aboveShots =>
+      'Số cú thành công không được lớn hơn số cú của bài',
   };
 
   /// Xác nhận sau khi lưu, kèm tỉ lệ đạt của chính buổi vừa ghi.
@@ -2059,6 +2089,10 @@ abstract final class Vi {
       : 'Dự kiến xong: ${shortDate(estimate.date!)}';
 
   static const roadmapAchieved = 'Đã đạt mục tiêu.';
+  static const roadmapS9Hint =
+      'Bài S9 chấm nhảy bi hoặc mát xê: để luyện, đổi mục tiêu sang '
+      'Thuần thục Nhảy bi hoặc Mát xê';
+  static const roadmapS9Pick = 'Đổi mục tiêu để luyện';
 
   static String stepStatus(StepStatus status) => switch (status) {
     StepStatus.dangLam => 'Đang làm',

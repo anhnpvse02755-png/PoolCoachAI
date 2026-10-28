@@ -10,7 +10,7 @@ enum StepKind {
   /// Tập một nhóm kỹ năng tới khi xong (mục 4.4).
   nhom,
 
-  /// Điểm mất ở S8/S9 — không nối nhóm nào, không có bài tập đo được (R5).
+  /// Điểm mất ở S9 — không nối nhóm nào, không có bài tập đo được (R5).
   buLe,
 
   /// Một bài tập của mục tiêu Thuần thục kỹ năng (R6).
@@ -128,7 +128,7 @@ final class RoadmapStep {
   /// Số buổi đạt liên tiếp gần nhất của [drillId], tối đa 3.
   final int passStreak;
 
-  /// null: bước không có dòng ngày (đã xong, S8/S9, bài của mục tiêu thuần thục).
+  /// null: bước không có dòng ngày (đã xong, S9, bài của mục tiêu thuần thục).
   final Estimate? estimate;
 
   RoadmapStep withStatus(StepStatus s) => _copy(status: s);

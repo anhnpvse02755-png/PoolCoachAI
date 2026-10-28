@@ -122,7 +122,52 @@ void main() {
       final pi = computePlayerIntelligence(
           drills: roadmapDrills, logs: const [], latestBu: allLost);
       expect(pi.buPercent.values.toSet(), {0});
-      expect(pi.weak, SkillCategory.values);
+      expect(pi.weak, SkillCategory.values.where((c) => !c.isAdvanced));
+    });
+
+    test('nhóm nâng cao chưa có buổi: không trong phạm vi, không yếu', () {
+      final pi = computePlayerIntelligence(drills: roadmapDrills, logs: const []);
+      expect(pi.inScope(SkillCategory.dungCo), isFalse);
+      expect(pi.inScope(SkillCategory.aiming), isTrue);
+      expect(pi.weak, isEmpty);
+    });
+
+    test('BU yếu S8, chưa có buổi Dựng cơ: không yếu; có một buổi: yếu theo BU', () {
+      final s8Lost = buResultGraded(
+        completedAt: DateTime(2026, 10, 10),
+        lost: const {'S8': 5},
+      );
+      final drills = [...roadmapDrills, ...advancedDrills];
+      final none = computePlayerIntelligence(drills: drills, logs: const [], latestBu: s8Lost);
+      expect(none.buPercent[SkillCategory.dungCo], 0);
+      expect(none.weak, isNot(contains(SkillCategory.dungCo)));
+      expect(none.weakSources.containsKey(SkillCategory.dungCo), isFalse);
+
+      final one = computePlayerIntelligence(
+          drills: drills, logs: sessions('c1', 5, [on(10, 1)]), latestBu: s8Lost);
+      expect(one.categories[SkillCategory.dungCo]!.mastery, isNull);
+      expect(one.weak, contains(SkillCategory.dungCo));
+      expect(one.weakSources[SkillCategory.dungCo], WeakSource.bu);
+    });
+
+    test('S8 không mất điểm: Dựng cơ có buổi vẫn không yếu theo BU', () {
+      final full = buResultGraded(completedAt: DateTime(2026, 10, 10));
+      final pi = computePlayerIntelligence(
+          drills: [...roadmapDrills, ...advancedDrills],
+          logs: sessions('c1', 5, [on(10, 1)]),
+          latestBu: full);
+      expect(pi.buPercent[SkillCategory.dungCo], 100);
+      expect(pi.weak, isNot(contains(SkillCategory.dungCo)));
+    });
+
+    test('ba buổi Nhảy bi kém: Nhảy bi vào danh sách yếu như mọi nhóm', () {
+      final pi = computePlayerIntelligence(
+        drills: [...roadmapDrills, ...advancedDrills],
+        logs: sessions('j1', 0, [on(10, 1), on(10, 2), on(10, 3)]),
+      );
+      expect(pi.inScope(SkillCategory.nhayBi), isTrue);
+      expect(pi.weak, contains(SkillCategory.nhayBi));
+      expect(pi.weakSources[SkillCategory.nhayBi], WeakSource.drills);
     });
 
     test('không truyền trận, không truyền BU: kết quả như cũ', () {

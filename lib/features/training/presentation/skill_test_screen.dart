@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/features/training/presentation/score_hint.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/repositories/skill_test_repository.dart';
@@ -299,9 +300,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
               labelText: drill.usesAttempts
                   ? Vi.sessionScoreLabelAttempts
                   : Vi.sessionScoreLabelTarget,
-              hintText: drill.usesAttempts
-                  ? Vi.sessionScoreHintAttempts
-                  : Vi.sessionScoreHintTarget,
+              hintText: scoreHintFor(drill),
               suffixText: drill.unit,
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -355,7 +354,8 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
     return switch (error) {
       SkillTestInputError.scoreInvalid ||
       SkillTestInputError.scoreNotWhole ||
-      SkillTestInputError.scoreAboveAttempts => Vi.skillTestInputError(error!),
+      SkillTestInputError.scoreAboveAttempts ||
+      SkillTestInputError.scoreAboveShots => Vi.skillTestInputError(error!),
       _ => null,
     };
   }

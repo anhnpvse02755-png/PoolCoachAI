@@ -6,7 +6,10 @@ import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/data/seed/seed_drills.dart';
+import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
+import 'package:poolcoachai/features/rank/presentation/layout_gallery_screen.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -392,5 +395,99 @@ void main() {
     expect(tester.takeException(), isNull);
     await scrollThroughAll(tester);
     expect(tester.takeException(), isNull);
+  });
+
+  group('bài nâng cao d11–d19', () {
+    const dungCoSource =
+        'Nguồn: Billiard University Exam II, S8, bậc Masters.';
+    const nhayBiSource =
+        'Nguồn: Billiard University Exam II, S9, bậc Bachelors; mẹo theo Dr. Dave Alciatore; lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 17.';
+    const matXeSource =
+        'Nguồn: Billiard University Exam II, S9, bậc Masters; mẹo theo Dr. Dave Alciatore; cách ngắm, lỗi hay gặp và cảnh báo theo Từ điển kiến thức Billiard Pool, mục 18.';
+
+    testWidgets('Dựng cơ: nguồn chỉ BU, không cảnh báo nỉ, chưa có mẹo, nút sơ đồ',
+        (tester) async {
+      await openDrill(tester, 'd12', drills: seedDrills);
+      expect(find.text(dungCoSource), findsOneWidget);
+      expect(find.textContaining('Từ điển'), findsNothing);
+      expect(find.text(Vi.drillClothWarning), findsNothing);
+      expect(find.text(Vi.drillNoSourcedTips), findsOneWidget);
+      await reveal(tester, find.text(Vi.drillOpenBuLayouts));
+      await tester.tap(find.text(Vi.drillOpenBuLayouts));
+      await tester.pumpAndSettle();
+      expect(find.byType(LayoutGalleryScreen), findsOneWidget);
+    });
+
+    testWidgets('Nhảy bi: nguồn Dr. Dave + Từ điển 17, có cảnh báo, không dòng chưa có mẹo',
+        (tester) async {
+      await openDrill(tester, 'd14', drills: seedDrills);
+      expect(find.text(nhayBiSource), findsOneWidget);
+      expect(find.text(Vi.drillClothWarning), findsOneWidget);
+      expect(find.text(Vi.drillNoSourcedTips), findsNothing);
+      expect(find.text(Vi.drillOpenBuLayouts), findsOneWidget);
+    });
+
+    testWidgets('Mát xê: nguồn Dr. Dave + Từ điển 18, có cảnh báo', (tester) async {
+      await openDrill(tester, 'd18', drills: seedDrills);
+      expect(find.text(matXeSource), findsOneWidget);
+      expect(find.text(Vi.drillClothWarning), findsOneWidget);
+      expect(find.text(Vi.drillNoSourcedTips), findsNothing);
+    });
+
+    testWidgets('bài cũ d1: không nguồn, cảnh báo, chưa có mẹo hay nút sơ đồ',
+        (tester) async {
+      await openDrill(tester, 'd1', drills: seedDrills);
+      expect(find.textContaining('Nguồn:'), findsNothing);
+      expect(find.text(Vi.drillClothWarning), findsNothing);
+      expect(find.text(Vi.drillNoSourcedTips), findsNothing);
+      expect(find.text(Vi.drillOpenBuLayouts), findsNothing);
+    });
+
+    testWidgets('nút Xem sơ đồ BU của d12 mở đúng các sơ đồ S8 Masters', (tester) async {
+      await openDrill(tester, 'd12', drills: seedDrills);
+      await reveal(tester, find.text(Vi.drillOpenBuLayouts));
+      await tester.tap(find.text(Vi.drillOpenBuLayouts));
+      await tester.pumpAndSettle();
+      final n = layoutsFor('S8', ExamIIVersion.masters).length;
+      expect(find.textContaining('Sơ đồ 1 / $n'), findsOneWidget);
+      // quay lại: về đúng chi tiết bài, không rơi ra ngoài
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(LayoutGalleryScreen), findsNothing);
+      expect(find.text(Vi.drillOpenBuLayouts), findsOneWidget);
+    });
+
+    for (final (id, version) in [
+      ('d14', ExamIIVersion.bachelors),
+      ('d18', ExamIIVersion.masters),
+    ]) {
+      testWidgets('nút Xem sơ đồ BU của $id mở đúng các sơ đồ S9 $version', (
+        tester,
+      ) async {
+        await openDrill(tester, id, drills: seedDrills);
+        await reveal(tester, find.text(Vi.drillOpenBuLayouts));
+        await tester.tap(find.text(Vi.drillOpenBuLayouts));
+        await tester.pumpAndSettle();
+        expect(find.byType(LayoutGalleryScreen), findsOneWidget);
+        final n = layoutsFor('S9', version).length;
+        expect(find.textContaining('Sơ đồ 1 / $n'), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(find.byType(LayoutGalleryScreen), findsNothing);
+      });
+    }
+
+    for (final id in ['d12', 'd14', 'd18']) {
+      testWidgets('360×640 chữ lớn: $id không tràn', (tester) async {
+        applyScreen(tester, const Size(360, 640), textScale: 1.5);
+        await openDrill(tester, id, drills: seedDrills, tall: false);
+        expect(tester.takeException(), isNull);
+        await reveal(tester, find.text(Vi.drillOpenBuLayouts));
+        expect(find.text(Vi.drillOpenBuLayouts), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await scrollThroughAll(tester);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 
 import '../../support/layout_sweep.dart';
@@ -26,6 +27,21 @@ void main() {
     await tester.pumpAndSettle();
     return db;
   }
+
+  testWidgets('bộ chọn nhóm có đủ ba nhóm nâng cao', (tester) async {
+    await openSchedule(tester);
+    await tester.tap(find.text(Vi.scheduleAdd));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<SkillCategory?>));
+    await tester.pumpAndSettle();
+    for (final c in [
+      SkillCategory.dungCo,
+      SkillCategory.nhayBi,
+      SkillCategory.matXe,
+    ]) {
+      expect(find.text(Vi.skill(c)), findsWidgets, reason: '$c');
+    }
+  });
 
   testWidgets('weekly schedule can be created, edited and removed', (
     tester,

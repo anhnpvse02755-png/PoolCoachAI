@@ -1,6 +1,7 @@
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
@@ -124,6 +125,7 @@ enum SkillTestInputError {
   attemptsRequired,
   attemptsInvalid,
   attemptsNotAllowed,
+  scoreAboveShots,
 }
 
 /// Đạt hay không theo đúng tiêu chí của buổi tập: `drillRatio >= 1`.
@@ -197,6 +199,14 @@ SkillTestInputError? checkSkillTestInput(
   int? attempts,
 }) {
   if (!score.isFinite || score < 0) return SkillTestInputError.scoreInvalid;
+  switch (checkShotScore(drill, score)) {
+    case ShotScoreError.notWhole:
+      return SkillTestInputError.scoreNotWhole;
+    case ShotScoreError.aboveShots:
+      return SkillTestInputError.scoreAboveShots;
+    case null:
+      break;
+  }
   if (drill.usesAttempts) {
     if (attempts == null) return SkillTestInputError.attemptsRequired;
     if (attempts <= 0) return SkillTestInputError.attemptsInvalid;

@@ -1,3 +1,4 @@
+import 'package:poolcoachai/data/database/category_compat.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
@@ -48,41 +49,74 @@ PlayerGoalRow toGoalRow(
 );
 
 const remoteGoalFields =
-    'id,goal_id,kind,category,event_date,created_at,updated_at,target_rank,tournament_id';
+    'id,goal_id,kind,category,category_ext,event_date,created_at,updated_at,target_rank,tournament_id';
 
 /// Dòng mục tiêu cho `POST /items/player_goals` (id là id người dùng, R1).
-Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
-  'id': r.userId,
-  'goal_id': r.goalId,
-  'kind': r.kind,
-  'category': r.category,
-  'event_date': _iso(r.eventDate),
-  'target_rank': r.targetRank,
-  'tournament_id': r.tournamentId,
-  'created_at': _iso(r.createdAt),
-  'updated_at': _iso(r.updatedAt),
-};
+///
+/// Mục tiêu có nhóm nâng cao không được lộ ra `kind` / `category`: bản đã
+/// phát hành ném khi gặp tên lạ ở `category`, nên nó đi với kind và category
+/// rỗng (bản cũ đọc là "không có mục tiêu") và tên nhóm nằm ở `category_ext`.
+Map<String, Object?> toRemoteGoal(PlayerGoalRow r) {
+  final advanced = r.category != null && !legacyCategoryNames.contains(r.category);
+  return {
+    'id': r.userId,
+    'goal_id': r.goalId,
+    'kind': advanced ? null : r.kind,
+    'category': advanced ? null : r.category,
+    'category_ext': advanced ? r.category : null,
+    'event_date': _iso(r.eventDate),
+    'target_rank': r.targetRank,
+    'tournament_id': r.tournamentId,
+    'created_at': _iso(r.createdAt),
+    'updated_at': _iso(r.updatedAt),
+  };
+}
 
-GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
-  updatedAt: _local(j['updated_at'])!,
-  goal: j['kind'] == null
+GoalRecord goalFromRemote(Map<String, Object?> j) {
+  // Tên lạ của bản sau thì null; sai kiểu thì ném.
+  final ext = joinCategoryName(null, j['category_ext']);
+  final extCategory = ext == null ? null : SkillCategory.values.byName(ext);
+  final updatedAt = _local(j['updated_at'])!;
+  final kindName = j['kind'] as String?;
+  if (kindName == null) {
+    // Mục tiêu nhóm nâng cao do bản mới ghi: kind rỗng, goal_id và category_ext
+    // có. Bản cũ bỏ mục tiêu thì goal_id cũng rỗng (category_ext còn sót).
+    final goalId = j['goal_id'] as String?;
+    if (goalId == null || extCategory == null) {
+      return GoalRecord(updatedAt: updatedAt);
+    }
+    return GoalRecord(
+      updatedAt: updatedAt,
+      goal: PlayerGoal(
+        goalId: goalId,
+        kind: GoalKind.thuanThucKyNang,
+        category: extCategory,
+        createdAt: _local(j['created_at'])!,
+      ),
+    );
+  }
+  final kind = GoalKind.values.byName(kindName);
+  final legacy = j['category'] == null
       ? null
-      : PlayerGoal(
-          goalId: j['goal_id']! as String,
-          kind: GoalKind.values.byName(j['kind']! as String),
-          category: j['category'] == null
-              ? null
-              : SkillCategory.values.byName(j['category']! as String),
-          eventDate: _local(j['event_date']),
-          createdAt: _local(j['created_at'])!,
-          // Máy cũ có thể để target_rank thừa ở dòng không phải Lên hạng.
-          targetRank:
-              j['kind'] == GoalKind.lenHang.name && j['target_rank'] != null
-              ? _rankOrNull(j['target_rank'] as String?)
-              : null,
-          tournamentId: j['tournament_id'] as String?,
-        ),
-);
+      : SkillCategory.values.byName(j['category']! as String);
+  return GoalRecord(
+    updatedAt: updatedAt,
+    goal: PlayerGoal(
+      goalId: j['goal_id']! as String,
+      kind: kind,
+      // category_ext còn sót khi bản cũ đổi mục tiêu: chỉ dùng cho Thuần thục.
+      category:
+          legacy ?? (kind == GoalKind.thuanThucKyNang ? extCategory : null),
+      eventDate: _local(j['event_date']),
+      createdAt: _local(j['created_at'])!,
+      // Máy cũ có thể để target_rank thừa ở dòng không phải Lên hạng.
+      targetRank: kind == GoalKind.lenHang && j['target_rank'] != null
+          ? _rankOrNull(j['target_rank'] as String?)
+          : null,
+      tournamentId: j['tournament_id'] as String?,
+    ),
+  );
+}
 
 /// Cùng người, cùng loại, cùng refId thì cùng id, trên mọi máy (R8).
 String achievementId(String userId, Achievement a) => const Uuid().v5(

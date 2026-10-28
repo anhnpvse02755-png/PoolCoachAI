@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -32,11 +33,12 @@ void main() {
     List<BuTest> tests = const [],
     BuResult? result,
     PlayerGoal? target,
+    List<Drill>? drills,
   }) =>
       buildRoadmap(
         goal: target ?? goal,
         rank: r,
-        drills: roadmapDrills,
+        drills: drills ?? roadmapDrills,
         logs: logs,
         tests: tests,
         latestResult: result,
@@ -78,7 +80,7 @@ void main() {
       expect(reason.drillIds, ['F3', 'F5']);
     });
 
-    test('D 120 → C cần 20: lấy dần tới khi đủ, có cả bước S8/S9', () {
+    test('D 120 → C cần 20: lấy dần tới khi đủ, có bước Dựng cơ và bước S9', () {
       final r = build(
         r: rank(Rank.d, source: RankSource.verified),
         result: result(120, const {'F1': 5, 'F3': 4, 'F5': 3, 'S5': 6, 'S8': 2, 'S9': 1}),
@@ -88,12 +90,22 @@ void main() {
         SkillCategory.position, // 7
         SkillCategory.safety, // 6 → 13
         SkillCategory.aiming, // 5 → 18
-        null, // S8/S9: 3 → 21 ≥ 20
+        SkillCategory.dungCo, // S8: 2 → 20 ≥ 20
         null, // Làm bài BU
       ]);
-      final buLe = r.steps[3];
-      expect(buLe.kind, StepKind.buLe);
-      expect(buLe.buDrillIds, ['S8', 'S9']);
+      expect(r.steps[3].reason,
+          isA<LostBuPoints>().having((x) => x.drillIds, 'drillIds', ['S8']));
+      expect(r.steps.any((s) => s.kind == StepKind.buLe), isFalse);
+    });
+
+    test('chỉ mất ở S9: bước Tập lại S9 trên bàn BU', () {
+      final r = build(
+        r: rank(Rank.d, source: RankSource.verified),
+        result: result(120, const {'S9': 3}),
+      );
+      final buLe = r.steps.singleWhere((s) => s.kind == StepKind.buLe);
+      expect(buLe.category, isNull);
+      expect(buLe.buDrillIds, ['S9']);
       expect(buLe.status, StepStatus.dangLam);
       expect(buLe.estimate, isNull);
     });
@@ -165,6 +177,12 @@ void main() {
       expect(r.steps.first.status, StepStatus.dangLam);
       expect(r.steps[1].status, StepStatus.chuaToi);
     });
+  });
+
+  test('Lên hạng chưa có BU: nhóm nâng cao chưa tập không thành bước', () {
+    final r = build(
+        r: rank(Rank.h), drills: [...roadmapDrills, ...advancedDrills]);
+    expect(r.steps.where((s) => s.category?.isAdvanced ?? false), isEmpty);
   });
 
   group('ngày dự kiến (spec mục 4.5)', () {

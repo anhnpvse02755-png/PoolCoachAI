@@ -25,6 +25,12 @@ class RoadmapScreen extends ConsumerStatefulWidget {
 
 class _RoadmapScreenState extends ConsumerState<RoadmapScreen> {
   bool _changing = false;
+  bool _openSkills = false;
+
+  void _leavePicker() => setState(() {
+    _changing = false;
+    _openSkills = false;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -40,14 +46,17 @@ class _RoadmapScreenState extends ConsumerState<RoadmapScreen> {
         ),
         data: (value) => value == null || _changing
             ? GoalPicker(
-                onPicked: () => setState(() => _changing = false),
-                onCancel: value == null
-                    ? null
-                    : () => setState(() => _changing = false),
+                openSkills: _openSkills,
+                onPicked: _leavePicker,
+                onCancel: value == null ? null : _leavePicker,
               )
             : RoadmapView(
                 roadmap: value,
                 onChange: () => setState(() => _changing = true),
+                onPickSkill: () => setState(() {
+                  _changing = true;
+                  _openSkills = true;
+                }),
               ),
       ),
     );
@@ -58,11 +67,13 @@ class RoadmapView extends ConsumerWidget {
   const RoadmapView({
     required this.roadmap,
     required this.onChange,
+    this.onPickSkill,
     super.key,
   });
 
   final Roadmap roadmap;
   final VoidCallback onChange;
+  final VoidCallback? onPickSkill;
 
   static String _subject(Achievement achievement, Map<String, Drill> drills) {
     final key = achievement.refId.split(':').last;
@@ -91,6 +102,7 @@ class RoadmapView extends ConsumerWidget {
           step: step,
           drill: drills[step.drillId],
           today: today,
+          onPickSkill: onPickSkill,
         );
 
     return ListView(

@@ -10,10 +10,12 @@ import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/drill_provenance.dart';
 import 'package:poolcoachai/domain/drill_ratio.dart';
 import 'package:poolcoachai/domain/knowledge_lookup.dart';
 import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/practice_constants.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/features/training/presentation/skill_test_card.dart';
 
 /// Chi tiết một bài tập — mục 6.3 của thiết kế.
@@ -116,6 +118,7 @@ class DrillDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              ..._advancedBlock(context, drill),
               if (related.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -166,6 +169,52 @@ class DrillDetailScreen extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Nguồn, cảnh báo nỉ và nút sơ đồ BU của bài nâng cao.
+///
+/// Cảnh báo nỉ chỉ cho Nhảy bi và Mát xê; Dựng cơ chưa có mẹo kỹ thuật có
+/// nguồn nên nói thẳng điều đó. Bài cũ không có gì ở đây.
+List<Widget> _advancedBlock(BuildContext context, Drill drill) {
+  final provenance = drillProvenanceOf(drill.id);
+  final showWarning =
+      drill.cat == SkillCategory.nhayBi || drill.cat == SkillCategory.matXe;
+  return [
+    if (drill.cat == SkillCategory.dungCo) ...[
+      const SizedBox(height: 8),
+      const Text(Vi.drillNoSourcedTips),
+    ],
+    if (showWarning) ...[
+      const SizedBox(height: 8),
+      const PcCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_outlined),
+            SizedBox(width: 8),
+            Expanded(child: Text(Vi.drillClothWarning)),
+          ],
+        ),
+      ),
+    ],
+    if (provenance != null) ...[
+      const SizedBox(height: 8),
+      Text(
+        Vi.drillSource(drill.cat, provenance),
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton(
+          onPressed: () => context.push(
+            Routes.rankLayoutsOf(provenance.buDrillId, provenance.version),
+          ),
+          child: const Text(Vi.drillOpenBuLayouts),
+        ),
+      ),
+    ],
+  ];
 }
 
 class _ReadinessCard extends StatelessWidget {

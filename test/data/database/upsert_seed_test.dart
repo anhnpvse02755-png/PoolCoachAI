@@ -29,7 +29,7 @@ void main() {
       final drills = await db.select(db.drillRows).get();
       final articles = await db.select(db.knowledgeRows).get();
 
-      expect(drills.length, 10);
+      expect(drills.length, 19);
       expect(articles.length, 6);
     });
 
@@ -70,7 +70,7 @@ void main() {
       await upsertSeed(db);
       await upsertSeed(db);
 
-      expect((await db.select(db.drillRows).get()).length, 10);
+      expect((await db.select(db.drillRows).get()).length, 19);
       expect((await db.select(db.knowledgeRows).get()).length, 6);
     });
 

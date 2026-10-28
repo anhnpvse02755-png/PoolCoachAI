@@ -85,14 +85,17 @@ RoadmapStep _milestone(Rank r, DateTime? retestFrom, {required bool retake}) => 
       reason: RankMilestone(r, from: retestFrom, retake: retake),
     );
 
-/// Nhóm dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
+/// Nhóm trong phạm vi (nhóm cơ bản, hoặc nhóm nâng cao đã có buổi có điểm)
+/// mà dưới 75 hoặc chưa đo, yếu nhất trước (mục 4.1 bước 6).
 List<RoadmapStep> _weakGroups(PracticeFacts facts) {
-  final weak = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList()
+  final weak = SkillCategory.values
+      .where((c) => facts.inScope(c) && !facts.atLeastStrong(c))
+      .toList()
     ..sort(facts.compareWeakness);
   return [for (final c in weak) facts.groupStep(c, facts.groupReason(c))];
 }
 
-/// Điểm mất giảm dần; bằng nhau thì nhóm yếu hơn trước; S8/S9 sau các nhóm
+/// Điểm mất giảm dần; bằng nhau thì nhóm yếu hơn trước; S9 sau các nhóm
 /// cùng điểm (mục 4.1 bước 4–5).
 int _byPointsThenWeakness(PracticeFacts facts, _Lost a, _Lost b) {
   final byPoints = b.points.compareTo(a.points);
@@ -179,7 +182,7 @@ Roadmap _skill(PlayerGoal goal, PracticeFacts facts) {
   return Roadmap(goal: goal, steps: placeSteps(facts, steps));
 }
 
-/// Mọi nhóm dưới 75; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
+/// Mọi nhóm dưới 75 trong phạm vi, cộng nhóm nâng cao đang mất điểm BU; có bài BU thì theo điểm mất, không thì theo độ yếu. Không
 /// có bước làm BU; bước không kịp trước ngày giải xếp riêng (mục 4.3).
 Roadmap _tournament(
   PlayerGoal goal,
@@ -203,7 +206,14 @@ Roadmap _tournament(
           .withStatus(StepStatus.chuaToi),
   ];
   final placed = {for (final s in fromMatches) s.category};
-  final below = SkillCategory.values.where((c) => !facts.atLeastStrong(c)).toList();
+  final lostByCat = result == null ? null : lostByCategory(result);
+  final below = SkillCategory.values
+      .where(
+        (c) =>
+            !facts.atLeastStrong(c) &&
+            (facts.inScope(c) || (lostByCat?.byCategory[c] ?? 0) > 0),
+      )
+      .toList();
   final List<RoadmapStep> steps;
   if (result == null) {
     below.sort(facts.compareWeakness);
@@ -268,7 +278,7 @@ List<RoadmapStep> placeSteps(
   }
 
   // Trạng thái: bước còn làm đầu tiên là "đang làm"; mục tiêu giải thì bước
-  // có ngày sau ngày giải là "không kịp" (mục 4.3). S8/S9 luôn đang làm, không
+  // có ngày sau ngày giải là "không kịp" (mục 4.3). S9 luôn đang làm, không
   // phải bước hiện tại (R5).
   final event = eventDate == null ? null : dateOnly(eventDate);
   var hasCurrent = false;

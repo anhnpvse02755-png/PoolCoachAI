@@ -66,7 +66,7 @@ typedef LostPoints = ({
   List<String> unmappedIds,
 });
 
-/// Cộng điểm mất theo nhóm qua [buDrillCategory]. Bài không nối nhóm (S8, S9)
+/// Cộng điểm mất theo nhóm qua [buDrillCategory]. Bài không nối nhóm (S9)
 /// vẫn tính vào [LostPoints.unmapped] — điểm mất không được biến mất.
 LostPoints lostByCategory(BuResult r) {
   final byCategory = <SkillCategory, int>{};
@@ -92,7 +92,7 @@ List<String> lostDrillsIn(BuResult r, SkillCategory c) => [
     ];
 
 /// Phần trăm điểm đạt theo nhóm: (tối đa − mất) / tối đa, cộng qua các bài của
-/// nhóm. Nhóm không có điểm tối đa thì vắng mặt; S8, S9 không tính.
+/// nhóm. Nhóm không có điểm tối đa thì vắng mặt; S9 không tính.
 Map<SkillCategory, int> buCategoryPercent(BuResult r) {
   final maxByCat = <SkillCategory, int>{};
   final lostByCat = <SkillCategory, int>{};

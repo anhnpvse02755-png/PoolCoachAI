@@ -10,6 +10,9 @@ void main() {
   test('bốn nhóm có tình huống, Phá và Cân bi thì không; hai chiều khớp nhau', () {
     expect(coachTopicOf(SkillCategory.breakShot), isNull);
     expect(coachTopicOf(SkillCategory.bank), isNull);
+    expect(coachTopicOf(SkillCategory.dungCo), isNull);
+    expect(coachTopicOf(SkillCategory.nhayBi), isNull);
+    expect(coachTopicOf(SkillCategory.matXe), isNull);
     for (final t in CoachTopic.values) {
       expect(coachTopicOf(categoryOf(t)), t);
     }

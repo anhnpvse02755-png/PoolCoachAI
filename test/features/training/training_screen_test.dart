@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart' show FilterChip;
 import 'package:flutter/widgets.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/features/training/presentation/planner/planner_screen.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
@@ -66,6 +68,21 @@ void main() {
     score: score,
     attempts: attempts,
   );
+
+  testWidgets('bộ lọc nhóm có đủ ba nhóm nâng cao', (tester) async {
+    await openTraining(tester, const []);
+    for (final c in [
+      SkillCategory.dungCo,
+      SkillCategory.nhayBi,
+      SkillCategory.matXe,
+    ]) {
+      expect(
+        find.widgetWithText(FilterChip, Vi.skill(c), skipOffstage: false),
+        findsOneWidget,
+        reason: '$c',
+      );
+    }
+  });
 
   testWidgets('bài đã chứng nhận có huy hiệu Đã chứng nhận', (tester) async {
     await openTraining(

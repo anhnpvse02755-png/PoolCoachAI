@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Sáu nhóm kỹ năng chính thức.
+/// Chín nhóm kỹ năng: sáu nhóm cơ bản và ba nhóm nâng cao.
 ///
 /// Khóa giữ tiếng Anh; tên tiếng Việt nằm ở [Vi.skill].
 /// Màu xem docs/superpowers/specs/2026-09-17-poolcoachai-shell-design.md mục 4.1.
@@ -45,6 +45,21 @@ enum SkillCategory {
     fg: Color(0xFFD98AC0),
     bg: Color(0xFF43213A),
     borderColor: Color(0xFF6F3760),
+  ),
+  dungCo(
+    fg: Color(0xFFA3C85A),
+    bg: Color(0xFF2F3E17),
+    borderColor: Color(0xFF4C6426),
+  ),
+  nhayBi(
+    fg: Color(0xFFF0904A),
+    bg: Color(0xFF4A2A12),
+    borderColor: Color(0xFF7A4620),
+  ),
+  matXe(
+    fg: Color(0xFFB4BCCB),
+    bg: Color(0xFF2E333D),
+    borderColor: Color(0xFF4A5262),
   );
 
   const SkillCategory({
@@ -61,4 +76,20 @@ enum SkillCategory {
 
   /// Màu viền viên thuốc.
   final Color borderColor;
+
+  /// Đây có phải nhóm nâng cao (spec 2026-10-29 §3) không: [dungCo],
+  /// [nhayBi], [matXe].
+  bool get isAdvanced => switch (this) {
+        SkillCategory.dungCo ||
+        SkillCategory.nhayBi ||
+        SkillCategory.matXe =>
+          true,
+        SkillCategory.aiming ||
+        SkillCategory.position ||
+        SkillCategory.breakShot ||
+        SkillCategory.safety ||
+        SkillCategory.kick ||
+        SkillCategory.bank =>
+          false,
+      };
 }

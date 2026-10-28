@@ -441,6 +441,225 @@ void main() {
     });
   });
 
+  group('nhóm nâng cao: hai trường (spec 2026-10-29 mục 6)', () {
+    final slotNow = now;
+    DriftScheduleRepository slots() =>
+        DriftScheduleRepository(db, userId: 'u1', now: () => slotNow);
+
+    Future<Map<String, Object?>> pushedTimer(SkillCategory? cat) async {
+      await DriftTimerSessionRepository(db, userId: 'u1').add(
+        TimerSession(
+          id: 't1',
+          date: DateTime.utc(2026, 10, 21, 7),
+          durationSec: 900,
+          cat: cat,
+        ),
+      );
+      Map<String, Object?>? body;
+      server.routes['POST /items/timer_sessions'] = (request) {
+        body = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 't1'});
+      };
+      expect(await service().syncNow(), SyncOutcome.done);
+      return body!;
+    }
+
+    test(
+      'buổi tập Dựng cơ lên với cat null, cat_ext dungCo',
+      () async {
+        final adv = await pushedTimer(SkillCategory.dungCo);
+        expect(adv, containsPair('cat', null));
+        expect(adv, containsPair('cat_ext', 'dungCo'));
+      },
+    );
+
+    test('buổi tập Ngắm bi lên với cat aiming, cat_ext null', () async {
+      final basic = await pushedTimer(SkillCategory.aiming);
+      expect(basic, containsPair('cat', 'aiming'));
+      expect(basic, containsPair('cat_ext', null));
+    });
+
+    test('kéo buổi tập cat null, cat_ext nhayBi: lưu nhóm Nhảy bi', () async {
+      server.routes['GET /items/timer_sessions'] = (_) => FakeDirectus.ok([
+        {..._remoteTimer('t2'), 'cat_ext': 'nhayBi'},
+        {..._remoteTimer('t3'), 'cat_ext': 'nhomTuongLai'},
+      ]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      final rows = {
+        for (final r in await db.select(db.timerSessionRows).get()) r.id: r,
+      };
+      expect(rows['t2']!.cat, 'nhayBi');
+      expect(rows['t3']!.cat, isNull);
+    });
+
+    test('lịch Dựng cơ lên với cat null, cat_ext dungCo, cat_ext_at = updated_at', () async {
+      await slots().save(
+        const ScheduleSlot(
+          id: 's1',
+          day: 2,
+          time: '19:00',
+          label: 'Tập dựng cơ',
+          cat: SkillCategory.dungCo,
+        ),
+      );
+      Map<String, Object?>? body;
+      server.routes['POST /items/schedule_slots'] = (request) {
+        body = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 's1'});
+      };
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect(body, containsPair('cat', null));
+      expect(body, containsPair('cat_ext', 'dungCo'));
+      expect(body!['cat_ext_at'], body!['updated_at']);
+    });
+
+    test('lịch Ngắm bi lên với cat aiming, cat_ext và cat_ext_at null', () async {
+      await slots().save(
+        const ScheduleSlot(
+          id: 's1',
+          day: 2,
+          time: '19:00',
+          label: 'Tập ngắm',
+          cat: SkillCategory.aiming,
+        ),
+      );
+      Map<String, Object?>? body;
+      server.routes['POST /items/schedule_slots'] = (request) {
+        body = FakeDirectus.body(request);
+        return FakeDirectus.ok({'id': 's1'});
+      };
+      expect(await service().syncNow(), SyncOutcome.done);
+      expect(body, containsPair('cat', 'aiming'));
+      expect(body, containsPair('cat_ext', null));
+      expect(body, containsPair('cat_ext_at', null));
+    });
+
+    test('xin trường cat_ext khi kéo buổi tập, cat_ext và cat_ext_at khi kéo lịch', () async {
+      await service().syncNow();
+      final timerFields = server
+          .sent('GET', '/items/timer_sessions')
+          .single
+          .url
+          .queryParameters['fields']!
+          .split(',');
+      final slotFields = server
+          .sent('GET', '/items/schedule_slots')
+          .single
+          .url
+          .queryParameters['fields']!
+          .split(',');
+      expect(timerFields, contains('cat_ext'));
+      expect(slotFields, containsAll(['cat_ext', 'cat_ext_at']));
+    });
+
+    // Bốn bước của máy cũ và máy mới trên cùng một khung lịch. Chỉ tin cat_ext
+    // khi cat_ext_at == updated_at: bản cũ sửa dòng làm updated_at đổi mà không
+    // chạm cat_ext / cat_ext_at.
+    Map<String, Object?> remoteSlotAt(
+      String updatedAt, {
+      String? cat,
+      String? catExt,
+      String? catExtAt,
+      String label = 'Tập',
+    }) => {
+      ..._remoteSlot('s1', label: label, cat: cat),
+      'updated_at': updatedAt,
+      'cat_ext': catExt,
+      'cat_ext_at': catExtAt,
+    };
+
+    Future<ScheduleSlot> pullSlot(Map<String, Object?> remote) async {
+      server.routes['GET /items/schedule_slots'] = (_) =>
+          FakeDirectus.ok([remote]);
+      expect(await service().syncNow(), SyncOutcome.done);
+      return (await slots().watchAll().first).single;
+    }
+
+    test('kéo lịch cat null, cat_ext dungCo, cat_ext_at = updated_at: nhóm Dựng cơ', () async {
+      final slot = await pullSlot(
+        remoteSlotAt(
+          '2026-10-21T08:00:00.000Z',
+          catExt: 'dungCo',
+          catExtAt: '2026-10-21T08:00:00.000Z',
+        ),
+      );
+      expect(slot.cat, SkillCategory.dungCo);
+    });
+
+    test('bốn bước: máy mới đặt Dựng cơ, máy cũ đổi Ngắm bi rồi Không nhóm: máy mới không còn nhóm', () async {
+      const t1 = '2026-10-21T08:00:00.000Z';
+      const t2 = '2026-10-21T09:00:00.000Z';
+      const t3 = '2026-10-21T10:00:00.000Z';
+      expect(
+        (await pullSlot(remoteSlotAt(t1, catExt: 'dungCo', catExtAt: t1))).cat,
+        SkillCategory.dungCo,
+      );
+      // Bản cũ đổi sang Ngắm bi: cat aiming, cat_ext và cat_ext_at đứng yên.
+      expect(
+        (await pullSlot(
+          remoteSlotAt(t2, cat: 'aiming', catExt: 'dungCo', catExtAt: t1),
+        )).cat,
+        SkillCategory.aiming,
+      );
+      // Bản cũ đổi sang Không nhóm: cat null, cat_ext vẫn dungCo nhưng đã cũ.
+      final slots3 = await pullSlot(
+        remoteSlotAt(t3, catExt: 'dungCo', catExtAt: t1),
+      );
+      expect(slots3.cat, isNull);
+      expect(
+        (await db.select(db.scheduleSlotRows).getSingle()).cat,
+        isNull,
+      );
+    });
+
+    test('bản cũ chỉ sửa tên lịch (gửi cat null): máy mới thấy đúng cái bản cũ thấy, không nhóm', () async {
+      const t1 = '2026-10-21T08:00:00.000Z';
+      const t2 = '2026-10-21T09:00:00.000Z';
+      await pullSlot(remoteSlotAt(t1, catExt: 'dungCo', catExtAt: t1));
+      final slot = await pullSlot(
+        remoteSlotAt(t2, label: 'Đổi tên', catExt: 'dungCo', catExtAt: t1),
+      );
+      expect(slot.label, 'Đổi tên');
+      expect(slot.cat, isNull);
+    });
+
+    test('cat_ext_at thiếu hoặc lệch: bỏ qua cat_ext', () async {
+      const t1 = '2026-10-21T08:00:00.000Z';
+      const t2 = '2026-10-21T09:00:00.000Z';
+      expect(
+        (await pullSlot(remoteSlotAt(t1, catExt: 'dungCo'))).cat,
+        isNull,
+      );
+      expect(
+        (await pullSlot(remoteSlotAt(t2, catExt: 'dungCo', catExtAt: t1))).cat,
+        isNull,
+      );
+    });
+
+    test('cat_ext_at cùng một thời điểm nhưng khác định dạng (…Z và …000+00:00): vẫn tin cat_ext', () async {
+      expect(
+        (await pullSlot(
+          remoteSlotAt(
+            '2026-10-21T08:00:00.000Z',
+            catExt: 'dungCo',
+            catExtAt: '2026-10-21T08:00:00.000+00:00',
+          ),
+        )).cat,
+        SkillCategory.dungCo,
+      );
+      expect(
+        (await pullSlot(
+          remoteSlotAt(
+            '2026-10-21T08:00:00+00:00',
+            catExt: 'nhayBi',
+            catExtAt: '2026-10-21T08:00:00Z',
+          ),
+        )).cat,
+        SkillCategory.nhayBi,
+      );
+    });
+  });
+
   group('schedule slots', () {
     var slotNow = now;
     DriftScheduleRepository slots() =>
