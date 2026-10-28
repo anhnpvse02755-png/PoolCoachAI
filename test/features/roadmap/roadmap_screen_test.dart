@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show ActionChip, CircularProgressIndicato
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -389,6 +390,54 @@ void main() {
       );
       expect(find.text(Vi.dataErrorTitle), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Lên hạng mất điểm ở S9: chạm Chọn nhóm để luyện mở bộ chọn với các nhóm đã mở sẵn',
+    (tester) async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.into(db.playerRankRows).insert(
+            toPlayerRankRow(
+              PlayerRank(
+                rank: Rank.d,
+                source: RankSource.verified,
+                buScore: 110,
+                testId: 't1',
+                onboardingState: OnboardingState.done,
+                updatedAt: testToday,
+              ),
+              userId: 'u1',
+            ),
+          );
+      final container = dbContainer(
+        db,
+        buResult: BuResult(
+          testId: 't1',
+          completedAt: testToday,
+          total: 120,
+          lost: const {'S9': 6},
+        ),
+      );
+      await container
+          .read(roadmapRepositoryProvider)!
+          .setGoal(kind: GoalKind.lenHang);
+      await open(tester, container);
+      await tester.scrollUntilVisible(
+        find.text(Vi.roadmapS9Pick),
+        200,
+        scrollable: roadmapList,
+      );
+      await tester.tap(find.text(Vi.roadmapS9Pick));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.goalPickTitle), findsOneWidget);
+      expect(find.text(Vi.skill(SkillCategory.nhayBi)), findsOneWidget);
+      await tester.tap(find.text(Vi.skill(SkillCategory.nhayBi)));
+      await tester.pumpAndSettle();
+      final row = await db.select(db.playerGoalRows).getSingle();
+      expect(row.kind, GoalKind.thuanThucKyNang.name);
+      expect(row.category, SkillCategory.nhayBi.name);
     },
   );
 }

@@ -2092,6 +2092,9 @@ abstract final class Vi {
       : 'Dự kiến xong: ${shortDate(estimate.date!)}';
 
   static const roadmapAchieved = 'Đã đạt mục tiêu.';
+  static const roadmapS9Hint =
+      'Bài S9 chấm nhảy bi hoặc mát xê: chọn nhóm Nhảy bi hoặc Mát xê để luyện';
+  static const roadmapS9Pick = 'Chọn nhóm để luyện';
 
   static String stepStatus(StepStatus status) => switch (status) {
     StepStatus.dangLam => 'Đang làm',

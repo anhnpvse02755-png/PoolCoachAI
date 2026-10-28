@@ -13,17 +13,25 @@ import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Chọn 1 trong 3 loại mục tiêu.
 class GoalPicker extends ConsumerStatefulWidget {
-  const GoalPicker({required this.onPicked, this.onCancel, super.key});
+  const GoalPicker({
+    required this.onPicked,
+    this.onCancel,
+    this.openSkills = false,
+    super.key,
+  });
 
   final VoidCallback onPicked;
   final VoidCallback? onCancel;
+
+  /// Mở sẵn danh sách nhóm của mục tiêu Thuần thục.
+  final bool openSkills;
 
   @override
   ConsumerState<GoalPicker> createState() => _GoalPickerState();
 }
 
 class _GoalPickerState extends ConsumerState<GoalPicker> {
-  bool _pickingCategory = false;
+  late bool _pickingCategory = widget.openSkills;
   bool _pickingRank = false;
 
   Future<void> _set(
