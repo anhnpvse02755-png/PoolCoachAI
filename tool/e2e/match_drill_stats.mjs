@@ -435,7 +435,10 @@ try {
   }
   await tab.waitForText('HẠNG H');
   await tab.click('Xác nhận');
-  await tab.waitForText('ước lượng');
+  // Mở từ Lộ trình thì Xác nhận quay về Lộ trình (nhãn 'ước lượng' chỉ có ở
+  // Hồ sơ); chờ ngắn cho hạng lưu xong rồi tải lại để đọc hạng đã lưu.
+  await tab.waitForText('Chọn mục tiêu');
+  await sleep(2000);
   await tab.goto(`${APP}/training/roadmap`);
   await tab.waitForText('Chọn mục tiêu');
   await tab.click('Lên hạng'); // Vi.goalKind(lenHang)
