@@ -332,7 +332,7 @@ Không gộp ba loại đánh giá thành một điểm duy nhất. Các lần k
 Đây là cách hiểu thống nhất cho tài liệu và các lần cập nhật tiếp theo:
 
 1. **Định hướng môn chơi:** MVP tập trung huấn luyện 9-ball và mục tiêu chạy rack 9-ball; không xóa khả năng mở rộng. Planner có thể hỗ trợ 8-ball/10-ball như công cụ riêng theo thiết kế hiện có. Chưa coi việc hỗ trợ nhiều luật là cam kết cho mọi module.
-2. **Taxonomy chính thức có sáu nhóm:** Ngắm bi, Điều bi/Vị trí, Phá, Phòng thủ, A băng (kick), Cân bi (bank). Một tài liệu cũ ghi năm nhóm hoặc “Bi băng”; nội dung đó được thay bằng sáu nhóm này để không gộp nhầm kick với bank.
+2. **Taxonomy chính thức có chín nhóm:** sáu nhóm cơ bản Ngắm bi, Điều bi/Vị trí, Phá, Phòng thủ, A băng (kick), Cân bi (bank), và ba nhóm nâng cao Dựng cơ, Nhảy bi, Mát xê (spec 2026-10-29). Mát xê là kỹ thuật riêng, không gộp với Nhảy bi. Một tài liệu cũ ghi năm nhóm hoặc “Bi băng”; nội dung đó được thay bằng các nhóm này để không gộp nhầm kick với bank.
 3. **Hạng không đồng nghĩa với năng lực từng kỹ năng:** hạng là hồ sơ trình độ tổng thể có nguồn; mastery/drill level là năng lực theo kỹ năng; kết quả rack là khả năng áp dụng. Không suy một loại từ loại còn lại nếu chưa có quy tắc kiểm chứng.
 4. **AI gợi ý, người chơi quyết định:** Learning Path/Recommendation ưu tiên luật xác định, kiểm thử được và có lý do. Cổng hạng/cấp không giao cho LLM quyết định. LLM Coach (nếu triển khai) chỉ diễn giải dữ liệu đã tính và đặt câu hỏi; không bịa số, không tự thay thế đánh giá chuyên môn.
 5. **Tập trung nhưng không ép:** Home có thể nêu một việc chính trong ngày; người dùng vẫn được tự chọn bài, xem kiến thức, tập tự do và mở công cụ bất cứ lúc nào.
@@ -380,7 +380,7 @@ Trạng thái dưới đây là **ảnh chụp mã nguồn và tài liệu trong
 |---|---|---|
 | Nền tảng/điều hướng | Flutter, giao diện tiếng Việt, năm tab chính; web build tồn tại | Android/iOS và trải nghiệm thực tế cần tiếp tục kiểm tra trên thiết bị |
 | Đánh giá/hạng | Có onboarding, câu hỏi, bài kiểm tra BU, lịch sử và đồng bộ hạng | Cần đối chiếu nghiệp vụ/UX khi mở rộng mục tiêu và kiểm tra kỹ năng |
-| Training/Drill | Có thư viện seed, lọc sáu nhóm, chi tiết bài, ghi kết quả thủ công/lịch sử; chi tiết bài hiển thị chuỗi buổi đạt gần nhất | Chưa có luồng camera và Recording Preparation; chưa có Skill Test/chứng nhận riêng hoặc tự mở level (tiêu chí cần chốt) |
+| Training/Drill | Có thư viện seed, lọc chín nhóm (ba nhóm nâng cao Dựng cơ, Nhảy bi, Mát xê, mỗi nhóm ba bài theo bố cục BU S8/S9, có dòng nguồn và cảnh báo nỉ), chi tiết bài, ghi kết quả thủ công/lịch sử; chi tiết bài hiển thị chuỗi buổi đạt gần nhất | Chưa có luồng camera và Recording Preparation; chưa có Skill Test/chứng nhận riêng hoặc tự mở level (tiêu chí cần chốt) |
 | Knowledge | Có nội dung seed, trang đọc và liên kết Drill | Có thể mở rộng bộ nội dung và cách tìm/lọc |
 | Intelligence/Home | Có tính toán xác định cho năng lực/gợi ý; Home hiện lịch hôm nay, streak, thời lượng tập tuần và bước Lộ trình | Tiếp tục kiểm chứng trên thiết bị thật; không suy rộng từ dữ liệu tập luyện sang kết luận trận đấu |
 | Mô phỏng góc cắt | Có màn và lõi hình học/vật lý | Cần tiếp tục kiểm chứng độ chính xác thực tế; đây là mô phỏng, không phải camera/physics đầy đủ |

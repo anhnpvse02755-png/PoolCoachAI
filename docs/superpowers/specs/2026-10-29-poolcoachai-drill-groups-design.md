@@ -63,7 +63,7 @@ Mỗi nhóm có 3 cấp, ứng với 3 bậc BU: **cấp 1 = Bachelors, cấp 2 
   - định nghĩa "nâng đuôi cơ";
   - lời bố cục BU: bi cái áp băng hoặc áp bi chướng ngại.
   - Không thêm mẹo nào vì không có nguồn. App nói thẳng "Chưa có mẹo kỹ thuật có nguồn cho dựng cơ."
-- **Cảnh báo an toàn:** cả ba nhóm đều có cảnh báo, theo Tu-Dien 17 và 18: "Nên luyện trên bàn tập hoặc nỉ cũ, dễ làm rách nỉ."
+- **Cảnh báo an toàn:** chỉ Nhảy bi và Mát xê có cảnh báo (Dựng cơ không có cảnh báo có nguồn), theo Tu-Dien 17 và 18: "Nên luyện trên bàn tập hoặc nỉ cũ, dễ làm rách nỉ."
 - **Câu chữ:** viết lại bằng tiếng Việt, đúng thuật ngữ đã duyệt. Phải qua bộ lọc từ cấm trong `seed_test.dart`.
 - **Id:** `d11`–`d19`, nối tiếp `d1`–`d10`.
 
@@ -140,8 +140,8 @@ Bản cũ mất gì, và không có gì hỏng:
 - Thành tích hiện khóa thô.
 
 **Thứ tự phát hành.**
-- Chạy bootstrap và verify Directus trên prod **trước khi đẩy PR**.
-- Sau khi người chơi đã dùng nhóm mới, **không rollback web**, vì dữ liệu máy đã chứa tên nhóm mới. Chỉ sửa tiến.
+- Thứ tự: bootstrap Directus trên prod, rồi verify, rồi đẩy PR, rồi publish web, rồi chạy e2e (`tool/e2e/drill_groups.mjs`).
+- Sau khi người chơi đã dùng nhóm mới, **không rollback web**, vì dữ liệu máy đã chứa tên nhóm mới. Chỉ sửa tiến. Lưu ý: một tab web bản cũ còn mở trên cùng origin sẽ báo lỗi khi đọc các dòng cục bộ đã ghi bằng tên nhóm mới (không sửa code, người chơi tải lại trang).
 
 **Bảng nguồn.**
 - Nằm ở `lib/domain/drill_provenance.dart`, không nằm trong seed. Lý do: kiến trúc cấm màn hình đọc seed.

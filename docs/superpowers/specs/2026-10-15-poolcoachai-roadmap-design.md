@@ -47,6 +47,7 @@ Hàm thuần Dart trong `lib/domain/roadmap/`, không import Flutter.
 3. **Điểm mất** mỗi bài BU = tối đa (theo bản Exam II đã làm) − điểm đạt. Cộng dồn theo nhóm qua bảng §5.
 4. Xếp nhóm theo điểm mất giảm dần; bằng nhau thì nhóm có độ thuần thục thấp hơn (Player Intelligence) đi trước. **Lấy dần nhóm cho tới khi tổng điểm mất đã lấy ≥ điểm cần thêm.**
 5. Điểm mất ở S8, S9 tính vào tổng nhưng không thuộc nhóm nào (§5): nếu > 0 thêm một bước `buLe` "Tập lại S8/S9 trên bàn BU" (không có bài tập cho kỹ thuật này), đặt theo thứ tự điểm mất như một nhóm.
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
 6. Chưa có bài BU hoàn chỉnh (hạng ước tính / tự khai, hoặc Exam II đang hoãn mà chưa có bài hoàn chỉnh nào trước đó) → các nhóm có độ thuần thục < 75 hoặc chưa đo được, xếp từ yếu nhất lên.
 7. Bước cuối luôn là `lamBaiBu`: mở từ `retestAvailableFrom` (mốc 14 ngày đã có); chưa từng làm thì mở ngay.
 
@@ -95,6 +96,7 @@ Thứ tự bước như §4.1 bước 3–6 (có BU thì theo điểm mất, kh�
 | S10 | Phá | breakShot |
 
 Lý do: mỗi bài xếp theo cái BU chấm điểm (bi vào → aiming; chỗ bi cái dừng → position). F8 và S4 chấm cả hai, xếp position. S8, S9 không khớp nhóm nào: tập ngắm không giúp dựng cơ hay nhảy bi, nên không giao bài sai mục đích. Bảng nằm trong `lib/domain/roadmap/bu_category_map.dart`, ghim bằng test.
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
 
 ## 6. Dữ liệu và đồng bộ
 
@@ -138,6 +140,7 @@ Chỉ repository gọi được thao tác ghi thành tích; test kiến trúc ch
 ## 9. Kiểm thử
 
 - `buildRoadmap`: đổi dữ liệu mẫu thì bước đổi; hai loại mục tiêu cho hai lộ trình khác nhau; điểm cần thêm và cách lấy dần nhóm (có BU / chưa có BU / Exam II hoãn); khóa lên hạng khi không hạng, A, PRO; mốc 14 ngày; xong cần đủ hai điều kiện và mở lại khi tụt; ngày dự kiến 28 ngày và "chưa đủ dữ liệu" khi tốc độ ≤ 0; bước không kịp của mục tiêu giải; bảng §5 ghim bằng test và tổng điểm theo nhóm + S8/S9 bằng tổng điểm mất.
+> Đã thay bởi spec 2026-10-29 §5: S8 nối Dựng cơ; S9 vẫn không nối.
 - Thành tích: chỉ qua 3 loại sự kiện; không trùng khi bước mở lại; đúng 5 mốc chuỗi; test kiến trúc.
 - `no_fabrication_test`: câu lý do đổi khi số liệu vào đổi.
 - Dữ liệu: migration 3 → 4 giữ dữ liệu cũ; repository; đồng bộ (`mergeGoal`, xóa mục tiêu, thành tích trùng).
