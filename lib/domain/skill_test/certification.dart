@@ -14,6 +14,8 @@ final class Certification {
     required this.certifiedAt,
     this.passThreshold,
     this.target,
+    this.score,
+    this.attempts,
   });
 
   final String testId;
@@ -26,6 +28,10 @@ final class Certification {
   /// phải bài hiện tại). Cả hai null khi bản ghi không có ảnh chụp.
   final double? passThreshold;
   final num? target;
+
+  /// Kết quả của lần đạt (bằng chứng: cùng cỡ bàn với [tableSize]).
+  final num? score;
+  final int? attempts;
 }
 
 /// Mỗi bài một chứng nhận, lấy từ lần đạt sớm nhất (hoà thì id nhỏ hơn).
@@ -52,6 +58,8 @@ Map<String, Certification> certificationsOf(Iterable<SkillTest> tests) {
         certifiedAt: t.completedAt!,
         passThreshold: t.passThreshold,
         target: t.target,
+        score: t.score,
+        attempts: t.attempts,
       ),
   };
 }

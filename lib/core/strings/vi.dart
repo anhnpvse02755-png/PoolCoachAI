@@ -721,7 +721,7 @@ abstract final class Vi {
   static const skillTestConditionsTitle = 'Điều kiện đo';
   static String skillTestCriterion(Drill drill) => drill.usesAttempts
       ? 'Tiêu chí đạt: từ ${(drill.passThreshold! * 100).round()}% số lần thử'
-      : 'Tiêu chí đạt: từ ${skillTestNumber(drill.target!)} — ${drill.unit}';
+      : 'Tiêu chí đạt: từ ${skillTestNumber(drill.target!)}, đơn vị: ${drill.unit}';
 
   /// Tiêu chí mà lần kiểm tra đã được chấm theo, lấy từ ảnh chụp lúc hoàn
   /// tất (không phải bài hiện tại). Null khi không có ảnh chụp.
@@ -737,7 +737,7 @@ abstract final class Vi {
       return 'Chấm theo tiêu chí: từ ${(threshold * 100).round()}% số lần thử';
     }
     if (target != null) {
-      return 'Chấm theo tiêu chí: từ ${skillTestNumber(target)} — $unit';
+      return 'Chấm theo tiêu chí: từ ${skillTestNumber(target)}, đơn vị: $unit';
     }
     return null;
   }
@@ -749,6 +749,20 @@ abstract final class Vi {
   static const certificationNoProgress = 'Chưa bài nào có buổi đạt liên tiếp.';
   static String certificationEntry(String drillName, int level, DateTime at) =>
       '$drillName — cấp $level — ${shortDate(at)}';
+  /// Điều kiện đo của lần đạt: cỡ bàn và kết quả (đếm cú hoặc theo đơn vị).
+  static String certificationEvidence(
+    TableSize size,
+    num? score,
+    int? attempts,
+    String unit,
+  ) {
+    final table = 'Bàn ${buTableSize(size)}';
+    if (score == null) return table;
+    return attempts != null
+        ? '$table · ${skillTestNumber(score)}/$attempts lần thử'
+        : '$table · ${skillTestNumber(score)} $unit';
+  }
+
   static const certificationGroupDone = 'Đã chứng nhận toàn nhóm';
   static String homeSkillTestReady(String drillName, int more) => more == 0
       ? 'Sẵn sàng kiểm tra: $drillName'
@@ -784,7 +798,7 @@ abstract final class Vi {
   static const skillTestNotFoundBody =
       'Bài tập này không còn trong thư viện, nên không thể làm bài kiểm tra.';
   static String skillTestNumber(num n) =>
-      n == n.truncate() ? '${n.truncate()}' : '$n';
+      n == n.truncate() ? '${n.truncate()}' : '$n'.replaceAll('.', ',');
   static String skillTestGateLine(
     gate.SkillTestGate g, {
     required String Function(String drillId) nameOf,

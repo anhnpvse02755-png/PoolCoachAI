@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
@@ -29,12 +31,26 @@ class CertificationSection extends ConsumerWidget {
         const SizedBox(height: AppSpacing.sm),
         if (summary.groups.isEmpty) ...[
           const Text(Vi.certificationEmpty),
-          Text(
-            closest == null
-                ? Vi.certificationNoProgress
-                : Vi.certificationClosest(closest.drill.name, closest.passCount),
-            style: theme.textTheme.bodySmall,
-          ),
+          if (closest == null)
+            Text(Vi.certificationNoProgress, style: theme.textTheme.bodySmall)
+          else
+            // Không để dòng cụt: sẵn sàng thì tới bài kiểm tra, chưa thì tới bài tập.
+            InkWell(
+              onTap: () => context.go(
+                closest.ready
+                    ? Routes.skillTest(closest.drill.id)
+                    : Routes.drill(closest.drill.id),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  closest.ready
+                      ? Vi.homeSkillTestReady(closest.drill.name, 0)
+                      : Vi.certificationClosest(closest.drill.name, closest.passCount),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
         ] else
           for (final g in summary.groups) _GroupView(group: g),
       ],
@@ -76,6 +92,15 @@ class _GroupView extends StatelessWidget {
                 )
                 case final criterion?)
               Text(criterion, style: theme.textTheme.bodySmall),
+            Text(
+              Vi.certificationEvidence(
+                e.certification.tableSize,
+                e.certification.score,
+                e.certification.attempts,
+                e.drill.unit,
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
           ],
         ],
       ),

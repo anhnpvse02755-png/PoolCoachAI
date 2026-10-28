@@ -26,6 +26,7 @@ class SkillTestCard extends ConsumerWidget {
     }
     final state = async.value;
     if (state == null) return const SizedBox.shrink();
+    final cert = ref.watch(certificationsProvider).value?[drill.id];
 
     final names = {for (final d in state.drills) d.id: d.name};
     final gate = state.gate;
@@ -43,6 +44,21 @@ class SkillTestCard extends ConsumerWidget {
             FilledButton(
               onPressed: () => context.go(Routes.skillTest(drill.id)),
               child: const Text(Vi.skillTestOpen),
+            ),
+          ],
+          if (gate is AlreadyCertified && cert != null) ...[
+            // Tiêu chí và điều kiện đo lấy từ lần đạt, không phải bài hiện tại.
+            if (Vi.criterionSnapshot(cert.passThreshold, cert.target, drill.unit)
+                case final criterion?)
+              Text(criterion, style: theme.textTheme.bodySmall),
+            Text(
+              Vi.certificationEvidence(
+                cert.tableSize,
+                cert.score,
+                cert.attempts,
+                drill.unit,
+              ),
+              style: theme.textTheme.bodySmall,
             ),
           ],
           if (gate is AlreadyCertified && state.formSlipped) ...[

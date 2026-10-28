@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -261,6 +262,20 @@ void main() {
     await reveal(tester, certified);
     expect(certified, findsOneWidget);
     expect(find.text(Vi.skillTestFormSlipped), findsNothing);
+  });
+
+  testWidgets('đã chứng nhận: thẻ nêu cỡ bàn, kết quả và tiêu chí của lần đạt',
+      (tester) async {
+    final certifiedAt = testToday.subtract(const Duration(days: 6));
+    await openDrill(tester, 'd1',
+        logs: threePasses('d1', before: testToday),
+        skillTests: [passedTest('d1', 1, certifiedAt)]);
+    final evidence = find.text(Vi.certificationEvidence(
+        TableSize.nineFootPlus, 9, 10, 'lần trúng / 10'));
+    await reveal(tester, evidence);
+    expect(evidence, findsOneWidget);
+    expect(find.text(Vi.criterionSnapshot(0.8, null, 'lần trúng / 10')!),
+        findsOneWidget);
   });
 
   testWidgets('chưa chứng nhận dù trượt phong độ: không có dòng phong độ',

@@ -150,6 +150,24 @@ void main() {
         expect([s.closest!.drill.id, s.closest!.passCount], ['a1', 2]);
       },
     );
+    test('gợi ý đánh dấu ready khi cổng đã mở, chưa mở thì không', () {
+      final open = certificationSummary(
+        drills: stDrills,
+        tests: const [],
+        logs: threePasses('a1'),
+      );
+      expect(open.closest!.ready, isTrue);
+      final notYet = certificationSummary(
+        drills: stDrills,
+        tests: const [],
+        logs: threePasses('a1').skip(1).toList(),
+      );
+      expect(notYet.closest!.ready, isFalse);
+    });
+    test('chứng nhận mang kết quả của lần đạt', () {
+      final c = certificationsOf([passedTest('a1', 1, stToday)])['a1']!;
+      expect([c.score, c.attempts], [9, 10]);
+    });
     test('hoà số buổi: bài cấp thấp hơn trước', () {
       final s = certificationSummary(
         drills: stDrills,

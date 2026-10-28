@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/skill_test/skill_test.dart';
 import 'package:poolcoachai/features/profile/presentation/certification_section.dart';
@@ -89,6 +90,57 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('80%'), findsNothing);
+  });
+
+  testWidgets('mỗi chứng nhận nêu cỡ bàn và kết quả của lần đạt', (tester) async {
+    await pumpSection(
+      tester,
+      testContainer(skillTests: [passedTest('d1', 1, testToday)]),
+    );
+    expect(
+      find.text(Vi.certificationEvidence(
+        TableSize.nineFootPlus, 9, 10, 'lần trúng / 10')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('gợi ý khi cổng đã mở: nói sẵn sàng và bấm vào bài kiểm tra', (
+    tester,
+  ) async {
+    final router = await pumpRoutedApp(
+      tester,
+      container: testContainer(logs: threePasses('d1', before: testToday)),
+    );
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+    final hint = find.text(Vi.homeSkillTestReady('Đường thẳng cơ bản', 0));
+    await tester.dragUntilVisible(hint, find.byType(ListView), const Offset(0, -150));
+    expect(find.textContaining('Gần sẵn sàng nhất'), findsNothing);
+    await tester.tap(hint);
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      Routes.skillTest('d1'),
+    );
+  });
+
+  testWidgets('gợi ý khi cổng chưa mở: bấm vào bài tập', (tester) async {
+    final router = await pumpRoutedApp(
+      tester,
+      container: testContainer(
+        logs: threePasses('d1', before: testToday).skip(1).toList(),
+      ),
+    );
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+    final hint = find.text(Vi.certificationClosest('Đường thẳng cơ bản', 2));
+    await tester.dragUntilVisible(hint, find.byType(ListView), const Offset(0, -150));
+    await tester.tap(hint);
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      Routes.drill('d1'),
+    );
   });
 
   testWidgets('đọc lỗi: nói thẳng là chưa tải được', (tester) async {

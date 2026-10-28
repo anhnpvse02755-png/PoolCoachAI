@@ -22,7 +22,8 @@ final class CertificationGroup {
   final bool complete;
 }
 
-typedef ReadyHint = ({Drill drill, int passCount});
+/// [ready]: cổng đã mở, bấm vào là làm bài kiểm tra được ngay.
+typedef ReadyHint = ({Drill drill, int passCount, bool ready});
 
 final class CertificationSummary {
   const CertificationSummary({required this.groups, required this.closest});
@@ -72,7 +73,7 @@ CertificationSummary certificationSummary({
     if (count < 1) continue;
     // Duyệt theo (cấp, id) nên chỉ thay khi nhiều buổi hơn hẳn.
     if (closest == null || count > closest.passCount) {
-      closest = (drill: d, passCount: count);
+      closest = (drill: d, passCount: count, ready: gate is SkillTestOpen);
     }
   }
   return CertificationSummary(groups: groups, closest: closest);
