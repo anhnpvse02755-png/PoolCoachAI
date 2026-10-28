@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -48,5 +49,27 @@ void main() {
     expect(toAchievement(back), a);
     expect(back.syncedAt, at);
     expect(back.id, row.id);
+  });
+
+  test('mục tiêu có hạng đích qua Drift và Directus rồi về nguyên vẹn', () {
+    final target = GoalRecord(
+      updatedAt: at,
+      goal: PlayerGoal(goalId: 'g3', kind: GoalKind.lenHang, createdAt: at, targetRank: Rank.d),
+    );
+    final row = toGoalRow(target, userId: 'u1');
+    expect(row.targetRank, 'd');
+    expect(toGoalRecord(row), target);
+    final json = toRemoteGoal(row);
+    expect(json['target_rank'], 'd');
+    expect(goalFromRemote(json), target);
+    expect(remoteGoalFields, contains('target_rank'));
+  });
+
+  test('máy chủ cũ không có target_rank thì coi là null', () {
+    final json = toRemoteGoal(toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g4', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ))..remove('target_rank');
+    expect(goalFromRemote(json).goal!.targetRank, isNull);
   });
 }

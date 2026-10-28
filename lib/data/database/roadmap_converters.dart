@@ -1,4 +1,5 @@
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -17,6 +18,7 @@ GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
               category: r.category == null ? null : SkillCategory.values.byName(r.category!),
               eventDate: r.eventDate,
               createdAt: r.createdAt!,
+              targetRank: r.targetRank == null ? null : Rank.values.byName(r.targetRank!),
             ),
     );
 
@@ -27,11 +29,12 @@ PlayerGoalRow toGoalRow(GoalRecord g, {required String userId, DateTime? syncedA
       category: g.goal?.category?.name,
       eventDate: g.goal?.eventDate,
       createdAt: g.goal?.createdAt,
+      targetRank: g.goal?.targetRank?.name,
       updatedAt: g.updatedAt,
       syncedAt: syncedAt,
     );
 
-const remoteGoalFields = 'id,goal_id,kind,category,event_date,created_at,updated_at';
+const remoteGoalFields = 'id,goal_id,kind,category,event_date,created_at,updated_at,target_rank';
 
 /// Dòng mục tiêu cho `POST /items/player_goals` (id là id người dùng, R1).
 Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
@@ -40,6 +43,7 @@ Map<String, Object?> toRemoteGoal(PlayerGoalRow r) => {
       'kind': r.kind,
       'category': r.category,
       'event_date': _iso(r.eventDate),
+      'target_rank': r.targetRank,
       'created_at': _iso(r.createdAt),
       'updated_at': _iso(r.updatedAt),
     };
@@ -54,6 +58,7 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
               category: j['category'] == null ? null : SkillCategory.values.byName(j['category']! as String),
               eventDate: _local(j['event_date']),
               createdAt: _local(j['created_at'])!,
+              targetRank: j['target_rank'] == null ? null : Rank.values.byName(j['target_rank']! as String),
             ),
     );
 

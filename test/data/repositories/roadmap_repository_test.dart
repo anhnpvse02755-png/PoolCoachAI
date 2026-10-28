@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -70,5 +71,22 @@ void main() {
         [Achievement(kind: AchievementKind.chuoiNgay, refId: '7', achievedAt: DateTime(2026, 10, 10))]);
     expect(await repo('u2').watchGoal().first, isNull);
     expect(await repo('u2').watchAchievements().first, isEmpty);
+  });
+
+  test('hạng đích chỉ lưu cho Lên hạng', () async {
+    await repo('u1').setGoal(
+        kind: GoalKind.chuanBiGiai, targetRank: Rank.d, eventDate: DateTime(2026, 11, 2));
+    expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);
+
+    await repo('u1').setGoal(kind: GoalKind.lenHang, targetRank: Rank.d);
+    expect((await db.select(db.playerGoalRows).getSingle()).targetRank, 'd');
+    expect((await repo('u1').watchGoal().first)!.goal!.targetRank, Rank.d);
+  });
+
+  test('chọn hạng kế tiếp lưu null, ghi đè hạng đích cũ', () async {
+    await repo('u1').setGoal(kind: GoalKind.lenHang, targetRank: Rank.d);
+    await repo('u1').setGoal(kind: GoalKind.lenHang);
+    expect((await db.select(db.playerGoalRows).getSingle()).targetRank, isNull);
+    expect((await repo('u1').watchGoal().first)!.goal!.targetRank, isNull);
   });
 }

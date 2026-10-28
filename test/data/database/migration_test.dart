@@ -62,7 +62,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     final legacyLog = (await db.select(db.drillLogRows).get()).single;
     expect(legacyLog.id, 'cu');
     expect(legacyLog.durationSec, isNull);
@@ -141,7 +141,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     final legacyLog = (await db.select(db.drillLogRows).get()).single;
     expect(legacyLog.id, 'cu');
     expect(legacyLog.durationSec, isNull);
@@ -178,13 +178,14 @@ void main() {
           raw.execute(
             "INSERT INTO timer_session_rows VALUES ('t1', 1760400000, 900, NULL, NULL);",
           );
+          _createV13PlayerGoalTable(raw);
           raw.execute('PRAGMA user_version = 4;');
         },
       );
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 13);
+      expect(db.schemaVersion, 14);
       expect((await db.select(db.scheduleSlotRows).get()).single.userId, '');
       expect((await db.select(db.timerSessionRows).get()).single.userId, '');
 
@@ -249,13 +250,14 @@ void main() {
         );
         _createOwnedDrillLogTable(raw);
         _createOwnedPracticeTables(raw);
+        _createV13PlayerGoalTable(raw);
         raw.execute('PRAGMA user_version = 7;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
     expect(match.userId, 'u1');
@@ -308,13 +310,14 @@ void main() {
           "shots TEXT NOT NULL DEFAULT '[]', "
           'started_at INTEGER NOT NULL, completed_at INTEGER NULL);',
         );
+        _createV13PlayerGoalTable(raw);
         raw.execute('PRAGMA user_version = 8;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.id, 'cue-v8');
     expect(cue.updatedAt, isNull);
@@ -368,13 +371,14 @@ void main() {
           "INSERT INTO pool_match_rows VALUES ('m9', 'u1', 'nineBall', 'An', "
           "'Bình', 5, '[]', '[]', 1760400000, NULL);",
         );
+        _createV13PlayerGoalTable(raw);
         raw.execute('PRAGMA user_version = 9;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.shaftDiameterMm, 12.4);
     expect(cue.shaftBrand, isNull);
@@ -406,13 +410,14 @@ void main() {
           "INSERT INTO drill_log_rows VALUES ('v10', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);",
         );
         _createV12PoolMatchTable(raw);
+        _createV13PlayerGoalTable(raw);
         raw.execute('PRAGMA user_version = 10;');
       },
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 13);
+    expect(db.schemaVersion, 14);
     expect((await db.select(db.drillLogRows).get()).single.id, 'v10');
     expect((await db.select(db.poolMatchRows).get()).single.isDeleted, isFalse);
     expect(await db.select(db.coachAttemptRows).get(), isEmpty);
@@ -452,12 +457,13 @@ void main() {
             "INSERT INTO drill_log_rows VALUES ('v11', 'd1', 1760400000, 7.0, 10, NULL, 'u1', NULL);",
           );
           _createV12PoolMatchTable(raw);
+          _createV13PlayerGoalTable(raw);
           raw.execute('PRAGMA user_version = 11;');
         },
       );
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
-      expect(db.schemaVersion, 13);
+      expect(db.schemaVersion, 14);
       final legacyLog = (await db.select(db.drillLogRows).get()).single;
       expect(legacyLog.id, 'v11');
       expect(legacyLog.durationSec, isNull);
@@ -476,6 +482,40 @@ void main() {
       expect([row.id, row.insufficient], [1, false]);
     },
   );
+
+  test('nâng từ v13 lên v14 thêm hạng đích, giữ nguyên mục tiêu đang có', () async {
+    final executor = NativeDatabase.memory(
+      setup: (raw) {
+        _createV13PlayerGoalTable(raw);
+        raw.execute(
+          "INSERT INTO player_goal_rows VALUES "
+          "('u1', 'g1', 'lenHang', NULL, NULL, 1760400000, 1760400000, NULL);",
+        );
+        raw.execute('PRAGMA user_version = 13;');
+      },
+    );
+    final db = AppDatabase.forTesting(executor);
+    addTearDown(db.close);
+
+    expect(db.schemaVersion, 14);
+    final row = (await db.select(db.playerGoalRows).get()).single;
+    expect([row.kind, row.targetRank], ['lenHang', null]);
+  });
+
+  test('tạo mới ở v14 ghi và đọc được hạng đích', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await db.into(db.playerGoalRows).insert(
+          PlayerGoalRowsCompanion.insert(
+            userId: 'u1',
+            updatedAt: DateTime(2026, 10, 28),
+            kind: const Value('lenHang'),
+            targetRank: const Value('d'),
+          ),
+        );
+    final row = (await db.select(db.playerGoalRows).get()).single;
+    expect(row.targetRank, 'd');
+  });
 }
 
 void _createPracticeTables(dynamic raw) {
@@ -529,5 +569,15 @@ void _createV12PoolMatchTable(dynamic raw) {
   raw.execute(
     "INSERT INTO pool_match_rows VALUES ('m12', 'u1', 'nineBall', 'An', "
     "'Bình', 5, '[]', '[]', 1760400000, NULL, NULL, NULL, NULL);",
+  );
+}
+
+/// Bảng mục tiêu đúng hình dạng v13 (có từ v4, trước cột hạng đích).
+void _createV13PlayerGoalTable(dynamic raw) {
+  raw.execute(
+    'CREATE TABLE player_goal_rows (user_id TEXT NOT NULL PRIMARY KEY, '
+    'goal_id TEXT NULL, kind TEXT NULL, category TEXT NULL, '
+    'event_date INTEGER NULL, created_at INTEGER NULL, '
+    'updated_at INTEGER NOT NULL, synced_at INTEGER NULL);',
   );
 }

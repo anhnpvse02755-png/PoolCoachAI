@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -28,7 +29,12 @@ class RoadmapRepository {
       _goalQuery().watchSingleOrNull().map((r) => r == null ? null : toGoalRecord(r));
 
   /// Đặt (hoặc đổi) mục tiêu: id mới, tính lại từ đầu (spec mục 2.4).
-  Future<void> setGoal({required GoalKind kind, SkillCategory? category, DateTime? eventDate}) {
+  Future<void> setGoal({
+    required GoalKind kind,
+    SkillCategory? category,
+    DateTime? eventDate,
+    Rank? targetRank,
+  }) {
     final now = _now();
     return _write(GoalRecord(
       updatedAt: now,
@@ -39,6 +45,7 @@ class RoadmapRepository {
         eventDate: kind == GoalKind.chuanBiGiai
             ? DateTime(eventDate!.year, eventDate.month, eventDate.day)
             : null,
+        targetRank: kind == GoalKind.lenHang ? targetRank : null,
         createdAt: now,
       ),
     ));
