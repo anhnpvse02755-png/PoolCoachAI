@@ -5,9 +5,11 @@
 //      nút 'Xem sơ đồ BU' mở đủ 3 sơ đồ (1 / 3 … 3 / 3).
 //   3) Ghi buổi tập d11 với kết quả 3; Thống kê hiện nhóm Dựng cơ có 1 buổi chấm được.
 //   4) Đồng hồ luyện tập: chọn nhóm Dựng cơ, bắt đầu, ~5 s, kết thúc và lưu.
-//   5) Directus (quyền admin): drill_logs d11 score 3; timer_sessions với
-//      cat null (trường cũ để trống vì bản đã phát hành không phân tích được
-//      tên mới) và cat_ext 'dungCo'.
+//   5) Lịch tập: thêm khung giờ nhóm Dựng cơ.
+//   6) Directus (quyền admin): drill_logs d11 score 3; timer_sessions và
+//      schedule_slots với cat null (trường cũ để trống vì bản đã phát hành
+//      không phân tích được tên mới), cat_ext 'dungCo'; lịch có cat_ext_at
+//      cùng thời điểm với updated_at.
 //
 //   PCAI_ALLOW_LIVE_DIRECTUS_E2E=1 node tool/e2e/drill_groups.mjs <appUrl>
 //
@@ -201,6 +203,10 @@ try {
     filtered.includes('Dựng cơ — bậc Bachelors'),
     'Tập luyện: thấy "Dựng cơ — bậc Bachelors"',
   );
+  await check(
+    !filtered.includes('Đường thẳng cơ bản') && !filtered.includes('Bi ảo — 15 góc cắt'), // d1, d2: seed_drills.dart, nhóm Ngắm bi
+    'Tập luyện: lọc Dựng cơ thì bài nhóm khác (d1, d2) không hiện',
+  );
 
   step(3, 'Chi tiết d11: nguồn, dòng chưa có mẹo có nguồn, sơ đồ BU');
   await tab.goto(`${APP}/training/drills/d11`);
@@ -249,7 +255,18 @@ try {
   await tab.click('Kết thúc và lưu');
   await tab.waitForText('Đã lưu buổi tập'); // Vi.timerSaved
 
-  step(7, 'Directus (quyền admin): drill_logs và timer_sessions của user thử');
+  step(7, 'Lịch tập: thêm khung giờ nhóm Dựng cơ');
+  await tab.goto(`${APP}/training/schedule`);
+  await tab.waitForText('Thêm lịch', 45000); // Vi.scheduleAdd
+  await tab.click('Thêm lịch');
+  await tab.waitForText('Tên buổi tập', 45000); // Vi.scheduleLabel
+  await tab.type('Tên buổi tập', 'Tập dựng cơ');
+  await tab.click('Nhóm kỹ năng (không bắt buộc)'); // Vi.scheduleChooseCategory
+  await tab.click('Dựng cơ'); // mục trong danh sách thả xuống: Vi.skill(dungCo)
+  await tab.click('Lưu lịch'); // Vi.scheduleSave
+  await tab.waitForText('Tập dựng cơ', 45000);
+
+  step(8, 'Directus (quyền admin): drill_logs, timer_sessions và schedule_slots của user thử');
   const adminToken = await directusAdminToken();
   const userId = await directusUserId(adminToken);
   const logs = await waitRows(
@@ -275,6 +292,21 @@ try {
     Number(session.duration_sec) >= 4,
     `Directus timer_sessions: duration_sec >= 4 (thấy ${session.duration_sec})`,
   );
+  const slotRows = await waitRows(
+    adminToken, userId, 'schedule_slots', 'label,cat,cat_ext,cat_ext_at,updated_at',
+    (rows) => rows.some((r) => r.label === 'Tập dựng cơ'),
+  );
+  await check(slotRows.length === 1, `Directus schedule_slots: đúng 1 dòng (thấy ${slotRows.length})`);
+  const slot = slotRows[0] ?? {};
+  await check(
+    slot.cat === null && slot.cat_ext === 'dungCo',
+    `Directus schedule_slots: cat null, cat_ext "dungCo" (thấy ${JSON.stringify(slot)})`,
+  );
+  await check(
+    slot.cat_ext_at != null && slot.updated_at != null &&
+      new Date(slot.cat_ext_at).getTime() === new Date(slot.updated_at).getTime(),
+    `Directus schedule_slots: cat_ext_at và updated_at cùng một thời điểm (thấy ${slot.cat_ext_at} / ${slot.updated_at})`,
+  );
 
   console.log(`\n${failed ? `HỎNG ${failed} kiểm tra.` : 'Xong, mọi kiểm tra đạt.'} Ảnh lỗi (nếu có) ở ${shots}`);
 } catch (error) {
@@ -288,6 +320,8 @@ try {
 } finally {
   try {
     if (tab) await tab.close();
+  } catch (e) {
+    console.warn(`Cảnh báo: không đóng được tab: ${e}`);
   } finally {
     await deleteUserRows(email);
     await deleteUserByEmail(email);

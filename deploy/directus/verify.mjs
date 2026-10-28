@@ -653,7 +653,9 @@ try {
       a.access_token,
     );
     extSlotBack.data?.cat_ext === 'dungCo' &&
-    new Date(extSlotBack.data?.cat_ext_at).getTime() !== new Date(extSlotBack.data?.updated_at).getTime()
+    extSlotBack.data?.cat_ext_at != null &&
+    new Date(extSlotBack.data.cat_ext_at).getTime() === new Date('2026-10-21T08:00:00.000Z').getTime() &&
+    new Date(extSlotBack.data.cat_ext_at).getTime() !== new Date(extSlotBack.data?.updated_at).getTime()
       ? ok('cat_ext của lịch còn nguyên sau PATCH kiểu bản cũ; cat_ext_at lệch updated_at (bản mới sẽ bỏ qua)')
       : fail(`lịch sau PATCH kiểu bản cũ: ${JSON.stringify(extSlotBack.data)}`);
     const extSlotNew = await call(
@@ -665,6 +667,17 @@ try {
     extSlotNew.status === 200
       ? ok('PATCH lịch mang cat_ext và cat_ext_at được nhận (quyền update có trường mới)')
       : fail(`PATCH lịch mang cat_ext → ${extSlotNew.status} ${extSlotNew.code}`);
+    const extSlotNewBack = await call(
+      'GET',
+      `/items/schedule_slots/${extSlot.id}?fields=cat_ext,cat_ext_at,updated_at`,
+      undefined,
+      a.access_token,
+    );
+    extSlotNewBack.data?.cat_ext === 'nhayBi' &&
+    extSlotNewBack.data?.cat_ext_at != null &&
+    new Date(extSlotNewBack.data.cat_ext_at).getTime() === new Date(extSlotNewBack.data?.updated_at).getTime()
+      ? ok('lịch sau PATCH kiểu bản mới: cat_ext_at và updated_at cùng một thời điểm (bản mới tin cat_ext)')
+      : fail(`lịch sau PATCH kiểu bản mới: ${JSON.stringify(extSlotNewBack.data)}`);
 
     const extCueId = randomUUID();
     const extCue = {
