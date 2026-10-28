@@ -25,6 +25,8 @@ import 'package:poolcoachai/domain/roadmap/bu_gap.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/rank.dart';
+import 'package:poolcoachai/domain/match_analysis/match_analysis_constants.dart';
+import 'package:poolcoachai/domain/match_analysis/rack_analysis.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -178,6 +180,47 @@ abstract final class Vi {
     int opponentScore,
     String opponent,
   ) => '$player $playerScore – $opponentScore $opponent';
+  // --- Phân tích trận (spec 2026-10-28) ---
+  static const matchAnalysisOpen = 'Phân tích trận';
+  static String matchAnalysisRacks(int withShots, int full) =>
+      '$withShots ván có ghi cú · $full ván ghi đủ';
+  static const matchAnalysisNoShots =
+      'Trận này chưa ghi cú đánh nên chưa phân tích được nguyên nhân. '
+      'Ghi cú ở trận sau để xem phân tích.';
+  static const matchAnalysisLostTitle = 'Nguyên nhân mất ván';
+  static String lostRackCause(LostRackCause c, int n) => switch (c) {
+    LostRackCause.offensiveMiss => 'Mất $n ván sau khi trượt cú tấn công',
+    LostRackCause.safety => 'Mất $n ván sau cú phòng thủ',
+    LostRackCause.foul => 'Mất $n ván sau khi phạm lỗi',
+    LostRackCause.scratch => 'Mất $n ván sau khi chết cái',
+    LostRackCause.dryBreak => 'Mất $n ván sau khi phá khô',
+    LostRackCause.opponentBreakAndRun => 'Đối thủ phá-và-dọn $n ván',
+    LostRackCause.notFull => '$n ván thua chưa ghi đủ cú',
+    LostRackCause.unclear => '$n ván thua chưa rõ nguyên nhân',
+  };
+  static const matchAnalysisBreakTitle = 'Phá';
+  static String matchAnalysisBreak(int shots, int made, int breakAndRuns) =>
+      'Phá $shots ván, vào bi $made, phá-và-dọn $breakAndRuns';
+  static String matchAnalysisOpponentBreak(
+    String name,
+    int shots,
+    int made,
+    int breakAndRuns,
+  ) => '$name: phá $shots ván, vào bi $made, phá-và-dọn $breakAndRuns';
+  static const matchAnalysisPositionTitle = 'Điều bi và lỗi';
+  static String matchAnalysisPositionFouls(
+    int failed,
+    int assessed,
+    int fouls,
+    int scratches,
+  ) => 'Điều bi hỏng $failed/$assessed, phạm lỗi $fouls, chết cái $scratches';
+  static const matchAnalysisFocusTitle = 'Nên luyện';
+  static String matchAnalysisFocus(String skill, int failures, int attempts) =>
+      '$skill: hỏng $failures/$attempts lần trong trận này';
+  static String matchAnalysisFocusDrill(String drill) => 'Bài nên tập: $drill';
+  static const matchAnalysisFocusNone =
+      'Trong trận này chưa có nhóm nào đủ '
+      '${MatchAnalysisConstants.singleMatchMinAttempts} lần thử và vượt ngưỡng yếu.';
   static String matchRaceTo(int target) => 'Chạm $target ván thắng';
   static String matchRackProgress(int count) => '$count ván đã ghi';
   static String matchRackLabel(int number) => 'Ván $number';
