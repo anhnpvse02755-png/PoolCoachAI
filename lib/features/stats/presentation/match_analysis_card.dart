@@ -89,7 +89,11 @@ class MatchAnalysisCard extends StatelessWidget {
           Text(Vi.statsMatchWeakTitle, style: theme.textTheme.titleSmall),
           const SizedBox(height: 4),
           if (a.weaknesses.isEmpty)
-            const Text(Vi.statsMatchWeakNone)
+            Text(
+              sampledGroups(a).isEmpty
+                  ? Vi.statsMatchWeakNone
+                  : Vi.statsMatchWeakNoneOverThreshold(a.matches),
+            )
           else
             for (final w in a.weaknesses)
               Text(

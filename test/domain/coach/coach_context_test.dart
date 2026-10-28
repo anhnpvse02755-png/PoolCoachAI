@@ -12,6 +12,7 @@ import 'package:poolcoachai/domain/player_intelligence.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/roadmap/roadmap.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../../support/coach_chat_fixtures.dart';
@@ -105,6 +106,60 @@ void main() {
     expect(() => jsonEncode(facts), returnsNormally);
   });
 
+  group('currentStep: mốc hạng và làm lại bài BU', () {
+    Map<String, Object?> stepFacts(RoadmapStep step) => (buildCoachContext(
+          pi: computePlayerIntelligence(drills: seedDrills, logs: const []),
+          rank: null,
+          currentStep: step,
+          attempts: const [],
+          today: null,
+          matches: const [],
+        ).toFacts())['currentStep']! as Map<String, Object?>;
+
+    test('mốc hạng làm lại: milestoneRank là hạng mốc, retake đúng', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.dangLam,
+        reason: RankMilestone(Rank.h),
+      ));
+      expect(f['kind'], 'lamBaiBu');
+      expect(f['milestoneRank'], 'h');
+      expect(f['retake'], isTrue);
+    });
+
+    test('mốc hạng làm lần đầu: retake sai', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.dangLam,
+        reason: RankMilestone(Rank.h, retake: false),
+      ));
+      expect(f['milestoneRank'], 'h');
+      expect(f['retake'], isFalse);
+    });
+
+    test('bước làm bài BU cuối (không phải mốc): không có mốc, retake sai vì không biết lần đầu hay làm lại', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.lamBaiBu,
+        status: StepStatus.chuaToi,
+        reason: RetestFrom(null),
+      ));
+      expect(f['milestoneRank'], isNull);
+      expect(f['retake'], isFalse);
+    });
+
+    test('bước khác: không có mốc, retake sai', () {
+      final f = stepFacts(const RoadmapStep(
+        kind: StepKind.nhom,
+        status: StepStatus.dangLam,
+        reason: NeedStreak(),
+        category: SkillCategory.aiming,
+      ));
+      expect(f.keys, ['kind', 'status', 'category', 'mastery', 'milestoneRank', 'retake']);
+      expect(f['milestoneRank'], isNull);
+      expect(f['retake'], isFalse);
+    });
+  });
+
   test('chưa có lần làm nào: lastSituation null, số liệu 0', () {
     final facts = buildCoachContext(
       pi: computePlayerIntelligence(drills: seedDrills, logs: const []),
@@ -192,6 +247,7 @@ void main() {
         'lostRackCauses': _noLostRacks(),
         'weak': <Object?>[],
         'weakRule': _weakRule,
+        'sampled': <Object?>[],
       },
     });
   });
@@ -203,7 +259,7 @@ void main() {
     final a = m['analysis']! as Map;
     expect(a.keys, [
       'matches', 'racksWon', 'racksLost', 'racksWithShots', 'fullRacks', 'runOuts', 'break', 'offense',
-      'position', 'safety', 'errors', 'lostRackCauses', 'weak', 'weakRule',
+      'position', 'safety', 'errors', 'lostRackCauses', 'weak', 'weakRule', 'sampled',
     ]);
     expect(a, {
       'matches': 3,
@@ -229,6 +285,7 @@ void main() {
         {'category': 'aiming', 'failures': 9, 'attempts': 15, 'matches': 3, 'failPercent': 60},
       ],
       'weakRule': _weakRule,
+      'sampled': ['aiming'],
     });
     expect((a['lostRackCauses']! as Map).keys, [for (final c in LostRackCause.values) c.name]);
   });

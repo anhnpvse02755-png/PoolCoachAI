@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/database/roadmap_converters.dart';
 import 'package:poolcoachai/domain/rank.dart';
@@ -84,5 +85,19 @@ void main() {
     final goal = goalFromRemote(json).goal!;
     expect(goal.kind, GoalKind.thuanThucKyNang);
     expect(goal.targetRank, isNull);
+  });
+
+  test('target_rank lạ (máy chủ mới hơn) coi là null, không ném', () {
+    final lenHang = toRemoteGoal(toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g6', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ))..['target_rank'] = 'xyz';
+    expect(goalFromRemote(lenHang).goal!.targetRank, isNull);
+
+    final row = toGoalRow(
+      GoalRecord(updatedAt: at, goal: PlayerGoal(goalId: 'g7', kind: GoalKind.lenHang, createdAt: at)),
+      userId: 'u1',
+    ).copyWith(targetRank: const Value('xyz'));
+    expect(toGoalRecord(row).goal!.targetRank, isNull);
   });
 }

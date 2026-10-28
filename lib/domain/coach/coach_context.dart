@@ -24,10 +24,30 @@ import 'package:poolcoachai/domain/skill_category.dart';
 // 4. Câu hỏi về một tình huống được trả lời bằng `Reveal` của Giai đoạn A.
 
 /// Bước hiện tại của Lộ trình, dạng dữ liệu (không câu chữ).
-typedef RoadmapStepFacts = ({StepKind kind, StepStatus status, SkillCategory? category, int? mastery});
+///
+/// [milestoneRank] chỉ có ở bước mốc hạng; [retake] chỉ đúng khi bước mốc hạng
+/// là làm lại (đã có kết quả BU). Bước làm bài BU cuối không biết lần đầu hay
+/// làm lại nên [retake] sai.
+typedef RoadmapStepFacts = ({
+  StepKind kind,
+  StepStatus status,
+  SkillCategory? category,
+  int? mastery,
+  Rank? milestoneRank,
+  bool retake,
+});
 
-RoadmapStepFacts roadmapStepFacts(RoadmapStep s) =>
-    (kind: s.kind, status: s.status, category: s.category, mastery: s.mastery);
+RoadmapStepFacts roadmapStepFacts(RoadmapStep s) {
+  final reason = s.reason;
+  return (
+    kind: s.kind,
+    status: s.status,
+    category: s.category,
+    mastery: s.mastery,
+    milestoneRank: reason is RankMilestone ? reason.rank : null,
+    retake: reason is RankMilestone && reason.retake,
+  );
+}
 
 /// Lần làm tình huống gần nhất, dạng dữ liệu.
 typedef CoachSituationFacts = ({
@@ -96,6 +116,8 @@ final class CoachContext {
                 'status': currentStep!.status.name,
                 'category': currentStep!.category?.name,
                 'mastery': currentStep!.mastery,
+                'milestoneRank': currentStep!.milestoneRank?.name,
+                'retake': currentStep!.retake,
               },
         'coach': {
           for (final t in CoachTopic.values)
@@ -252,6 +274,9 @@ Map<String, Object?> _analysisFacts(MatchAnalysis a) => {
           for (final e in MatchAnalysisConstants.failPercentFrom.entries) e.key.name: e.value,
         },
       },
+      // Nhóm đủ mẫu: `weak` rỗng mà `sampled` có nhóm nghĩa là không nhóm nào
+      // yếu; `sampled` rỗng mới là chưa đủ dữ liệu.
+      'sampled': [for (final c in sampledGroups(a)) c.name],
     };
 
 /// Ngữ cảnh cho Coach Chat, hàm thuần trên dữ liệu đã có.

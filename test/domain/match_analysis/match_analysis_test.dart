@@ -438,4 +438,42 @@ void main() {
       expect(noDrills.single.signal.category, SkillCategory.aiming);
     });
   });
+
+  group('sampledGroups', () {
+    test('nhóm đủ trận và đủ lần thử dù không yếu', () {
+      // 3 trận, 15 cú thường, không trượt: đủ mẫu nhưng không vượt ngưỡng.
+      final matches = [
+        for (var i = 0; i < 3; i++)
+          completedMatch('ok-$i', const [p], [
+            for (var n = 1; n <= 5; n++) shotAt(1, n, p, N, made),
+          ]),
+      ];
+      final a = analyzeMatches(matches);
+      expect(a.weaknesses, isEmpty);
+      expect(sampledGroups(a), [SkillCategory.aiming]);
+    });
+
+    test('thiếu trận hoặc thiếu lần thử thì không đủ mẫu', () {
+      // 2 trận x 8 cú: đủ lần thử nhưng thiếu trận. 3 trận x 3 cú: thiếu lần thử.
+      final fewMatches = analyzeMatches([
+        for (var i = 0; i < 2; i++)
+          completedMatch('m-$i', const [p], [
+            for (var n = 1; n <= 8; n++) shotAt(1, n, p, N, made),
+          ]),
+      ]);
+      expect(sampledGroups(fewMatches), isEmpty);
+      final fewShots = analyzeMatches([
+        for (var i = 0; i < 3; i++)
+          completedMatch('s-$i', const [p], [
+            for (var n = 1; n <= 3; n++) shotAt(1, n, p, N, made),
+          ]),
+      ]);
+      expect(sampledGroups(fewShots), isEmpty);
+    });
+
+    test('nhóm yếu cũng đủ mẫu', () {
+      final a = analyzeMatches(matchesWeakAt(SkillCategory.aiming, at: DateTime(2026, 10, 20)));
+      expect(sampledGroups(a), contains(SkillCategory.aiming));
+    });
+  });
 }

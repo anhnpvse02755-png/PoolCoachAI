@@ -396,6 +396,8 @@ abstract final class Vi {
   ) => '$skill: hỏng $failures/$attempts lần ($percent%)';
   static const statsMatchWeakNone =
       'Chưa đủ dữ liệu để kết luận (cần ít nhất ${MatchAnalysisConstants.minMatches} trận và ${MatchAnalysisConstants.minAttempts} lần thử mỗi nhóm).';
+  static String statsMatchWeakNoneOverThreshold(int matches) =>
+      'Không nhóm nào vượt ngưỡng yếu trong $matches trận gần đây.';
   static String statsMatchCount(int recorded, int completed) =>
       '$recorded ($completed)';
   static String statsPositionCount(int success, int assessed) =>
@@ -1836,10 +1838,11 @@ abstract final class Vi {
             '${retake ? 'Làm lại' : 'Làm'} bài BU — mốc hạng ${rank.label}',
           _ => 'Làm bài BU',
         },
-        StepKind.dauTap => () {
-          final r = step.reason as NotEnoughMatches;
-          return 'Đấu tập: ghi ít nhất ${r.need - r.have} trận có ghi cú';
-        }(),
+        StepKind.dauTap => switch (step.reason) {
+          NotEnoughMatches(:final have, :final need) =>
+            'Đấu tập: ghi ít nhất ${need - have} trận có ghi cú',
+          _ => 'Đấu tập',
+        },
       };
 
   static String stepProgress(int? mastery, int streak) =>

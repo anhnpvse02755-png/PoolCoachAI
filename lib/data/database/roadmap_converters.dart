@@ -8,6 +8,9 @@ import 'package:uuid/uuid.dart';
 String? _iso(DateTime? d) => d?.toUtc().toIso8601String();
 DateTime? _local(Object? s) => s == null ? null : DateTime.parse(s as String).toLocal();
 
+/// Hạng lạ (máy chủ mới hơn) coi là không có: lấy hạng kế tiếp thay vì ném.
+Rank? _rankOrNull(String? name) => name == null ? null : Rank.values.asNameMap()[name];
+
 GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
       updatedAt: r.updatedAt,
       goal: r.kind == null
@@ -18,7 +21,7 @@ GoalRecord toGoalRecord(PlayerGoalRow r) => GoalRecord(
               category: r.category == null ? null : SkillCategory.values.byName(r.category!),
               eventDate: r.eventDate,
               createdAt: r.createdAt!,
-              targetRank: r.targetRank == null ? null : Rank.values.byName(r.targetRank!),
+              targetRank: _rankOrNull(r.targetRank),
             ),
     );
 
@@ -60,7 +63,7 @@ GoalRecord goalFromRemote(Map<String, Object?> j) => GoalRecord(
               createdAt: _local(j['created_at'])!,
               // Máy cũ có thể để target_rank thừa ở dòng không phải Lên hạng.
               targetRank: j['kind'] == GoalKind.lenHang.name && j['target_rank'] != null
-                  ? Rank.values.byName(j['target_rank']! as String)
+                  ? _rankOrNull(j['target_rank'] as String?)
                   : null,
             ),
     );

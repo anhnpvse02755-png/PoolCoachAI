@@ -36,3 +36,17 @@ test('lời dặn giải thích khoá phân tích trận, nguồn nhóm yếu v�
     assert.ok(SYSTEM_PROMPT.includes(must), must);
   }
 });
+
+test('lời dặn không nói "weak rỗng là chưa đủ dữ liệu" bừa: phân biệt theo sampled', () => {
+  assert.ok(!SYSTEM_PROMPT.includes('weak rỗng là chưa có nhóm nào đủ dữ liệu'), 'câu cũ vẫn còn');
+  for (const must of ['sampled', 'không nhóm nào yếu', 'chưa đủ dữ liệu']) {
+    assert.ok(SYSTEM_PROMPT.includes(must), must);
+  }
+});
+
+test('lời dặn mô tả milestoneRank và retake của currentStep, lamBaiBu không luôn là làm lại', () => {
+  for (const must of ['milestoneRank', 'retake']) {
+    assert.ok(SYSTEM_PROMPT.includes(must), must);
+  }
+  assert.ok(!SYSTEM_PROMPT.includes('lamBaiBu (làm lại bài kiểm tra BU)'), 'lamBaiBu vẫn luôn là làm lại');
+});

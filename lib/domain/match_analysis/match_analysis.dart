@@ -425,3 +425,13 @@ MatchAnalysis analyzeMatches(
     )),
   );
 }
+
+/// Nhóm đủ mẫu để kết luận (đủ trận và đủ lần thử), yếu hay không. Khác
+/// [MatchAnalysis.weaknesses]: danh sách yếu rỗng mà nhóm này không rỗng nghĩa
+/// là đủ dữ liệu và không nhóm nào vượt ngưỡng, không phải thiếu dữ liệu.
+List<SkillCategory> sampledGroups(MatchAnalysis analysis) => [
+      for (final s in analysis.signals.values)
+        if (s.matches >= MatchAnalysisConstants.minMatches &&
+            s.attempts >= MatchAnalysisConstants.minAttempts)
+          s.category,
+    ];

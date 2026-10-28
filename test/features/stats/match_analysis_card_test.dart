@@ -149,6 +149,7 @@ void main() {
     expect(a.fullRacks, 0);
     await pumpCard(tester, a);
     expect(find.textContaining('Dọn bàn:'), findsNothing);
+    expect(find.textContaining('Phá-và-dọn'), findsNothing);
     expect(find.textContaining('Trượt cú kế tiếp'), findsNothing);
     expect(find.text(Vi.statsMatchAnalysisBasis(1, 0)), findsOneWidget);
   });
@@ -207,13 +208,61 @@ void main() {
     });
   });
 
+  group('dòng nhóm yếu khi không có nhóm yếu', () {
+    testWidgets('đủ mẫu mà không nhóm nào vượt ngưỡng: nói không vượt ngưỡng, không nói thiếu dữ liệu', (
+      tester,
+    ) async {
+      final a = analyzeMatches([
+        for (var i = 0; i < 3; i++)
+          completedMatch('ok-$i', const [RackWinner.player], [
+            for (var n = 1; n <= 5; n++)
+              shotAt(1, n, RackWinner.player, MatchShotType.normal, MatchShotOutcome.made),
+          ]),
+      ]);
+      expect(a.weaknesses, isEmpty);
+      expect(sampledGroups(a), isNotEmpty);
+      await pumpCard(tester, a);
+      expect(find.text(Vi.statsMatchWeakNoneOverThreshold(3)), findsOneWidget);
+      expect(find.text(Vi.statsMatchWeakNone), findsNothing);
+    });
+
+    testWidgets('chưa nhóm nào đủ mẫu: vẫn nói chưa đủ dữ liệu', (tester) async {
+      final a = analyzeMatches([
+        completedMatch('m', const [RackWinner.player], [
+          shotAt(1, 1, RackWinner.player, MatchShotType.normal, MatchShotOutcome.made),
+        ]),
+      ]);
+      expect(sampledGroups(a), isEmpty);
+      await pumpCard(tester, a);
+      expect(find.text(Vi.statsMatchWeakNone), findsOneWidget);
+      expect(find.textContaining('vượt ngưỡng yếu'), findsNothing);
+    });
+  });
+
   testWidgets('360x640 chữ lớn: thẻ đầy đủ không tràn', (tester) async {
     applyScreen(tester, const Size(360, 640), textScale: 2.0);
-    final a = analyzeMatches(
-      matchesWeakAt(SkillCategory.aiming, at: testToday),
-    );
+    const p = RackWinner.player;
+    const o = RackWinner.opponent;
+    const nm = MatchShotType.normal;
+    final withSafety = completedMatch('safe', const [p], [
+      shotAt(1, 1, p, MatchShotType.breakShot, MatchShotOutcome.made),
+      shotAt(1, 2, p, nm, MatchShotOutcome.made, position: PositionOutcome.unsuccessful),
+      shotAt(1, 3, p, nm, MatchShotOutcome.missed),
+      shotAt(1, 4, o, nm, MatchShotOutcome.missed),
+      shotAt(1, 5, p, MatchShotType.safety, MatchShotOutcome.made),
+      shotAt(1, 6, o, nm, MatchShotOutcome.missed),
+      shotAt(1, 7, p, nm, MatchShotOutcome.made, position: PositionOutcome.successful),
+    ]);
+    final a = analyzeMatches([
+      ...matchesWeakAt(SkillCategory.aiming, at: testToday),
+      withSafety,
+    ]);
+    // Dòng phòng thủ là dòng dài nhất: thẻ phải thật sự dựng nó.
+    expect(a.assessedSafeties, greaterThan(0));
+    expect(a.weaknesses, isNotEmpty);
     await pumpCard(tester, a);
     await tester.pumpAndSettle();
+    expect(find.textContaining('Phòng thủ:'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
