@@ -8,15 +8,18 @@ import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/drift_match_repository.dart';
 import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
+import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/features/play/presentation/match_analysis_sheet.dart';
 import 'package:poolcoachai/features/play/presentation/play_screen.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_detail_screen.dart';
 import 'package:poolcoachai/features/play/presentation/tournament_list_screen.dart';
 
 import '../../support/layout_sweep.dart';
@@ -94,6 +97,44 @@ class _LaggyRepo extends TournamentRepository {
     await super.remove(id);
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
+}
+
+/// Kho giải mà ghi/sửa/xóa luôn ném.
+class _FailingTournamentRepo extends TournamentRepository {
+  _FailingTournamentRepo(super.db)
+    : super(userId: 'u1', now: () => testToday, newId: () => 'x');
+
+  @override
+  Future<void> update(String id, TournamentDraft draft) =>
+      Future.error(StateError('hỏng'));
+
+  @override
+  Future<void> remove(String id) => Future.error(StateError('hỏng'));
+}
+
+class _FailingGoalRepo extends RoadmapRepository {
+  _FailingGoalRepo(super.db)
+    : super(userId: 'u1', now: () => testToday, newId: () => 'g');
+
+  @override
+  Future<void> setGoal({
+    required GoalKind kind,
+    SkillCategory? category,
+    DateTime? eventDate,
+    Rank? targetRank,
+    String? tournamentId,
+  }) => Future.error(StateError('hỏng'));
+
+  @override
+  Future<void> linkTournament(String tournamentId) =>
+      Future.error(StateError('hỏng'));
+}
+
+class _FailingStartRepo extends DriftMatchRepository {
+  _FailingStartRepo(super.db) : super(userId: 'u1');
+
+  @override
+  Future<void> start(PoolMatch match) => Future.error(StateError('hỏng'));
 }
 
 Future<AppDatabase> newDb() async {
@@ -524,6 +565,123 @@ void main() {
       expect(row.location, 'CLB A');
     },
   );
+
+  group('thất bại: báo lỗi, ở lại màn, nút dùng lại được', () {
+    FilledButton? filled(WidgetTester tester, String key) =>
+        tester.widgetList<FilledButton>(find.byKey(Key(key))).firstOrNull;
+
+    testWidgets('bắt đầu trận lỗi: thông báo, vẫn ở chi tiết giải', (
+      tester,
+    ) async {
+      final db = await newDb();
+      await tRepo(
+        db,
+        'on',
+      ).create(TournamentDraft(name: 'Giải Q1', startDate: testToday));
+      await open(
+        tester,
+        dbContainer(db, matchRepo: _FailingStartRepo.new),
+        'on',
+      );
+      await tester.tap(find.byKey(const Key('tournament-start-match')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('match-player-name')), 'An');
+      await tester.enterText(
+        find.byKey(const Key('match-opponent-name')),
+        'Bình',
+      );
+      await tester.tap(find.text(Vi.matchStartAction));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.matchStartFailed), findsOneWidget);
+      expect(find.byType(TournamentDetailScreen), findsOneWidget);
+      expect(find.byType(PlayScreen), findsNothing);
+      expect(filled(tester, 'tournament-start-match')!.onPressed, isNotNull);
+      expect(await db.select(db.poolMatchRows).get(), isEmpty);
+    });
+
+    testWidgets('đặt mục tiêu lỗi: thông báo, nút Chuẩn bị còn đó', (
+      tester,
+    ) async {
+      final db = await newDb();
+      await createUp(db);
+      await open(
+        tester,
+        dbContainer(db, roadmapRepo: _FailingGoalRepo.new),
+        'up',
+      );
+      await tester.tap(find.byKey(const Key('tournament-prepare')));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.tournamentGoalFailed), findsOneWidget);
+      expect(find.text(Vi.tournamentPreparing), findsNothing);
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('tournament-prepare')))
+            .onPressed,
+        isNotNull,
+      );
+      expect(await db.select(db.playerGoalRows).get(), isEmpty);
+    });
+
+    testWidgets(
+      'xóa lỗi: thông báo, giải còn nguyên, không hiện "không tìm thấy"',
+      (tester) async {
+        final db = await newDb();
+        await createUp(db);
+        await open(
+          tester,
+          dbContainer(db, tournamentRepo: _FailingTournamentRepo.new),
+          'up',
+        );
+        await tester.tap(find.byKey(const Key('tournament-delete')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(Vi.tournamentDeleteConfirm));
+        await tester.pumpAndSettle();
+        expect(find.text(Vi.tournamentDeleteFailed), findsOneWidget);
+        expect(find.text(Vi.tournamentNotFoundTitle), findsNothing);
+        expect(find.text('Cúp Mùa Đông'), findsOneWidget);
+        expect(
+          tester
+              .widget<IconButton>(find.byKey(const Key('tournament-delete')))
+              .onPressed,
+          isNotNull,
+        );
+        expect(
+          (await db.select(db.tournamentRows).getSingle()).isDeleted,
+          isFalse,
+        );
+      },
+    );
+
+    testWidgets('sửa lỗi: thông báo, dữ liệu cũ còn nguyên', (tester) async {
+      final db = await newDb();
+      await createUp(db);
+      await open(
+        tester,
+        dbContainer(db, tournamentRepo: _FailingTournamentRepo.new),
+        'up',
+      );
+      await tester.tap(find.byKey(const Key('tournament-edit')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('tournament-name')),
+        'Tên mới',
+      );
+      await tester.tap(find.text(Vi.tournamentSave));
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.tournamentSaveFailed), findsOneWidget);
+      expect(find.text('Cúp Mùa Đông'), findsOneWidget);
+      expect(
+        (await db.select(db.tournamentRows).getSingle()).name,
+        'Cúp Mùa Đông',
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('tournament-edit')))
+            .onPressed,
+        isNotNull,
+      );
+    });
+  });
 
   testWidgets('id không còn: màn không tìm thấy, có nút về danh sách', (
     tester,

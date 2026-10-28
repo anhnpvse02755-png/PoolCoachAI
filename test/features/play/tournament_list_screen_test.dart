@@ -64,8 +64,8 @@ Finder endRowText() => find.descendant(
 
 /// Kho giải mà `create` chờ [release] rồi mới ghi, hoặc ném khi [fail].
 class _SlowRepo extends TournamentRepository {
-  _SlowRepo(AppDatabase db, {this.fail = false})
-    : super(db, userId: 'u1', now: () => testToday, newId: () => 'x');
+  _SlowRepo(super.db, {this.fail = false})
+    : super(userId: 'u1', now: () => testToday, newId: () => 'x');
 
   final bool fail;
   final release = Completer<void>();

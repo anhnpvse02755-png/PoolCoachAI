@@ -23,6 +23,8 @@ import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/repositories/match_repository.dart';
+import 'package:poolcoachai/data/repositories/roadmap_repository.dart';
 import 'package:poolcoachai/data/repositories/tournament_repository.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
@@ -250,7 +252,8 @@ Future<(GoRouter, FakeAuthRepository)> pumpAuthApp(
 /// Như [testContainer] nhưng hạng và bài kiểm tra đọc từ [db] thật (SQLite
 /// trong bộ nhớ) — cho widget test cần ghi rồi đọc lại.
 ///
-/// [tournamentRepo] thay kho giải (ví dụ kho ghi xong rồi mới trả về chậm).
+/// [tournamentRepo], [roadmapRepo], [matchRepo] thay kho tương ứng (ví dụ kho
+/// ghi xong rồi mới trả về chậm, hoặc kho luôn ném).
 /// [rankLag] làm stream hạng trễ như Drift trên web (chạy trong worker):
 /// dòng vừa ghi tới màn hình sau một nhịp.
 ProviderContainer dbContainer(
@@ -262,9 +265,19 @@ ProviderContainer dbContainer(
   List<DrillLog>? logs,
   List<Drill>? drills,
   TournamentRepository Function(AppDatabase db)? tournamentRepo,
+  RoadmapRepository Function(AppDatabase db)? roadmapRepo,
+  MatchRepository Function(AppDatabase db)? matchRepo,
 }) {
   return ProviderContainer(
     overrides: [
+      if (roadmapRepo != null)
+        roadmapRepositoryProvider.overrideWith(
+          (ref) => roadmapRepo(ref.watch(appDatabaseProvider)),
+        ),
+      if (matchRepo != null)
+        matchRepositoryProvider.overrideWith(
+          (ref) => matchRepo(ref.watch(appDatabaseProvider)),
+        ),
       if (tournamentRepo != null)
         tournamentRepositoryProvider.overrideWith(
           (ref) => tournamentRepo(ref.watch(appDatabaseProvider)),
