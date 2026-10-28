@@ -314,6 +314,34 @@ void main() {
     );
   });
 
+  test('lõi Skill Test không phụ thuộc Flutter, không dùng Vi, không có chuỗi tiếng Việt, không dựng PlayerRank', () {
+    final files = dartFilesIn('lib/domain/skill_test');
+    final offenders = <String>[];
+    for (final file in files) {
+      final code = codeOnly(file.readAsStringSync());
+      final path = file.path.replaceAll(r'', '/');
+      for (final banned in [
+        'package:flutter',
+        'core/strings/vi.dart',
+        'PlayerRank(',
+        'player_rank.dart',
+        'rank_rules.dart',
+      ]) {
+        if (code.contains(banned)) offenders.add('$path: $banned');
+      }
+      for (final m in vietnameseLiteral.allMatches(code)) {
+        offenders.add('$path: ${m[0]}');
+      }
+    }
+
+    expect(files, isNotEmpty);
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'cổng mở cấp do luật quyết định, không đổi hạng (README quy tắc 2; spec skill test mục 2)',
+    );
+  });
+
   test('app không gọi thẳng Claude và không chứa khoá Anthropic', () {
     final files = dartFilesIn('lib');
     expect(
