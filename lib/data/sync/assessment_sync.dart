@@ -121,10 +121,11 @@ class AssessmentSyncService {
 
     try {
       await _pushFinishedTests(userId);
-      await _pushSkillTests(userId);
       final hadRow = await _syncRank(userId);
       rankFetched = true;
       _onRankFetch(userId, hadRow ? RankFetch.found : RankFetch.foundNone);
+      // Sau khi đã lấy hạng: đẩy bài kiểm tra bị 5xx không được chặn việc đó.
+      await _pushSkillTests(userId);
       await _pullTests(userId);
       await _pullSkillTests(userId);
       return SyncOutcome.done;

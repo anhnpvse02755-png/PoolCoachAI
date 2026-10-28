@@ -326,6 +326,16 @@ void main() {
       expect((await db.select(db.skillTestRows).getSingle()).syncedAt, now);
     });
 
+    test('đẩy bài kiểm tra bị 5xx vẫn không chặn việc lấy hạng', () async {
+      serve(ranks: [remoteRank(Rank.d, RankSource.verified, newer)]);
+      server.routes['POST /items/skill_tests'] = (_) => FakeDirectus.error(503, 'SERVICE_UNAVAILABLE');
+      await local(passedTest('a1', 1, older));
+      expect(await build().syncNow(), SyncOutcome.failed);
+      expect(fetches, [('u1', RankFetch.found)]);
+      expect((await rankRow()).rank, 'd');
+      expect((await db.select(db.skillTestRows).getSingle()).syncedAt, isNull);
+    });
+
     test('máy chủ từ chối (403): nằm chờ, không gửi lại trong cùng dịch vụ, hạng vẫn đồng bộ', () async {
       serve();
       server.routes['POST /items/skill_tests'] = (_) => FakeDirectus.error(403, 'FORBIDDEN');
