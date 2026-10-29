@@ -1,7 +1,7 @@
 // Thông báo "Gợi ý tập mới" trên Chrome thật, một tài khoản thử, đồng hồ trang dời:
 //   1) Trước khi tải trang, dời Date của trang tới 07:55:00 hôm nay (giờ máy)
 //      bằng Page.addScriptToEvaluateOnNewDocument; cấp quyền thông báo cho APP.
-//   2) Trang Thông báo có 'Gợi ý tập mới', 'Đã gửi' và dòng trống của hộp Đã gửi.
+//   2) Trang Thông báo có 'Gợi ý tập mới', 'ĐÃ GỬI' và dòng trống của hộp Đã gửi.
 //   3) Trang chủ có bài gợi ý; ghi một buổi tập cho bài đó để gợi ý của ngày đổi.
 //   4) Qua 08:00 (đồng hồ dời): chuông đọc 'Thông báo, 1 chưa đọc', hộp Đã gửi
 //      có 'Có gợi ý tập mới'; mở màn rồi quay lại thì chuông về 'Thông báo'.
@@ -159,13 +159,13 @@ try {
 
   step(3, 'Màn Thông báo: Gợi ý tập mới, Đã gửi, hộp trống');
   await tab.goto(`${APP}/notifications`);
-  await tab.waitForText('Loại thông báo', 45000); // Vi.notificationsSettingsTitle
+  await tab.waitForText('LOẠI THÔNG BÁO', 45000); // Vi.notificationsSettingsTitle
   if (granted && (await tab.text()).includes('Bật thông báo')) {
     await tab.click('Bật thông báo'); // Vi.equipmentReminderEnable
     await sleep(2000);
   }
   const screen = await scrollUntilText('Chưa có thông báo nào trong 30 ngày qua.');
-  for (const piece of ['Gợi ý tập mới', 'Đã gửi', 'Chưa có thông báo nào trong 30 ngày qua.']) {
+  for (const piece of ['Gợi ý tập mới', 'ĐÃ GỬI', 'Chưa có thông báo nào trong 30 ngày qua.']) {
     await check(screen.includes(piece), `Màn Thông báo có "${piece}"`);
   }
 
@@ -175,11 +175,10 @@ try {
     await tab.waitForText('Bài tập gợi ý', 45000);
     await scrollUntilText('Mở');
     await tab.click('Mở'); // Vi.homeDrillOpen: chuyển sang tab Tập luyện, Trang chủ không còn hiện
-    await tab.waitForText('Bắt đầu tập', 45000); // Vi.drillStartAction
+    await scrollUntilText('Bắt đầu tập'); // Vi.drillStartAction: ở 360x640 nút nằm dưới màn
     await tab.click('Bắt đầu tập');
     await tab.waitForText('Lưu kết quả', 45000); // Vi.sessionSaveAction
-    const form = await tab.text();
-    if (form.includes('Số lần thử')) { // Vi.sessionAttemptsLabel: bài chấm theo ngưỡng
+    if (await tab.eval(`[...document.querySelectorAll('input, textarea')].some((e) => (e.getAttribute('aria-label') || '').includes('Số lần thử'))`)) { // Vi.sessionAttemptsLabel: bài chấm theo ngưỡng
       await tab.type('Số lần đạt', '10'); // Vi.sessionScoreLabelAttempts
       await tab.type('Số lần thử', '10');
     } else {
@@ -199,7 +198,7 @@ try {
     }
     await check(bell, 'Chuông đọc "Thông báo, 1 chưa đọc"');
     await tab.click('Thông báo, 1 chưa đọc');
-    await tab.waitForText('Loại thông báo', 45000);
+    await tab.waitForText('LOẠI THÔNG BÁO', 45000);
     const inbox = await scrollUntilText('Có gợi ý tập mới'); // Vi.recommendationReminderTitle
     await check(inbox.includes('Có gợi ý tập mới'), 'Đã gửi có "Có gợi ý tập mới"');
     await tab.eval('history.back()');

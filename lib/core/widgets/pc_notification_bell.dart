@@ -30,6 +30,8 @@ class PcNotificationBell extends ConsumerWidget {
           tooltip: Vi.notificationsBellTooltip(n),
           icon: Badge(
             isLabelVisible: n > 0,
+            // Chữ lớn làm huy hiệu rộng ra phía phải; kéo vào để không chạm mép.
+            offset: const Offset(-6, 0),
             label: Text(Vi.notificationsUnreadBadge(n)),
             child: const Icon(Icons.notifications_none),
           ),

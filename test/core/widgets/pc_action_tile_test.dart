@@ -90,6 +90,22 @@ void main() {
     }
   }
 
+  testWidgets('nút hành động là nút tô (tonal), không phải chữ trần', (
+    tester,
+  ) async {
+    final (title, body, label) = cases.first;
+    await open(
+      tester,
+      width: 360,
+      scale: 1.0,
+      title: title,
+      body: body,
+      label: label,
+    );
+    expect(find.widgetWithText(FilledButton, label), findsOneWidget);
+    expect(find.widgetWithText(TextButton, label), findsNothing);
+  });
+
   testWidgets('x1.5 ở 360: nút xuống dưới chữ, cột chữ đủ rộng', (
     tester,
   ) async {
