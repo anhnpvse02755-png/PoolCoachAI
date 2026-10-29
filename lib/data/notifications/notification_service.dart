@@ -201,8 +201,21 @@ class NotificationService {
     }
   }();
 
-  Future<void> _markScheduleCurrent() async {
-    _scheduleOutdated = Future.value(false);
+  /// Tăng mỗi lần có yêu cầu đặt lại hết mới (đổi thẳng tài khoản).
+  int _outdatedGeneration = 0;
+
+  void _requestReplaceAll() {
+    _outdatedGeneration++;
+    _scheduleOutdated = Future.value(true);
+  }
+
+  /// Lần đặt lại hết đã xong. [generation] là [_outdatedGeneration] lúc lần
+  /// đó đọc cờ: có yêu cầu mới trong lúc nó chạy (đổi tài khoản) thì giữ cờ
+  /// cho lần sau, không xoá mất.
+  Future<void> _markScheduleCurrent(int generation) async {
+    if (generation == _outdatedGeneration) {
+      _scheduleOutdated = Future.value(false);
+    }
     try {
       await _scheduleVersion?.save(notificationScheduleVersion);
     } on Object {
@@ -303,23 +316,45 @@ class NotificationService {
           // trước vừa xoá, luồng phát bản cũ, lần sau xoá lại… không dừng.
           final current = await log.all();
           if (!ready()) return;
+          final outdatedGeneration = _outdatedGeneration;
           final replaceAll = await _scheduleOutdated;
           if (!ready()) return;
           final plan = _plan(now, current: current);
           // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
           // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
-          final cancelled = await reconcileNotifications(
-            scheduler,
-            plan,
-            userId: userId,
-            keep: dueEarlierToday(current, now),
-            replaceAll: replaceAll,
-          );
-          await log.syncPlanned(plan, now: now, cancelled: cancelled);
-          if (replaceAll) await _markScheduleCurrent();
+          final gone = <int>{};
+          try {
+            await reconcileNotifications(
+              scheduler,
+              plan,
+              userId: userId,
+              keep: dueEarlierToday(current, now),
+              replaceAll: replaceAll,
+              gone: gone,
+            );
+          } on Object {
+            // Hệ điều hành ném giữa chừng: cái đã huỷ không còn dòng nào; kế
+            // hoạch chưa đặt xong thì chưa ghi (lần đồng bộ sau làm tiếp).
+            await log.forgetUnsent(gone);
+            rethrow;
+          }
+          await log.syncPlanned(plan, now: now, cancelled: gone);
+          if (replaceAll) await _markScheduleCurrent(outdatedGeneration);
         } else {
-          // Không có quyền thì không đặt gì: nhật ký không giữ mục tương lai.
-          await log.syncPlanned(const [], now: now);
+          // Không có quyền thì không đặt gì: huỷ cái còn chờ (kể cả cái quá
+          // giờ chưa giao, giờ sẽ không bao giờ hiện) và nhật ký không giữ
+          // mục tương lai hay dòng của cái vừa huỷ.
+          final gone = <int>{};
+          try {
+            await reconcileNotifications(
+              scheduler,
+              const [],
+              userId: userId,
+              gone: gone,
+            );
+          } finally {
+            await log.syncPlanned(const [], now: now, cancelled: gone);
+          }
         }
       }
     }).catchError((Object _) {});
@@ -429,7 +464,7 @@ class NotificationService {
       _forgetFuture(previous, scheduler);
       // Đổi thẳng tài khoản: thông báo trùng id (cùng nội dung) vẫn mang
       // payload của người trước, chạm vào sẽ bị bỏ qua. Đặt lại hết.
-      if (userId != null) _scheduleOutdated = Future.value(true);
+      if (userId != null) _requestReplaceAll();
     }
     for (final subscription in _dataSubscriptions) {
       unawaited(subscription.cancel());

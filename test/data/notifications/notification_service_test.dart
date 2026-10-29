@@ -870,6 +870,94 @@ void main() {
       expect((await logRows()).map((x) => x.id), isNot(contains(id)));
     });
 
+    test('huỷ hỏng giữa chừng: dòng của cái đã huỷ vẫn bị xoá', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final overdue = {
+        for (final n in scheduler.scheduled)
+          if (n.at.isBefore(DateTime(2026, 10, 15))) n.id,
+      };
+      expect(overdue, hasLength(2), reason: 'bảo dưỡng 13/10 và gợi ý 14/10');
+
+      // Sang ngày 15 mà cả hai vẫn chờ: phải huỷ cả hai, nhưng hệ điều hành
+      // từ chối lần huỷ thứ hai.
+      now = DateTime(2026, 10, 15, 0, 30);
+      scheduler.failCancelAfter = scheduler.cancelled.length + 1;
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      final gone = scheduler.cancelled.toSet().intersection(overdue);
+      expect(gone, hasLength(1));
+      final rows = {for (final r in await logRows()) r.id};
+      expect(rows.intersection(gone), isEmpty, reason: 'đã huỷ: không còn dòng');
+      expect(
+        rows.intersection(overdue.difference(gone)),
+        hasLength(1),
+        reason: 'chưa huỷ được, vẫn chờ: giữ dòng',
+      );
+    });
+
+    test('mất quyền khi một thông báo quá giờ còn chờ: huỷ, xoá dòng', () async {
+      scheduler.granted = true;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+
+      // 08:03, chưa giao; quyền bị tắt: thông báo đó sẽ không bao giờ hiện.
+      now = DateTime(2026, 10, 14, 8, 3);
+      scheduler.granted = false;
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      expect(s.permission, 'denied');
+      expect(scheduler.pending.keys, isNot(contains(id)));
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+    });
+
+    test('đổi tài khoản giữa lúc đặt lại hết: tài khoản mới vẫn được đặt lại',
+        () async {
+      scheduler.granted = true;
+      // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
+      for (final user in ['u1', 'u2']) {
+        for (final day in [11, 12]) {
+          await DriftTimerSessionRepository(db, userId: user).add(
+            TimerSession(
+              id: '$user-$day',
+              date: DateTime(2026, 10, day, 10),
+              durationSec: 600,
+            ),
+          );
+        }
+      }
+      // Bản cũ đã đặt nhắc streak; lần mở này phải đặt lại hết.
+      final old = scheduling()..start();
+      await pumpEventQueue();
+      old.dispose();
+      await pumpEventQueue();
+      final id = scheduler.pending.keys.single;
+
+      final gate = Completer<void>();
+      scheduler.holdSchedule = gate;
+      final s = scheduling(scheduleVersion: _FakeScheduleVersionStore())
+        ..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      // Lần đặt lại của u1 đang dở thì đổi sang u2.
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      scheduler.holdSchedule = null;
+      gate.complete();
+      await pumpEventQueue();
+      expect(scheduler.pending.keys, [id]);
+      expect(parseNotificationPayload(scheduler.payloads[id])?.userId, 'u2');
+    });
+
     test('đăng xuất khi một thông báo quá giờ còn chờ: xoá dòng của nó', () async {
       scheduler.granted = true;
       await saveCue(dueDate: DateTime(2026, 10, 20));
@@ -1421,11 +1509,18 @@ class _FakeScheduler implements NotificationScheduler {
   /// Payload của mỗi thông báo đang chờ.
   final payloads = <int, String>{};
 
+  /// Đặt khác null thì mỗi lần đặt chờ cổng này.
+  Completer<void>? holdSchedule;
+
+  /// Đặt khác null thì lần huỷ thứ [failCancelAfter] + 1 trở đi ném.
+  int? failCancelAfter;
+
   @override
   Future<void> schedule(
     PlannedNotification notification, {
     required String payload,
   }) async {
+    await holdSchedule?.future;
     scheduleCalls++;
     everScheduled.add(notification);
     pending[notification.id] = notification;
@@ -1434,6 +1529,10 @@ class _FakeScheduler implements NotificationScheduler {
 
   @override
   Future<void> cancel(int id) async {
+    final limit = failCancelAfter;
+    if (limit != null && cancelled.length >= limit) {
+      throw StateError('hệ điều hành từ chối huỷ');
+    }
     cancelled.add(id);
     pending.remove(id);
     payloads.remove(id);

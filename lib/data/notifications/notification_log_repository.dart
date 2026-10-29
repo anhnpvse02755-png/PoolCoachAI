@@ -92,6 +92,16 @@ class NotificationLogRepository {
     }
   });
 
+  /// Xoá dòng của [ids], dù giờ đã qua hay chưa: chúng vừa bị huỷ khỏi lịch
+  /// hệ điều hành khi chưa hiện. Dùng khi lần đối chiếu hỏng giữa chừng (chưa
+  /// tới được [syncPlanned]).
+  Future<void> forgetUnsent(Set<int> ids) async {
+    if (ids.isEmpty) return;
+    await (_db.delete(
+      _t,
+    )..where((r) => r.userId.equals(userId) & r.id.isIn(ids))).go();
+  }
+
   /// Ghi một thông báo vừa hiện (trên web, nơi không có lịch sẵn), kèm dọn
   /// mục quá 30 ngày.
   Future<void> recordShown(

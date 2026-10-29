@@ -46,18 +46,25 @@ abstract class NotificationScheduler {
 /// huỷ mà không đặt lại.
 ///
 /// Payload mang [userId]: chạm thông báo của tài khoản khác thì bị bỏ qua.
+///
+/// [gone]: nếu có, nhận dần từng id đã thật sự bị huỷ mà chưa đặt lại, ngay
+/// khi việc đó xảy ra. Hệ điều hành ném giữa chừng thì [gone] vẫn đúng với
+/// những gì đã làm, để nơi gọi xoá đúng các dòng nhật ký đó.
 Future<Set<int>> reconcileNotifications(
   NotificationScheduler scheduler,
   List<PlannedNotification> desired, {
   required String userId,
   Set<int> keep = const {},
   bool replaceAll = false,
+  Set<int>? gone,
 }) async {
+  final out = gone ?? <int>{};
   final pending = await scheduler.pendingIds();
   final desiredIds = {for (final n in desired) n.id};
   final cancelled = pending.difference({...desiredIds, ...keep});
   for (final id in replaceAll ? pending.difference(keep) : cancelled) {
     await scheduler.cancel(id);
+    out.add(id);
   }
   for (final n in desired) {
     if (replaceAll || !pending.contains(n.id)) {
@@ -65,7 +72,8 @@ Future<Set<int>> reconcileNotifications(
         n,
         payload: notificationPayload(n.kind, n.key, userId: userId),
       );
+      out.remove(n.id);
     }
   }
-  return cancelled;
+  return out;
 }
