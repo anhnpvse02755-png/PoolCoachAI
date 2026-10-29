@@ -1,21 +1,21 @@
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show ByteData, FontLoader;
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_theme.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/features/play/presentation/match_dialogs.dart';
+import 'package:poolcoachai/features/play/presentation/tournament_form.dart';
 import 'package:poolcoachai/features/training/presentation/drill_session_screen.dart';
 import 'package:poolcoachai/features/training/presentation/schedule_screen.dart';
 import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/core/theme/app_theme.dart';
-import 'package:poolcoachai/features/play/presentation/tournament_form.dart';
 
 import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
@@ -28,9 +28,8 @@ void main() {
   /// Chủ đề của app vẽ bằng Roboto thật (font dự phòng của test quá rộng).
   Future<ThemeData> robotoTheme(WidgetTester tester) async {
     const family = 'RobotoFormLabels';
-    final bytes = File(
-      'test/fixtures/fonts/roboto-regular.ttf',
-    ).readAsBytesSync();
+    final bytes = File('test/fixtures/fonts/roboto-regular.ttf')
+        .readAsBytesSync();
     await tester.runAsync(
       () => (FontLoader(
         family,
@@ -44,9 +43,13 @@ void main() {
   /// tiêu đề thanh trên là vấn đề riêng, không phải nhãn ô nhập).
   List<String> ellipsized(WidgetTester tester) {
     final inAppBar = <RenderObject>{
-      for (final e in find
-          .descendant(of: find.byType(AppBar), matching: find.byType(RichText))
-          .evaluate())
+      for (final e
+          in find
+              .descendant(
+                of: find.byType(AppBar),
+                matching: find.byType(RichText),
+              )
+              .evaluate())
         e.renderObject!,
     };
     final out = <String>[];
@@ -86,7 +89,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(Vi.tournamentLocation), findsOneWidget);
     expect(ellipsized(tester), isEmpty);
-    for (final key in ['tournament-game-type', 'tournament-result', 'tournament-notes']) {
+    for (final key in [
+      'tournament-game-type',
+      'tournament-result',
+      'tournament-notes',
+    ]) {
       await tester.ensureVisible(find.byKey(Key(key)));
       await tester.pumpAndSettle();
       expect(ellipsized(tester), isEmpty, reason: key);

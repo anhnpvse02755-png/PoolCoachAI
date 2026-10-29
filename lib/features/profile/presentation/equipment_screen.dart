@@ -525,24 +525,46 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
       });
     // Thẻ nhắc nằm trong vùng cuộn: ở chữ lớn nó cao hơn màn hình, và nếu
     // đứng yên trên danh sách thì danh sách bị ép về 0, không cuộn tới được.
-    return ListView(
-      padding: pcScrollPadding(
-        context,
-        const EdgeInsets.fromLTRB(12, 8, 12, 88),
-      ),
-      children: [
-        _maintenanceReminderCard(),
+    // Trạng thái trống lấp phần còn lại và nằm giữa nó.
+    final padding = pcScrollPadding(
+      context,
+      const EdgeInsets.fromLTRB(12, 8, 12, 88),
+    );
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
+          sliver: SliverToBoxAdapter(child: _maintenanceReminderCard()),
+        ),
         if (cues.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 24),
-            child: PcEmptyState(
-              icon: Icons.sports,
-              title: Vi.equipmentTitle,
-              body: Vi.equipmentEmpty,
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: padding.bottom),
+              child: const Center(
+                child: PcEmptyState(
+                  icon: Icons.sports,
+                  title: Vi.equipmentTitle,
+                  body: Vi.equipmentEmpty,
+                ),
+              ),
             ),
           )
         else
-          ...sortedCues.map((cue) => _cueCard(cue, now, sessions, winRates)),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              padding.left,
+              0,
+              padding.right,
+              padding.bottom,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                for (final cue in sortedCues)
+                  _cueCard(cue, now, sessions, winRates),
+              ]),
+            ),
+          ),
       ],
     );
   }

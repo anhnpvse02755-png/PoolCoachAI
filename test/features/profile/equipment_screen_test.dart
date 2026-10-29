@@ -7,15 +7,16 @@ import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
-import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
+import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
-import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -400,7 +401,13 @@ void main() {
       int cues = 6,
     }) async {
       applyScreen(tester, const Size(360, 640), textScale: textScale);
-final fontBytes = File(        'test/fixtures/fonts/roboto-regular.ttf',      ).readAsBytesSync();      await tester.runAsync(        () => (FontLoader(          _family,        )..addFont(Future.value(ByteData.sublistView(fontBytes)))).load(),      );
+      final fontBytes = File('test/fixtures/fonts/roboto-regular.ttf')
+          .readAsBytesSync();
+      await tester.runAsync(
+        () => (FontLoader(
+          _family,
+        )..addFont(Future.value(ByteData.sublistView(fontBytes)))).load(),
+      );
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
       final repo = DriftCueEquipmentRepository(db, userId: 'u1');
@@ -433,7 +440,10 @@ final fontBytes = File(        'test/fixtures/fonts/roboto-regular.ttf',      ).
           container: container,
           child: MaterialApp(
             theme: ThemeData(fontFamily: _family),
-            home: const PcFabInset(extent: coachInset, child: EquipmentScreen()),
+            home: const PcFabInset(
+              extent: coachInset,
+              child: EquipmentScreen(),
+            ),
           ),
         ),
       );
@@ -478,8 +488,25 @@ final fontBytes = File(        'test/fixtures/fonts/roboto-regular.ttf',      ).
       await openWithReminder(tester, textScale: 1.0, cues: 1);
       final text = tester.getRect(find.text(Vi.equipmentReminderPrompt));
       final button = tester.getRect(find.text(Vi.equipmentReminderEnable));
-      expect(button.top, lessThan(text.bottom), reason: 'nút cùng hàng với chữ');
+      expect(
+        button.top,
+        lessThan(text.bottom),
+        reason: 'nút cùng hàng với chữ',
+      );
       expect(button.left, greaterThan(text.left + 100));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('chưa có cơ: trạng thái trống nằm giữa phần còn lại dưới thẻ, '
+        'trên chỗ nút nổi', (tester) async {
+      await openWithReminder(tester, textScale: 1.0, cues: 0);
+      final card = tester.getRect(find.byType(Card).first);
+      final empty = tester.getCenter(find.text(Vi.equipmentEmpty));
+      // Vùng còn lại: dưới thẻ tới trên chỗ nút Thêm cơ và nút Coach (88+72).
+      final middle = (card.bottom + (640 - 88 - coachInset)) / 2;
+      final centreOfBlock = tester.getCenter(find.byType(PcEmptyState)).dy;
+      expect(centreOfBlock, closeTo(middle, 6));
+      expect(empty.dy, greaterThan(card.bottom));
       expect(tester.takeException(), isNull);
     });
   });

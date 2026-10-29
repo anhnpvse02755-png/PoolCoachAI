@@ -790,11 +790,6 @@ abstract final class Vi {
   /// 8 trên 10 thì trúng 9 là 113% mục tiêu, không phải "9".
   static String drillRatioPercent(double ratio) => '${(ratio * 100).round()}%';
 
-  /// Cùng tỉ lệ đó kèm chữ "mục tiêu", cho hàng lịch sử: một số trần như 113%
-  /// dễ bị đọc là tỉ lệ thành công, mà thành công không thể quá 100%.
-  static String drillRatioOfGoal(double ratio) =>
-      '${drillRatioPercent(ratio)} mục tiêu';
-
   /// Đã tập nhưng thiếu dữ liệu để chấm.
   ///
   /// Không quy về 0: thiếu dữ liệu khác hẳn làm kém, và 0 ở đây là
