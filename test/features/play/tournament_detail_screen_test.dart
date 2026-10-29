@@ -219,6 +219,23 @@ void main() {
     expect(find.text(Vi.tournamentMatchesEmpty), findsOneWidget);
   });
 
+  testWidgets('giải sắp tới chưa có trận: có tiêu đề Các trận, chữ rỗng cỡ thân',
+      (tester) async {
+    await open(tester, testContainer(tournaments: [up]), 'up');
+    final title = find.text(Vi.tournamentMatchesTitle);
+    final empty = find.text(Vi.tournamentMatchesEmpty);
+    expect(title, findsOneWidget);
+    expect(empty, findsOneWidget);
+    expect(
+      tester.getTopLeft(title).dy < tester.getTopLeft(empty).dy,
+      isTrue,
+      reason: 'tiêu đề nằm trên chữ rỗng',
+    );
+    final style = tester.widget<Text>(empty).style;
+    final context = tester.element(empty);
+    expect(style?.fontWeight, isNot(Theme.of(context).textTheme.titleMedium?.fontWeight));
+  });
+
   testWidgets('bấm trận đã xong mở phân tích trận', (tester) async {
     await open(
       tester,

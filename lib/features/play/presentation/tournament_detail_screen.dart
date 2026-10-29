@@ -337,13 +337,9 @@ class _TournamentDetailScreenState
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            view.matches.isEmpty
-                ? Vi.tournamentMatchesEmpty
-                : Vi.tournamentMatchesTitle,
-            style: textTheme.titleMedium,
-          ),
+          child: Text(Vi.tournamentMatchesTitle, style: textTheme.titleMedium),
         ),
+        if (view.matches.isEmpty) const Text(Vi.tournamentMatchesEmpty),
         for (final m in view.matches) _matchTile(m, textTheme),
         const SizedBox(height: 4),
         MatchAnalysisCard(
