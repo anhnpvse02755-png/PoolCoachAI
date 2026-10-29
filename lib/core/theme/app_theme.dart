@@ -47,6 +47,12 @@ abstract final class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      // Chữ lỗi và chữ gợi ý dưới ô nhập dài hơn một dòng khi chữ hệ thống
+      // phóng 1.5 lần; mặc định Material cắt còn một dòng kèm dấu ba chấm.
+      inputDecorationTheme: const InputDecorationTheme(
+        errorMaxLines: 3,
+        helperMaxLines: 3,
+      ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.bgScreen,

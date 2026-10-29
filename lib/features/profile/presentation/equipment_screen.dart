@@ -141,7 +141,8 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                     key: const Key('cue-shaft-diameter'),
                     initialValue: diameter,
                     decoration: const InputDecoration(
-                      labelText: Vi.equipmentShaftDiameter,
+                      // Nhãn dài: cho xuống hai dòng thay vì bị cắt ở x1.5.
+                      label: Text(Vi.equipmentShaftDiameter, maxLines: 2),
                       suffixText: Vi.unitMm,
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
