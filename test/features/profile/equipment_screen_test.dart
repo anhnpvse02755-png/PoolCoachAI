@@ -519,14 +519,28 @@ void main() {
           size: c.size,
           navHeight: 80,
         );
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        if (c.scale == 1.0 && c.size.width == 360) {
+          // Vừa khung: danh sách trống không cuộn và khối nằm giữa.
+          expect(position.maxScrollExtent, 0);
+        }
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        // Cuộn hết: chữ trống phải còn thấy được và nằm trên cả hai nút.
+        final viewportBottom = c.size.height - 80;
         final text = tester.getRect(find.text(Vi.equipmentEmpty));
         final addFab = tester.getRect(find.byType(FloatingActionButton));
         final coachFab = Rect.fromLTWH(
           c.size.width - 16 - 56,
-          c.size.height - 80 - coachInset,
+          viewportBottom - coachInset,
           56,
           56,
         );
+        expect(text.height, greaterThan(0));
+        expect(text.top, greaterThanOrEqualTo(0));
+        expect(text.bottom, lessThanOrEqualTo(viewportBottom));
         expect(text.overlaps(addFab), isFalse, reason: 'đè nút Thêm cơ');
         expect(text.overlaps(coachFab), isFalse, reason: 'đè nút Coach');
         expect(tester.takeException(), isNull);

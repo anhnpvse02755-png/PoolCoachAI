@@ -12,7 +12,6 @@ class PcEmptyState extends StatelessWidget {
     required this.title,
     required this.body,
     this.action,
-    this.compact = false,
     super.key,
   });
 
@@ -26,9 +25,6 @@ class PcEmptyState extends StatelessWidget {
   /// thường không có việc gì để người dùng bấm.
   final Widget? action;
 
-  /// Chỗ hẹp: bỏ biểu tượng và tiêu đề, chỉ còn câu thân.
-  final bool compact;
-
   @override
   Widget build(BuildContext context) {
     // Cuộn được: máy ngang mà bàn phím mở thì chỗ còn lại thấp hơn nội dung.
@@ -38,20 +34,18 @@ class PcEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!compact) ...[
-              Icon(icon, size: 44, color: AppColors.textDisabled),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
+            Icon(icon, size: 44, color: AppColors.textDisabled),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               body,
               textAlign: TextAlign.center,

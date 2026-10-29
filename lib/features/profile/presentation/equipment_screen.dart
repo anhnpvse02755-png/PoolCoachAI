@@ -5,7 +5,6 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
@@ -27,6 +26,17 @@ class EquipmentScreen extends ConsumerStatefulWidget {
 
 class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   bool _saving = false;
+
+  /// Nút Thêm cơ cao theo cỡ chữ: đo sau khi dựng thay vì đoán hằng số.
+  final _addFabKey = GlobalKey();
+  double _addFabHeight = 56;
+
+  void _measureAddFab() {
+    final height = _addFabKey.currentContext?.size?.height;
+    if (height != null && height != _addFabHeight && mounted) {
+      setState(() => _addFabHeight = height);
+    }
+  }
 
   Future<void> _requestMaintenanceNotifications() async {
     final service = ref.read(notificationServiceProvider);
@@ -459,6 +469,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureAddFab());
     final equipmentAsync = ref.watch(cueEquipmentProvider);
     final sessionsAsync = ref.watch(timerSessionsProvider);
     final matches = ref.watch(matchesProvider).value ?? const <PoolMatch>[];
@@ -488,6 +499,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
             right: 16,
             bottom: 16 + PcFabInset.of(context),
             child: FloatingActionButton.extended(
+              key: _addFabKey,
               heroTag: 'equipment-add',
               onPressed: _saving ? null : () => _editCue(),
               icon: const Icon(Icons.add),
@@ -538,26 +550,20 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
           sliver: SliverToBoxAdapter(child: _maintenanceReminderCard()),
         ),
         if (cues.isEmpty)
-          // Có thân cuộn: vùng bị chặn ở trên hai nút nổi (đệm đáy). Chữ lớn
-          // mà vùng ấy không đủ chỗ cho cả khối thì chỉ giữ câu chính, thay
-          // vì để khối tràn xuống dưới nút Thêm cơ.
+          // Cao tự nhiên: vừa chỗ thì khối nằm giữa, không thì cả danh sách
+          // cuộn. Đệm đáy chừa chỗ cho cả hai nút nổi ở cỡ chữ hiện tại.
           SliverFillRemaining(
+            hasScrollBody: false,
             child: Padding(
-              padding: EdgeInsets.only(bottom: padding.bottom),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = MediaQuery.textScalerOf(context).scale(1);
-                  // Biểu tượng + tiêu đề + hai dòng thân + đệm của khối đủ.
-                  final fullHeight =
-                      44 + AppSpacing.md + 15 * 1.4 * scale + AppSpacing.sm +
-                      13 * 1.5 * 2 * scale + 2 * AppSpacing.xxl;
-                  return PcEmptyState(
-                    icon: Icons.sports,
-                    title: Vi.equipmentTitle,
-                    body: Vi.equipmentEmpty,
-                    compact: constraints.maxHeight < fullHeight,
-                  );
-                },
+              padding: EdgeInsets.only(
+                bottom: 16 + PcFabInset.of(context) + _addFabHeight + 8,
+              ),
+              child: const Center(
+                child: PcEmptyState(
+                  icon: Icons.sports,
+                  title: Vi.equipmentTitle,
+                  body: Vi.equipmentEmpty,
+                ),
               ),
             ),
           )
