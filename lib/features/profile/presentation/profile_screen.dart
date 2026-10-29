@@ -10,6 +10,7 @@ import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
@@ -142,11 +143,11 @@ class ProfileScreen extends ConsumerWidget {
       title: Vi.profileTitle,
       body: Column(
         children: [
-          if (unsyncable > 0) _UnsyncableNotice(count: unsyncable),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
+                if (unsyncable > 0) _UnsyncableNotice(count: unsyncable),
                 Text(Vi.profileSignedInAs(name)),
                 const SizedBox(height: AppSpacing.md),
                 const RankCard(),
@@ -217,16 +218,13 @@ class _UnsyncableNotice extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      margin: const EdgeInsets.all(AppSpacing.md),
-      child: ListTile(
-        leading: const Icon(Icons.warning_amber_outlined),
-        title: Text(Vi.unsyncableTitle(count)),
-        subtitle: const Text(Vi.unsyncableBody),
-        isThreeLine: true,
-        trailing: TextButton(
-          onPressed: () => _discard(context, ref),
-          child: const Text(Vi.unsyncableDiscard),
-        ),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: PcActionTile(
+        icon: const Icon(Icons.warning_amber_outlined),
+        title: Vi.unsyncableTitle(count),
+        body: Vi.unsyncableBody,
+        actionLabel: Vi.unsyncableDiscard,
+        onAction: () => _discard(context, ref),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
@@ -570,46 +571,13 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         ),
       );
     }
-    final enable = TextButton(
-      onPressed: _requestMaintenanceNotifications,
-      child: const Text(Vi.equipmentReminderEnable),
-    );
     return Card(
-      child: LayoutBuilder(
-        builder: (context, box) {
-          // Quy tắc theo bề rộng, không đo chữ (font nạp muộn làm số đo cũ):
-          // hàng chỉ khi cột chữ, sau biểu tượng và nút, còn ít nhất 11 ký
-          // tự cỡ 12 sp theo cỡ chữ người dùng. Hẹp hơn thì chữ bị bóp từng
-          // từ một dòng, nên nút xuống dưới chữ.
-          final scaler = MediaQuery.textScalerOf(context);
-          const iconSlot = 56.0;
-          const buttonPadding = 12.0;
-          final buttonWidth =
-              scaler.scale(14) * Vi.equipmentReminderEnable.length * 0.5 +
-              buttonPadding * 2;
-          final textWidth = box.maxWidth - iconSlot - buttonWidth;
-          if (textWidth >= scaler.scale(12) * 11) {
-            return ListTile(
-              leading: icon,
-              title: title,
-              subtitle: Text(message),
-              trailing: enable,
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ListTile(leading: icon, title: title, subtitle: Text(message)),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8, bottom: 8),
-                  child: enable,
-                ),
-              ),
-            ],
-          );
-        },
+      child: PcActionTile(
+        icon: icon,
+        title: Vi.equipmentReminderTitle,
+        body: message,
+        actionLabel: Vi.equipmentReminderEnable,
+        onAction: _requestMaintenanceNotifications,
       ),
     );
   }
