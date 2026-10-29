@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 /// Hàng thông báo có một nút hành động: biểu tượng, tiêu đề, chữ giải thích
-/// và nút chữ.
+/// và nút tô (tonal).
 ///
 /// Nút nằm cùng hàng với chữ khi cột chữ còn đủ rộng, ngược lại nút xuống
 /// dưới chữ. Bố cục đo nút thật lúc dàn trang (nên chạy lại khi font nạp
@@ -58,7 +58,14 @@ class PcActionTile extends StatelessWidget {
       chrome: _padding + _iconWidth + _iconGap,
       minTextWidth: scaler.scale(12) * 11,
       content: content,
-      button: TextButton(onPressed: onAction, child: Text(actionLabel)),
+      button: FilledButton.tonal(
+        onPressed: onAction,
+        // Đệm ngang gọn như nút chữ cũ để cột chữ giữ nguyên bề rộng.
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        child: Text(actionLabel),
+      ),
     );
   }
 }

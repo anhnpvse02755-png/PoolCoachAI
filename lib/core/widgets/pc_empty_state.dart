@@ -12,6 +12,7 @@ class PcEmptyState extends StatelessWidget {
     required this.title,
     required this.body,
     this.action,
+    this.compact = false,
     super.key,
   });
 
@@ -25,17 +26,23 @@ class PcEmptyState extends StatelessWidget {
   /// thường không có việc gì để người dùng bấm.
   final Widget? action;
 
+  /// Gọn: bỏ biểu tượng và thu đệm, khi chỗ còn lại quá thấp để chữ khỏi bị
+  /// nút nổi che.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     // Cuộn được: máy ngang mà bàn phím mở thì chỗ còn lại thấp hơn nội dung.
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
+        padding: EdgeInsets.all(compact ? AppSpacing.lg : AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 44, color: AppColors.textDisabled),
-            const SizedBox(height: AppSpacing.md),
+            if (!compact) ...[
+              Icon(icon, size: 44, color: AppColors.textDisabled),
+              const SizedBox(height: AppSpacing.md),
+            ],
             Text(
               title,
               textAlign: TextAlign.center,

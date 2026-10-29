@@ -193,6 +193,31 @@ void main() {
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
   });
 
+  testWidgets('x1.5 ở 360x640: huy hiệu nằm trọn trong thanh tiêu đề và màn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640), textScale: 1.5);
+    await add(1, past);
+    await add(2, past.subtract(const Duration(minutes: 5)));
+    await open(tester);
+    final appBar = tester.getRect(find.byType(AppBar));
+    final badge = tester.getRect(
+      find
+          .ancestor(of: find.text('2'), matching: find.byType(DecoratedBox))
+          .first,
+    );
+    expect(badge.width, greaterThan(0));
+    expect(
+      appBar.contains(badge.topLeft) && appBar.contains(badge.bottomRight),
+      isTrue,
+      reason: 'huy hiệu $badge phải nằm trong thanh tiêu đề $appBar',
+    );
+    expect(
+      Offset.zero & const Size(360, 640),
+      predicate<Rect>((s) => s.contains(badge.topLeft) && s.contains(badge.bottomRight)),
+    );
+  });
+
   testWidgets('chạm chuông mở màn Thông báo', (tester) async {
     await open(tester);
     await tester.tap(find.byType(IconButton));

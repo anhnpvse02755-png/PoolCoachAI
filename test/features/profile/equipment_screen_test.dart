@@ -604,6 +604,25 @@ void main() {
         expect(text.overlaps(coachFab), isFalse, reason: 'đè nút Coach');
         expect(tester.takeException(), isNull);
       });
+      testWidgets('chưa có cơ ${c.name}: ở đầu danh sách chữ trống cũng '
+          'không đè nút Thêm cơ', (tester) async {
+        await openWithReminder(
+          tester,
+          textScale: c.scale,
+          cues: 0,
+          size: c.size,
+          navHeight: 80,
+        );
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        expect(position.pixels, 0);
+        final text = tester.getRect(find.text(Vi.equipmentEmpty));
+        final addFab = tester.getRect(find.byType(FloatingActionButton));
+        expect(text.height, greaterThan(0));
+        expect(text.overlaps(addFab), isFalse, reason: 'đè nút Thêm cơ');
+        expect(tester.takeException(), isNull);
+      });
     }
 
     testWidgets('chưa có cơ: trạng thái trống nằm giữa phần còn lại dưới thẻ, '

@@ -31,6 +31,9 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   final _addFabKey = GlobalKey();
   double _addFabHeight = 56;
 
+  /// Chiều cao gần đúng của khối trống đầy đủ (biểu tượng, tiêu đề, 2 dòng).
+  static const _emptyBlockHeight = 150.0;
+
   void _measureAddFab() {
     final height = _addFabKey.currentContext?.size?.height;
     if (height != null && height != _addFabHeight && mounted) {
@@ -551,21 +554,30 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         ),
         if (cues.isEmpty)
           // Cao tự nhiên: vừa chỗ thì khối nằm giữa, không thì cả danh sách
-          // cuộn. Đệm đáy chừa chỗ cho cả hai nút nổi ở cỡ chữ hiện tại.
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: 16 + PcFabInset.of(context) + _addFabHeight + 8,
-              ),
-              child: const Center(
-                child: PcEmptyState(
-                  icon: Icons.sports,
-                  title: Vi.equipmentTitle,
-                  body: Vi.equipmentEmpty,
+          // cuộn. Đệm đáy chừa chỗ cho cả hai nút nổi ở cỡ chữ hiện tại; chỗ
+          // quá thấp (chữ lớn, thẻ nhắc cao) thì dùng dạng gọn, không biểu
+          // tượng, để chữ nằm trên nút Thêm cơ ngay từ đầu danh sách.
+          SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final reserve = 16 + PcFabInset.of(context) + _addFabHeight + 8;
+              final free = constraints.remainingPaintExtent - reserve;
+              final compact =
+                  free < MediaQuery.textScalerOf(context).scale(_emptyBlockHeight);
+              return SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: reserve),
+                  child: Center(
+                    child: PcEmptyState(
+                      icon: Icons.sports,
+                      title: Vi.equipmentTitle,
+                      body: Vi.equipmentEmpty,
+                      compact: compact,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           )
         else
           SliverPadding(
