@@ -30,9 +30,16 @@ class NotificationPlatform {
 
   String? get permission => _permission;
 
-  /// Đọc quyền hiện tại của hệ điều hành vào [permission].
+  /// Đọc quyền hiện tại của hệ điều hành vào [permission]. Gọi lại được: quyền
+  /// bị tắt trong Cài đặt thì 'granted' thành 'denied'.
   Future<void> loadPermission() async {
-    if (await scheduler!.hasPermission()) _permission = 'granted';
+    final scheduler = this.scheduler;
+    if (scheduler == null) return;
+    if (await scheduler.hasPermission()) {
+      _permission = 'granted';
+    } else if (_permission == 'granted') {
+      _permission = 'denied';
+    }
   }
 
   Future<String?> requestPermission() async {

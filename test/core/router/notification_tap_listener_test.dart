@@ -39,6 +39,22 @@ class _Platform extends NotificationPlatform {
   Future<String?> takeLaunchPayload() async => launch;
 }
 
+/// Dịch vụ chỉ đếm số lần được báo app quay lại.
+class _ResumeCountingService extends NotificationService {
+  _ResumeCountingService(AppDatabase db)
+    : super(
+        db: db,
+        auth: FakeAuthRepository(),
+        now: () => testToday,
+        platform: _Platform(),
+      );
+
+  int resumes = 0;
+
+  @override
+  Future<void> resumed() async => resumes++;
+}
+
 void main() {
   test('mỗi loại mở đúng màn', () {
     final r = recommendationKey(
@@ -180,6 +196,44 @@ void main() {
       expect(path(), Routes.home);
       service.dispose();
     });
+  });
+
+  testWidgets('quay lại app: báo dịch vụ (đọc lại quyền, đồng bộ)', (
+    tester,
+  ) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final service = _ResumeCountingService(db);
+    addTearDown(service.dispose);
+    final router = createAppRouter(auth: signedInGate());
+    addTearDown(router.dispose);
+    final container = ProviderContainer(
+      parent: testContainer(),
+      overrides: [notificationServiceProvider.overrideWithValue(service)],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: NotificationTapListener(
+          router: router,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(service.resumes, 0);
+    for (final state in const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    expect(service.resumes, 1);
   });
 
   testWidgets('PoolCoachApp tự dựng router thì gắn listener chạm thông báo', (

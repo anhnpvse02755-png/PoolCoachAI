@@ -320,6 +320,27 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('bật quyền trong cài đặt rồi quay lại: thẻ quyền cập nhật', (
+      tester,
+    ) async {
+      await open(tester, withService());
+      expect(find.text(Vi.notificationsPermissionPrompt), findsOneWidget);
+
+      platform.value = 'granted';
+      for (final state in const [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text(Vi.notificationsPermissionGranted), findsOneWidget);
+    });
+
     testWidgets('denied state explains how to re-enable, without button', (
       tester,
     ) async {

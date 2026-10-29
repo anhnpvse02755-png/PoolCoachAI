@@ -585,6 +585,36 @@ void main() {
       expect(scheduler.scheduled, hasLength(1));
     });
 
+    test('quyền bị tắt trong Cài đặt: lần đồng bộ sau thấy ngay', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final reminders = scheduling()..start();
+      addTearDown(reminders.dispose);
+      await pumpEventQueue();
+      expect((await logRows()).where((r) => r.at.isAfter(now)), isNotEmpty);
+
+      scheduler.granted = false;
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      expect(reminders.permission, 'denied');
+      expect((await logRows()).where((r) => r.at.isAfter(now)), isEmpty);
+    });
+
+    test('quay lại app: kiểm lại quyền rồi đồng bộ', () async {
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final reminders = scheduling()..start();
+      addTearDown(reminders.dispose);
+      await pumpEventQueue();
+      expect(scheduler.scheduled, isEmpty);
+
+      // Người dùng bật quyền trong Cài đặt rồi quay lại app.
+      scheduler.granted = true;
+      await reminders.resumed();
+      await pumpEventQueue();
+      expect(reminders.permission, 'granted');
+      expect(scheduler.scheduled, hasLength(2));
+    });
+
     test('does not touch the OS before preferences are loaded', () async {
       scheduler.granted = true;
       await saveSlot(time: '18:00');

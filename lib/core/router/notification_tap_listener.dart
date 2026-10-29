@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +25,9 @@ String? notificationRoute(NotificationTap tap) => switch (tap.kind) {
 ///
 /// Dịch vụ giữ lần chạm tới trước khi widget này có mặt (khởi động lạnh) và
 /// giao ngay khi [NotificationService.setTapHandler] được gọi.
+///
+/// Widget này sống suốt đời app, nên cũng báo dịch vụ mỗi lần app quay lại
+/// từ nền ([NotificationService.resumed]): quyền có thể đã đổi trong Cài đặt.
 class NotificationTapListener extends ConsumerStatefulWidget {
   const NotificationTapListener({
     required this.router,
@@ -41,16 +46,21 @@ class NotificationTapListener extends ConsumerStatefulWidget {
 class _NotificationTapListenerState
     extends ConsumerState<NotificationTapListener> {
   late final NotificationService _service;
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     _service = ref.read(notificationServiceProvider);
     _service.setTapHandler(_onTap);
+    _lifecycle = AppLifecycleListener(
+      onResume: () => unawaited(_service.resumed()),
+    );
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _service.setTapHandler(null);
     super.dispose();
   }

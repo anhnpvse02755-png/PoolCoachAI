@@ -181,7 +181,6 @@ class NotificationService {
 
   NotificationScheduler? get _scheduler => _platform.scheduler;
 
-  late final Future<void> _permissionLoaded = _platform.loadPermission();
   Future<void> _syncChain = Future.value();
 
   /// Lịch hệ điều hành do bản cũ đặt (thiếu thứ bản này cần) thì lần đồng bộ
@@ -270,7 +269,13 @@ class NotificationService {
     _syncQueued = true;
     _syncChain = _syncChain.then((_) async {
       _syncQueued = false;
-      await _permissionLoaded;
+      // Đọc lại quyền mỗi lần: người dùng có thể tắt nó trong Cài đặt bất cứ
+      // lúc nào, và nhật ký không được giữ mục tương lai khi không có quyền.
+      try {
+        await _platform.loadPermission();
+      } on Object {
+        // Đọc lỗi thì giữ quyền đã biết.
+      }
       if (_disposed) return;
       final userId = _userId;
       if (userId == null) {
@@ -320,6 +325,19 @@ class NotificationService {
         userId: userId,
       ).syncPlanned(const [], now: _now().toLocal(), cancelled: pending);
     }).catchError((Object _) {});
+  }
+
+  /// App vừa quay lại từ nền: quyền có thể đã đổi trong Cài đặt, và giờ có
+  /// thể đã trôi qua lúc máy ngủ.
+  /// Đọc lại quyền, rồi đồng bộ (Android/iOS) hoặc xem cái đã tới giờ (web).
+  Future<void> resumed() async {
+    if (!_started || _disposed || !_platform.isSupported) return;
+    try {
+      await _platform.loadPermission();
+    } on Object {
+      // Đọc lỗi thì giữ quyền đã biết.
+    }
+    checkNow();
   }
 
   Future<String?> requestPermission() async {

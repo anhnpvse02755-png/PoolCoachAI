@@ -34,6 +34,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// Mục chưa đọc lúc mở màn: in đậm suốt lượt xem này dù đã đánh dấu đọc.
   final _bold = <int>{};
 
+  /// Quay lại từ Cài đặt (bật/tắt quyền ở đó): đọc lại quyền và vẽ lại thẻ.
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       (_, next) => _markSeen(next),
       fireImmediately: true,
     );
+    _lifecycle = AppLifecycleListener(onResume: _resumed);
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _resumed() async {
+    await ref.read(notificationServiceProvider).resumed();
+    if (mounted) setState(() {});
   }
 
   /// Chỉ đọc nhật ký khi đã có giá trị và không đang tải lại: nhật ký cũ của
