@@ -522,28 +522,26 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         }
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
-    return Column(
+    // Thẻ nhắc nằm trong vùng cuộn: ở chữ lớn nó cao hơn màn hình, và nếu
+    // đứng yên trên danh sách thì danh sách bị ép về 0, không cuộn tới được.
+    return ListView(
+      padding: pcScrollPadding(
+        context,
+        const EdgeInsets.fromLTRB(12, 8, 12, 88),
+      ),
       children: [
         _maintenanceReminderCard(),
-        Expanded(
-          child: cues.isEmpty
-              ? const Center(
-                  child: PcEmptyState(
-                    icon: Icons.sports,
-                    title: Vi.equipmentTitle,
-                    body: Vi.equipmentEmpty,
-                  ),
-                )
-              : ListView(
-                  padding: pcScrollPadding(
-                    context,
-                    const EdgeInsets.fromLTRB(12, 8, 12, 88),
-                  ),
-                  children: sortedCues
-                      .map((cue) => _cueCard(cue, now, sessions, winRates))
-                      .toList(growable: false),
-                ),
-        ),
+        if (cues.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: PcEmptyState(
+              icon: Icons.sports,
+              title: Vi.equipmentTitle,
+              body: Vi.equipmentEmpty,
+            ),
+          )
+        else
+          ...sortedCues.map((cue) => _cueCard(cue, now, sessions, winRates)),
       ],
     );
   }
@@ -557,20 +555,61 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         : permission == 'denied'
         ? Vi.equipmentReminderDenied
         : Vi.equipmentReminderPrompt;
+    const icon = Icon(Icons.notifications_active_outlined);
+    const title = Text(Vi.equipmentReminderTitle);
+    final canEnable = permission != 'granted' && permission != 'denied';
+    if (!canEnable) {
+      return Card(
+        child: ListTile(
+          leading: icon,
+          title: title,
+          subtitle: Text(message),
+          trailing: permission == 'granted'
+              ? const Icon(Icons.check_circle_outline)
+              : null,
+        ),
+      );
+    }
+    final enable = TextButton(
+      onPressed: _requestMaintenanceNotifications,
+      child: const Text(Vi.equipmentReminderEnable),
+    );
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: ListTile(
-        leading: const Icon(Icons.notifications_active_outlined),
-        title: const Text(Vi.equipmentReminderTitle),
-        subtitle: Text(message),
-        trailing: permission != 'granted' && permission != 'denied'
-            ? TextButton(
-                onPressed: _requestMaintenanceNotifications,
-                child: const Text(Vi.equipmentReminderEnable),
-              )
-            : permission == 'granted'
-            ? const Icon(Icons.check_circle_outline)
-            : null,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // Quy tắc theo bề rộng, không đo chữ (font nạp muộn làm số đo cũ):
+          // hàng chỉ khi cột chữ, sau biểu tượng và nút, còn ít nhất 11 ký
+          // tự cỡ 12 sp theo cỡ chữ người dùng. Hẹp hơn thì chữ bị bóp từng
+          // từ một dòng, nên nút xuống dưới chữ.
+          final scaler = MediaQuery.textScalerOf(context);
+          const iconSlot = 56.0;
+          const buttonPadding = 12.0;
+          final buttonWidth =
+              scaler.scale(14) * Vi.equipmentReminderEnable.length * 0.5 +
+              buttonPadding * 2;
+          final textWidth = box.maxWidth - iconSlot - buttonWidth;
+          if (textWidth >= scaler.scale(12) * 11) {
+            return ListTile(
+              leading: icon,
+              title: title,
+              subtitle: Text(message),
+              trailing: enable,
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(leading: icon, title: title, subtitle: Text(message)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8, bottom: 8),
+                  child: enable,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
