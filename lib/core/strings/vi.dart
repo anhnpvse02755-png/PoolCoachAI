@@ -584,13 +584,17 @@ abstract final class Vi {
   static const equipmentNotificationTitle = 'Đến lịch bảo dưỡng đầu cơ';
   static String equipmentNotificationBody(String cueName, int daysBefore) =>
       '$cueName: lịch bảo dưỡng ${daysBefore == 0 ? 'hôm nay' : 'sau $daysBefore ngày'}.';
-  static const equipmentReminderEnabled =
-      'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
+  static String equipmentReminderEnabled({required bool inBackground}) =>
+      inBackground
+      ? 'Điện thoại sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó, kể cả khi ứng dụng đang đóng.'
+      : 'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
   static const equipmentReminderDenied =
       'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
   static const equipmentReminderEnable = 'Bật thông báo';
-  static const equipmentReminderPrompt =
-      'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó. Chỉ hoạt động khi ứng dụng đang mở.';
+  static String equipmentReminderPrompt({required bool inBackground}) =>
+      inBackground
+      ? 'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó, kể cả khi ứng dụng đang đóng.'
+      : 'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó. Chỉ hoạt động khi ứng dụng đang mở.';
   static const equipmentPracticeTime = 'Thời gian tập với cơ';
   static const equipmentLastUsed = 'Lần dùng gần nhất';
   static const equipmentNoRecordedPractice = 'Chưa có buổi tập ghi với cơ này.';
@@ -697,11 +701,15 @@ abstract final class Vi {
   static const notificationsPermissionDenied =
       'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt của thiết bị hoặc trình duyệt.';
   static const notificationsPermissionPrompt =
-      'Bật thông báo để nhận nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
+      'Bật thông báo để nhận gợi ý tập mới, nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
   static const notificationsPermissionUnsupported =
       'Thiết bị hoặc trình duyệt này không hỗ trợ thông báo.';
-  static const notificationsWebOnlyWhileOpen =
-      'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở.';
+  static const notificationsBackgroundNote =
+      'Trên điện thoại, thông báo vẫn đến khi ứng dụng đang đóng.';
+  static const notificationsRecommendationLimit =
+      'Gợi ý tập mới được tính từ dữ liệu trên máy này lúc ứng dụng mở lần cuối. Nếu bạn tập trên máy khác, thông báo có thể chưa theo kịp.';
+  static String get notificationsWebOnlyWhileOpen =>
+      'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở. Gợi ý tập mới chỉ hiện nếu trang đã mở từ trước ${recommendationReminderHour.toString().padLeft(2, '0')}:00.';
 
   // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
   //

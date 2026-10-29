@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/router/notification_tap_listener.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 import 'package:poolcoachai/core/widgets/pc_rebuild_at.dart';
@@ -186,40 +187,48 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ListTile(
-            leading: Icon(
-              granted
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_none,
+          if (granted || denied)
+            ListTile(
+              leading: Icon(
+                granted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_none,
+              ),
+              title: const Text(Vi.notificationsPermissionTitle),
+              subtitle: Text(
+                granted
+                    ? Vi.notificationsPermissionGranted
+                    : Vi.notificationsPermissionDenied,
+              ),
+              trailing: granted
+                  ? const Icon(Icons.check_circle_outline)
+                  : null,
+            )
+          else
+            // Nút xuống dưới chữ khi cột chữ hẹp (màn nhỏ, chữ lớn).
+            PcActionTile(
+              icon: const Icon(Icons.notifications_none),
+              title: Vi.notificationsPermissionTitle,
+              body: Vi.notificationsPermissionPrompt,
+              actionLabel: Vi.equipmentReminderEnable,
+              onAction: _enable,
             ),
-            title: const Text(Vi.notificationsPermissionTitle),
-            subtitle: Text(
-              granted
-                  ? Vi.notificationsPermissionGranted
-                  : denied
-                  ? Vi.notificationsPermissionDenied
-                  : Vi.notificationsPermissionPrompt,
-            ),
-            trailing: granted
-                ? const Icon(Icons.check_circle_outline)
-                : denied
-                ? null
-                : TextButton(
-                    onPressed: _enable,
-                    child: const Text(Vi.equipmentReminderEnable),
-                  ),
-          ),
-          if (!service.schedulesInBackground)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
+          for (final note in service.schedulesInBackground
+              ? const [
+                  Vi.notificationsBackgroundNote,
+                  Vi.notificationsRecommendationLimit,
+                ]
+              : [Vi.notificationsWebOnlyWhileOpen])
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 0,
                 AppSpacing.md,
                 AppSpacing.sm,
               ),
               child: Text(
-                Vi.notificationsWebOnlyWhileOpen,
-                style: TextStyle(color: AppColors.textMuted),
+                note,
+                style: const TextStyle(color: AppColors.textMuted),
               ),
             ),
         ],

@@ -19,6 +19,7 @@ import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
@@ -399,6 +400,7 @@ void main() {
       WidgetTester tester, {
       required double textScale,
       int cues = 6,
+      bool background = false,
     }) async {
       applyScreen(tester, const Size(360, 640), textScale: textScale);
       final fontBytes = File('test/fixtures/fonts/roboto-regular.ttf')
@@ -429,7 +431,9 @@ void main() {
               db: ref.watch(appDatabaseProvider),
               auth: ref.watch(authRepositoryProvider),
               now: ref.watch(nowProvider),
-              platform: _PromptPlatform(),
+              platform: _PromptPlatform(
+                scheduler: background ? _IdleScheduler() : null,
+              ),
             ),
           ),
         ],
@@ -453,7 +457,7 @@ void main() {
     testWidgets('x1.5: cột chữ của thẻ không bị bóp từng từ', (tester) async {
       await openWithReminder(tester, textScale: 1.5);
       final textWidth = tester
-          .getSize(find.text(Vi.equipmentReminderPrompt))
+          .getSize(find.text(Vi.equipmentReminderPrompt(inBackground: false)))
           .width;
       expect(textWidth, greaterThanOrEqualTo(12 * 1.5 * 11));
       expect(tester.takeException(), isNull);
@@ -484,9 +488,20 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('điện thoại (có lịch nền): thẻ nhắc nói vẫn đến khi ứng dụng '
+        'đóng, x1.5 đủ chữ không tràn', (tester) async {
+      await openWithReminder(tester, textScale: 1.5, background: true);
+      expect(
+        find.text(Vi.equipmentReminderPrompt(inBackground: true)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Chỉ hoạt động khi'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('x1.0: nút nằm cùng hàng với chữ như cũ', (tester) async {
       await openWithReminder(tester, textScale: 1.0, cues: 1);
-      final text = tester.getRect(find.text(Vi.equipmentReminderPrompt));
+      final text = tester.getRect(find.text(Vi.equipmentReminderPrompt(inBackground: false)));
       final button = tester.getRect(find.text(Vi.equipmentReminderEnable));
       expect(
         button.top,
@@ -516,8 +531,10 @@ const _family = 'RobotoEquipment';
 
 /// Trình duyệt giả: hỗ trợ thông báo, chưa được cấp quyền.
 class _PromptPlatform extends NotificationPlatform {
+  _PromptPlatform({this.scheduler});
+
   @override
-  NotificationScheduler? get scheduler => null;
+  final NotificationScheduler? scheduler;
 
   @override
   bool get isSupported => true;
@@ -527,4 +544,31 @@ class _PromptPlatform extends NotificationPlatform {
 
   @override
   Future<String?> requestPermission() async => 'granted';
+}
+
+/// Bộ đặt lịch giả: chỉ cần có mặt để nền tảng đặt lịch được ở nền.
+class _IdleScheduler implements NotificationScheduler {
+  @override
+  Future<bool> hasPermission() async => false;
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<Set<int>> pendingIds() async => {};
+
+  @override
+  Future<void> schedule(PlannedNotification notification) async {}
+
+  @override
+  Future<void> cancel(int id) async {}
+
+  @override
+  Future<void> cancelAll() async {}
+
+  @override
+  set onTap(void Function(String payload)? handler) {}
+
+  @override
+  Future<String?> launchPayload() async => null;
 }

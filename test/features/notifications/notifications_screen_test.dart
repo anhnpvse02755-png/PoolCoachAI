@@ -35,8 +35,9 @@ class _Platform extends NotificationPlatform {
   String value = 'default';
   int requests = 0;
 
+  /// Có bộ đặt lịch là điện thoại; không có là trình duyệt.
   @override
-  NotificationScheduler? get scheduler => null;
+  NotificationScheduler? scheduler;
 
   @override
   bool get isSupported => true;
@@ -268,6 +269,57 @@ void main() {
       expect(find.text(Vi.equipmentReminderEnable), findsNothing);
     });
 
+    Future<void> openNarrow(WidgetTester tester) async {
+      applyScreen(tester, const Size(360, 640), textScale: 1.5);
+      final container = withService();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: NotificationsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('web: ghi chú chỉ khi đang mở, không có ghi chú nền', (
+      tester,
+    ) async {
+      await open(tester, withService());
+      expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsOneWidget);
+      expect(find.text(Vi.notificationsBackgroundNote), findsNothing);
+      expect(find.text(Vi.notificationsRecommendationLimit), findsNothing);
+      expect(
+        Vi.notificationsWebOnlyWhileOpen,
+        contains('${recommendationReminderHour.toString().padLeft(2, '0')}:00'),
+      );
+    });
+
+    testWidgets('điện thoại: ghi chú nền và giới hạn gợi ý, không có ghi chú '
+        'web', (tester) async {
+      platform.scheduler = _IdleScheduler();
+      await open(tester, withService());
+      expect(find.text(Vi.notificationsBackgroundNote), findsOneWidget);
+      expect(find.text(Vi.notificationsRecommendationLimit), findsOneWidget);
+      expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsNothing);
+    });
+
+    testWidgets('360x640 x1.5 web: ghi chú đủ chữ, không tràn', (tester) async {
+      await openNarrow(tester);
+      expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('360x640 x1.5 điện thoại: hai ghi chú đủ chữ, không tràn', (
+      tester,
+    ) async {
+      platform.scheduler = _IdleScheduler();
+      await openNarrow(tester);
+      expect(find.text(Vi.notificationsBackgroundNote), findsOneWidget);
+      expect(find.text(Vi.notificationsRecommendationLimit), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('denied state explains how to re-enable, without button', (
       tester,
     ) async {
@@ -443,4 +495,31 @@ void main() {
       expect(find.text(Vi.notificationsSentTitle.toUpperCase()), findsOneWidget);
     },
   );
+}
+
+/// Bộ đặt lịch giả: chỉ cần có mặt để nền tảng đặt lịch được ở nền.
+class _IdleScheduler implements NotificationScheduler {
+  @override
+  Future<bool> hasPermission() async => false;
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<Set<int>> pendingIds() async => {};
+
+  @override
+  Future<void> schedule(PlannedNotification notification) async {}
+
+  @override
+  Future<void> cancel(int id) async {}
+
+  @override
+  Future<void> cancelAll() async {}
+
+  @override
+  set onTap(void Function(String payload)? handler) {}
+
+  @override
+  Future<String?> launchPayload() async => null;
 }

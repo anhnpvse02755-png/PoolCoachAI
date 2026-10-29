@@ -55,7 +55,7 @@ void main() {
   final cases = <(String, String, String)>[
     (
       Vi.equipmentReminderTitle,
-      Vi.equipmentReminderPrompt,
+      Vi.equipmentReminderPrompt(inBackground: true),
       Vi.equipmentReminderEnable,
     ),
     (Vi.unsyncableTitle(2), Vi.unsyncableBody, Vi.unsyncableDiscard),
