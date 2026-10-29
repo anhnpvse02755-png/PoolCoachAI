@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -231,9 +232,15 @@ void main() {
       isTrue,
       reason: 'tiêu đề nằm trên chữ rỗng',
     );
-    final style = tester.widget<Text>(empty).style;
-    final context = tester.element(empty);
-    expect(style?.fontWeight, isNot(Theme.of(context).textTheme.titleMedium?.fontWeight));
+    // Kiểu hiệu lực (đã gộp với kiểu kế thừa) phải đúng bodyMedium của theme.
+    final effective = (tester.renderObject<RenderParagraph>(empty).text
+            as TextSpan)
+        .style!;
+    final body = Theme.of(tester.element(empty)).textTheme.bodyMedium!;
+    expect(
+      [effective.fontSize, effective.fontWeight, effective.fontFamily],
+      [body.fontSize, body.fontWeight, body.fontFamily],
+    );
   });
 
   testWidgets('bấm trận đã xong mở phân tích trận', (tester) async {

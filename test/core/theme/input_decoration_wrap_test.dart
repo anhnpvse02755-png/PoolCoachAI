@@ -144,4 +144,41 @@ void main() {
     expect(field.top <= labelRect.top && labelRect.bottom <= field.bottom, isTrue,
         reason: 'nhãn $labelRect lệch khỏi ô $field');
   });
+
+  testWidgets('nhãn Size ngọn đã nổi lên (có giá trị) vẫn hiện đủ, không đè giá trị',
+      (tester) async {
+    applyScreen(tester, phone, textScale: 1.5);
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = dbContainer(db);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: await robotoTheme(tester),
+          home: const EquipmentScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(Vi.equipmentAdd));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('cue-shaft-diameter')));
+    await tester.enterText(find.byKey(const Key('cue-shaft-diameter')), '12.5');
+    await tester.pumpAndSettle();
+
+    final label = find.text(Vi.equipmentShaftDiameter);
+    expect(truncated(tester, label), isFalse);
+    final field = tester.getRect(find.byKey(const Key('cue-shaft-diameter')));
+    final labelRect = tester.getRect(label);
+    final value = tester.getRect(find.descendant(
+      of: find.byKey(const Key('cue-shaft-diameter')),
+      matching: find.byType(EditableText),
+    ));
+    expect(field.top <= labelRect.top && labelRect.bottom <= field.bottom, isTrue,
+        reason: 'nhãn nổi $labelRect lệch khỏi ô $field');
+    expect(labelRect.bottom <= value.top + 1, isTrue,
+        reason: 'nhãn nổi $labelRect đè giá trị $value');
+  });
 }
