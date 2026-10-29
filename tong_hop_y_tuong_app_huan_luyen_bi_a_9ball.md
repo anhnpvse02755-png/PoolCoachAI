@@ -391,7 +391,7 @@ Trạng thái dưới đây là **ảnh chụp mã nguồn và tài liệu trong
 | Play/ghi trận/rack | Có ghi trận, kết quả từng rack, ghi nhận cú đánh thủ công, sửa thông tin trận và xóa trận có xác nhận; trận đồng bộ theo tài khoản, trận đã xóa được đánh dấu và đồng bộ để không hiện lại | Chưa có giải đấu hay Camera/Vision; cần phân biệt dữ liệu người chơi tự ghi với kết quả được xác minh tự động |
 | Statistics | Có tổng hợp buổi tập, thời lượng Drill/Timer, streak, kết quả trận, chỉ số cú đánh/điều bi và biểu đồ số buổi tập/trận theo ngày trong tuần hiện tại | Thời lượng Drill là thời gian màn ghi kết quả mở (không tính app ở nền), không phải đo hoạt động thực tế; không coi hoạt động cùng ngày là quan hệ nhân quả hay đánh giá chạy rack |
 | Equipment/cơ | Có quản lý thông tin cơ, lịch bảo dưỡng, nhắc bảo dưỡng và đồng bộ | Tiếp tục kiểm chứng thông báo trên từng nền tảng |
-| Notifications | Có màn hình và thiết lập thông báo; hỗ trợ nhắc bảo dưỡng, nhắc lịch tập và nhắc giữ streak cục bộ | Chưa có thông báo khi có recommendation mới từ Coach; chưa có push khi ứng dụng đóng (trên web chỉ hiện khi tab còn mở) |
+| Notifications | Có màn hình và thiết lập thông báo; nhắc bảo dưỡng, nhắc lịch tập, nhắc giữ streak và gợi ý tập mới cục bộ; hộp Đã gửi có số chưa đọc; chạm thông báo mở đúng màn | Chưa có push từ máy chủ khi ứng dụng/tab đã đóng (P6b); trên web chỉ hiện khi tab còn mở |
 | Tài khoản/đồng bộ | Có auth, lưu cục bộ và đồng bộ một số dữ liệu | Cần tiếp tục mở rộng các loại dữ liệu cần đồng bộ; ứng dụng cần giữ trải nghiệm offline |
 | Vision/AI | Có nguyên tắc kiến trúc và hướng thiết kế | Chưa triển khai; cần chốt tiêu chuẩn độ chính xác và bước người chơi xác nhận/sửa trước khi ảnh hưởng dữ liệu đánh giá |
 
