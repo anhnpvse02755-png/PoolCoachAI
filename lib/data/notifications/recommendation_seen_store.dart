@@ -10,6 +10,9 @@ abstract class RecommendationSeenStore {
   Future<SeenRecommendation?> load(String userId);
 
   Future<void> save(String userId, SeenRecommendation seen);
+
+  /// Xoá cặp đã thấy của [userId] (đăng xuất và quên).
+  Future<void> forget(String userId);
 }
 
 /// Lưu bằng shared_preferences (localStorage trên web). Giá trị hỏng hoặc
@@ -56,5 +59,11 @@ class SharedPreferencesRecommendationSeenStore
         'at': seen.at.toIso8601String(),
       }),
     );
+  }
+
+  @override
+  Future<void> forget(String userId) async {
+    final store = await SharedPreferences.getInstance();
+    await store.remove(_key(userId));
   }
 }

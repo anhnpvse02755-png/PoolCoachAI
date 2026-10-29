@@ -35,6 +35,7 @@ import 'package:poolcoachai/domain/timer_session.dart';
 import '../../support/coach_chat_fixtures.dart';
 import '../../support/fake_auth.dart';
 import '../../support/fake_coach_chat.dart';
+import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/test_data.dart';
 
 void main() {
@@ -457,6 +458,7 @@ void main() {
           auth: auth,
           userId: 'u1',
           forgetChatInFlight: container.read(coachChatControllerProvider.notifier).forgetInFlight,
+          recommendationSeen: FakeRecommendationSeenStore(),
         );
 
     Future<List<String>> savedTexts(AppDatabase db, String userId) async =>
@@ -677,6 +679,7 @@ void main() {
         auth: auth,
         userId: 'u2',
         forgetChatInFlight: container.read(coachChatControllerProvider.notifier).forgetInFlight,
+        recommendationSeen: FakeRecommendationSeenStore(),
       );
       await pumpEventQueue();
 

@@ -23,6 +23,22 @@ void main() {
     expect(await store.load('u2'), isNull);
   });
 
+  test('quên một tài khoản: chỉ xoá của người đó', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+    final seen = SeenRecommendation(
+      cat: SkillCategory.bank,
+      drillId: 'd8',
+      at: DateTime(2026, 9, 22, 10),
+    );
+    await store.save('u1', seen);
+    await store.save('u2', seen);
+
+    await store.forget('u1');
+
+    expect(await store.load('u1'), isNull);
+    expect(await store.load('u2'), seen);
+  });
+
   test('giá trị hỏng hoặc nhóm lạ: coi như chưa thấy', () async {
     final store = SharedPreferencesRecommendationSeenStore();
 

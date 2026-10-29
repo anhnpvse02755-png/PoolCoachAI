@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 
 /// Số buổi của [userId] chưa lên server.
@@ -54,12 +55,17 @@ Future<void> discardUnsyncableLogs(AppDatabase db, String userId) async {
 /// Đăng xuất **trước** rồi mới xoá: lượt đồng bộ đang chạy thấy người
 /// dùng đổi thì bỏ kết quả kéo về, nên không dựng lại những dòng vừa xoá.
 ///
+/// [recommendationSeen]: cặp gợi ý người này thấy lần cuối nằm ngoài DB
+/// (shared_preferences), nên được quên riêng. Bắt buộc như
+/// [forgetChatInFlight], để nơi gọi nào cũng xoá nó.
+///
 /// Tự động đăng xuất không bao giờ đi qua đây — nó giữ nguyên mọi thứ.
 Future<void> signOutAndForget({
   required AppDatabase db,
   required AuthRepository auth,
   required String userId,
   required void Function(String userId) forgetChatInFlight,
+  required RecommendationSeenStore recommendationSeen,
 }) async {
   forgetChatInFlight(userId);
   await auth.signOut();
@@ -115,6 +121,13 @@ Future<void> signOutAndForget({
   await (db.delete(
     db.notificationLogRows,
   )..where((t) => t.userId.equals(userId))).go();
+  // Cặp gợi ý đã thấy cũng vậy. Không xoá được thì thôi: dữ liệu luyện tập đã
+  // xoá ở trên, cặp này chỉ quyết định có báo gợi ý mới hay không.
+  try {
+    await recommendationSeen.forget(userId);
+  } on Object {
+    // Bỏ qua.
+  }
 }
 
 /// Dòng hạng và lần kiểm tra đã xong của [userId] chưa lên server. Lần đang

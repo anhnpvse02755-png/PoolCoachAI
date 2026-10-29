@@ -19,4 +19,9 @@ class FakeRecommendationSeenStore implements RecommendationSeenStore {
   Future<void> save(String userId, SeenRecommendation seen) async {
     saved[userId] = seen;
   }
+
+  @override
+  Future<void> forget(String userId) async {
+    saved.remove(userId);
+  }
 }

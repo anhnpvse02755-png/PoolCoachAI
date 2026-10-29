@@ -13,9 +13,12 @@ import 'package:poolcoachai/data/sync/sync_service.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 
 import '../../support/fake_auth.dart';
 import '../../support/fake_directus.dart';
+import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/in_memory_session_store.dart';
 import '../../support/skill_test_fixtures.dart';
 
@@ -256,6 +259,7 @@ void main() {
       auth: auth,
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
 
     final left = await db.select(db.drillLogRows).get();
@@ -323,6 +327,7 @@ void main() {
         auth: auth,
         userId: 'u1',
         forgetChatInFlight: (_) {},
+        recommendationSeen: FakeRecommendationSeenStore(),
       );
       await pumpEventQueue();
       pullGate.complete(); // server trả dữ liệu của người vừa đăng xuất
@@ -409,6 +414,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
 
     expect((await db.select(db.playerRankRows).get()).map((r) => r.userId), [
@@ -488,6 +494,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
 
     expect((await db.select(db.playerGoalRows).get()).map((r) => r.userId), [
@@ -511,6 +518,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
     expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), [
       'u2',
@@ -539,10 +547,34 @@ void main() {
       auth: FakeAuthRepository.signedIn(userId: 'u1'),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
     expect((await db.select(db.notificationLogRows).get()).map((r) => r.userId), [
       'u2',
     ]);
+  });
+
+  test('đăng xuất quên cặp gợi ý đã thấy của người đó, giữ của người khác',
+      () async {
+    final seen = FakeRecommendationSeenStore();
+    for (final user in ['u1', 'u2']) {
+      await seen.save(
+        user,
+        SeenRecommendation(
+          cat: SkillCategory.aiming,
+          drillId: 'd1',
+          at: DateTime(2026, 10, 13, 9),
+        ),
+      );
+    }
+    await signOutAndForget(
+      db: db,
+      auth: FakeAuthRepository.signedIn(userId: 'u1'),
+      userId: 'u1',
+      forgetChatInFlight: (_) {},
+      recommendationSeen: seen,
+    );
+    expect(seen.saved.keys, ['u2']);
   });
 
   test(
@@ -569,6 +601,7 @@ void main() {
         auth: FakeAuthRepository.signedIn(),
         userId: 'u1',
         forgetChatInFlight: (_) {},
+        recommendationSeen: FakeRecommendationSeenStore(),
       );
       expect((await db.select(db.skillTestRows).get()).map((r) => r.id), [
         'st-u2',
@@ -628,6 +661,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(userId: 'u1'),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      recommendationSeen: FakeRecommendationSeenStore(),
     );
     expect((await db.select(db.tournamentRows).get()).map((r) => r.id), [
       't-u2',
