@@ -5,9 +5,11 @@ import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
+import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
@@ -130,6 +132,23 @@ final recommendationSourceProvider = Provider<RecommendationSource?>((ref) {
     seen: seen.requireValue,
   );
 });
+
+/// Nhật ký thông báo của người đang đăng nhập; null khi chưa đăng nhập.
+final notificationLogRepositoryProvider =
+    Provider<NotificationLogRepository?>((ref) {
+      final userId = ref.watch(currentUserIdProvider);
+      if (userId == null) return null;
+      return NotificationLogRepository(
+        ref.watch(appDatabaseProvider),
+        userId: userId,
+      );
+    });
+
+final notificationLogProvider = StreamProvider<List<NotificationLogEntry>>(
+  (ref) =>
+      ref.watch(notificationLogRepositoryProvider)?.watchAll() ??
+      Stream.value(const []),
+);
 
 /// Dịch vụ giữ thông báo của hệ điều hành/trình duyệt khớp với kế hoạch.
 final notificationServiceProvider = Provider<NotificationService>((ref) {

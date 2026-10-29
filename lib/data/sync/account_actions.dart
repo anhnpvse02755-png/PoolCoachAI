@@ -111,6 +111,10 @@ Future<void> signOutAndForget({
   await (db.delete(
     db.coachChatTurnRows,
   )..where((t) => t.userId.equals(userId))).go();
+  // Nhật ký thông báo chỉ nằm trên máy này.
+  await (db.delete(
+    db.notificationLogRows,
+  )..where((t) => t.userId.equals(userId))).go();
 }
 
 /// Dòng hạng và lần kiểm tra đã xong của [userId] chưa lên server. Lần đang

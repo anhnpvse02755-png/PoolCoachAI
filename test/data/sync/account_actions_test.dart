@@ -518,6 +518,33 @@ void main() {
     ]);
   });
 
+  test('đăng xuất xoá nhật ký thông báo của người đó, giữ của người khác', () async {
+    for (final user in ['u1', 'u2']) {
+      await db
+          .into(db.notificationLogRows)
+          .insert(
+            NotificationLogRowsCompanion.insert(
+              userId: user,
+              id: 1,
+              kind: 'streak',
+              key: 'k',
+              at: DateTime(2026, 10, 13, 20),
+              title: 'T',
+              body: 'B',
+            ),
+          );
+    }
+    await signOutAndForget(
+      db: db,
+      auth: FakeAuthRepository.signedIn(userId: 'u1'),
+      userId: 'u1',
+      forgetChatInFlight: (_) {},
+    );
+    expect((await db.select(db.notificationLogRows).get()).map((r) => r.userId), [
+      'u2',
+    ]);
+  });
+
   test(
     'đăng xuất xoá lần kiểm tra kỹ năng của người đó, giữ của người khác',
     () async {

@@ -23,6 +23,7 @@ import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/providers/tournament_providers.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -128,9 +129,15 @@ ProviderContainer testContainer({
   AsyncValue<List<Tournament>>? tournamentsAsync,
   AsyncValue<GoalRecord?>? goalAsync,
   Map<String, TournamentStatus>? forcedTournamentStatus,
+  List<NotificationLogEntry>? notificationLog,
 }) {
   return ProviderContainer(
     overrides: [
+      // Không dựng AppDatabase thật trong widget test: không có kho nhật ký.
+      notificationLogRepositoryProvider.overrideWithValue(null),
+      notificationLogProvider.overrideWith(
+        (ref) => Stream.value(notificationLog ?? const <NotificationLogEntry>[]),
+      ),
       // Cho test chứng minh màn hình dùng trạng thái do provider đưa ra, không
       // tự tính lại: ép trạng thái khác với ngày thật của giải.
       if (forcedTournamentStatus != null)

@@ -30,6 +30,7 @@ void main() {
     expect(await db.select(db.drillLogRows).get(), isEmpty);
     expect(await db.select(db.authSessionRows).get(), isEmpty);
     expect(await db.select(db.skillTestRows).get(), isEmpty);
+    expect(await db.select(db.notificationLogRows).get(), isEmpty);
 
     await db
         .into(db.drillLogRows)
@@ -66,7 +67,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final legacyLog = (await db.select(db.drillLogRows).get()).single;
     expect(legacyLog.id, 'cu');
     expect(legacyLog.durationSec, isNull);
@@ -145,7 +146,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final legacyLog = (await db.select(db.drillLogRows).get()).single;
     expect(legacyLog.id, 'cu');
     expect(legacyLog.durationSec, isNull);
@@ -189,7 +190,7 @@ void main() {
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 16);
+      expect(db.schemaVersion, 17);
       expect((await db.select(db.scheduleSlotRows).get()).single.userId, '');
       expect((await db.select(db.timerSessionRows).get()).single.userId, '');
 
@@ -261,7 +262,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     expect(await db.select(db.skillTestRows).get(), isEmpty);
     final match = (await db.select(db.poolMatchRows).get()).single;
     expect(match.id, 'match-old');
@@ -322,7 +323,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.id, 'cue-v8');
     expect(cue.updatedAt, isNull);
@@ -383,7 +384,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final cue = (await db.select(db.cueEquipmentRows).getSingle());
     expect(cue.shaftDiameterMm, 12.4);
     expect(cue.shaftBrand, isNull);
@@ -422,7 +423,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     expect((await db.select(db.drillLogRows).get()).single.id, 'v10');
     expect((await db.select(db.poolMatchRows).get()).single.isDeleted, isFalse);
     expect(await db.select(db.coachAttemptRows).get(), isEmpty);
@@ -468,7 +469,7 @@ void main() {
       );
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
-      expect(db.schemaVersion, 16);
+      expect(db.schemaVersion, 17);
       final legacyLog = (await db.select(db.drillLogRows).get()).single;
       expect(legacyLog.id, 'v11');
       expect(legacyLog.durationSec, isNull);
@@ -503,7 +504,7 @@ void main() {
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final row = (await db.select(db.playerGoalRows).get()).single;
     expect([row.kind, row.targetRank], ['lenHang', null]);
   });
@@ -541,7 +542,7 @@ void main() {
       );
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
-      expect(db.schemaVersion, 16);
+      expect(db.schemaVersion, 17);
       final kept = (await db.select(db.achievementRows).get()).single;
       expect(
         [kept.id, kept.kind, kept.refId, kept.syncedAt],
@@ -549,7 +550,7 @@ void main() {
       );
       expect(await db.select(db.skillTestRows).get(), isEmpty);
       final version = await db.customSelect('PRAGMA user_version').getSingle();
-      expect(version.read<int>('user_version'), 16);
+      expect(version.read<int>('user_version'), 17);
       await db
           .into(db.skillTestRows)
           .insert(
@@ -594,18 +595,18 @@ void main() {
     );
     final db = AppDatabase.forTesting(executor);
     addTearDown(db.close);
-    expect(db.schemaVersion, 16);
+    expect(db.schemaVersion, 17);
     final m = (await db.select(db.poolMatchRows).get()).single;
     expect([m.id, m.tournamentId, m.roundLabel], ['m12', null, null]);
     final g = (await db.select(db.playerGoalRows).get()).single;
     expect([g.kind, g.tournamentId], ['chuanBiGiai', null]);
     expect(await db.select(db.tournamentRows).get(), isEmpty);
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.read<int>('user_version'), 16);
+    expect(version.read<int>('user_version'), 17);
   });
 
   test(
-    'nâng từ v11 lên v16: trận và mục tiêu ghi được tournament_id',
+    'nâng từ v11 lên v17: trận và mục tiêu ghi được tournament_id',
     () async {
       final executor = NativeDatabase.memory(
         setup: (raw) {
@@ -617,6 +618,7 @@ void main() {
       );
       final db = AppDatabase.forTesting(executor);
       addTearDown(db.close);
+      expect(await db.select(db.notificationLogRows).get(), isEmpty);
       await (db.update(db.poolMatchRows)).write(
         const PoolMatchRowsCompanion(
           tournamentId: Value('t1'),
@@ -643,6 +645,55 @@ void main() {
       );
     },
   );
+
+  test('nâng từ v16 lên v17 thêm bảng nhật ký thông báo, giữ nguyên dữ liệu', () async {
+    final executor = NativeDatabase.memory(
+      setup: (raw) {
+        raw.execute(
+          'CREATE TABLE coach_chat_turn_rows (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, '
+          'user_id TEXT NOT NULL, created_at INTEGER NOT NULL, '
+          'from_player INTEGER NOT NULL CHECK (from_player IN (0, 1)), '
+          'message TEXT NOT NULL, '
+          'insufficient INTEGER NOT NULL DEFAULT 0 CHECK (insufficient IN (0, 1)));',
+        );
+        raw.execute(
+          "INSERT INTO coach_chat_turn_rows (user_id, created_at, from_player, message) VALUES ('u1', 1760400000, 1, 'Chào');",
+        );
+        raw.execute('PRAGMA user_version = 16;');
+      },
+    );
+    final db = AppDatabase.forTesting(executor);
+    addTearDown(db.close);
+    expect(db.schemaVersion, 17);
+    final chat = (await db.select(db.coachChatTurnRows).get()).single;
+    expect([chat.userId, chat.message], ['u1', 'Chào']);
+    expect(await db.select(db.notificationLogRows).get(), isEmpty);
+    final version = await db.customSelect('PRAGMA user_version').getSingle();
+    expect(version.read<int>('user_version'), 17);
+  });
+
+  test('tạo mới ở v17 ghi và đọc được nhật ký thông báo', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    for (final u in ['u1', 'u2']) {
+      await db
+          .into(db.notificationLogRows)
+          .insert(
+            NotificationLogRowsCompanion.insert(
+              userId: u,
+              id: 7,
+              kind: 'recommendation',
+              key: '2026-10-13:aiming:d1',
+              at: DateTime(2026, 10, 13, 8),
+              title: 'Gợi ý',
+              body: 'Tập đi',
+            ),
+          );
+    }
+    final rows = await db.select(db.notificationLogRows).get();
+    expect(rows.map((r) => r.userId).toSet(), {'u1', 'u2'});
+    expect(rows.every((r) => r.readAt == null), isTrue);
+  });
 
   test('tạo mới ở v16 ghi và đọc được giải', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());

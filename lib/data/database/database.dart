@@ -406,6 +406,21 @@ class CoachChatTurnRows extends Table {
   BoolColumn get insufficient => boolean().withDefault(const Constant(false))();
 }
 
+/// Nhật ký thông báo đã lập/đã hiện — chỉ trên máy này, không đồng bộ (spec P6a §4).
+class NotificationLogRows extends Table {
+  TextColumn get userId => text()();
+  IntColumn get id => integer()();
+  TextColumn get kind => text()();
+  TextColumn get key => text()();
+  DateTimeColumn get at => dateTime()();
+  TextColumn get title => text()();
+  TextColumn get body => text()();
+  DateTimeColumn get readAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {userId, id};
+}
+
 // ─── Database ───────────────────────────────────────────────────────────────
 
 @DriftDatabase(
@@ -427,6 +442,7 @@ class CoachChatTurnRows extends Table {
     TournamentRows,
     CoachAttemptRows,
     CoachChatTurnRows,
+    NotificationLogRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -436,7 +452,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -534,6 +550,10 @@ class AppDatabase extends _$AppDatabase {
         if (from >= 4) {
           await m.addColumn(playerGoalRows, playerGoalRows.tournamentId);
         }
+      }
+      if (from < 17) {
+        // Chỉ thêm bảng (spec P6a §4): không đụng dữ liệu cũ.
+        await m.createTable(notificationLogRows);
       }
     },
   );
