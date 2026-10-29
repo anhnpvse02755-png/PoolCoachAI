@@ -27,6 +27,17 @@ class EquipmentScreen extends ConsumerStatefulWidget {
 class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   bool _saving = false;
 
+  /// Nút Thêm cơ cao theo cỡ chữ: đo sau khi dựng thay vì đoán hằng số.
+  final _addFabKey = GlobalKey();
+  double _addFabHeight = 56;
+
+  void _measureAddFab() {
+    final height = _addFabKey.currentContext?.size?.height;
+    if (height != null && height != _addFabHeight && mounted) {
+      setState(() => _addFabHeight = height);
+    }
+  }
+
   Future<void> _requestMaintenanceNotifications() async {
     final service = ref.read(notificationServiceProvider);
     await service.requestPermission();
@@ -458,6 +469,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureAddFab());
     final equipmentAsync = ref.watch(cueEquipmentProvider);
     final sessionsAsync = ref.watch(timerSessionsProvider);
     final matches = ref.watch(matchesProvider).value ?? const <PoolMatch>[];
@@ -487,6 +499,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
             right: 16,
             bottom: 16 + PcFabInset.of(context),
             child: FloatingActionButton.extended(
+              key: _addFabKey,
               heroTag: 'equipment-add',
               onPressed: _saving ? null : () => _editCue(),
               icon: const Icon(Icons.add),
@@ -537,10 +550,14 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
           sliver: SliverToBoxAdapter(child: _maintenanceReminderCard()),
         ),
         if (cues.isEmpty)
+          // Cao tự nhiên: vừa chỗ thì khối nằm giữa, không thì cả danh sách
+          // cuộn. Đệm đáy chừa chỗ cho cả hai nút nổi ở cỡ chữ hiện tại.
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
-              padding: EdgeInsets.only(bottom: padding.bottom),
+              padding: EdgeInsets.only(
+                bottom: 16 + PcFabInset.of(context) + _addFabHeight + 8,
+              ),
               child: const Center(
                 child: PcEmptyState(
                   icon: Icons.sports,

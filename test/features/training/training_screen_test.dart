@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart' show FilterChip;
+import 'package:flutter/material.dart' show FilterChip, ListTile;
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/widgets.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,7 @@ import 'package:poolcoachai/features/training/presentation/schedule_screen.dart'
 import 'package:poolcoachai/features/training/presentation/simulator/simulator_screen.dart';
 import 'package:poolcoachai/features/training/presentation/timer_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/skill_test_fixtures.dart';
 import '../../support/test_data.dart';
 
@@ -34,6 +36,8 @@ void main() {
     WidgetTester tester,
     List<DrillLog> logs, {
     List<SkillTest> skillTests = const [],
+    Size size = const Size(800, 1600),
+    double textScale = 1.0,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -41,9 +45,7 @@ void main() {
     addTearDown(container.dispose);
 
     // Thẻ đầu trang đã nhiều: cao hơn để danh sách bài vẫn nằm trong khung.
-    tester.view.physicalSize = const Size(800, 1600);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+    applyScreen(tester, size, textScale: textScale);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -120,6 +122,49 @@ void main() {
     expect(find.text(Vi.statsPercent(113)), findsOneWidget);
     expect(find.text('9.0'), findsNothing);
   });
+
+  for (final c in [
+    (name: '360x640 x1.0', size: const Size(360, 640), scale: 1.0),
+    (name: '360x640 x1.5', size: const Size(360, 640), scale: 1.5),
+    (name: '320x640 x1.0', size: const Size(320, 640), scale: 1.0),
+  ]) {
+    testWidgets('tỉ lệ đạt đọc được trọn "% mục tiêu" ở ${c.name}', (
+      tester,
+    ) async {
+      await openTraining(
+        tester,
+        [log(id: 'l1', date: DateTime(2026, 9, 20), score: 9)],
+        size: c.size,
+        textScale: c.scale,
+      );
+      // Danh sách dựng lười: cuộn tới khi hàng của bài d1 được dựng.
+      final label = find.text(Vi.statsPercent(113));
+      await tester.scrollUntilVisible(
+        label,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      final tile = find.ancestor(of: label, matching: find.byType(ListTile));
+      final text = tester.getRect(label);
+      final tileRect = tester.getRect(tile);
+      // Chữ nằm trọn trong hàng: bị cắt thì đáy chữ tràn ra ngoài hàng.
+      expect(text.bottom, lessThanOrEqualTo(tileRect.bottom + 0.5));
+      expect(text.top, greaterThanOrEqualTo(tileRect.top - 0.5));
+      expect(text.right, lessThanOrEqualTo(tileRect.right + 0.5));
+      // Nằm ở cột chữ chính (cùng mép trái với tên bài), không trong ô phụ
+      // hẹp bên phải: ở chữ lớn ô ấy cắt mất "mục tiêu".
+      final name = tester.getRect(
+        find.descendant(of: tile, matching: find.byType(Text)).at(1),
+      );
+      expect(text.left, closeTo(name.left, 0.5));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: label, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('lấy lần tập gần nhất, không phải lần tập đầu tiên', (
     tester,
