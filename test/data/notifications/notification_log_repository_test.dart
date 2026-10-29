@@ -66,6 +66,27 @@ void main() {
     expect(await ids(), [2, 9]);
   });
 
+  test('mục đã qua giờ mà bị huỷ khi còn chờ thì xoá; người khác không đụng',
+      () async {
+    final other = NotificationLogRepository(db, userId: 'u2');
+    final past = DateTime(2026, 10, 13, 8);
+    for (final r in [repo, other]) {
+      await r.recordShown(planned(1, past), at: past);
+      await r.recordShown(planned(2, past), at: past);
+    }
+    // Id 3 bị huỷ nhưng vẫn nằm trong kế hoạch (đặt lại): giữ.
+    await repo.syncPlanned(
+      [planned(3, DateTime(2026, 10, 14, 8))],
+      now: now,
+      cancelled: {1, 3},
+    );
+    expect(await ids(), [2, 3]);
+    expect(
+      (await other.watchAll().first).map((e) => e.id).toList()..sort(),
+      [1, 2],
+    );
+  });
+
   test('không đổi gì thì không ghi: luồng theo dõi không phát lại', () async {
     final plan = [planned(1, DateTime(2026, 10, 14, 8))];
     await repo.syncPlanned(plan, now: now);

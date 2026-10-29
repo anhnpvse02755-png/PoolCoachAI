@@ -54,9 +54,14 @@ class NotificationLogRepository {
   /// Đưa nhật ký khớp kế hoạch: xoá mục tương lai không còn trong kế hoạch,
   /// xoá mục quá 30 ngày, thêm mục mới của kế hoạch. Không đổi gì thì không
   /// chạy câu lệnh ghi nào.
+  ///
+  /// [cancelled]: id vừa bị huỷ khỏi lịch hệ điều hành khi còn chờ. Dòng của
+  /// chúng bị xoá dù giờ đã qua: thông báo chưa từng hiện, hộp "Đã gửi"
+  /// không được nhận là đã gửi.
   Future<void> syncPlanned(
     List<PlannedNotification> planned, {
     required DateTime now,
+    Set<int> cancelled = const {},
   }) async {
     final rows = await (_db.select(
       _t,
@@ -66,7 +71,8 @@ class NotificationLogRepository {
     final cutoff = _cutoff(now);
     final staleIds = [
       for (final r in rows)
-        if ((r.at.isAfter(now) && !plannedIds.contains(r.id)) ||
+        if ((!plannedIds.contains(r.id) &&
+                (r.at.isAfter(now) || cancelled.contains(r.id))) ||
             !r.at.isAfter(cutoff))
           r.id,
     ];

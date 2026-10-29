@@ -58,6 +58,20 @@ DateTime? nextDelivery(List<NotificationLogEntry> all, DateTime now) {
   return next;
 }
 
+/// Id các mục đã tới giờ trong chính ngày (giờ máy) của [now].
+///
+/// Android đặt lịch "không chính xác", nên thông báo có thể tới muộn vài
+/// phút. Mục nào trong số này hệ điều hành còn giữ là chưa được giao, nên
+/// không được huỷ. Sang ngày sau mà vẫn còn chờ thì coi như đã lỡ.
+Set<int> dueEarlierToday(List<NotificationLogEntry> log, DateTime now) => {
+  for (final e in log)
+    if (!e.at.isAfter(now) &&
+        e.at.year == now.year &&
+        e.at.month == now.month &&
+        e.at.day == now.day)
+      e.id,
+};
+
 /// Mốc "đã thấy" để so với gợi ý mới: cái mới nhất theo giờ giữa cặp đã hiện
 /// trên Trang chủ và mọi gợi ý đã giao trong nhật ký (khoá hỏng bị bỏ).
 SeenRecommendation? recommendationBaseline({

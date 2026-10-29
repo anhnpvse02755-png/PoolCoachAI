@@ -44,6 +44,17 @@ void main() {
     expect(unreadCount(all, now), 1);
   });
 
+  test('đã tới giờ trong hôm nay: bỏ mục tương lai và mục hôm trước', () {
+    final all = [
+      entry(1, DateTime(2026, 10, 12, 23, 59)), // hôm qua
+      entry(2, DateTime(2026, 10, 13)), // nửa đêm hôm nay
+      entry(3, DateTime(2026, 10, 13, 8)),
+      entry(4, now), // đúng bây giờ
+      entry(5, DateTime(2026, 10, 13, 9, 1)), // tương lai
+    ];
+    expect(dueEarlierToday(all, now), {2, 3, 4});
+  });
+
   test('lần giao kế tiếp là mục tương lai sớm nhất', () {
     final all = [
       entry(1, DateTime(2026, 10, 12, 8)),

@@ -679,6 +679,88 @@ void main() {
       expect(row.at, DateTime(2026, 10, 14, 8));
     });
 
+    // Android đặt lịch "không chính xác": thông báo 08:00 có thể tới muộn vài
+    // phút. Trong lúc đó hệ điều hành vẫn giữ nó là đang chờ.
+    test('quá giờ mà hệ điều hành còn chờ, cùng ngày: giữ, không huỷ', () async {
+      scheduler.granted = true;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+
+      // 08:03, chưa được giao; dữ liệu đổi nên đồng bộ chạy lại.
+      now = DateTime(2026, 10, 14, 8, 3);
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      expect(scheduler.cancelled, isNot(contains(id)));
+      expect(scheduler.pending.keys, contains(id));
+      expect((await logRows()).map((x) => x.id), contains(id));
+    });
+
+    test('quá ngày mà hệ điều hành còn chờ: huỷ và xoá khỏi nhật ký', () async {
+      scheduler.granted = true;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+
+      // Sang ngày sau mà vẫn chưa giao: huỷ, và "Đã gửi" không được nhận là
+      // đã gửi.
+      now = DateTime(2026, 10, 15, 0, 30);
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      expect(scheduler.cancelled, contains(id));
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+    });
+
+    test('đăng xuất khi một thông báo quá giờ còn chờ: xoá dòng của nó', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+      // Hệ điều hành đã giao thông báo bảo dưỡng 09:00 ngày 13.
+      scheduler.pending.removeWhere(
+        (_, n) => n.at == DateTime(2026, 10, 13, 9),
+      );
+
+      now = DateTime(2026, 10, 14, 8, 3);
+      auth.emit(const SignedOut());
+      await pumpEventQueue();
+      expect(scheduler.scheduled, isEmpty);
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      // Thông báo bảo dưỡng 09:00 ngày 13 đã được giao (không còn chờ): dòng
+      // của nó ở lại.
+      expect(
+        (await logRows()).map((x) => x.at),
+        contains(DateTime(2026, 10, 13, 9)),
+      );
+    });
+
+    test('đổi tài khoản khi một thông báo quá giờ còn chờ: xoá dòng của u1',
+        () async {
+      scheduler.granted = true;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+
+      now = DateTime(2026, 10, 14, 8, 3);
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      expect(scheduler.pending.keys, isNot(contains(id)));
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+    });
+
     test(
       'chưa cấp quyền: không đặt gì, nhật ký không có mục tương lai',
       () async {
@@ -959,6 +1041,19 @@ void main() {
       expect(scheduler.pending.keys, {2, 3});
       expect(scheduler.cancelled, [1]);
       expect(scheduler.scheduleCalls, 1);
+    });
+
+    test('keep: còn chờ thì để yên; trả về id đã huỷ', () async {
+      final scheduler = _FakeScheduler()
+        ..pending = {1: n(1), 2: n(2), 4: n(4)};
+      final cancelled = await reconcileNotifications(
+        scheduler,
+        [n(3)],
+        keep: {1, 5},
+      );
+      expect(cancelled, {2, 4});
+      expect(scheduler.pending.keys, {1, 3});
+      expect(scheduler.scheduleCalls, 1, reason: 'keep không được đặt mới');
     });
   });
 }

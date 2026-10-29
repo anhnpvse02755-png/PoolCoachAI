@@ -30,19 +30,24 @@ abstract class NotificationScheduler {
 }
 
 /// Đưa lịch của hệ điều hành về đúng [desired]: huỷ cái thừa, đặt cái
-/// thiếu, giữ nguyên cái đã đúng.
+/// thiếu, giữ nguyên cái đã đúng. Trả về id đã huỷ.
 ///
 /// Id sinh từ giờ và chữ của thông báo, nên cùng id là cùng thông báo.
-Future<void> reconcileNotifications(
+/// [keep]: id không có trong [desired] mà vẫn để yên nếu còn chờ (thông báo
+/// đã quá giờ nhưng hệ điều hành chưa giao).
+Future<Set<int>> reconcileNotifications(
   NotificationScheduler scheduler,
-  List<PlannedNotification> desired,
-) async {
+  List<PlannedNotification> desired, {
+  Set<int> keep = const {},
+}) async {
   final pending = await scheduler.pendingIds();
-  final wanted = {for (final n in desired) n.id};
-  for (final id in pending.difference(wanted)) {
+  final wanted = {for (final n in desired) n.id, ...keep};
+  final cancelled = pending.difference(wanted);
+  for (final id in cancelled) {
     await scheduler.cancel(id);
   }
   for (final n in desired) {
     if (!pending.contains(n.id)) await scheduler.schedule(n);
   }
+  return cancelled;
 }

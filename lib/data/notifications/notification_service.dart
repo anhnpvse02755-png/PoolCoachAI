@@ -258,8 +258,14 @@ class NotificationService {
           final current = await log.all();
           if (_disposed || _userId != userId) return;
           final plan = _plan(now, current: current);
-          await reconcileNotifications(scheduler, plan);
-          await log.syncPlanned(plan, now: now);
+          // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
+          // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
+          final cancelled = await reconcileNotifications(
+            scheduler,
+            plan,
+            keep: dueEarlierToday(current, now),
+          );
+          await log.syncPlanned(plan, now: now, cancelled: cancelled);
         } else {
           // Không có quyền thì không đặt gì: nhật ký không giữ mục tương lai.
           await log.syncPlanned(const [], now: now);
@@ -269,16 +275,18 @@ class NotificationService {
   }
 
   /// Android/iOS: người dùng vừa rời [userId] (đăng xuất, tự đăng xuất, đổi
-  /// mật khẩu, đổi thẳng tài khoản). Lịch của họ đã/sẽ bị huỷ, nên xoá cả
-  /// các mục tương lai trong nhật ký của họ, kẻo sau giờ đó hộp "Đã gửi"
+  /// mật khẩu, đổi thẳng tài khoản). Lịch của họ sắp bị huỷ (chạy trước lần
+  /// đồng bộ huỷ nó), nên xoá các mục tương lai trong nhật ký của họ, và cả
+  /// mục đã quá giờ mà hệ điều hành còn chờ (chưa hiện), kẻo hộp "Đã gửi"
   /// liệt kê cái chưa từng được gửi.
-  void _forgetFuture(String userId) {
+  void _forgetFuture(String userId, NotificationScheduler scheduler) {
     _syncChain = _syncChain.then((_) async {
       if (_disposed) return;
+      final pending = await scheduler.pendingIds();
       await NotificationLogRepository(
         _db,
         userId: userId,
-      ).syncPlanned(const [], now: _now().toLocal());
+      ).syncPlanned(const [], now: _now().toLocal(), cancelled: pending);
     }).catchError((Object _) {});
   }
 
@@ -352,8 +360,9 @@ class NotificationService {
     _timerSessions = const [];
     _log = null;
     _awaitingFirst = 0;
-    if (previous != null && _scheduler != null && !_disposed) {
-      _forgetFuture(previous);
+    final scheduler = _scheduler;
+    if (previous != null && scheduler != null && !_disposed) {
+      _forgetFuture(previous, scheduler);
     }
     for (final subscription in _dataSubscriptions) {
       unawaited(subscription.cancel());
