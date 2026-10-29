@@ -88,11 +88,12 @@ Widget _tournamentField({
     initialValue: value,
     isExpanded: true,
     decoration: const InputDecoration(labelText: Vi.matchTournament),
-    // Tên giải dài hiện tới hai dòng, cả ở ô đã chọn lẫn trong danh sách.
+    // Ô đã chọn cao đúng một dòng nên tên giải dài phải một dòng có dấu ba
+    // chấm (hai dòng sẽ bị cắt cụt không dấu); danh sách chọn vẫn hai dòng.
     selectedItemBuilder: (_) => [
       const Text(Vi.matchNoTournament),
       ...tournaments.map(
-        (t) => Text(t.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        (t) => Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
     ],
     items: [

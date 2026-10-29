@@ -906,7 +906,7 @@ void main() {
     );
 
     testWidgets(
-      'tên giải dài hiện tới hai dòng ở ô đã chọn và trong danh sách chọn',
+      'tên giải dài: ô đã chọn một dòng có dấu ba chấm, danh sách chọn tới hai dòng',
       (tester) async {
         await addTournament('t1', longName, start: testToday);
         await openStart(tester);
@@ -917,7 +917,8 @@ void main() {
             matching: find.text(longName),
           ),
         );
-        expect(shown().maxLines, 2);
+        expect(shown().maxLines, 1);
+        expect(shown().overflow, TextOverflow.ellipsis);
         await tester.tap(find.byKey(const Key('match-tournament')));
         await tester.pumpAndSettle();
         final menu = tester.widget<Text>(find.text(longName).last);
