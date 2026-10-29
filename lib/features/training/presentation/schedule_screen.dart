@@ -101,7 +101,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 DropdownButtonFormField<SkillCategory?>(
                   initialValue: category,
                   decoration: const InputDecoration(
-                    labelText: Vi.scheduleChooseCategory,
+                    label: Text(Vi.scheduleChooseCategory, maxLines: 2),
                   ),
                   items: [
                     const DropdownMenuItem<SkillCategory?>(
