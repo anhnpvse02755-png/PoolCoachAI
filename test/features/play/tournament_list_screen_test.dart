@@ -367,6 +367,24 @@ void main() {
     expect(await db.select(db.tournamentRows).get(), isEmpty);
   });
 
+  testWidgets('tên rỗng báo lỗi, gõ tên xong thì lỗi biến mất ngay', (
+    tester,
+  ) async {
+    await openForm(tester);
+    final error = Vi.tournamentInputError(TournamentInputError.nameRequired);
+    await tester.tap(find.text(Vi.tournamentSave));
+    await tester.pumpAndSettle();
+    expect(find.text(error), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('tournament-name')), 'Giải A');
+    await tester.pumpAndSettle();
+    expect(find.text(error), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('tournament-name')), '');
+    await tester.pumpAndSettle();
+    expect(find.text(error), findsOneWidget, reason: 'xoá hết thì báo lại');
+  });
+
   testWidgets('ngày kết thúc trước ngày bắt đầu: báo lỗi, không lưu', (
     tester,
   ) async {

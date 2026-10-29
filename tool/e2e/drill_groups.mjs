@@ -259,7 +259,9 @@ try {
   await tab.goto(`${APP}/training/schedule`);
   await tab.waitForText('Thêm lịch', 45000); // Vi.scheduleAdd
   await tab.click('Thêm lịch');
-  await tab.waitForText('Tên buổi tập', 45000); // Vi.scheduleLabel
+  // Nhãn ô trống chỉ nằm trong aria-label của input, không có trong chữ hiện;
+  // 'Lưu lịch' là nút duy nhất của hộp thoại.
+  await tab.waitForText('Lưu lịch', 45000); // Vi.scheduleSave
   await tab.type('Tên buổi tập', 'Tập dựng cơ');
   await tab.click('Nhóm kỹ năng (không bắt buộc)'); // Vi.scheduleChooseCategory
   await tab.click('Dựng cơ'); // mục trong danh sách thả xuống: Vi.skill(dungCo)

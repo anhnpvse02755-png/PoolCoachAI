@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
@@ -92,6 +93,7 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
       // Mô phỏng không cần dữ liệu bài tập: thẻ nằm ngoài `when` để vẫn
       // hiện khi danh sách đang tải hay tải lỗi.
       body: ListView(
+        padding: pcScrollPadding(context, EdgeInsets.zero),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),

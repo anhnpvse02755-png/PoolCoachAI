@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/features/training/presentation/score_hint.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
@@ -211,7 +212,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
         return PcRootScaffold(
           title: Vi.skillTestTitle(live.drill.name),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: pcScrollPadding(context, const EdgeInsets.all(16)),
             child: _startedAt == null
                 ? _prepView(context, state)
                 : _entryView(context, live),
@@ -385,7 +386,7 @@ class _SkillTestScreenState extends ConsumerState<SkillTestScreen> {
     final mark = skillTestPassMark(result);
     final next = nextLevelDrills(drill, state.drills);
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: pcScrollPadding(context, const EdgeInsets.all(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

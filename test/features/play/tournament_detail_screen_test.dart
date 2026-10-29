@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -219,6 +220,29 @@ void main() {
     expect(find.text(Vi.tournamentMatchesEmpty), findsOneWidget);
   });
 
+  testWidgets('giải sắp tới chưa có trận: có tiêu đề Các trận, chữ rỗng cỡ thân',
+      (tester) async {
+    await open(tester, testContainer(tournaments: [up]), 'up');
+    final title = find.text(Vi.tournamentMatchesTitle);
+    final empty = find.text(Vi.tournamentMatchesEmpty);
+    expect(title, findsOneWidget);
+    expect(empty, findsOneWidget);
+    expect(
+      tester.getTopLeft(title).dy < tester.getTopLeft(empty).dy,
+      isTrue,
+      reason: 'tiêu đề nằm trên chữ rỗng',
+    );
+    // Kiểu hiệu lực (đã gộp với kiểu kế thừa) phải đúng bodyMedium của theme.
+    final effective = (tester.renderObject<RenderParagraph>(empty).text
+            as TextSpan)
+        .style!;
+    final body = Theme.of(tester.element(empty)).textTheme.bodyMedium!;
+    expect(
+      [effective.fontSize, effective.fontWeight, effective.fontFamily],
+      [body.fontSize, body.fontWeight, body.fontFamily],
+    );
+  });
+
   testWidgets('bấm trận đã xong mở phân tích trận', (tester) async {
     await open(
       tester,
@@ -231,6 +255,27 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tournament-match-a')));
     await tester.pumpAndSettle();
     expect(find.byType(MatchAnalysisView), findsOneWidget);
+  });
+
+  testWidgets('phân tích trận mở trên navigator gốc: nút Coach nằm sau tấm chắn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640));
+    await open(
+      tester,
+      testContainer(
+        tournaments: [on],
+        matches: [m('a', won: 3, lost: 2, at: DateTime(2026, 9, 21, 9))],
+      ),
+      'on',
+    );
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('tournament-match-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament-match-a')));
+    await tester.pumpAndSettle();
+    expect(find.byType(MatchAnalysisView), findsOneWidget);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsNothing);
   });
 
   testWidgets('bấm trận đang đánh sang Thi đấu', (tester) async {

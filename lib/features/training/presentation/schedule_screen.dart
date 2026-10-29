@@ -4,6 +4,7 @@ import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -236,7 +237,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       );
     }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+      padding: pcScrollPadding(
+        context,
+        const EdgeInsets.fromLTRB(16, 8, 16, 88),
+      ),
       children: [
         for (var day = 0; day < Vi.scheduleDays.length; day++)
           if (slots.any((slot) => slot.day == day)) ...[
@@ -275,7 +279,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           ),
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: 16 + PcFabInset.of(context),
             child: FloatingActionButton.extended(
               heroTag: 'schedule-add',
               onPressed: _saving ? null : () => _editSlot(),

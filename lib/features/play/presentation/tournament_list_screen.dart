@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/features/play/presentation/tournament_form.dart';
@@ -131,7 +132,7 @@ class _TournamentListScreenState extends ConsumerState<TournamentListScreen> {
           body: Vi.dataErrorBody,
         ),
         data: (g) => ListView(
-          padding: const EdgeInsets.all(12),
+          padding: pcScrollPadding(context, const EdgeInsets.all(12)),
           children: [
             FilledButton.icon(
               key: const Key('tournament-add'),

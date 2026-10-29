@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -146,7 +147,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     return PcRootScaffold(
       title: Vi.timerTitle,
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: pcScrollPadding(context, const EdgeInsets.all(16)),
         children: [
           SegmentedButton<bool>(
             segments: const [

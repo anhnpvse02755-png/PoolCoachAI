@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 
 /// Khung bọc 5 tab và nút Huấn luyện viên dùng được ở mọi tab.
 ///
@@ -27,8 +28,9 @@ class PcShellScaffold extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  /// Khoảng nút Coach nổi chiếm ở đáy thân màn (nút 56 + lề). Màn có bảng
-  /// cuộn chèn khoảng trống này ở cuối, để cuộn hết thì nút không che chữ.
+  /// Khoảng nút Coach nổi chiếm ở đáy thân màn (nút 56 + lề). Shell điện
+  /// thoại dọc công bố khoảng này qua [PcFabInset]; mỗi danh sách cuộn cộng nó
+  /// vào đệm đáy bằng [pcScrollPadding], nên cuộn hết là chữ nằm trên nút.
   static const fabClearance = 56 + kFloatingActionButtonMargin;
 
   static const _icons = <IconData>[
@@ -59,13 +61,21 @@ class PcShellScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.sizeOf(context).width < AppLayout.mediumWidth) {
+      final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
       return Scaffold(
-        body: navigationShell,
-        floatingActionButton: FloatingActionButton(
-          tooltip: Vi.coachTitle,
-          onPressed: () => context.push(Routes.coach),
-          child: const Icon(Icons.psychology_outlined),
+        body: PcFabInset(
+          extent: keyboardOpen ? 0 : fabClearance,
+          child: navigationShell,
         ),
+        // Bàn phím mở thì nút ẩn: nó sẽ nổi lên ngay trên bàn phím và che ô
+        // đang nhập.
+        floatingActionButton: keyboardOpen
+            ? null
+            : FloatingActionButton(
+                tooltip: Vi.coachTitle,
+                onPressed: () => context.push(Routes.coach),
+                child: const Icon(Icons.psychology_outlined),
+              ),
         // Nhãn thanh dưới giữ cỡ gốc: năm ô trên 360 dp không còn chỗ cho
         // chữ to hơn (Flutter tự kẹp ở 1.3, mức thấp hơn thắng).
         bottomNavigationBar: MediaQuery.withClampedTextScaling(

@@ -11,6 +11,7 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
@@ -25,6 +26,7 @@ import 'package:poolcoachai/features/rank/presentation/onboarding_screen.dart';
 import 'package:poolcoachai/features/rank/presentation/rank_card.dart';
 import 'package:poolcoachai/features/rank/presentation/test_screen.dart';
 
+import '../../support/layout_sweep.dart';
 import '../../support/roadmap_fixtures.dart';
 import '../../support/test_data.dart';
 
@@ -221,6 +223,18 @@ void main() {
     expect(find.byType(TestScreen), findsOneWidget);
   });
 
+  testWidgets('ⓘ mở trên navigator gốc: nút Coach nằm sau tấm chắn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640));
+    await pump(tester, Routes.profile, rank: verifiedD);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip(Vi.rankInfo));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.rankDisclaimer), findsOneWidget);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsNothing);
+  });
+
   testWidgets('ⓘ mở câu miễn trừ, bảng quy đổi và nguồn BU', (tester) async {
     await pump(tester, Routes.profile, rank: verifiedD);
     await tester.tap(find.byTooltip(Vi.rankInfo));
@@ -249,7 +263,7 @@ void main() {
     'font tới sau khung hình đầu: thẻ Xác định hạng chọn lại hàng/cột',
     (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(300, 640);
+      tester.view.physicalSize = const Size(340, 640);
       addTearDown(tester.view.reset);
       const family = 'FontToiSau';
       final container = testContainer();
@@ -283,6 +297,73 @@ void main() {
       expect(inRow(), isTrue, reason: 'Roboto hẹp: phải quay về một hàng');
     },
   );
+
+  // Quy tắc hàng/cột: Row chỉ khi cột chữ rộng ít nhất textScaler.scale(12) * 11
+  // (11 ký tự cỡ 12, lớn theo chữ hệ thống). Nhỏ hơn thì chữ bị bóp ra từng từ một dòng, nên xuống Column.
+  group('thẻ Xác định hạng chọn hàng/cột theo bề rộng cột chữ', () {
+    Future<(Rect, Rect, Rect)> measure(
+      WidgetTester tester,
+      Size size,
+      double scale,
+    ) async {
+      applyScreen(tester, size, textScale: scale);
+      const family = 'RobotoThe';
+      final bytes = File('test/fixtures/fonts/roboto-regular.ttf')
+          .readAsBytesSync();
+      await tester.runAsync(
+        () => (FontLoader(
+          family,
+        )..addFont(Future.value(ByteData.sublistView(bytes)))).load(),
+      );
+      final container = testContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: ThemeData(fontFamily: family),
+            home: Scaffold(
+              body: ListView(
+                padding: const EdgeInsets.all(16),
+                children: const [HomeRankHeader()],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (
+        tester.getRect(find.byType(PcCard)),
+        tester.getRect(find.text(Vi.homeRankCardBody)),
+        tester.getRect(find.byType(FilledButton)),
+      );
+    }
+
+    for (final (size, scale, expectRow) in [
+      (const Size(360, 640), 1.0, true),
+      (const Size(360, 640), 1.5, false),
+      (const Size(320, 640), 1.0, false),
+    ]) {
+      testWidgets('${size.width.toInt()}x${size.height.toInt()}, chữ x$scale: '
+          '${expectRow ? "một hàng" : "xuống cột"}', (tester) async {
+        final (card, body, button) = await measure(tester, size, scale);
+        final inRow = button.left >= body.right;
+        expect(
+          inRow,
+          expectRow,
+          reason: 'card $card body $body button $button',
+        );
+        // Hàng thì cột chữ hơn mức tối thiểu có biên rõ (>= 15 dp); cột thì
+        // chữ chiếm cả bề rộng trong của thẻ.
+        final minWidth = scale * 12 * 11;
+        if (expectRow) {
+          expect(body.width, greaterThanOrEqualTo(minWidth + 15));
+        } else {
+          expect(body.width, greaterThanOrEqualTo(minWidth));
+        }
+      });
+    }
+  });
 
   testWidgets('có hạng: Trang chủ hiện huy hiệu nhỏ và nhãn nguồn', (
     tester,

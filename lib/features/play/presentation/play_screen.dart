@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
@@ -511,7 +512,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           body: Vi.dataErrorBody,
         ),
         data: (matches) => ListView(
-          padding: const EdgeInsets.all(12),
+          padding: pcScrollPadding(context, const EdgeInsets.all(12)),
           children: [
             const TournamentPlayCard(),
             const SizedBox(height: 12),

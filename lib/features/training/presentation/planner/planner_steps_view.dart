@@ -2,7 +2,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
-import 'package:poolcoachai/core/widgets/pc_shell_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/domain/planner/candidates.dart';
 import 'package:poolcoachai/domain/planner/plan_step.dart';
@@ -398,8 +397,6 @@ class _PlannerStepsViewState extends State<PlannerStepsView> {
           ),
           const SizedBox(height: 12),
           Text(Vi.simDisclaimer, style: text.bodySmall),
-          // Cuộn hết thì nút Coach nổi không che ô XEM TRƯỚC hay nút bấm.
-          const SizedBox(height: PcShellScaffold.fabClearance),
         ],
       ),
     );

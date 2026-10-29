@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/domain/rank.dart';
 import 'package:poolcoachai/domain/roadmap/goal.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -69,7 +70,7 @@ class _GoalPickerState extends ConsumerState<GoalPicker> {
     final block = lenHangBlock(playerRank);
     final from = playerRank?.rank;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: pcScrollPadding(context, const EdgeInsets.all(16)),
       children: [
         Text(Vi.goalPickTitle, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
