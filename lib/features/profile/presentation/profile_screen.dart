@@ -10,6 +10,7 @@ import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/sync/account_actions.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -168,7 +169,10 @@ class ProfileScreen extends ConsumerWidget {
           ),
           // Đăng xuất ghim ở đáy: thẻ hạng và lịch sử dài ra thì nút vẫn ở chỗ cũ.
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: pcScrollPadding(
+              context,
+              const EdgeInsets.all(AppSpacing.lg),
+            ),
             child: OutlinedButton.icon(
               onPressed: () => _signOut(context, ref),
               icon: const Icon(Icons.logout),

@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/tournament_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/roadmap/achievements.dart';
@@ -106,7 +107,7 @@ class RoadmapView extends ConsumerWidget {
         );
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: pcScrollPadding(context, const EdgeInsets.all(16)),
       children: [
         PcCard(
           child: Column(

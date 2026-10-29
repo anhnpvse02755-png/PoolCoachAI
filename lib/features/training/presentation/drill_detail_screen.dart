@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
 import 'package:poolcoachai/domain/drill.dart';
@@ -70,7 +71,7 @@ class DrillDetailScreen extends ConsumerWidget {
         return PcRootScaffold(
           title: drill.name,
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: pcScrollPadding(context, const EdgeInsets.all(16)),
             children: [
               PcCard(
                 child: Column(

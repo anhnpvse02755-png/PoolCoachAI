@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/domain/table_geometry/table_spec.dart';
 import 'package:poolcoachai/features/training/presentation/simulator/table_drawing.dart';
 
@@ -131,7 +132,10 @@ class TablePanelLayout extends StatelessWidget {
               SizedBox(
                 width: arrangement.panelWidth,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                  padding: pcScrollPadding(
+                    context,
+                    const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                  ),
                   child: panel,
                 ),
               ),
@@ -147,7 +151,10 @@ class TablePanelLayout extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: pcScrollPadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                ),
                 child: panel,
               ),
             ),

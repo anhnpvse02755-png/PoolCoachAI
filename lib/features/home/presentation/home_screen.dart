@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/core/widgets/pc_skill_chip.dart';
 import 'package:poolcoachai/features/home/presentation/skill_test_home_line.dart';
@@ -32,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
           body: Vi.dataErrorBody,
         ),
         data: (rec) => ListView(
-          padding: const EdgeInsets.all(16),
+          padding: pcScrollPadding(context, const EdgeInsets.all(16)),
           children: [
             const HomeRankHeader(),
             // Chuỗi ngày tập liên tiếp. 0 là con số thật, hiện bình thường.

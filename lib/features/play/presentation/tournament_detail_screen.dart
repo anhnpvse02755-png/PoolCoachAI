@@ -8,6 +8,7 @@ import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
 import 'package:poolcoachai/domain/match_analysis/match_analysis.dart';
@@ -327,7 +328,7 @@ class _TournamentDetailScreenState
     final goal = ref.watch(tournamentGoalStateProvider(t.id)).value;
     final canStart = ref.watch(startMatchInputsProvider).hasValue;
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: pcScrollPadding(context, const EdgeInsets.all(12)),
       children: [
         _info(t, status, textTheme),
         const SizedBox(height: 12),

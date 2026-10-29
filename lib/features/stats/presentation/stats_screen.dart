@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
@@ -58,7 +59,7 @@ class StatsScreen extends ConsumerWidget {
     return PcRootScaffold(
       title: Vi.statsTitle,
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: pcScrollPadding(context, const EdgeInsets.all(16)),
         children: [
           Text(Vi.statsOverview, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),

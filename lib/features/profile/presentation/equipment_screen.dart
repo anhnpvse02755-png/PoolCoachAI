@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/cue_performance/cue_win_rate.dart';
@@ -483,7 +484,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
           ),
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: 16 + PcFabInset.of(context),
             child: FloatingActionButton.extended(
               heroTag: 'equipment-add',
               onPressed: _saving ? null : () => _editCue(),
@@ -534,7 +535,10 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
+                  padding: pcScrollPadding(
+                    context,
+                    const EdgeInsets.fromLTRB(12, 8, 12, 88),
+                  ),
                   children: sortedCues
                       .map((cue) => _cueCard(cue, now, sessions, winRates))
                       .toList(growable: false),

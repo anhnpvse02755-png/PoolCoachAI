@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/features/training/presentation/score_hint.dart';
@@ -146,7 +147,7 @@ class _DrillSessionScreenState extends ConsumerState<DrillSessionScreen>
         return PcRootScaffold(
           title: Vi.sessionTitle(drill.name),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: pcScrollPadding(context, const EdgeInsets.all(16)),
             child: Form(
               key: _formKey,
               child: Column(
