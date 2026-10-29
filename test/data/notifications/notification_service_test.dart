@@ -479,6 +479,58 @@ void main() {
       expect(got, isEmpty);
     });
 
+    test('chạm chỉ đánh dấu dòng đã tới giờ của người đang đăng nhập', () async {
+      await shownSchedule();
+      final mine = (await logRows()).single;
+      PlannedNotification same(DateTime at) => PlannedNotification(
+        id: mine.id + 1,
+        kind: NotificationKind.schedule,
+        key: mine.key,
+        at: at,
+        validUntil: at.add(const Duration(hours: 1)),
+        title: mine.title,
+        body: mine.body,
+      );
+      // Cùng (loại, khoá): một dòng tương lai của u1, một dòng của u2.
+      await NotificationLogRepository(
+        db,
+        userId: 'u1',
+      ).syncPlanned([same(DateTime(2026, 10, 20, 17, 30))], now: now);
+      await NotificationLogRepository(
+        db,
+        userId: 'u2',
+      ).recordShown(same(mine.at), at: mine.at);
+
+      platform.onTap!(platform.notifications.single.payload);
+      await pumpEventQueue();
+      final u1 = {for (final r in await logRows()) r.id: r.readAt};
+      expect(u1, {mine.id: now, mine.id + 1: null});
+      expect((await logRows('u2')).single.readAt, isNull);
+    });
+
+    test('khởi động lạnh: start lần hai hay handler mới không giao lại', () async {
+      await saveSlot(time: '18:00');
+      platform
+        ..permissionValue = 'granted'
+        ..launch = notificationPayload(
+          NotificationKind.schedule,
+          's1:2026-10-13',
+          userId: 'u1',
+        );
+      final s = service()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      expect(got, hasLength(1));
+
+      s.start();
+      await pumpEventQueue();
+      s.setTapHandler((tap) => got.add(tap));
+      await pumpEventQueue();
+      expect(got, hasLength(1));
+    });
+
     test('payload rác: không gọi handler, không đổi dòng nào', () async {
       final s = await shownSchedule();
       final got = <NotificationTap>[];

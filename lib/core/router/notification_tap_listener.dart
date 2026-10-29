@@ -68,6 +68,10 @@ class _NotificationTapListenerState
   void _onTap(NotificationTap tap) {
     final route = notificationRoute(tap);
     if (route == null) return;
+    // Đi sau khung hình hiện tại, không giữa lúc dựng (lần chạm tới từ hệ
+    // điều hành, có khi ngay khi widget vừa gắn ở khởi động lạnh). Lần chạm
+    // tới lúc app đứng yên thì không có khung hình nào sắp tới để chạy
+    // callback, nên xin một khung (ensureVisualUpdate).
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
         if (mounted) widget.router.go(route);
