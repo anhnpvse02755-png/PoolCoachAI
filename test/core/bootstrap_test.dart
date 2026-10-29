@@ -6,9 +6,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/bootstrap.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
+import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import '../support/fake_auth.dart';
+import '../support/fake_recommendation_seen_store.dart';
+
+/// Kho cài đặt giả: mỗi tài khoản một bộ, vắng thì mặc định.
+class _PrefsStore implements NotificationPrefsStore {
+  _PrefsStore(this.saved);
+
+  final Map<String, NotificationPrefs> saved;
+
+  @override
+  Future<NotificationPrefs> load(String userId) async =>
+      saved[userId] ?? const NotificationPrefs();
+
+  @override
+  Future<void> save(String userId, NotificationPrefs prefs) async =>
+      saved[userId] = prefs;
+}
 
 /// Nạp seed lúc khởi động — mục 4.3.1 của thiết kế.
 ///
@@ -43,6 +63,49 @@ void main() {
     await restoreSession(container);
 
     expect(auth.calls, ['restore']);
+  });
+
+  test(
+    'startNotifications giữ dịch vụ luôn nghe: đăng nhập sau khi mở app thì '
+    'cài đặt của tài khoản tới được dịch vụ',
+    () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final auth = FakeAuthRepository();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          authRepositoryProvider.overrideWithValue(auth),
+          notificationPrefsStoreProvider.overrideWithValue(
+            _PrefsStore({'u1': const NotificationPrefs(streak: false)}),
+          ),
+          recommendationSeenStoreProvider.overrideWithValue(
+            FakeRecommendationSeenStore(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      startNotifications(container);
+      await pumpEventQueue();
+      final service = container.read(notificationServiceProvider);
+      expect(service.prefs, const NotificationPrefs());
+
+      // Chỉ cái nghe thường trực làm chuỗi auth → cài đặt dựng lại; một lần
+      // `read` để dịch vụ ngưng nghe, nên nó giữ mặc định của lúc chưa đăng
+      // nhập.
+      auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
+      await pumpEventQueue();
+      expect(service.prefs, const NotificationPrefs(streak: false));
+      expect(service.recommendationSource?.userId, 'u1');
+    },
+  );
+
+  test('startSync bật thông báo qua startNotifications', () {
+    final source = File('lib/core/bootstrap.dart').readAsStringSync();
+    final body = source.substring(source.indexOf('void startSync('));
+    expect(body, contains('startNotifications(container)'));
+    expect(body, isNot(contains('container.read(notificationServiceProvider)')));
   });
 
   test('main nạp seed xong mới dựng app', () {

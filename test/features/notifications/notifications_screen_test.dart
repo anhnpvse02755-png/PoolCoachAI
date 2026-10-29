@@ -9,12 +9,15 @@ import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_auth.dart';
+import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/test_data.dart';
 
 /// Trình duyệt giả: hỗ trợ thông báo, không đặt lịch được.
@@ -57,12 +60,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Mặc định không có bài nào: không có gợi ý, các test cũ giữ nghĩa.
   ProviderContainer containerWith({
     Map<String, Object> saved = const {},
     List<ScheduleSlot>? schedule,
+    List<Drill> drills = const [],
+    FakeRecommendationSeenStore? seenStore,
   }) {
     SharedPreferences.setMockInitialValues(saved);
-    return testContainer(schedule: schedule);
+    return testContainer(
+      schedule: schedule,
+      drills: drills,
+      seenStore: seenStore,
+    );
   }
 
   Finder switchOf(NotificationKind kind) =>
@@ -116,6 +126,41 @@ void main() {
     expect(saved.schedule, isFalse);
     expect(saved.maintenance, isTrue);
     expect(saved.streak, isTrue);
+  });
+
+  testWidgets('Sắp tới có Gợi ý tập mới ngày mai lúc 08:00', (tester) async {
+    await open(tester, containerWith(drills: testDrills));
+    expect(find.text(Vi.recommendationReminderTitle), findsOneWidget);
+    expect(find.text('08:00'), findsOneWidget);
+    expect(find.text(Vi.notificationsTomorrow.toUpperCase()), findsOneWidget);
+  });
+
+  testWidgets('đã thấy đúng cặp ở Trang chủ: Sắp tới không có gợi ý', (
+    tester,
+  ) async {
+    final tomorrow = DateTime(
+      testToday.year,
+      testToday.month,
+      testToday.day + 1,
+      recommendationReminderHour,
+    );
+    final rec = RecommendationInputs(
+      drills: testDrills,
+      logs: const [],
+      knowledge: testKnowledge,
+      timerSessions: const [],
+      schedule: const [],
+      matches: const [],
+    ).recommendFor(tomorrow);
+    final store = FakeRecommendationSeenStore()
+      ..saved['u1'] = SeenRecommendation(
+        cat: rec.cat,
+        drillId: rec.drill!.id,
+        at: testToday,
+      );
+    await open(tester, containerWith(drills: testDrills, seenStore: store));
+    expect(find.text(Vi.recommendationReminderTitle), findsNothing);
+    expect(find.text(Vi.notificationsUpcomingEmpty), findsOneWidget);
   });
 
   testWidgets('saved preferences are shown on open', (tester) async {

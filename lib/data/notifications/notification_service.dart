@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
@@ -9,8 +11,10 @@ import 'package:poolcoachai/data/repositories/drift_repositories.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
@@ -21,6 +25,10 @@ import 'package:poolcoachai/domain/timer_session.dart';
 /// ([reconcileNotifications]). Web: trình duyệt không đặt lịch được, nên
 /// một timer xem kế hoạch mỗi phút và báo cái nào đến giờ, ghi lại vào
 /// localStorage để không báo hai lần. Đăng xuất thì huỷ hết.
+///
+/// Nhật ký thông báo (`notification_log_rows`) đi cùng: Android/iOS ghi
+/// đúng kế hoạch đã đặt, web ghi lúc thông báo thật sự hiện. Mọi lần ghi
+/// chỉ ghi phần khác, nên việc dịch vụ tự theo dõi nhật ký không lặp vòng.
 class NotificationService {
   NotificationService({
     required this._db,
@@ -46,6 +54,16 @@ class NotificationService {
   List<ScheduleSlot> _slots = const [];
   List<DrillLog> _logs = const [];
   List<TimerSession> _timerSessions = const [];
+
+  /// Nguồn gợi ý mới nhất Riverpod đưa tới. Không xoá khi đổi tài khoản:
+  /// chỉ được dùng khi `userId` của nó là người đang đăng nhập.
+  RecommendationSource? _source;
+
+  /// Nhật ký của người đang đăng nhập; null tới lần phát đầu tiên.
+  List<NotificationLogEntry>? _log;
+
+  /// Lúc phiên của người hiện tại bắt đầu trên tab/app này.
+  DateTime _userSince = DateTime(0);
   StreamSubscription<AuthState>? _authSubscription;
   final _dataSubscriptions = <StreamSubscription<Object?>>[];
   Timer? _timer;
@@ -83,6 +101,18 @@ class NotificationService {
     if (_started && !_disposed) checkNow();
   }
 
+  /// Đổi nguồn gợi ý. Null: chưa đủ dữ liệu, không lập gợi ý.
+  void setRecommendationSource(RecommendationSource? source) {
+    _source = source;
+    if (_started && !_disposed) checkNow();
+  }
+
+  @visibleForTesting
+  NotificationPrefs? get prefs => _prefs;
+
+  @visibleForTesting
+  RecommendationSource? get recommendationSource => _source;
+
   NotificationScheduler? get _scheduler => _platform.scheduler;
 
   late final Future<void> _permissionLoaded = _platform.loadPermission();
@@ -91,7 +121,20 @@ class NotificationService {
   List<PlannedNotification> _plan(DateTime now, {int? limit}) {
     final prefs = _prefs;
     if (prefs == null) return const [];
+    // Gợi ý chỉ khi nguồn là của người đang đăng nhập và nhật ký của họ đã
+    // nạp (mốc "đã thấy" cần cả hai).
+    final source = _source;
+    final log = _log;
+    final ready = source != null && source.userId == _userId && log != null;
     return planNotifications(
+      recommendation: ready ? source.inputs : null,
+      lastSeenRecommendation: ready
+          ? recommendationBaseline(
+              shownOnHome: source.seen,
+              log: log,
+              now: _now().toLocal(),
+            )
+          : null,
       cues: _cues,
       slots: _slots,
       streak: streakStateOf(
@@ -105,8 +148,8 @@ class NotificationService {
     );
   }
 
-  /// Android/iOS: đưa lịch của hệ điều hành về đúng kế hoạch. Xếp hàng để
-  /// hai lần đồng bộ không chạy chồng lên nhau.
+  /// Android/iOS: đưa lịch của hệ điều hành và nhật ký về đúng kế hoạch.
+  /// Xếp hàng để hai lần đồng bộ không chạy chồng lên nhau.
   void _syncSchedule(NotificationScheduler scheduler) {
     _syncChain = _syncChain.then((_) async {
       await _permissionLoaded;
@@ -114,9 +157,32 @@ class NotificationService {
       final userId = _userId;
       if (userId == null) {
         await scheduler.cancelAll();
-      } else if (_prefs != null && _platform.permission == 'granted') {
-        await reconcileNotifications(scheduler, _plan(_now().toLocal()));
+      } else if (_prefs != null) {
+        final now = _now().toLocal();
+        final log = NotificationLogRepository(_db, userId: userId);
+        if (_platform.permission == 'granted') {
+          final plan = _plan(now);
+          await reconcileNotifications(scheduler, plan);
+          await log.syncPlanned(plan, now: now);
+        } else {
+          // Không có quyền thì không đặt gì: nhật ký không giữ mục tương lai.
+          await log.syncPlanned(const [], now: now);
+        }
       }
+    }).catchError((Object _) {});
+  }
+
+  /// Android/iOS: người dùng vừa rời [userId] (đăng xuất, tự đăng xuất, đổi
+  /// mật khẩu, đổi thẳng tài khoản). Lịch của họ đã/sẽ bị huỷ, nên xoá cả
+  /// các mục tương lai trong nhật ký của họ, kẻo sau giờ đó hộp "Đã gửi"
+  /// liệt kê cái chưa từng được gửi.
+  void _forgetFuture(String userId) {
+    _syncChain = _syncChain.then((_) async {
+      if (_disposed) return;
+      await NotificationLogRepository(
+        _db,
+        userId: userId,
+      ).syncPlanned(const [], now: _now().toLocal());
     }).catchError((Object _) {});
   }
 
@@ -141,15 +207,23 @@ class NotificationService {
       return;
     }
     final now = _now().toLocal();
+    final log = NotificationLogRepository(_db, userId: _userId!);
     // Từ đầu ngày: kế hoạch chỉ giữ cái còn ở phía sau "bây giờ", mà web
     // cần cả cái đã đến giờ trong hôm nay.
     final startOfDay = DateTime(now.year, now.month, now.day);
     for (final n in _plan(startOfDay, limit: 1 << 20)) {
       if (n.at.isAfter(now) || !now.isBefore(n.validUntil)) continue;
+      // Gợi ý của lúc trước khi mở tab (hay đăng nhập) là thứ Trang chủ
+      // đang hiện: không báo lại.
+      if (n.kind == NotificationKind.recommendation &&
+          !n.at.isAfter(_userSince)) {
+        continue;
+      }
       final key = _storageKey(n);
       if (_platform.readValue(key) != null) continue;
       _platform.show(title: n.title, body: n.body, tag: key);
       _platform.writeValue(key, now.toIso8601String());
+      unawaited(log.recordShown(n, at: now).catchError((Object _) {}));
     }
   }
 
@@ -168,11 +242,17 @@ class NotificationService {
 
   void _setUser(String? userId) {
     if (_userId == userId) return;
+    final previous = _userId;
     _userId = userId;
+    _userSince = _now().toLocal();
     _cues = const [];
     _slots = const [];
     _logs = const [];
     _timerSessions = const [];
+    _log = null;
+    if (previous != null && _scheduler != null && !_disposed) {
+      _forgetFuture(previous);
+    }
     for (final subscription in _dataSubscriptions) {
       unawaited(subscription.cancel());
     }
@@ -207,6 +287,10 @@ class NotificationService {
     watch(
       DriftTimerSessionRepository(_db, userId: userId).watchAll(),
       (sessions) => _timerSessions = sessions,
+    );
+    watch(
+      NotificationLogRepository(_db, userId: userId).watchAll(),
+      (log) => _log = log,
     );
   }
 

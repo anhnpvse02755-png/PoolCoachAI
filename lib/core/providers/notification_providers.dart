@@ -162,6 +162,11 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
     (_, next) => service.setPrefs(next.value),
     fireImmediately: true,
   );
+  ref.listen(
+    recommendationSourceProvider,
+    (_, next) => service.setRecommendationSource(next),
+    fireImmediately: true,
+  );
   ref.onDispose(service.dispose);
   return service;
 });
@@ -174,7 +179,20 @@ final upcomingNotificationsProvider = Provider<List<PlannedNotification>>((
 ) {
   final now = ref.watch(nowProvider)();
   final prefs = ref.watch(notificationPrefsProvider).value;
+  // Gợi ý như dịch vụ: chỉ khi nguồn đủ và nhật ký đã nạp xong (không phải
+  // giá trị cũ của người trước đang tải lại).
+  final source = ref.watch(recommendationSourceProvider);
+  final log = ref.watch(notificationLogProvider);
+  final ready = source != null && log.hasValue && !log.isLoading;
   final plan = planNotifications(
+    recommendation: ready ? source.inputs : null,
+    lastSeenRecommendation: ready
+        ? recommendationBaseline(
+            shownOnHome: source.seen,
+            log: log.requireValue,
+            now: now,
+          )
+        : null,
     cues: ref.watch(cueEquipmentProvider).value ?? const [],
     slots: ref.watch(scheduleProvider).value ?? const [],
     streak: streakStateOf(
