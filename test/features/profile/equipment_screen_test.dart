@@ -399,8 +399,10 @@ void main() {
       WidgetTester tester, {
       required double textScale,
       int cues = 6,
+      Size size = const Size(360, 640),
+      double navHeight = 0,
     }) async {
-      applyScreen(tester, const Size(360, 640), textScale: textScale);
+      applyScreen(tester, size, textScale: textScale);
       final fontBytes = File('test/fixtures/fonts/roboto-regular.ttf')
           .readAsBytesSync();
       await tester.runAsync(
@@ -440,9 +442,15 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: ThemeData(fontFamily: _family),
-            home: const PcFabInset(
-              extent: coachInset,
-              child: EquipmentScreen(),
+            home: Scaffold(
+              body: const PcFabInset(
+                extent: coachInset,
+                child: EquipmentScreen(),
+              ),
+              // Thanh dưới của shell: thân màn thấp hơn khung nhìn.
+              bottomNavigationBar: navHeight == 0
+                  ? null
+                  : SizedBox(height: navHeight),
             ),
           ),
         ),
@@ -496,6 +504,48 @@ void main() {
       expect(button.left, greaterThan(text.left + 100));
       expect(tester.takeException(), isNull);
     });
+
+    for (final c in [
+      (name: '360x640 x1.0', size: const Size(360, 640), scale: 1.0),
+      (name: '360x640 x1.5', size: const Size(360, 640), scale: 1.5),
+      (name: '320x640 x1.2', size: const Size(320, 640), scale: 1.2),
+    ]) {
+      testWidgets('chưa có cơ ${c.name}: chữ trống không đè nút Thêm cơ '
+          'hay nút Coach', (tester) async {
+        await openWithReminder(
+          tester,
+          textScale: c.scale,
+          cues: 0,
+          size: c.size,
+          navHeight: 80,
+        );
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable).first)
+            .position;
+        if (c.scale == 1.0 && c.size.width == 360) {
+          // Vừa khung: danh sách trống không cuộn và khối nằm giữa.
+          expect(position.maxScrollExtent, 0);
+        }
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        // Cuộn hết: chữ trống phải còn thấy được và nằm trên cả hai nút.
+        final viewportBottom = c.size.height - 80;
+        final text = tester.getRect(find.text(Vi.equipmentEmpty));
+        final addFab = tester.getRect(find.byType(FloatingActionButton));
+        final coachFab = Rect.fromLTWH(
+          c.size.width - 16 - 56,
+          viewportBottom - coachInset,
+          56,
+          56,
+        );
+        expect(text.height, greaterThan(0));
+        expect(text.top, greaterThanOrEqualTo(0));
+        expect(text.bottom, lessThanOrEqualTo(viewportBottom));
+        expect(text.overlaps(addFab), isFalse, reason: 'đè nút Thêm cơ');
+        expect(text.overlaps(coachFab), isFalse, reason: 'đè nút Coach');
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('chưa có cơ: trạng thái trống nằm giữa phần còn lại dưới thẻ, '
         'trên chỗ nút nổi', (tester) async {

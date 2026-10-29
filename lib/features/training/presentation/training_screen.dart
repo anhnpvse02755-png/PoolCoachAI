@@ -235,6 +235,13 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(drill.unit),
+                              if (result case _Scored(:final ratio))
+                                Text(
+                                  Vi.statsPercent((ratio * 100).round()),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleSmall,
+                                ),
                               if (passCount != null)
                                 Text(Vi.drillReadinessProgress(passCount)),
                               if (certifiedIds.contains(drill.id))
@@ -256,16 +263,9 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                               Vi.drillRatioUnknown,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            // "113% mục tiêu" dài hơn số trần: giới hạn bề rộng
-                            // để chữ xuống hai dòng thay vì nuốt cả hàng.
-                            _Scored(:final ratio) => ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 88),
-                              child: Text(
-                                Vi.statsPercent((ratio * 100).round()),
-                                textAlign: TextAlign.end,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ),
+                            // Tỉ lệ đạt nằm ở cột chữ chính (dòng phụ), không ở ô
+                            // phụ bên phải: ở chữ lớn ô ấy cắt mất "mục tiêu".
+                            _Scored() => null,
                           },
                           onTap: () => context.go(Routes.drill(drill.id)),
                         ),
