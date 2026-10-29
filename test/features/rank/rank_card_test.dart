@@ -263,7 +263,7 @@ void main() {
     'font tới sau khung hình đầu: thẻ Xác định hạng chọn lại hàng/cột',
     (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(300, 640);
+      tester.view.physicalSize = const Size(340, 640);
       addTearDown(tester.view.reset);
       const family = 'FontToiSau';
       final container = testContainer();
@@ -298,8 +298,8 @@ void main() {
     },
   );
 
-  // Quy tắc hàng/cột: Row chỉ khi cột chữ rộng ít nhất 45% bề rộng trong của
-  // thẻ. Nhỏ hơn thì chữ bị bóp ra từng từ một dòng, nên xuống Column.
+  // Quy tắc hàng/cột: Row chỉ khi cột chữ rộng ít nhất textScaler.scale(12) * 11
+  // (11 ký tự cỡ 12, lớn theo chữ hệ thống). Nhỏ hơn thì chữ bị bóp ra từng từ một dòng, nên xuống Column.
   group('thẻ Xác định hạng chọn hàng/cột theo bề rộng cột chữ', () {
     Future<(Rect, Rect, Rect)> measure(
       WidgetTester tester,
@@ -353,8 +353,14 @@ void main() {
           expectRow,
           reason: 'card $card body $body button $button',
         );
-        // Dù hàng hay cột, chữ giới thiệu không bị bóp hẹp dưới 45% thẻ.
-        expect(body.width, greaterThanOrEqualTo((card.width - 24) * 0.45 - 1));
+        // Hàng thì cột chữ hơn mức tối thiểu có biên rõ (>= 15 dp); cột thì
+        // chữ chiếm cả bề rộng trong của thẻ.
+        final minWidth = scale * 12 * 11;
+        if (expectRow) {
+          expect(body.width, greaterThanOrEqualTo(minWidth + 15));
+        } else {
+          expect(body.width, greaterThanOrEqualTo(minWidth));
+        }
       });
     }
   });

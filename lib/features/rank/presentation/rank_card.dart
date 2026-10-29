@@ -209,9 +209,9 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
           child: const Text(Vi.rankDetermine, textAlign: TextAlign.center),
         );
         // Nút giữ độ rộng tự nhiên. Quy tắc duy nhất: hàng chỉ khi cột chữ còn
-        // rộng ít nhất [minTextShare] bề rộng trong của thẻ; hẹp hơn thì chữ
-        // bị bóp ra từng từ một dòng, nên xuống cột. Tỉ lệ (không phải số dp
-        // cố định) để cùng quy tắc đúng ở 320 dp lẫn khi chữ phóng 1.5 lần.
+        // rộng ít nhất 11 ký tự cỡ 12 sp, tính theo cỡ chữ người dùng chọn;
+        // hẹp hơn thì chữ bị bóp ra từng từ một dòng, nên xuống cột. Mức tối
+        // thiểu lớn theo chữ nên chữ phóng 1.5 lần đòi cột chữ rộng 1.5 lần.
         final label = TextPainter(
           text: TextSpan(
             text: Vi.rankDetermine,
@@ -223,10 +223,10 @@ class _UnrankedCardBodyState extends State<_UnrankedCardBody> {
         final labelWidth = label.width;
         label.dispose();
         const buttonPadding = 48.0;
-        const minTextShare = 0.45;
+        final minTextWidth = MediaQuery.textScalerOf(context).scale(12) * 11;
         final textWidth =
             box.maxWidth - (labelWidth + buttonPadding) - AppSpacing.sm;
-        final fitsInRow = textWidth >= box.maxWidth * minTextShare;
+        final fitsInRow = textWidth >= minTextWidth;
         if (fitsInRow) {
           return Row(
             children: [
