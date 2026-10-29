@@ -9,6 +9,8 @@ import 'package:poolcoachai/domain/coach/hints.dart';
 import 'package:poolcoachai/domain/coach/reference.dart';
 import 'package:poolcoachai/domain/coach/reveal.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart'
+    show notificationInboxDays;
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
@@ -582,13 +584,19 @@ abstract final class Vi {
   static const equipmentNotificationTitle = 'Đến lịch bảo dưỡng đầu cơ';
   static String equipmentNotificationBody(String cueName, int daysBefore) =>
       '$cueName: lịch bảo dưỡng ${daysBefore == 0 ? 'hôm nay' : 'sau $daysBefore ngày'}.';
-  static const equipmentReminderEnabled =
-      'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
-  static const equipmentReminderDenied =
-      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
+  static String equipmentReminderEnabled({required bool inBackground}) =>
+      inBackground
+      ? 'Điện thoại sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó, kể cả khi ứng dụng đang đóng.'
+      : 'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
+  static String equipmentReminderDenied({required bool inBackground}) =>
+      inBackground
+      ? 'Quyền thông báo đang bị chặn. Hãy bật lại trong Cài đặt của điện thoại.'
+      : 'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
   static const equipmentReminderEnable = 'Bật thông báo';
-  static const equipmentReminderPrompt =
-      'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó. Chỉ hoạt động khi ứng dụng đang mở.';
+  static String equipmentReminderPrompt({required bool inBackground}) =>
+      inBackground
+      ? 'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó, kể cả khi ứng dụng đang đóng.'
+      : 'Thông báo lúc 09:00 ngày đến hạn và 7 ngày trước đó. Chỉ hoạt động khi ứng dụng đang mở.';
   static const equipmentPracticeTime = 'Thời gian tập với cơ';
   static const equipmentLastUsed = 'Lần dùng gần nhất';
   static const equipmentNoRecordedPractice = 'Chưa có buổi tập ghi với cơ này.';
@@ -633,11 +641,14 @@ abstract final class Vi {
   // Thông báo — nội dung do bộ lập lịch (lib/domain/notifications) điền
   // từ dữ liệu thật của người chơi.
   static String notificationKind(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation => 'Gợi ý tập mới',
     NotificationKind.maintenance => 'Bảo dưỡng đầu cơ',
     NotificationKind.schedule => 'Lịch tập',
     NotificationKind.streak => 'Chuỗi ngày tập',
   };
   static String notificationKindHint(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation =>
+      'Lúc ${recommendationReminderHour.toString().padLeft(2, '0')}:00, khi gợi ý tập của ngày khác với gợi ý bạn thấy lần cuối ở Trang chủ.',
     NotificationKind.maintenance =>
       'Lúc 09:00, 7 ngày trước và đúng ngày đến hạn bảo dưỡng đầu cơ.',
     NotificationKind.schedule =>
@@ -645,6 +656,12 @@ abstract final class Vi {
     NotificationKind.streak =>
       'Lúc $streakReminderHour:00 nếu bạn có chuỗi từ $streakReminderMinDays ngày trở lên mà hôm nay chưa ghi buổi tập.',
   };
+  static const recommendationReminderTitle = 'Có gợi ý tập mới';
+  static String recommendationReminderBody(
+    String drillName,
+    SkillCategory cat,
+    String reason,
+  ) => '${skill(cat)} · $drillName. $reason';
   static const scheduleReminderTitle = 'Sắp đến giờ tập';
   static String scheduleReminderBody(
     String label,
@@ -671,16 +688,30 @@ abstract final class Vi {
   static String notificationsTime(DateTime at) =>
       '${at.hour.toString().padLeft(2, '0')}:'
       '${at.minute.toString().padLeft(2, '0')}';
+  static const notificationsSentTitle = 'Đã gửi';
+  static const notificationsSentEmpty =
+      'Chưa có thông báo nào trong $notificationInboxDays ngày qua.';
+  static String notificationsUnreadBadge(int n) => n > 99 ? '99+' : '$n';
+  static String notificationsBellTooltip(int unread) => unread == 0
+      ? notificationsTitle
+      : '$notificationsTitle, $unread chưa đọc';
+  static String notificationsSentAt(DateTime at, DateTime now) =>
+      '${at.year == now.year && at.month == now.month && at.day == now.day ? notificationsToday : notificationsDay(at)}, '
+      '${notificationsTime(at)}';
   static const notificationsPermissionTitle = 'Quyền thông báo';
   static const notificationsPermissionGranted = 'Đã bật thông báo.';
-  static const notificationsPermissionDenied =
-      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt của thiết bị hoặc trình duyệt.';
+  static String notificationsPermissionDenied({required bool inBackground}) =>
+      equipmentReminderDenied(inBackground: inBackground);
   static const notificationsPermissionPrompt =
-      'Bật thông báo để nhận nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
+      'Bật thông báo để nhận gợi ý tập mới, nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
   static const notificationsPermissionUnsupported =
       'Thiết bị hoặc trình duyệt này không hỗ trợ thông báo.';
-  static const notificationsWebOnlyWhileOpen =
-      'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở.';
+  static const notificationsBackgroundNote =
+      'Trên điện thoại, thông báo vẫn đến khi ứng dụng đang đóng.';
+  static const notificationsRecommendationLimit =
+      'Gợi ý tập mới được tính từ dữ liệu trên máy này lúc ứng dụng mở lần cuối. Nếu bạn tập trên máy khác, thông báo có thể chưa theo kịp.';
+  static String get notificationsWebOnlyWhileOpen =>
+      'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở. Gợi ý tập mới chỉ hiện nếu trang đã mở từ trước ${recommendationReminderHour.toString().padLeft(2, '0')}:00.';
 
   // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
   //

@@ -12,18 +12,34 @@ class NotificationPlatform {
           scheduler ??
           (Platform.isAndroid || Platform.isIOS
               ? LocalNotificationsScheduler()
-              : null);
+              : null) {
+    this.scheduler?.onTap = (payload) => onTap?.call(payload);
+  }
 
   final NotificationScheduler? scheduler;
+
+  /// Dịch vụ đặt vào đây để nhận lần chạm thông báo.
+  void Function(String payload)? onTap;
+
+  /// Chuỗi của thông báo đã mở app từ trạng thái đóng hẳn, nếu có.
+  Future<String?> takeLaunchPayload() =>
+      scheduler?.launchPayload() ?? Future.value();
   String _permission = 'default';
 
   bool get isSupported => scheduler != null;
 
   String? get permission => _permission;
 
-  /// Đọc quyền hiện tại của hệ điều hành vào [permission].
+  /// Đọc quyền hiện tại của hệ điều hành vào [permission]. Gọi lại được: quyền
+  /// bị tắt trong Cài đặt thì 'granted' thành 'denied'.
   Future<void> loadPermission() async {
-    if (await scheduler!.hasPermission()) _permission = 'granted';
+    final scheduler = this.scheduler;
+    if (scheduler == null) return;
+    if (await scheduler.hasPermission()) {
+      _permission = 'granted';
+    } else if (_permission == 'granted') {
+      _permission = 'denied';
+    }
   }
 
   Future<String?> requestPermission() async {
@@ -35,6 +51,7 @@ class NotificationPlatform {
     required String title,
     required String body,
     required String tag,
+    required String payload,
   }) {
     throw UnsupportedError('Native platforms schedule instead of showing');
   }

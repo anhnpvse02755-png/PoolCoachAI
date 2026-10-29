@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
@@ -127,6 +128,7 @@ class ProfileScreen extends ConsumerWidget {
       forgetChatInFlight: ref
           .read(coachChatControllerProvider.notifier)
           .forgetInFlight,
+      recommendationSeen: ref.read(recommendationSeenStoreProvider),
     );
   }
 

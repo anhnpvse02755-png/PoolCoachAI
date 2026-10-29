@@ -1,19 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_layout.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 
 import '../../support/layout_sweep.dart';
+
+/// Chuông trên thanh tiêu đề đọc nhật ký thông báo: mọi lần dựng cần một
+/// nhật ký.
+Widget _scoped(Widget child) => ProviderScope(
+  overrides: [
+    notificationLogProvider.overrideWith(
+      (ref) => Stream.value(const <NotificationLogEntry>[]),
+    ),
+  ],
+  child: child,
+);
 
 void main() {
   group('PcRootScaffold', () {
     testWidgets('đặt tên màn lên thanh tiêu đề', (tester) async {
-      await tester.pumpWidget(
+      await tester.pumpWidget(_scoped(
         const MaterialApp(
           home: PcRootScaffold(title: 'Thống kê', body: SizedBox()),
         ),
-      );
+      ));
 
       expect(
         find.descendant(
@@ -25,26 +39,45 @@ void main() {
     });
 
     testWidgets('dựng phần thân được truyền vào', (tester) async {
-      await tester.pumpWidget(
+      await tester.pumpWidget(_scoped(
         const MaterialApp(
           home: PcRootScaffold(
             title: 'Thống kê',
             body: Text('nội dung thân màn'),
           ),
         ),
-      );
+      ));
 
       expect(find.text('nội dung thân màn'), findsOneWidget);
     });
 
     testWidgets('có chuông thông báo kèm nhãn trợ năng', (tester) async {
-      await tester.pumpWidget(
+      await tester.pumpWidget(_scoped(
         const MaterialApp(
           home: PcRootScaffold(title: 'Thống kê', body: SizedBox()),
         ),
-      );
+      ));
 
       expect(find.byTooltip(Vi.notificationsTitle), findsOneWidget);
+    });
+
+    testWidgets('thanh trên có chuông kèm huy hiệu', (tester) async {
+      await tester.pumpWidget(
+        _scoped(
+          const MaterialApp(
+            home: PcRootScaffold(title: 'Thống kê', body: SizedBox()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(Badge),
+        ),
+        findsOneWidget,
+      );
     });
   });
 
@@ -53,7 +86,7 @@ void main() {
       WidgetTester tester, {
       required Widget body,
       double maxBodyWidth = AppLayout.readableMaxWidth,
-    }) => tester.pumpWidget(
+    }) => tester.pumpWidget(_scoped(
       MaterialApp(
         home: PcRootScaffold(
           title: 'Thống kê',
@@ -61,7 +94,7 @@ void main() {
           maxBodyWidth: maxBodyWidth,
         ),
       ),
-    );
+    ));
 
     testWidgets('màn rộng 1280: thân màn tối đa 840 và nằm giữa, '
         'thanh tiêu đề vẫn rộng hết', (tester) async {

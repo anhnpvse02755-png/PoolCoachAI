@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
@@ -18,15 +20,26 @@ import 'package:poolcoachai/features/training/presentation/simulator/table_paint
 import '../../support/test_data.dart';
 
 /// Màn nhập bàn (spec mục 6) và việc chuyển qua lại với màn từng bước.
+/// Chuông trên thanh tiêu đề đọc nhật ký thông báo: màn dựng không qua
+/// container của app cần một nhật ký rỗng.
+Widget _bellScope(Widget child) => ProviderScope(
+  overrides: [
+    notificationLogProvider.overrideWith(
+      (ref) => Stream.value(const <NotificationLogEntry>[]),
+    ),
+  ],
+  child: child,
+);
+
 void main() {
   Future<void> open(WidgetTester tester, {SetupDraft draft = const SetupDraft()}) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(_bellScope(MaterialApp(
       theme: AppTheme.dark(),
       home: PlannerScreen(initialDraft: draft),
-    ));
+    )));
     await tester.pumpAndSettle();
   }
 

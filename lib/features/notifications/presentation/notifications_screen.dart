@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/router/notification_tap_listener.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
+import 'package:poolcoachai/core/widgets/pc_rebuild_at.dart';
 import 'package:poolcoachai/core/widgets/pc_section_header.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 
 /// Màn Thông báo, mở đè lên shell từ chuông trên thanh tiêu đề.
 ///
-/// Có Scaffold và AppBar riêng vì nó nằm ngoài shell 5 tab. Ba phần:
-/// quyền thông báo, loại thông báo bật/tắt, và danh sách sẽ gửi trong
-/// 7 ngày tới — chính kế hoạch mà dịch vụ gửi, không phải bản sao.
+/// Có Scaffold và AppBar riêng vì nó nằm ngoài shell 5 tab. Bốn phần:
+/// - quyền thông báo (kèm ghi chú theo nền tảng);
+/// - "Đã gửi": nhật ký 30 ngày, mục chưa đọc in đậm, mở màn là đã đọc;
+/// - loại thông báo bật/tắt;
+/// - danh sách sẽ gửi trong 7 ngày tới — chính kế hoạch mà dịch vụ gửi,
+///   không phải bản sao.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -25,6 +34,119 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  /// Mục chưa đọc lúc mở màn: in đậm suốt lượt xem này dù đã đánh dấu đọc.
+  final _bold = <int>{};
+
+  /// Quay lại từ Cài đặt (bật/tắt quyền ở đó): đọc lại quyền và vẽ lại thẻ.
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      notificationLogProvider,
+      (_, next) => _markSeen(next),
+      fireImmediately: true,
+    );
+    _lifecycle = AppLifecycleListener(onResume: _resumed);
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _resumed() async {
+    await ref.read(notificationServiceProvider).resumed();
+    if (mounted) setState(() {});
+  }
+
+  /// Chỉ đọc nhật ký khi đã có giá trị và không đang tải lại: nhật ký cũ của
+  /// tài khoản trước không được đánh dấu đọc cho tài khoản sau.
+  void _markSeen(AsyncValue<List<NotificationLogEntry>> log) {
+    if (!log.hasValue || log.isLoading) return;
+    final now = ref.read(nowProvider)();
+    final ids = [
+      for (final e in inboxEntries(log.requireValue, now))
+        if (e.readAt == null && !_bold.contains(e.id)) e.id,
+    ];
+    if (ids.isEmpty) return;
+    _bold.addAll(ids);
+    if (mounted) setState(() {});
+    ref.read(notificationLogRepositoryProvider)?.markRead(ids, at: now);
+  }
+
+  Widget _sent() {
+    final log = ref.watch(notificationLogProvider);
+    final all = log.hasValue && !log.isLoading
+        ? log.requireValue
+        : const <NotificationLogEntry>[];
+    final clock = ref.watch(nowProvider);
+    return PcRebuildAt(
+      clock: clock,
+      nextAt: (now) => nextDelivery(all, now),
+      // Một mục vừa tới giờ khi màn đang mở cũng là đã thấy.
+      onDue: () => _markSeen(ref.read(notificationLogProvider)),
+      builder: (context) {
+        final current = clock();
+        final entries = inboxEntries(all, current);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const PcSectionHeader(title: Vi.notificationsSentTitle),
+            if (entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  Vi.notificationsSentEmpty,
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
+              )
+            else
+              for (final e in entries) ...[
+                PcCard(
+                  padding: EdgeInsets.zero,
+                  // Giờ gửi nằm trên dòng riêng, không ở cột trái: chữ lớn
+                  // trên điện thoại thì cột trái ép tiêu đề và nội dung hẹp.
+                  child: ListTile(
+                    title: Text(
+                      e.title,
+                      style: TextStyle(
+                        fontWeight: _bold.contains(e.id)
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          Vi.notificationsSentAt(e.at, current),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(e.body),
+                      ],
+                    ),
+                    onTap: () {
+                      final route = notificationRoute(
+                        NotificationTap(e.kind, e.key),
+                      );
+                      if (route != null) context.go(route);
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _enable() async {
     await ref.read(notificationServiceProvider).requestPermission();
     if (mounted) setState(() {});
@@ -43,6 +165,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           _permissionCard(),
+          _sent(),
           const PcSectionHeader(title: Vi.notificationsSettingsTitle),
           PcCard(
             padding: EdgeInsets.zero,
@@ -94,40 +217,50 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ListTile(
-            leading: Icon(
-              granted
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_none,
+          if (granted || denied)
+            ListTile(
+              leading: Icon(
+                granted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_none,
+              ),
+              title: const Text(Vi.notificationsPermissionTitle),
+              subtitle: Text(
+                granted
+                    ? Vi.notificationsPermissionGranted
+                    : Vi.notificationsPermissionDenied(
+                        inBackground: service.schedulesInBackground,
+                      ),
+              ),
+              trailing: granted
+                  ? const Icon(Icons.check_circle_outline)
+                  : null,
+            )
+          else
+            // Nút xuống dưới chữ khi cột chữ hẹp (màn nhỏ, chữ lớn).
+            PcActionTile(
+              icon: const Icon(Icons.notifications_none),
+              title: Vi.notificationsPermissionTitle,
+              body: Vi.notificationsPermissionPrompt,
+              actionLabel: Vi.equipmentReminderEnable,
+              onAction: _enable,
             ),
-            title: const Text(Vi.notificationsPermissionTitle),
-            subtitle: Text(
-              granted
-                  ? Vi.notificationsPermissionGranted
-                  : denied
-                  ? Vi.notificationsPermissionDenied
-                  : Vi.notificationsPermissionPrompt,
-            ),
-            trailing: granted
-                ? const Icon(Icons.check_circle_outline)
-                : denied
-                ? null
-                : TextButton(
-                    onPressed: _enable,
-                    child: const Text(Vi.equipmentReminderEnable),
-                  ),
-          ),
-          if (!service.schedulesInBackground)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
+          for (final note in service.schedulesInBackground
+              ? const [
+                  Vi.notificationsBackgroundNote,
+                  Vi.notificationsRecommendationLimit,
+                ]
+              : [Vi.notificationsWebOnlyWhileOpen])
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 0,
                 AppSpacing.md,
                 AppSpacing.sm,
               ),
               child: Text(
-                Vi.notificationsWebOnlyWhileOpen,
-                style: TextStyle(color: AppColors.textMuted),
+                note,
+                style: const TextStyle(color: AppColors.textMuted),
               ),
             ),
         ],

@@ -591,10 +591,16 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
     if (!reminders.isSupported) return const SizedBox.shrink();
     final permission = reminders.permission;
     final message = permission == 'granted'
-        ? Vi.equipmentReminderEnabled
+        ? Vi.equipmentReminderEnabled(
+            inBackground: reminders.schedulesInBackground,
+          )
         : permission == 'denied'
-        ? Vi.equipmentReminderDenied
-        : Vi.equipmentReminderPrompt;
+        ? Vi.equipmentReminderDenied(
+            inBackground: reminders.schedulesInBackground,
+          )
+        : Vi.equipmentReminderPrompt(
+            inBackground: reminders.schedulesInBackground,
+          );
     const icon = Icon(Icons.notifications_active_outlined);
     const title = Text(Vi.equipmentReminderTitle);
     final canEnable = permission != 'granted' && permission != 'denied';

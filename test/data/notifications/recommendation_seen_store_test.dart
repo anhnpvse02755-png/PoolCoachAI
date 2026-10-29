@@ -1,0 +1,76 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  const key = 'poolcoachai:recommendation-seen:v1:u1';
+
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('lưu và đọc theo tài khoản, không lẫn', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+    final seen = SeenRecommendation(
+      cat: SkillCategory.bank,
+      drillId: 'd8',
+      at: DateTime(2026, 9, 22, 10),
+    );
+
+    await store.save('u1', seen);
+
+    expect(await store.load('u1'), seen);
+    expect(await store.load('u2'), isNull);
+  });
+
+  test('quên một tài khoản: chỉ xoá của người đó', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+    final seen = SeenRecommendation(
+      cat: SkillCategory.bank,
+      drillId: 'd8',
+      at: DateTime(2026, 9, 22, 10),
+    );
+    await store.save('u1', seen);
+    await store.save('u2', seen);
+
+    await store.forget('u1');
+
+    expect(await store.load('u1'), isNull);
+    expect(await store.load('u2'), seen);
+  });
+
+  test('giá trị hỏng hoặc nhóm lạ: coi như chưa thấy', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+
+    SharedPreferences.setMockInitialValues({
+      key: '{"cat":"nope","drillId":"d1","at":"2026-09-22T10:00:00.000"}',
+    });
+    expect(await store.load('u1'), isNull);
+
+    SharedPreferences.setMockInitialValues({key: '{'});
+    expect(await store.load('u1'), isNull);
+  });
+
+  test('sai kiểu, thiếu trường hay giờ hỏng: coi như chưa thấy', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+    for (final raw in [
+      '[]',
+      '"chuỗi"',
+      '{"cat":1,"drillId":"d1","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":7,"at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"d1","at":20260922}',
+      '{"cat":"bank","drillId":"d1"}',
+      '{"cat":"bank","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"d1","at":"không phải giờ"}',
+    ]) {
+      SharedPreferences.setMockInitialValues({key: raw});
+      expect(await store.load('u1'), isNull, reason: raw);
+    }
+    // Đối chứng: cùng dạng mà đủ và đúng thì đọc được.
+    SharedPreferences.setMockInitialValues({
+      key: '{"cat":"bank","drillId":"d1","at":"2026-09-22T10:00:00.000"}',
+    });
+    expect(await store.load('u1'), isNotNull);
+  });
+}

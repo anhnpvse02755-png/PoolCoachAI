@@ -24,6 +24,7 @@ import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 
+import '../../support/idle_notification_scheduler.dart';
 import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
@@ -399,6 +400,8 @@ void main() {
       WidgetTester tester, {
       required double textScale,
       int cues = 6,
+      bool background = false,
+      String permission = 'default',
       Size size = const Size(360, 640),
       double navHeight = 0,
     }) async {
@@ -431,7 +434,10 @@ void main() {
               db: ref.watch(appDatabaseProvider),
               auth: ref.watch(authRepositoryProvider),
               now: ref.watch(nowProvider),
-              platform: _PromptPlatform(),
+              platform: _PromptPlatform(
+                scheduler: background ? IdleNotificationScheduler() : null,
+                permissionValue: permission,
+              ),
             ),
           ),
         ],
@@ -461,7 +467,7 @@ void main() {
     testWidgets('x1.5: cột chữ của thẻ không bị bóp từng từ', (tester) async {
       await openWithReminder(tester, textScale: 1.5);
       final textWidth = tester
-          .getSize(find.text(Vi.equipmentReminderPrompt))
+          .getSize(find.text(Vi.equipmentReminderPrompt(inBackground: false)))
           .width;
       expect(textWidth, greaterThanOrEqualTo(12 * 1.5 * 11));
       expect(tester.takeException(), isNull);
@@ -492,9 +498,62 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('điện thoại (có lịch nền): thẻ nhắc nói vẫn đến khi ứng dụng '
+        'đóng, x1.5 đủ chữ không tràn', (tester) async {
+      await openWithReminder(tester, textScale: 1.5, background: true);
+      expect(
+        find.text(Vi.equipmentReminderPrompt(inBackground: true)),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Chỉ hoạt động khi'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('điện thoại, đã bật: nói vẫn nhắc khi ứng dụng đóng', (
+      tester,
+    ) async {
+      await openWithReminder(
+        tester,
+        textScale: 1.5,
+        background: true,
+        permission: 'granted',
+      );
+      expect(
+        find.text(Vi.equipmentReminderEnabled(inBackground: true)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(Vi.equipmentReminderEnabled(inBackground: false)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final background in [true, false]) {
+      testWidgets('bị chặn (${background ? 'điện thoại' : 'web'}): chỉ đúng '
+          'chỗ bật lại của nền tảng', (tester) async {
+        await openWithReminder(
+          tester,
+          textScale: 1.0,
+          background: background,
+          permission: 'denied',
+        );
+        expect(
+          find.text(Vi.equipmentReminderDenied(inBackground: background)),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('trình duyệt'),
+          background ? findsNothing : findsOneWidget,
+        );
+      });
+    }
+
     testWidgets('x1.0: nút nằm cùng hàng với chữ như cũ', (tester) async {
       await openWithReminder(tester, textScale: 1.0, cues: 1);
-      final text = tester.getRect(find.text(Vi.equipmentReminderPrompt));
+      final text = tester.getRect(
+        find.text(Vi.equipmentReminderPrompt(inBackground: false)),
+      );
       final button = tester.getRect(find.text(Vi.equipmentReminderEnable));
       expect(
         button.top,
@@ -566,14 +625,18 @@ const _family = 'RobotoEquipment';
 
 /// Trình duyệt giả: hỗ trợ thông báo, chưa được cấp quyền.
 class _PromptPlatform extends NotificationPlatform {
+  _PromptPlatform({this.scheduler, this.permissionValue = 'default'});
+
   @override
-  NotificationScheduler? get scheduler => null;
+  final NotificationScheduler? scheduler;
+
+  final String permissionValue;
 
   @override
   bool get isSupported => true;
 
   @override
-  String? get permission => 'default';
+  String? get permission => permissionValue;
 
   @override
   Future<String?> requestPermission() async => 'granted';

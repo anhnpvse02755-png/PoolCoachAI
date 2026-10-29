@@ -33,8 +33,24 @@ void startSync(ProviderContainer container) {
   container.read(syncServiceProvider);
   container.read(cueEquipmentSyncProvider);
   container.read(practiceSyncProvider);
-  container.read(notificationServiceProvider).start();
+  startNotifications(container);
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);
   container.read(coachSyncProvider);
+}
+
+/// Bật dịch vụ thông báo và giữ nó được nghe suốt đời app (plan ★12).
+///
+/// Không dùng `container.read`: trong Riverpod 3.4.3 `read` là `listen` rồi
+/// `close` ngay, nên dịch vụ thành không còn ai nghe, và các `ref.listen` của
+/// nó (cài đặt thông báo, nguồn gợi ý) bị vô hiệu. Lần đổi `state =` trực
+/// tiếp vẫn tới được (như lần nạp cài đặt đầu tiên), nhưng một provider không
+/// còn ai nghe thì không dựng lại khi thứ nó phụ thuộc đổi. Vì vậy sau khi
+/// đăng nhập giữa phiên hay đổi tài khoản, chuỗi auth → cài đặt / nguồn gợi
+/// ý không dựng lại, và dịch vụ giữ cài đặt mặc định (hoặc của tài khoản
+/// trước) cho tới khi một màn hình nào đó theo dõi chúng.
+///
+/// Đăng ký ở đây không bao giờ đóng: dịch vụ sống cùng [container].
+void startNotifications(ProviderContainer container) {
+  container.listen(notificationServiceProvider, (_, _) {}).read().start();
 }

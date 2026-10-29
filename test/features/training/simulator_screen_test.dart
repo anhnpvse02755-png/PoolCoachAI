@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
@@ -26,6 +28,17 @@ import '../../support/test_data.dart';
 
 /// Mô phỏng góc cắt — spec 2026-10-01 mục 5 và 2026-10-02 mục 6. Mọi con
 /// số mong đợi lấy từ chính lõi, không viết tay.
+/// Chuông trên thanh tiêu đề đọc nhật ký thông báo: màn dựng không qua
+/// container của app cần một nhật ký rỗng.
+Widget _bellScope(Widget child) => ProviderScope(
+  overrides: [
+    notificationLogProvider.overrideWith(
+      (ref) => Stream.value(const <NotificationLogEntry>[]),
+    ),
+  ],
+  child: child,
+);
+
 void main() {
   const table = TableSpec.nineFoot;
   final initial = bestPocket(
@@ -395,10 +408,10 @@ void main() {
     tester.view.physicalSize = const Size(1200, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(_bellScope(MaterialApp(
       theme: AppTheme.dark(),
       home: SimulatorScreen(aim: aim),
-    ));
+    )));
     await tester.pumpAndSettle();
   }
 

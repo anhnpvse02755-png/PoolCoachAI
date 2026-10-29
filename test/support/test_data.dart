@@ -16,11 +16,14 @@ import 'package:poolcoachai/data/repositories/coach_chat_repository.dart';
 import 'package:poolcoachai/domain/coach/attempt.dart';
 import 'package:poolcoachai/domain/coach/coach_context.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/providers/skill_test_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/providers/tournament_providers.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/tournament/tournament.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -46,6 +49,7 @@ import 'package:poolcoachai/domain/pool_match.dart';
 
 import 'coach_fixtures.dart';
 import 'fake_coach_chat.dart';
+import 'fake_recommendation_seen_store.dart';
 import 'planner_tables.dart';
 import 'fake_auth.dart';
 
@@ -93,6 +97,8 @@ ProviderContainer testContainer({
   List<Drill>? drills,
   List<KnowledgeArticle>? knowledge,
   List<DrillLog>? logs,
+  Stream<List<DrillLog>>? logsStream,
+  RecommendationSeenStore? seenStore,
   List<TimerSession>? timerSessions,
   List<ScheduleSlot>? schedule,
   List<CueEquipment>? equipment,
@@ -123,9 +129,17 @@ ProviderContainer testContainer({
   AsyncValue<List<Tournament>>? tournamentsAsync,
   AsyncValue<GoalRecord?>? goalAsync,
   Map<String, TournamentStatus>? forcedTournamentStatus,
+  List<NotificationLogEntry>? notificationLog,
+  List<Override> extraOverrides = const [],
 }) {
   return ProviderContainer(
     overrides: [
+      // Không dựng AppDatabase thật trong widget test: không có kho nhật ký.
+      notificationLogRepositoryProvider.overrideWithValue(null),
+      notificationLogProvider.overrideWith(
+        (ref) =>
+            Stream.value(notificationLog ?? const <NotificationLogEntry>[]),
+      ),
       // Cho test chứng minh màn hình dùng trạng thái do provider đưa ra, không
       // tự tính lại: ép trạng thái khác với ngày thật của giải.
       if (forcedTournamentStatus != null)
@@ -156,8 +170,12 @@ ProviderContainer testContainer({
       knowledgeProvider.overrideWith(
         (ref) => Stream.value(knowledge ?? testKnowledge),
       ),
+      // `logsStream` thắng `logs`.
       drillLogsProvider.overrideWith(
-        (ref) => Stream.value(logs ?? const <DrillLog>[]),
+        (ref) => logsStream ?? Stream.value(logs ?? const <DrillLog>[]),
+      ),
+      recommendationSeenStoreProvider.overrideWithValue(
+        seenStore ?? FakeRecommendationSeenStore(),
       ),
       timerSessionsProvider.overrideWith(
         (ref) => Stream.value(timerSessions ?? const <TimerSession>[]),
@@ -214,6 +232,7 @@ ProviderContainer testContainer({
         latestBuResultProvider.overrideWithValue(
           AsyncData<BuResult?>(buResult),
         ),
+      ...extraOverrides,
     ],
   );
 }
@@ -264,6 +283,7 @@ ProviderContainer dbContainer(
   DateTime Function()? clock,
   Duration? rankLag,
   List<DrillLog>? logs,
+  RecommendationSeenStore? seenStore,
   List<Drill>? drills,
   TournamentRepository Function(AppDatabase db)? tournamentRepo,
   RoadmapRepository Function(AppDatabase db)? roadmapRepo,
@@ -299,6 +319,9 @@ ProviderContainer dbContainer(
       appDatabaseProvider.overrideWithValue(db),
       // Không widget test nào được chạm mạng: luôn thay backend thật.
       coachChatBackendProvider.overrideWithValue(FakeCoachChat()),
+      recommendationSeenStoreProvider.overrideWithValue(
+        seenStore ?? FakeRecommendationSeenStore(),
+      ),
       nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),
       knowledgeProvider.overrideWith((ref) => Stream.value(testKnowledge)),

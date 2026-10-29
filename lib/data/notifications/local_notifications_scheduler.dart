@@ -19,6 +19,7 @@ class LocalNotificationsScheduler implements NotificationScheduler {
 
   /// 'cue_maintenance' giữ nguyên để kênh cũ của người đã cài vẫn dùng được.
   static String _channelId(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation => 'recommendation_reminder',
     NotificationKind.maintenance => 'cue_maintenance',
     NotificationKind.schedule => 'schedule_reminder',
     NotificationKind.streak => 'streak_reminder',
@@ -26,6 +27,10 @@ class LocalNotificationsScheduler implements NotificationScheduler {
 
   final FlutterLocalNotificationsPlugin _plugin;
   Future<void>? _init;
+  void Function(String payload)? _onTap;
+
+  @override
+  set onTap(void Function(String payload)? handler) => _onTap = handler;
 
   Future<void> _ensureInit() => _init ??= _initialize();
 
@@ -43,7 +48,19 @@ class LocalNotificationsScheduler implements NotificationScheduler {
           requestSoundPermission: false,
         ),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) _onTap?.call(payload);
+      },
     );
+  }
+
+  @override
+  Future<String?> launchPayload() async {
+    await _ensureInit();
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return null;
+    return details?.notificationResponse?.payload;
   }
 
   @override
@@ -90,7 +107,10 @@ class LocalNotificationsScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<void> schedule(PlannedNotification notification) async {
+  Future<void> schedule(
+    PlannedNotification notification, {
+    required String payload,
+  }) async {
     await _ensureInit();
     final at = notification.at;
     await _plugin.zonedSchedule(
@@ -115,6 +135,7 @@ class LocalNotificationsScheduler implements NotificationScheduler {
         iOS: const DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
     );
   }
 

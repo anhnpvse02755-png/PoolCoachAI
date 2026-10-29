@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 
 /// Đặt lịch thông báo của hệ điều hành (Android/iOS). Tách khỏi plugin để
@@ -12,30 +13,67 @@ abstract class NotificationScheduler {
   /// Id các thông báo đang chờ trong hệ điều hành.
   Future<Set<int>> pendingIds();
 
-  /// Đặt một thông báo vào giờ [PlannedNotification.at].
-  Future<void> schedule(PlannedNotification notification);
+  /// Đặt một thông báo vào giờ [PlannedNotification.at], kèm [payload]
+  /// (`notificationPayload`) để nhận ra nó khi chạm.
+  Future<void> schedule(
+    PlannedNotification notification, {
+    required String payload,
+  });
 
   /// Huỷ một thông báo đang chờ.
   Future<void> cancel(int id);
 
   /// Huỷ mọi thông báo đã đặt.
   Future<void> cancelAll();
+
+  /// Nơi nhận chuỗi đi kèm thông báo khi người dùng chạm lúc app đang chạy.
+  set onTap(void Function(String payload)? handler);
+
+  /// Chuỗi đi kèm thông báo đã mở app từ trạng thái đóng hẳn; null nếu app
+  /// không được mở bằng thông báo.
+  Future<String?> launchPayload();
 }
 
 /// Đưa lịch của hệ điều hành về đúng [desired]: huỷ cái thừa, đặt cái
-/// thiếu, giữ nguyên cái đã đúng.
+/// thiếu, giữ nguyên cái đã đúng. Trả về id đã huỷ.
 ///
 /// Id sinh từ giờ và chữ của thông báo, nên cùng id là cùng thông báo.
-Future<void> reconcileNotifications(
+/// [keep]: id không có trong [desired] mà vẫn để yên nếu còn chờ (thông báo
+/// đã quá giờ nhưng hệ điều hành chưa giao).
+///
+/// [replaceAll]: đặt lại cả cái đang chờ đúng id (cái cũ thiếu thứ bản mới
+/// cần, như payload, hoặc là của tài khoản trước). Id trả về vẫn chỉ là cái
+/// huỷ mà không đặt lại.
+///
+/// Payload mang [userId]: chạm thông báo của tài khoản khác thì bị bỏ qua.
+///
+/// [gone]: nếu có, nhận dần từng id đã thật sự bị huỷ mà chưa đặt lại, ngay
+/// khi việc đó xảy ra. Hệ điều hành ném giữa chừng thì [gone] vẫn đúng với
+/// những gì đã làm, để nơi gọi xoá đúng các dòng nhật ký đó.
+Future<Set<int>> reconcileNotifications(
   NotificationScheduler scheduler,
-  List<PlannedNotification> desired,
-) async {
+  List<PlannedNotification> desired, {
+  required String userId,
+  Set<int> keep = const {},
+  bool replaceAll = false,
+  Set<int>? gone,
+}) async {
+  final out = gone ?? <int>{};
   final pending = await scheduler.pendingIds();
-  final wanted = {for (final n in desired) n.id};
-  for (final id in pending.difference(wanted)) {
+  final desiredIds = {for (final n in desired) n.id};
+  final cancelled = pending.difference({...desiredIds, ...keep});
+  for (final id in replaceAll ? pending.difference(keep) : cancelled) {
     await scheduler.cancel(id);
+    out.add(id);
   }
   for (final n in desired) {
-    if (!pending.contains(n.id)) await scheduler.schedule(n);
+    if (replaceAll || !pending.contains(n.id)) {
+      await scheduler.schedule(
+        n,
+        payload: notificationPayload(n.kind, n.key, userId: userId),
+      );
+      out.remove(n.id);
+    }
   }
+  return out;
 }
