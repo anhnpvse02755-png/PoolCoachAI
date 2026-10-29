@@ -15,6 +15,16 @@ void main() {
   // Thứ Ba 2026-10-13.
   final now = DateTime(2026, 10, 13, 7);
   const noStreak = StreakState(days: 0, practicedToday: false);
+  const secondAimingDrill = Drill(
+    id: 'd2',
+    cat: SkillCategory.aiming,
+    name: 'Đường chéo cơ bản',
+    level: 1,
+    unit: 'lần trúng / 10',
+    passThreshold: 0.8,
+    goal: 'g',
+    steps: [],
+  );
   const bankDrill = Drill(
     id: 'b1',
     cat: SkillCategory.bank,
@@ -103,26 +113,51 @@ void main() {
     expect(reco(inputs(drills: const [])), isEmpty);
   });
 
-  test('đã tập bài được gợi ý trước 08:00: thông báo hôm nay không nói về bài đó', () {
-    final x = inputs().recommendFor(DateTime(2026, 10, 13, 8)).drill!.id;
-    final today = reco(
-      inputs(
-        logs: [
-          DrillLog(
-            id: 'l',
-            drillId: x,
-            date: DateTime(2026, 10, 13, 6, 30),
-            score: 1,
-          ),
-        ],
-      ),
-      at: DateTime(2026, 10, 13, 7, 30),
-    ).where((n) => n.at == DateTime(2026, 10, 13, 8));
-    expect(
-      today.where((n) => parseRecommendationKey(n.key)!.drillId == x),
-      isEmpty,
-    );
-  });
+  test(
+    'đã tập bài được gợi ý trước 08:00: thông báo hôm nay nói về bài khác',
+    () {
+      // Khung lịch Thứ Ba gắn nhóm ngắm giữ nhóm của hôm nay; nhóm có hai
+      // bài, nên bỏ bài đã tập thì vẫn còn bài để gợi ý.
+      final drills = [...testDrills, secondAimingDrill];
+      const schedule = [
+        ScheduleSlot(
+          id: 's',
+          day: 1,
+          time: '19:00',
+          label: 'l',
+          cat: SkillCategory.aiming,
+        ),
+      ];
+      final before = DateTime(2026, 10, 13, 7, 30);
+      final eight = DateTime(2026, 10, 13, 8);
+      String drillOf(PlannedNotification n) =>
+          parseRecommendationKey(n.key)!.drillId;
+
+      // Cùng dữ liệu mà chưa tập: 08:00 hôm nay nói về x.
+      final untouched = reco(
+        inputs(drills: drills, schedule: schedule),
+        at: before,
+      );
+      final x = drillOf(untouched.singleWhere((n) => n.at == eight));
+
+      final today = reco(
+        inputs(
+          schedule: schedule,
+          drills: drills,
+          logs: [
+            DrillLog(
+              id: 'l',
+              drillId: x,
+              date: DateTime(2026, 10, 13, 6, 30),
+              score: 1,
+            ),
+          ],
+        ),
+        at: before,
+      ).singleWhere((n) => n.at == eight);
+      expect(drillOf(today), isNot(x));
+    },
+  );
 
   test('nội dung là khuôn Vi điền từ computeRecommendation', () {
     final rec = inputs().recommendFor(DateTime(2026, 10, 13, 8));

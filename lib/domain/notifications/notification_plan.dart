@@ -70,15 +70,15 @@ StreakState streakStateOf({
 
 /// Toàn bộ thông báo còn phải gửi sau [now], xếp theo giờ, tối đa [limit].
 ///
+/// - Gợi ý tập mới: 08:00 hôm nay (nếu chưa tới) và 08:00 ngày mai, tính
+///   bằng [RecommendationInputs.recommendFor]. Chỉ khi gợi ý của ngày đó có
+///   bài và khác cặp (nhóm, bài) đã thấy lần cuối [lastSeenRecommendation]
+///   hoặc của ngày liền trước trong cùng kế hoạch.
 /// - Bảo dưỡng: như [computeMaintenanceSchedule], không giới hạn ngày.
 /// - Lịch tập: [scheduleReminderLeadMinutes] phút trước giờ bắt đầu của
 ///   mỗi khung tuần, trong [scheduleReminderHorizonDays] ngày tới.
 /// - Chuỗi: 20:00 hôm nay nếu chuỗi từ [streakReminderMinDays] ngày mà
 ///   hôm nay chưa tập.
-///
-/// - Gợi ý tập mới: 08:00 hôm nay (nếu chưa tới) và 08:00 ngày mai, chỉ
-///   khi gợi ý của ngày đó có bài và khác cặp (nhóm, bài) đã thấy lần cuối
-///   [lastSeenRecommendation] hoặc của ngày liền trước trong cùng kế hoạch.
 ///
 /// Loại bị tắt trong [prefs] không có mặt.
 List<PlannedNotification> planNotifications({
