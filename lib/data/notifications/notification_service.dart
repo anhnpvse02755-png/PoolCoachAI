@@ -282,9 +282,18 @@ class NotificationService {
       }
       if (_disposed) return;
       final userId = _userId;
+      // Đủ dữ liệu của đúng người này để lập kế hoạch. Kiểm lại sau mỗi lần
+      // chờ: trong lúc đó tài khoản có thể đổi đi rồi đổi lại (các luồng
+      // của người đó phát lại từ đầu) hay cài đặt về "chưa nạp", và một kế
+      // hoạch lập từ dữ liệu trống sẽ huỷ mọi thông báo đang chờ.
+      bool ready() =>
+          !_disposed &&
+          _userId == userId &&
+          _prefs != null &&
+          _awaitingFirst == 0;
       if (userId == null) {
         await scheduler.cancelAll();
-      } else if (_prefs != null && _awaitingFirst == 0) {
+      } else if (ready()) {
         final now = _now().toLocal();
         final log = NotificationLogRepository(_db, userId: userId);
         if (_platform.permission == 'granted') {
@@ -293,10 +302,10 @@ class NotificationService {
           // có thể chậm một lần ghi: lập từ nó thì lần này thêm lại cái lần
           // trước vừa xoá, luồng phát bản cũ, lần sau xoá lại… không dừng.
           final current = await log.all();
-          if (_disposed || _userId != userId) return;
-          final plan = _plan(now, current: current);
+          if (!ready()) return;
           final replaceAll = await _scheduleOutdated;
-          if (_disposed || _userId != userId) return;
+          if (!ready()) return;
+          final plan = _plan(now, current: current);
           // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
           // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
           final cancelled = await reconcileNotifications(
@@ -434,16 +443,29 @@ class NotificationService {
     void watch<T>(Stream<T> stream, void Function(T value) assign) {
       var first = true;
       _awaitingFirst++;
+      void arrived() {
+        if (first) {
+          first = false;
+          _awaitingFirst--;
+        }
+      }
+
       _dataSubscriptions.add(
-        stream.listen((value) {
-          if (_userId != userId || _disposed) return;
-          if (first) {
-            first = false;
-            _awaitingFirst--;
-          }
-          assign(value);
-          checkNow();
-        }),
+        stream.listen(
+          (value) {
+            if (_userId != userId || _disposed) return;
+            arrived();
+            assign(value);
+            checkNow();
+          },
+          // Lỗi cũng là lần phát đầu (giữ giá trị trước đó): không thì một
+          // luồng hỏng chặn đồng bộ của mọi loại khác suốt phiên.
+          onError: (Object _) {
+            if (_userId != userId || _disposed) return;
+            arrived();
+            checkNow();
+          },
+        ),
       );
     }
 

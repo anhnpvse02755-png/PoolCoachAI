@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show AsyncData, AsyncError, AsyncLoading, AsyncValue;
@@ -1010,8 +1012,25 @@ void main() {
           if (r.at.isAfter(now) && r.kind == NotificationKind.recommendation.name)
             r.id,
       };
-      // Lịch hệ điều hành và nhật ký khớp nhau, dù cuối cùng giữ hay mất.
+      // Lịch hệ điều hành và nhật ký khớp nhau. Lần lỗi đã xoá gợi ý, nên
+      // "đang tải" sau đó không còn gì để giữ.
       expect(pendingReco, futureRows);
+      expect(pendingReco, isEmpty);
+
+      // Nguồn sẵn sàng trở lại: đúng một gợi ý, có cả trong nhật ký.
+      s.setRecommendationSource(source());
+      await pumpEventQueue();
+      final reco = recommendations().single;
+      expect(reco.at, DateTime(2026, 10, 14, 8));
+      expect(
+        {
+          for (final r in await logRows())
+            if (r.at.isAfter(now) &&
+                r.kind == NotificationKind.recommendation.name)
+              r.id,
+        },
+        {reco.id},
+      );
     });
 
     test('nguồn đang tải mà tắt loại gợi ý: gợi ý đã đặt bị huỷ', () async {
@@ -1110,6 +1129,39 @@ void main() {
       expect(scheduler.everScheduled.map((n) => n.kind), [
         NotificationKind.schedule,
       ]);
+    });
+
+    test('một luồng dữ liệu lỗi ngay lần đầu: các loại khác vẫn được đặt', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      // Luồng buổi đồng hồ lỗi (bảng hỏng) và không bao giờ phát giá trị.
+      await db.customStatement('DROP TABLE timer_session_rows');
+      final s = scheduling()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.scheduled, hasLength(2));
+    });
+
+    test('cài đặt về "chưa nạp" khi đồng bộ đang đọc nhật ký: không huỷ gì',
+        () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final s = scheduling()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.scheduled, hasLength(2));
+
+      // Giữ DB bận: lần đồng bộ sau đứng ở bước đọc nhật ký.
+      final gate = Completer<void>();
+      final busy = db.transaction(() => gate.future);
+      s.setPrefs(const NotificationPrefs(streak: false));
+      await pumpEventQueue();
+      s.setPrefs(null);
+      gate.complete();
+      await busy;
+      await pumpEventQueue();
+      expect(scheduler.cancelled, isEmpty);
+      expect(scheduler.scheduled, hasLength(2));
     });
 
     test('nhiều thay đổi dồn dập: số lần đồng bộ có giới hạn', () async {
