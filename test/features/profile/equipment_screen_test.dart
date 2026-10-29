@@ -401,6 +401,7 @@ void main() {
       required double textScale,
       int cues = 6,
       bool background = false,
+      String permission = 'default',
       Size size = const Size(360, 640),
       double navHeight = 0,
     }) async {
@@ -435,6 +436,7 @@ void main() {
               now: ref.watch(nowProvider),
               platform: _PromptPlatform(
                 scheduler: background ? IdleNotificationScheduler() : null,
+                permissionValue: permission,
               ),
             ),
           ),
@@ -506,6 +508,46 @@ void main() {
       expect(find.textContaining('Chỉ hoạt động khi'), findsNothing);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('điện thoại, đã bật: nói vẫn nhắc khi ứng dụng đóng', (
+      tester,
+    ) async {
+      await openWithReminder(
+        tester,
+        textScale: 1.5,
+        background: true,
+        permission: 'granted',
+      );
+      expect(
+        find.text(Vi.equipmentReminderEnabled(inBackground: true)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(Vi.equipmentReminderEnabled(inBackground: false)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final background in [true, false]) {
+      testWidgets('bị chặn (${background ? 'điện thoại' : 'web'}): chỉ đúng '
+          'chỗ bật lại của nền tảng', (tester) async {
+        await openWithReminder(
+          tester,
+          textScale: 1.0,
+          background: background,
+          permission: 'denied',
+        );
+        expect(
+          find.text(Vi.equipmentReminderDenied(inBackground: background)),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('trình duyệt'),
+          background ? findsNothing : findsOneWidget,
+        );
+      });
+    }
 
     testWidgets('x1.0: nút nằm cùng hàng với chữ như cũ', (tester) async {
       await openWithReminder(tester, textScale: 1.0, cues: 1);
@@ -581,16 +623,18 @@ const _family = 'RobotoEquipment';
 
 /// Trình duyệt giả: hỗ trợ thông báo, chưa được cấp quyền.
 class _PromptPlatform extends NotificationPlatform {
-  _PromptPlatform({this.scheduler});
+  _PromptPlatform({this.scheduler, this.permissionValue = 'default'});
 
   @override
   final NotificationScheduler? scheduler;
+
+  final String permissionValue;
 
   @override
   bool get isSupported => true;
 
   @override
-  String? get permission => 'default';
+  String? get permission => permissionValue;
 
   @override
   Future<String?> requestPermission() async => 'granted';

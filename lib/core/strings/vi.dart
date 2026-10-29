@@ -588,8 +588,10 @@ abstract final class Vi {
       inBackground
       ? 'Điện thoại sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó, kể cả khi ứng dụng đang đóng.'
       : 'Trình duyệt sẽ nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó khi ứng dụng đang mở.';
-  static const equipmentReminderDenied =
-      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
+  static String equipmentReminderDenied({required bool inBackground}) =>
+      inBackground
+      ? 'Quyền thông báo đang bị chặn. Hãy bật lại trong Cài đặt của điện thoại.'
+      : 'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt trang web của trình duyệt.';
   static const equipmentReminderEnable = 'Bật thông báo';
   static String equipmentReminderPrompt({required bool inBackground}) =>
       inBackground
@@ -698,8 +700,8 @@ abstract final class Vi {
       '${notificationsTime(at)}';
   static const notificationsPermissionTitle = 'Quyền thông báo';
   static const notificationsPermissionGranted = 'Đã bật thông báo.';
-  static const notificationsPermissionDenied =
-      'Quyền thông báo đang bị chặn. Hãy bật lại trong cài đặt của thiết bị hoặc trình duyệt.';
+  static String notificationsPermissionDenied({required bool inBackground}) =>
+      equipmentReminderDenied(inBackground: inBackground);
   static const notificationsPermissionPrompt =
       'Bật thông báo để nhận gợi ý tập mới, nhắc bảo dưỡng, nhắc giờ tập và nhắc giữ chuỗi.';
   static const notificationsPermissionUnsupported =

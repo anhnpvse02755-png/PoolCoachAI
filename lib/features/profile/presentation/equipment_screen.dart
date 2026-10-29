@@ -595,7 +595,9 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
             inBackground: reminders.schedulesInBackground,
           )
         : permission == 'denied'
-        ? Vi.equipmentReminderDenied
+        ? Vi.equipmentReminderDenied(
+            inBackground: reminders.schedulesInBackground,
+          )
         : Vi.equipmentReminderPrompt(
             inBackground: reminders.schedulesInBackground,
           );

@@ -349,8 +349,27 @@ void main() {
     ) async {
       platform.value = 'denied';
       await open(tester, withService());
-      expect(find.text(Vi.notificationsPermissionDenied), findsOneWidget);
+      expect(
+        find.text(Vi.notificationsPermissionDenied(inBackground: false)),
+        findsOneWidget,
+      );
       expect(find.text(Vi.equipmentReminderEnable), findsNothing);
+    });
+
+    testWidgets('điện thoại bị chặn: nói bật lại trong Cài đặt, không nhắc '
+        'trình duyệt', (tester) async {
+      platform
+        ..value = 'denied'
+        ..scheduler = IdleNotificationScheduler();
+      await open(tester, withService());
+      expect(
+        find.text(Vi.notificationsPermissionDenied(inBackground: true)),
+        findsOneWidget,
+      );
+      expect(
+        Vi.notificationsPermissionDenied(inBackground: true),
+        isNot(contains('trình duyệt')),
+      );
     });
   });
 

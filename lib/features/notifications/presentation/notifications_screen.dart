@@ -228,7 +228,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               subtitle: Text(
                 granted
                     ? Vi.notificationsPermissionGranted
-                    : Vi.notificationsPermissionDenied,
+                    : Vi.notificationsPermissionDenied(
+                        inBackground: service.schedulesInBackground,
+                      ),
               ),
               trailing: granted
                   ? const Icon(Icons.check_circle_outline)
