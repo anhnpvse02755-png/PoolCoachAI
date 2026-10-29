@@ -14,6 +14,7 @@ import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
@@ -91,6 +92,15 @@ class NotificationService {
     if (_started || _disposed) return;
     _started = true;
     if (!_platform.isSupported) return;
+    _platform.onTap = _onTapPayload;
+    unawaited(
+      _platform
+          .takeLaunchPayload()
+          .then((p) {
+            if (p != null) _onTapPayload(p);
+          })
+          .catchError((Object _) {}),
+    );
     _setUser(_signedInUserId);
     _authSubscription = _auth.watchSession().listen((state) {
       _setUser(switch (state) {
@@ -103,6 +113,42 @@ class NotificationService {
       _timer = Timer.periodic(_checkEvery, (_) => checkNow());
     }
     checkNow();
+  }
+
+  void Function(NotificationTap tap)? _tapHandler;
+
+  /// Lần chạm tới khi chưa có ai nhận (khởi động lạnh: thông báo mở app trước
+  /// khi widget lắng nghe dựng xong).
+  NotificationTap? _bufferedTap;
+
+  /// Đặt nơi nhận lần chạm thông báo. Có lần chạm đang giữ thì giao đúng một
+  /// lần rồi xoá.
+  void setTapHandler(void Function(NotificationTap tap)? handler) {
+    _tapHandler = handler;
+    final buffered = _bufferedTap;
+    if (handler != null && buffered != null) {
+      _bufferedTap = null;
+      handler(buffered);
+    }
+  }
+
+  void _onTapPayload(String payload) {
+    final tap = parseNotificationPayload(payload);
+    if (tap == null || _disposed) return;
+    final userId = _userId;
+    if (userId != null) {
+      unawaited(
+        NotificationLogRepository(_db, userId: userId)
+            .markReadByKey(tap.kind, tap.key, now: _now().toLocal())
+            .catchError((Object _) {}),
+      );
+    }
+    final handler = _tapHandler;
+    if (handler != null) {
+      handler(tap);
+    } else {
+      _bufferedTap = tap;
+    }
   }
 
   /// Đổi cài đặt loại thông báo. Null: chưa nạp xong.
@@ -271,7 +317,12 @@ class NotificationService {
       }
       final key = _storageKey(n);
       if (_platform.readValue(key) != null) continue;
-      _platform.show(title: n.title, body: n.body, tag: key);
+      _platform.show(
+        title: n.title,
+        body: n.body,
+        tag: key,
+        payload: notificationPayload(n.kind, n.key),
+      );
       _platform.writeValue(key, now.toIso8601String());
       unawaited(log.recordShown(n, at: now).catchError((Object _) {}));
     }

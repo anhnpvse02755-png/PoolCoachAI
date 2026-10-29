@@ -12,6 +12,7 @@ import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
@@ -361,6 +362,101 @@ void main() {
       s.checkNow();
       await pumpEventQueue();
       expect(platform.notifications, isEmpty);
+    });
+  });
+
+  group('chạm thông báo', () {
+    /// Báo lịch tập 17:30 và trả về khoá của nó.
+    Future<NotificationService> shownSchedule() async {
+      await saveSlot(time: '18:00');
+      platform.permissionValue = 'granted';
+      now = DateTime(2026, 10, 13, 17, 30);
+      final s = service()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      return s;
+    }
+
+    test('chạm đánh dấu đã đọc mục đã tới giờ của đúng (loại, khoá)', () async {
+      await shownSchedule();
+      final rows = await logRows();
+      expect(rows, hasLength(1));
+      expect(rows.single.readAt, isNull);
+      // Gửi kèm payload của (loại, khoá) đó.
+      expect(
+        platform.notifications.single.payload,
+        notificationPayload(NotificationKind.schedule, rows.single.key),
+      );
+
+      // Chạm vào một thông báo khác loại cùng khoá: không động tới dòng này.
+      platform.onTap!(notificationPayload(NotificationKind.streak, rows.single.key));
+      await pumpEventQueue();
+      expect((await logRows()).single.readAt, isNull);
+
+      platform.onTap!(platform.notifications.single.payload);
+      await pumpEventQueue();
+      expect((await logRows()).single.readAt, now);
+    });
+
+    test('chạm trước khi có handler: giữ lại, giao một lần khi handler tới', () async {
+      final s = await shownSchedule();
+      final payload = platform.notifications.single.payload;
+      platform.onTap!(payload);
+      await pumpEventQueue();
+
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      expect(got, [parseNotificationPayload(payload)]);
+      s.setTapHandler(null);
+      s.setTapHandler(got.add);
+      expect(got, hasLength(1), reason: 'giao một lần rồi xoá');
+
+      platform.onTap!(payload);
+      expect(got, hasLength(2), reason: 'có handler thì giao thẳng');
+    });
+
+    test('khởi động lạnh: payload mở app được giao và đánh dấu đã đọc', () async {
+      await saveSlot(time: '18:00');
+      platform.permissionValue = 'granted';
+      now = DateTime(2026, 10, 13, 17, 30);
+      final first = service()..start();
+      await pumpEventQueue();
+      final payload = platform.notifications.single.payload;
+      first.dispose();
+
+      platform.launch = payload;
+      final s = service()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      expect(got, [parseNotificationPayload(payload)]);
+      expect((await logRows()).single.readAt, now);
+    });
+
+    test('payload rác: không gọi handler, không đổi dòng nào', () async {
+      final s = await shownSchedule();
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      for (final bad in ['', 'rác', 'nope|k', 'schedule|']) {
+        platform.onTap!(bad);
+      }
+      await pumpEventQueue();
+      expect(got, isEmpty);
+      expect((await logRows()).single.readAt, isNull);
+    });
+
+    test('Android/iOS: nền tảng nhận onTap, payload mở app qua scheduler', () async {
+      final scheduler = _FakeScheduler()..granted = true..launch = 'streak|k1';
+      final s = service(using: _SchedulingPlatform(scheduler));
+      s.start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      expect(got, [const NotificationTap(NotificationKind.streak, 'k1')]);
+      scheduler.onTapHandler!('schedule|s1:2026-9-22');
+      expect(got.last, const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'));
     });
   });
 
@@ -935,6 +1031,16 @@ class _FakeScheduler implements NotificationScheduler {
     cancelAllCalls++;
     pending = {};
   }
+
+  void Function(String payload)? onTapHandler;
+
+  String? launch;
+
+  @override
+  set onTap(void Function(String payload)? handler) => onTapHandler = handler;
+
+  @override
+  Future<String?> launchPayload() async => launch;
 }
 
 class _SchedulingPlatform extends NotificationPlatform {
@@ -948,7 +1054,14 @@ class _FakeNotificationPlatform extends NotificationPlatform {
 
   String permissionValue = 'default';
   int permissionRequests = 0;
-  final notifications = <({String title, String body, String tag})>[];
+  final notifications =
+      <({String title, String body, String tag, String payload})>[];
+
+  /// Chuỗi của thông báo đã mở app từ trạng thái đóng, nếu có.
+  String? launch;
+
+  @override
+  Future<String?> takeLaunchPayload() async => launch;
   final storedValues = <String, String>{};
 
   @override
@@ -969,8 +1082,9 @@ class _FakeNotificationPlatform extends NotificationPlatform {
     required String title,
     required String body,
     required String tag,
+    required String payload,
   }) {
-    notifications.add((title: title, body: body, tag: tag));
+    notifications.add((title: title, body: body, tag: tag, payload: payload));
   }
 
   @override

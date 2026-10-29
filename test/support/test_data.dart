@@ -130,6 +130,7 @@ ProviderContainer testContainer({
   AsyncValue<GoalRecord?>? goalAsync,
   Map<String, TournamentStatus>? forcedTournamentStatus,
   List<NotificationLogEntry>? notificationLog,
+  List<Override> extraOverrides = const [],
 }) {
   return ProviderContainer(
     overrides: [
@@ -230,6 +231,7 @@ ProviderContainer testContainer({
         latestBuResultProvider.overrideWithValue(
           AsyncData<BuResult?>(buResult),
         ),
+      ...extraOverrides,
     ],
   );
 }

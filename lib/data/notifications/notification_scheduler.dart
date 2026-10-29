@@ -20,6 +20,13 @@ abstract class NotificationScheduler {
 
   /// Huỷ mọi thông báo đã đặt.
   Future<void> cancelAll();
+
+  /// Nơi nhận chuỗi đi kèm thông báo khi người dùng chạm lúc app đang chạy.
+  set onTap(void Function(String payload)? handler);
+
+  /// Chuỗi đi kèm thông báo đã mở app từ trạng thái đóng hẳn; null nếu app
+  /// không được mở bằng thông báo.
+  Future<String?> launchPayload();
 }
 
 /// Đưa lịch của hệ điều hành về đúng [desired]: huỷ cái thừa, đặt cái

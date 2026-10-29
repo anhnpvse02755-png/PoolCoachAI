@@ -10,6 +10,12 @@ class NotificationPlatform {
   // ignore: avoid_unused_constructor_parameters
   NotificationPlatform({NotificationScheduler? scheduler});
 
+  /// Dịch vụ đặt vào đây để nhận lần chạm thông báo.
+  void Function(String payload)? onTap;
+
+  /// Trình duyệt không có thông báo mở app từ trạng thái đóng.
+  Future<String?> takeLaunchPayload() => Future.value();
+
   /// Trình duyệt không đặt lịch được: dịch vụ tự kiểm tra bằng timer.
   NotificationScheduler? get scheduler => null;
 
@@ -28,8 +34,17 @@ class NotificationPlatform {
     required String title,
     required String body,
     required String tag,
+    required String payload,
   }) {
-    web.Notification(title, web.NotificationOptions(body: body, tag: tag));
+    final notification = web.Notification(
+      title,
+      web.NotificationOptions(body: body, tag: tag),
+    );
+    notification.onclick = (web.Event _) {
+      onTap?.call(payload);
+      web.window.focus();
+      notification.close();
+    }.toJS;
   }
 
   String? readValue(String key) => web.window.localStorage.getItem(key);

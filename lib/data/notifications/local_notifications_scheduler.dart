@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -27,6 +28,10 @@ class LocalNotificationsScheduler implements NotificationScheduler {
 
   final FlutterLocalNotificationsPlugin _plugin;
   Future<void>? _init;
+  void Function(String payload)? _onTap;
+
+  @override
+  set onTap(void Function(String payload)? handler) => _onTap = handler;
 
   Future<void> _ensureInit() => _init ??= _initialize();
 
@@ -44,7 +49,19 @@ class LocalNotificationsScheduler implements NotificationScheduler {
           requestSoundPermission: false,
         ),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) _onTap?.call(payload);
+      },
     );
+  }
+
+  @override
+  Future<String?> launchPayload() async {
+    await _ensureInit();
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return null;
+    return details?.notificationResponse?.payload;
   }
 
   @override
@@ -116,6 +133,7 @@ class LocalNotificationsScheduler implements NotificationScheduler {
         iOS: const DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: notificationPayload(notification.kind, notification.key),
     );
   }
 

@@ -4,6 +4,10 @@ class NotificationPlatform {
   // ignore: avoid_unused_constructor_parameters
   NotificationPlatform({NotificationScheduler? scheduler});
 
+  void Function(String payload)? onTap;
+
+  Future<String?> takeLaunchPayload() => Future.value();
+
   /// Chỉ Android/iOS đặt lịch qua hệ điều hành.
   NotificationScheduler? get scheduler => null;
 
@@ -19,6 +23,7 @@ class NotificationPlatform {
     required String title,
     required String body,
     required String tag,
+    required String payload,
   }) {
     throw UnsupportedError('Notifications are not supported on this platform');
   }

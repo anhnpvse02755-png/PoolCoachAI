@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
+import 'package:poolcoachai/core/router/notification_tap_listener.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_layout.dart';
 import 'package:poolcoachai/core/theme/app_theme.dart';
@@ -56,7 +57,7 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
       ref.watch(onboardingGateProvider);
       ref.watch(achievementRecorderProvider);
     }
-    return MaterialApp.router(
+    final app = MaterialApp.router(
       title: Vi.appName,
       theme: AppTheme.dark(),
       routerConfig: _router,
@@ -78,5 +79,8 @@ class _PoolCoachAppState extends ConsumerState<PoolCoachApp> {
         ),
       ),
     );
+    return _ownsRouter
+        ? NotificationTapListener(router: _router, child: app)
+        : app;
   }
 }
