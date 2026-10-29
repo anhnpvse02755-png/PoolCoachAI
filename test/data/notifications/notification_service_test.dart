@@ -1,4 +1,6 @@
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show AsyncData, AsyncError, AsyncLoading, AsyncValue;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -9,6 +11,7 @@ import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
@@ -25,15 +28,29 @@ void main() {
   late _FakeNotificationPlatform platform;
   late DateTime now;
 
+  /// Lưới chống vòng lặp: mỗi lần đồng bộ đọc đồng hồ của dịch vụ. Quá
+  /// [_maxClockReads] lần trong một test là dịch vụ tự kích mình mãi (đồng bộ
+  /// → ghi nhật ký → nhật ký phát → đồng bộ…); ném để vòng dừng ngay và test
+  /// đỏ thay vì treo máy.
+  var clockReads = 0;
+
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     auth = FakeAuthRepository.signedIn(userId: 'u1');
     platform = _FakeNotificationPlatform();
     // Thứ Ba.
     now = DateTime(2026, 10, 13, 8, 59);
+    clockReads = 0;
   });
 
-  tearDown(() => db.close());
+  tearDown(() async {
+    await db.close();
+    expect(
+      clockReads,
+      lessThanOrEqualTo(_maxClockReads),
+      reason: 'dịch vụ không hội tụ: vòng đồng bộ ↔ nhật ký',
+    );
+  });
 
   NotificationService service({
     NotificationPrefs? prefs = const NotificationPrefs(),
@@ -41,7 +58,12 @@ void main() {
   }) => NotificationService(
     db: db,
     auth: auth,
-    now: () => now,
+    now: () {
+      if (++clockReads > _maxClockReads) {
+        throw StateError('dịch vụ đọc đồng hồ quá $_maxClockReads lần');
+      }
+      return now;
+    },
     platform: using ?? platform,
   )..setPrefs(prefs);
 
@@ -70,25 +92,30 @@ void main() {
         TimerSession(id: 't$at', date: at, durationSec: 600),
       );
 
-  RecommendationSource source({
+  RecommendationInputs inputsWith(List<Drill> drills) => RecommendationInputs(
+    drills: drills,
+    logs: const [],
+    knowledge: const [],
+    timerSessions: const [],
+    schedule: const [],
+    matches: const [],
+  );
+
+  AsyncValue<RecommendationSource> source({
     String userId = 'u1',
     SeenRecommendation? seen,
-  }) => RecommendationSource(
-    userId: userId,
-    inputs: RecommendationInputs(
-      drills: testDrills,
-      logs: const [],
-      knowledge: const [],
-      timerSessions: const [],
-      schedule: const [],
-      matches: const [],
+    List<Drill>? drills,
+  }) => AsyncData(
+    RecommendationSource(
+      userId: userId,
+      inputs: inputsWith(drills ?? testDrills),
+      seen: seen,
     ),
-    seen: seen,
   );
 
   /// Cặp (nhóm, bài) của gợi ý ngày [day] lúc 08:00, đúng như bộ lập tính.
   SeenRecommendation pairOf(DateTime day, {required DateTime seenAt}) {
-    final rec = source().inputs.recommendFor(
+    final rec = inputsWith(testDrills).recommendFor(
       DateTime(day.year, day.month, day.day, recommendationReminderHour),
     );
     return SeenRecommendation(cat: rec.cat, drillId: rec.drill!.id, at: seenAt);
@@ -266,7 +293,7 @@ void main() {
           ..setRecommendationSource(
             source(
               seen: SeenRecommendation(
-                cat: SkillCategory.bank,
+                cat: SkillCategory.aiming,
                 drillId: 'x',
                 at: DateTime(2026, 10, 12),
               ),
@@ -303,7 +330,7 @@ void main() {
         ..setRecommendationSource(
           source(
             seen: SeenRecommendation(
-              cat: SkillCategory.bank,
+              cat: SkillCategory.aiming,
               drillId: 'x',
               at: DateTime(2026, 10, 12),
             ),
@@ -345,6 +372,13 @@ void main() {
     }) => service(prefs: prefs, using: _SchedulingPlatform(scheduler));
 
     setUp(() => scheduler = _FakeScheduler());
+    tearDown(
+      () => expect(
+        scheduler.pendingIdsCalls,
+        lessThanOrEqualTo(_maxPendingIdsCalls),
+        reason: 'dịch vụ không hội tụ: đối chiếu lặp mãi',
+      ),
+    );
 
     test('schedules nothing until permission is granted', () async {
       await saveCue(dueDate: DateTime(2026, 10, 20));
@@ -495,7 +529,7 @@ void main() {
       final r = recommendations();
       expect(r.map((n) => n.at), [DateTime(2026, 10, 14, 8)]);
       expect((await logRows()).map((x) => x.id), contains(r.single.id));
-      expect(s.recommendationSource?.userId, 'u1');
+      expect(s.recommendationSource.value?.userId, 'u1');
     });
 
     test('nguồn của tài khoản khác bị bỏ qua', () async {
@@ -596,6 +630,180 @@ void main() {
       addTearDown(s.dispose);
       await pumpEventQueue();
       expect(recommendations(), isEmpty);
+      // Không phải đặt rồi huỷ khi nhật ký nạp xong: chưa từng được đặt.
+      expect(
+        scheduler.everScheduled.where(
+          (n) => n.kind == NotificationKind.recommendation,
+        ),
+        isEmpty,
+      );
+    });
+
+    /// Lần mở app trước: đã đặt gợi ý (và các loại khác) và ghi nhật ký. Trả
+    /// về id của gợi ý; bộ đếm của [scheduler] được đặt lại.
+    Future<int> previousRun() async {
+      scheduler.granted = true;
+      final first = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      await pumpEventQueue();
+      final id = recommendations().single.id;
+      first.dispose();
+      await pumpEventQueue();
+      scheduler
+        ..cancelled.clear()
+        ..everScheduled.clear()
+        ..scheduleCalls = 0
+        ..pendingIdsCalls = 0;
+      return id;
+    }
+
+    test('mở app khi nguồn gợi ý còn đang tải: giữ nguyên gợi ý đã đặt', () async {
+      final id = await previousRun();
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(const AsyncLoading());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.cancelled, isEmpty);
+      expect(scheduler.everScheduled, isEmpty);
+      expect(recommendations().map((n) => n.id), [id]);
+      expect((await logRows()).map((x) => x.id), contains(id));
+    });
+
+    test('nguồn sẵn sàng với cặp khác: huỷ gợi ý cũ, đặt gợi ý mới', () async {
+      final id = await previousRun();
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(const AsyncLoading());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+
+      s.setRecommendationSource(source(drills: [_otherDrill]));
+      await pumpEventQueue();
+      expect(scheduler.cancelled, contains(id));
+      final next = recommendations().single;
+      expect(next.id, isNot(id));
+      expect(next.key, contains(_otherDrill.id));
+      expect((await logRows()).map((x) => x.id), [next.id]);
+    });
+
+    test(
+      'nguồn gợi ý lỗi: bỏ gợi ý, các loại khác vẫn được đặt',
+      () async {
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        await saveSlot(time: '18:00');
+        await practice(DateTime(2026, 10, 11, 10));
+        await practice(DateTime(2026, 10, 12, 10));
+        final id = await previousRun();
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(
+            AsyncError(StateError('hỏng'), StackTrace.empty),
+          );
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.cancelled, [id]);
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+        expect(scheduler.scheduled.map((n) => n.kind).toSet(), {
+          NotificationKind.maintenance,
+          NotificationKind.schedule,
+          NotificationKind.streak,
+        });
+      },
+    );
+
+    test('nguồn đổi lỗi ↔ đang tải dồn dập: hội tụ về đúng trạng thái', () async {
+      await previousRun();
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(const AsyncLoading());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+
+      // Lỗi xoá gợi ý; đang tải ngay sau đó, khi luồng nhật ký chưa kịp phát
+      // bản mới, không được thêm lại cái vừa xoá từ bản cũ.
+      for (var i = 0; i < 6; i++) {
+        s.setRecommendationSource(
+          AsyncError(StateError('hỏng'), StackTrace.empty),
+        );
+        await Future<void>.delayed(Duration.zero);
+        s.setRecommendationSource(const AsyncLoading());
+        await Future<void>.delayed(Duration.zero);
+      }
+      await pumpEventQueue();
+      final pendingReco = recommendations().map((n) => n.id).toSet();
+      final futureRows = {
+        for (final r in await logRows())
+          if (r.at.isAfter(now) && r.kind == NotificationKind.recommendation.name)
+            r.id,
+      };
+      // Lịch hệ điều hành và nhật ký khớp nhau, dù cuối cùng giữ hay mất.
+      expect(pendingReco, futureRows);
+    });
+
+    test('nguồn đang tải mà tắt loại gợi ý: gợi ý đã đặt bị huỷ', () async {
+      final id = await previousRun();
+      final s = scheduling(
+        prefs: const NotificationPrefs(recommendation: false),
+      )
+        ..start()
+        ..setRecommendationSource(const AsyncLoading());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.cancelled, [id]);
+      expect(await logRows(), isEmpty);
+    });
+
+    test('nguồn đang tải mà mất quyền: gợi ý đã giữ không còn trong nhật ký',
+        () async {
+      final id = await previousRun();
+      scheduler.granted = false;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(const AsyncLoading());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+    });
+
+    test('mở app: không huỷ rồi đặt lại thông báo bảo dưỡng đang chờ', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final first = scheduling()..start();
+      await pumpEventQueue();
+      expect(scheduler.scheduled, hasLength(2));
+      first.dispose();
+      await pumpEventQueue();
+      scheduler
+        ..cancelled.clear()
+        ..everScheduled.clear();
+
+      final s = scheduling()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.cancelled, isEmpty);
+      expect(scheduler.everScheduled, isEmpty);
+      expect(scheduler.scheduled, hasLength(2));
+    });
+
+    test('nhiều thay đổi dồn dập: số lần đồng bộ có giới hạn', () async {
+      scheduler.granted = true;
+      final s = scheduling()
+        ..start()
+        ..setRecommendationSource(source());
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final before = scheduler.pendingIdsCalls;
+
+      for (var i = 0; i < 10; i++) {
+        s
+          ..setRecommendationSource(source())
+          ..setPrefs(NotificationPrefs(streak: i.isEven));
+      }
+      await pumpEventQueue();
+      expect(scheduler.pendingIdsCalls - before, lessThanOrEqualTo(2));
+      expect(recommendations(), hasLength(1));
     });
 
     test('đăng xuất (không quên): mục tương lai của tài khoản cũ bị xoá', () async {
@@ -659,6 +867,24 @@ void main() {
   });
 }
 
+/// Giới hạn của lưới chống vòng lặp: rộng hơn nhiều so với một test bình
+/// thường, đủ hẹp để một vòng tự kích dừng sau vài giây.
+const _maxClockReads = 2000;
+const _maxPendingIdsCalls = 200;
+
+/// Bài khác `testDrills` (cùng nhóm ngắm): dữ liệu chỉ có bài này thì gợi ý
+/// đổi cặp.
+const _otherDrill = Drill(
+  id: 'd2',
+  cat: SkillCategory.aiming,
+  name: 'Đường chéo cơ bản',
+  level: 1,
+  unit: 'lần trúng / 10',
+  passThreshold: 0.8,
+  goal: 'Đánh chéo bi cái.',
+  steps: ['Bước 1'],
+);
+
 class _FakeScheduler implements NotificationScheduler {
   bool granted = false;
   int permissionRequests = 0;
@@ -666,6 +892,10 @@ class _FakeScheduler implements NotificationScheduler {
   List<int> cancelled = [];
   int scheduleCalls = 0;
   int cancelAllCalls = 0;
+  int pendingIdsCalls = 0;
+
+  /// Mọi thông báo từng được đặt, kể cả cái đã huỷ sau đó.
+  final everScheduled = <PlannedNotification>[];
 
   List<PlannedNotification> get scheduled => pending.values.toList();
 
@@ -679,11 +909,18 @@ class _FakeScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<Set<int>> pendingIds() async => pending.keys.toSet();
+  Future<Set<int>> pendingIds() async {
+    // Lưới chống vòng lặp, như đồng hồ của dịch vụ.
+    if (++pendingIdsCalls > _maxPendingIdsCalls) {
+      throw StateError('đối chiếu quá $_maxPendingIdsCalls lần');
+    }
+    return pending.keys.toSet();
+  }
 
   @override
   Future<void> schedule(PlannedNotification notification) async {
     scheduleCalls++;
+    everScheduled.add(notification);
     pending[notification.id] = notification;
   }
 

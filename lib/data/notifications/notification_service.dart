@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show AsyncData, AsyncError, AsyncLoading, AsyncValue;
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
@@ -55,12 +57,21 @@ class NotificationService {
   List<DrillLog> _logs = const [];
   List<TimerSession> _timerSessions = const [];
 
-  /// Nguồn gợi ý mới nhất Riverpod đưa tới. Không xoá khi đổi tài khoản:
-  /// chỉ được dùng khi `userId` của nó là người đang đăng nhập.
-  RecommendationSource? _source;
+  /// Nguồn gợi ý mới nhất Riverpod đưa tới: đang tải, lỗi hay sẵn sàng.
+  /// Không xoá khi đổi tài khoản: nguồn sẵn sàng chỉ được dùng khi `userId`
+  /// của nó là người đang đăng nhập.
+  AsyncValue<RecommendationSource> _source = const AsyncLoading();
 
   /// Nhật ký của người đang đăng nhập; null tới lần phát đầu tiên.
   List<NotificationLogEntry>? _log;
+
+  /// Số luồng dữ liệu của người hiện tại chưa phát lần đầu. Android/iOS chưa
+  /// đồng bộ khi còn luồng chưa phát, kẻo kế hoạch thiếu dữ liệu huỷ rồi đặt
+  /// lại thông báo đang chờ.
+  int _awaitingFirst = 0;
+
+  /// Đã có một lần đồng bộ xếp hàng chờ chạy (gộp các yêu cầu dồn dập).
+  bool _syncQueued = false;
 
   /// Lúc phiên của người hiện tại bắt đầu trên tab/app này.
   DateTime _userSince = DateTime(0);
@@ -101,8 +112,12 @@ class NotificationService {
     if (_started && !_disposed) checkNow();
   }
 
-  /// Đổi nguồn gợi ý. Null: chưa đủ dữ liệu, không lập gợi ý.
-  void setRecommendationSource(RecommendationSource? source) {
+  /// Đổi nguồn gợi ý.
+  ///
+  /// - Sẵn sàng (của người đang đăng nhập): lập gợi ý từ nó.
+  /// - Đang tải: Android/iOS giữ nguyên gợi ý đã đặt trong nhật ký.
+  /// - Lỗi: bỏ gợi ý; các loại khác vẫn chạy.
+  void setRecommendationSource(AsyncValue<RecommendationSource> source) {
     _source = source;
     if (_started && !_disposed) checkNow();
   }
@@ -111,30 +126,52 @@ class NotificationService {
   NotificationPrefs? get prefs => _prefs;
 
   @visibleForTesting
-  RecommendationSource? get recommendationSource => _source;
+  AsyncValue<RecommendationSource> get recommendationSource => _source;
 
   NotificationScheduler? get _scheduler => _platform.scheduler;
 
   late final Future<void> _permissionLoaded = _platform.loadPermission();
   Future<void> _syncChain = Future.value();
 
-  List<PlannedNotification> _plan(DateTime now, {int? limit}) {
+  /// Kế hoạch lúc [now]. [current] là nhật ký vừa đọc thẳng từ DB
+  /// (Android/iOS); thiếu thì dùng bản của luồng theo dõi.
+  List<PlannedNotification> _plan(
+    DateTime now, {
+    int? limit,
+    List<NotificationLogEntry>? current,
+  }) {
     final prefs = _prefs;
     if (prefs == null) return const [];
+    final cap = limit ?? maxPendingNotifications;
+    // Luồng nhật ký chưa phát lần nào: chưa có gì về gợi ý.
+    final log = _log == null ? null : current ?? _log;
+    final source = _source;
+    // Nguồn sẵn sàng của tài khoản khác (Riverpod chưa kịp đổi theo) được coi
+    // như đang tải: không dùng, nhưng cũng không huỷ gợi ý của người này.
+    final mine = switch (source) {
+      AsyncData(:final value) when value.userId == _userId => value,
+      _ => null,
+    };
     // Gợi ý chỉ khi nguồn là của người đang đăng nhập và nhật ký của họ đã
     // nạp (mốc "đã thấy" cần cả hai).
-    final source = _source;
-    final log = _log;
-    final ready = source != null && source.userId == _userId && log != null;
-    return planNotifications(
-      recommendation: ready ? source.inputs : null,
-      lastSeenRecommendation: ready
-          ? recommendationBaseline(
-              shownOnHome: source.seen,
-              log: log,
+    final ready = log != null ? mine : null;
+    // Android/iOS, nguồn chưa sẵn sàng (không lỗi): giữ gợi ý tương lai đã
+    // đặt, để id y nguyên và lịch hệ điều hành lẫn nhật ký không bị đụng.
+    final keep =
+        log != null &&
+        mine == null &&
+        source is! AsyncError &&
+        prefs.recommendation &&
+        _scheduler != null;
+    final plan = planNotifications(
+      recommendation: ready?.inputs,
+      lastSeenRecommendation: ready == null
+          ? null
+          : recommendationBaseline(
+              shownOnHome: ready.seen,
+              log: log!,
               now: _now().toLocal(),
-            )
-          : null,
+            ),
       cues: _cues,
       slots: _slots,
       streak: streakStateOf(
@@ -144,24 +181,37 @@ class NotificationService {
       ),
       prefs: prefs,
       now: now,
-      limit: limit ?? maxPendingNotifications,
+      limit: keep ? 1 << 20 : cap,
     );
+    if (!keep) return plan;
+    return withLoggedRecommendations(plan, log, now: now, limit: cap);
   }
 
   /// Android/iOS: đưa lịch của hệ điều hành và nhật ký về đúng kế hoạch.
-  /// Xếp hàng để hai lần đồng bộ không chạy chồng lên nhau.
+  /// Xếp hàng để hai lần đồng bộ không chạy chồng lên nhau; trong lúc một lần
+  /// đang chạy, mọi yêu cầu mới gộp vào đúng một lần chờ (lần đó đọc trạng
+  /// thái mới nhất lúc chạy).
   void _syncSchedule(NotificationScheduler scheduler) {
+    if (_syncQueued) return;
+    _syncQueued = true;
     _syncChain = _syncChain.then((_) async {
+      _syncQueued = false;
       await _permissionLoaded;
       if (_disposed) return;
       final userId = _userId;
       if (userId == null) {
         await scheduler.cancelAll();
-      } else if (_prefs != null) {
+      } else if (_prefs != null && _awaitingFirst == 0) {
         final now = _now().toLocal();
         final log = NotificationLogRepository(_db, userId: userId);
         if (_platform.permission == 'granted') {
-          final plan = _plan(now);
+          // Kế hoạch đọc lại chính nhật ký nó ghi (gợi ý giữ lại, mốc đã
+          // thấy), nên phải đọc bản hiện tại trong DB. Bản của luồng theo dõi
+          // có thể chậm một lần ghi: lập từ nó thì lần này thêm lại cái lần
+          // trước vừa xoá, luồng phát bản cũ, lần sau xoá lại… không dừng.
+          final current = await log.all();
+          if (_disposed || _userId != userId) return;
+          final plan = _plan(now, current: current);
           await reconcileNotifications(scheduler, plan);
           await log.syncPlanned(plan, now: now);
         } else {
@@ -250,6 +300,7 @@ class NotificationService {
     _logs = const [];
     _timerSessions = const [];
     _log = null;
+    _awaitingFirst = 0;
     if (previous != null && _scheduler != null && !_disposed) {
       _forgetFuture(previous);
     }
@@ -263,9 +314,15 @@ class NotificationService {
     }
 
     void watch<T>(Stream<T> stream, void Function(T value) assign) {
+      var first = true;
+      _awaitingFirst++;
       _dataSubscriptions.add(
         stream.listen((value) {
           if (_userId != userId || _disposed) return;
+          if (first) {
+            first = false;
+            _awaitingFirst--;
+          }
           assign(value);
           checkNow();
         }),

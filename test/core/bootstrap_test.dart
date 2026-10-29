@@ -97,7 +97,7 @@ void main() {
       auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
       await pumpEventQueue();
       expect(service.prefs, const NotificationPrefs(streak: false));
-      expect(service.recommendationSource?.userId, 'u1');
+      expect(service.recommendationSource.value?.userId, 'u1');
     },
   );
 

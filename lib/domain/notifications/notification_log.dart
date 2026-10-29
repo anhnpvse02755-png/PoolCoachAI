@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 
@@ -80,4 +81,38 @@ SeenRecommendation? recommendationBaseline({
     }
   }
   return best;
+}
+
+/// [plan] cộng các gợi ý còn ở tương lai đã có trong [log], giữ nguyên id,
+/// giờ và chữ (hạn: hết ngày giao). Dùng khi nguồn gợi ý còn đang tải: cái đã
+/// đặt không bị huỷ rồi đặt lại. Xếp như [planNotifications], tối đa [limit].
+List<PlannedNotification> withLoggedRecommendations(
+  List<PlannedNotification> plan,
+  List<NotificationLogEntry> log, {
+  required DateTime now,
+  required int limit,
+}) {
+  final ids = {for (final n in plan) n.id};
+  final merged = [
+    ...plan,
+    for (final e in log)
+      if (e.kind == NotificationKind.recommendation &&
+          e.at.isAfter(now) &&
+          !ids.contains(e.id))
+        PlannedNotification(
+          id: e.id,
+          kind: e.kind,
+          key: e.key,
+          at: e.at,
+          validUntil: DateTime(e.at.year, e.at.month, e.at.day + 1),
+          title: e.title,
+          body: e.body,
+        ),
+  ];
+  merged.sort((a, b) {
+    final byTime = a.at.compareTo(b.at);
+    if (byTime != 0) return byTime;
+    return '${a.kind.name}:${a.key}'.compareTo('${b.kind.name}:${b.key}');
+  });
+  return merged.take(limit).toList();
 }

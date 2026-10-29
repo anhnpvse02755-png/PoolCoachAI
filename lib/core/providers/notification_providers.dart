@@ -119,19 +119,27 @@ class RecommendationSeenController
   }
 }
 
-/// Đủ dữ liệu để dịch vụ lập thông báo gợi ý; null khi chưa có tài khoản hoặc
-/// còn nguồn đang tải, đang tải lại hay lỗi.
-final recommendationSourceProvider = Provider<RecommendationSource?>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  final inputs = ref.watch(recommendationInputsProvider);
-  final seen = ref.watch(recommendationSeenProvider);
-  if (userId == null || gate<Object?>([inputs, seen]) != null) return null;
-  return RecommendationSource(
-    userId: userId,
-    inputs: inputs.requireValue,
-    seen: seen.requireValue,
-  );
-});
+/// Đủ dữ liệu để dịch vụ lập thông báo gợi ý.
+///
+/// [AsyncLoading] khi chưa có tài khoản hoặc còn nguồn đang tải / đang tải
+/// lại: dịch vụ giữ nguyên gợi ý đã đặt. [AsyncError] khi một nguồn lỗi: dịch
+/// vụ bỏ gợi ý, các loại khác vẫn chạy.
+final recommendationSourceProvider =
+    Provider<AsyncValue<RecommendationSource>>((ref) {
+      final userId = ref.watch(currentUserIdProvider);
+      final inputs = ref.watch(recommendationInputsProvider);
+      final seen = ref.watch(recommendationSeenProvider);
+      if (userId == null) return const AsyncLoading();
+      final blocked = gate<RecommendationSource>([inputs, seen]);
+      if (blocked != null) return blocked;
+      return AsyncData(
+        RecommendationSource(
+          userId: userId,
+          inputs: inputs.requireValue,
+          seen: seen.requireValue,
+        ),
+      );
+    });
 
 /// Nhật ký thông báo của người đang đăng nhập; null khi chưa đăng nhập.
 final notificationLogRepositoryProvider =
@@ -181,10 +189,19 @@ final upcomingNotificationsProvider = Provider<List<PlannedNotification>>((
   final prefs = ref.watch(notificationPrefsProvider).value;
   // Gợi ý như dịch vụ: chỉ khi nguồn đủ và nhật ký đã nạp xong (không phải
   // giá trị cũ của người trước đang tải lại).
-  final source = ref.watch(recommendationSourceProvider);
+  final sourceAsync = ref.watch(recommendationSourceProvider);
+  final source = sourceAsync.value;
   final log = ref.watch(notificationLogProvider);
-  final ready = source != null && log.hasValue && !log.isLoading;
-  final plan = planNotifications(
+  final logReady = log.hasValue && !log.isLoading;
+  final ready = source != null && logReady;
+  // Như dịch vụ: nguồn còn đang tải thì gợi ý đã đặt (trong nhật ký) vẫn nằm
+  // trong lịch, nên vẫn hiện ở đây.
+  final keep =
+      !ready &&
+      logReady &&
+      sourceAsync is AsyncLoading &&
+      (prefs ?? const NotificationPrefs()).recommendation;
+  final planned = planNotifications(
     recommendation: ready ? source.inputs : null,
     lastSeenRecommendation: ready
         ? recommendationBaseline(
@@ -202,7 +219,16 @@ final upcomingNotificationsProvider = Provider<List<PlannedNotification>>((
     ),
     prefs: prefs ?? const NotificationPrefs(),
     now: now,
+    limit: keep ? 1 << 20 : maxPendingNotifications,
   );
+  final plan = keep
+      ? withLoggedRecommendations(
+          planned,
+          log.requireValue,
+          now: now,
+          limit: maxPendingNotifications,
+        )
+      : planned;
   final horizon = now.add(const Duration(days: scheduleReminderHorizonDays));
   return [
     for (final n in plan)

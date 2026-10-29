@@ -16,22 +16,30 @@ class NotificationLogRepository {
   $NotificationLogRowsTable get _t => _db.notificationLogRows;
 
   Stream<List<NotificationLogEntry>> watchAll() {
-    return (_db.select(_t)..where((r) => r.userId.equals(userId))).watch().map(
-      (rows) => [
-        for (final r in rows)
-          if (_kindOf(r.kind) case final kind?)
-            NotificationLogEntry(
-              id: r.id,
-              kind: kind,
-              key: r.key,
-              at: r.at,
-              title: r.title,
-              body: r.body,
-              readAt: r.readAt,
-            ),
-      ],
-    );
+    return (_db.select(
+      _t,
+    )..where((r) => r.userId.equals(userId))).watch().map(_entries);
   }
+
+  /// Nhật ký lúc này, đọc thẳng từ DB (không qua luồng theo dõi, vốn có thể
+  /// còn chậm một lần ghi).
+  Future<List<NotificationLogEntry>> all() async => _entries(
+    await (_db.select(_t)..where((r) => r.userId.equals(userId))).get(),
+  );
+
+  static List<NotificationLogEntry> _entries(List<NotificationLogRow> rows) => [
+    for (final r in rows)
+      if (_kindOf(r.kind) case final kind?)
+        NotificationLogEntry(
+          id: r.id,
+          kind: kind,
+          key: r.key,
+          at: r.at,
+          title: r.title,
+          body: r.body,
+          readAt: r.readAt,
+        ),
+  ];
 
   static NotificationKind? _kindOf(String name) {
     for (final k in NotificationKind.values) {

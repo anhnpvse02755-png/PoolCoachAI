@@ -374,7 +374,7 @@ void main() {
       await pumpEventQueue();
     }
 
-    test('nguồn gợi ý null khi một nguồn đang tải lại', () async {
+    test('nguồn gợi ý đang tải khi một nguồn đang tải lại', () async {
       final container = ProviderContainer(
         overrides: [
           nowProvider.overrideWithValue(() => today),
@@ -409,7 +409,32 @@ void main() {
       addTearDown(container.dispose);
       await settleSource(container);
 
-      expect(container.read(recommendationSourceProvider), isNull);
+      expect(
+        container.read(recommendationSourceProvider),
+        isA<AsyncLoading<RecommendationSource>>(),
+      );
+    });
+
+    test('một nguồn lỗi: nguồn gợi ý là lỗi, không phải đang tải', () async {
+      final container = containerWith(
+        matchStream: Stream.error(StateError('hỏng')),
+      );
+      await settleSource(container);
+
+      expect(
+        container.read(recommendationSourceProvider),
+        isA<AsyncError<RecommendationSource>>(),
+      );
+    });
+
+    test('chưa đăng nhập: nguồn gợi ý đang chờ tài khoản', () async {
+      final container = containerWith(auth: FakeAuthRepository());
+      await settleSource(container);
+
+      expect(
+        container.read(recommendationSourceProvider),
+        isA<AsyncLoading<RecommendationSource>>(),
+      );
     });
 
     test(
@@ -424,7 +449,7 @@ void main() {
         final container = containerWith(seenStore: store);
         await settleSource(container);
 
-        final source = container.read(recommendationSourceProvider)!;
+        final source = container.read(recommendationSourceProvider).requireValue;
         expect(source.userId, 'u1');
         expect(source.seen, seen);
         expect(source.inputs.drills, drills);
@@ -435,7 +460,7 @@ void main() {
       final container = containerWith();
       await settleSource(container);
 
-      final source = container.read(recommendationSourceProvider)!;
+      final source = container.read(recommendationSourceProvider).requireValue;
       expect(source.seen, isNull);
     });
 
@@ -446,7 +471,8 @@ void main() {
 
       expect(
         container
-            .read(recommendationSourceProvider)!
+            .read(recommendationSourceProvider)
+            .requireValue
             .inputs
             .recommendFor(today)
             .drill
@@ -478,7 +504,9 @@ void main() {
       final state = container.read(recommendationSeenProvider);
       expect(state.hasValue && !state.isLoading, isTrue);
       expect(state.value, isNull);
-      expect(container.read(recommendationSourceProvider)?.seen, isNull);
+      final source = container.read(recommendationSourceProvider);
+      expect(source.requireValue.userId, 'u2');
+      expect(source.requireValue.seen, isNull);
     });
   });
 

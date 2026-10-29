@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
@@ -10,6 +12,8 @@ import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
 import 'package:poolcoachai/domain/drill.dart';
+import 'package:poolcoachai/domain/drill_log.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
@@ -66,12 +70,16 @@ void main() {
     List<ScheduleSlot>? schedule,
     List<Drill> drills = const [],
     FakeRecommendationSeenStore? seenStore,
+    Stream<List<DrillLog>>? logsStream,
+    List<NotificationLogEntry>? notificationLog,
   }) {
     SharedPreferences.setMockInitialValues(saved);
     return testContainer(
       schedule: schedule,
       drills: drills,
       seenStore: seenStore,
+      logsStream: logsStream,
+      notificationLog: notificationLog,
     );
   }
 
@@ -161,6 +169,44 @@ void main() {
     await open(tester, containerWith(drills: testDrills, seenStore: store));
     expect(find.text(Vi.recommendationReminderTitle), findsNothing);
     expect(find.text(Vi.notificationsUpcomingEmpty), findsOneWidget);
+  });
+
+  group('nguồn gợi ý chưa sẵn sàng', () {
+    // Gợi ý đã đặt từ lần mở trước, còn ở tương lai.
+    final kept = NotificationLogEntry(
+      id: 41,
+      kind: NotificationKind.recommendation,
+      key: '2026-9-23:aiming:d1',
+      at: DateTime(2026, 9, 23, recommendationReminderHour),
+      title: Vi.recommendationReminderTitle,
+      body: 'Nội dung đã lập lần trước',
+    );
+
+    testWidgets('đang tải: Sắp tới vẫn hiện gợi ý đã đặt', (tester) async {
+      await open(
+        tester,
+        containerWith(
+          drills: testDrills,
+          logsStream: StreamController<List<DrillLog>>().stream,
+          notificationLog: [kept],
+        ),
+      );
+      expect(find.text(Vi.recommendationReminderTitle), findsOneWidget);
+      expect(find.text(kept.body), findsOneWidget);
+      expect(find.text('08:00'), findsOneWidget);
+    });
+
+    testWidgets('lỗi: Sắp tới không còn gợi ý', (tester) async {
+      await open(
+        tester,
+        containerWith(
+          drills: testDrills,
+          logsStream: Stream.error(StateError('hỏng')),
+          notificationLog: [kept],
+        ),
+      );
+      expect(find.text(Vi.recommendationReminderTitle), findsNothing);
+    });
   });
 
   testWidgets('saved preferences are shown on open', (tester) async {
