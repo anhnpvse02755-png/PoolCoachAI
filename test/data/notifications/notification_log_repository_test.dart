@@ -135,6 +135,13 @@ void main() {
       2: later,
       3: null,
     });
+    // Cùng id (id không chứa tài khoản) mà của người khác: không bị đụng.
+    final theirsAfter = await other.watchAll().first;
+    expect({for (final e in theirsAfter) e.id: e.readAt}, {
+      1: null,
+      2: null,
+      3: null,
+    });
   });
 
   test('mục cũ hơn 30 ngày bị dọn khi ghi', () async {

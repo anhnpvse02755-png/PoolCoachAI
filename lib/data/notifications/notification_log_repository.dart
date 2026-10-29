@@ -58,11 +58,14 @@ class NotificationLogRepository {
   /// [cancelled]: id vừa bị huỷ khỏi lịch hệ điều hành khi còn chờ. Dòng của
   /// chúng bị xoá dù giờ đã qua: thông báo chưa từng hiện, hộp "Đã gửi"
   /// không được nhận là đã gửi.
+  ///
+  /// Đọc và ghi trong cùng một giao dịch: một lần ghi khác (web ghi thông báo
+  /// vừa hiện, đánh dấu đã đọc) không lọt vào giữa.
   Future<void> syncPlanned(
     List<PlannedNotification> planned, {
     required DateTime now,
     Set<int> cancelled = const {},
-  }) async {
+  }) => _db.transaction(() async {
     final rows = await (_db.select(
       _t,
     )..where((r) => r.userId.equals(userId))).get();
@@ -76,22 +79,18 @@ class NotificationLogRepository {
             !r.at.isAfter(cutoff))
           r.id,
     ];
-    final toInsert = [
-      for (final n in planned)
-        if (!presentIds.contains(n.id)) n,
-    ];
-    if (staleIds.isEmpty && toInsert.isEmpty) return;
-    await _db.transaction(() async {
-      if (staleIds.isNotEmpty) {
-        await (_db.delete(
-          _t,
-        )..where((r) => r.userId.equals(userId) & r.id.isIn(staleIds))).go();
-      }
-      for (final n in toInsert) {
-        await _db.into(_t).insert(_companion(n, n.at), mode: InsertMode.insertOrIgnore);
-      }
-    });
-  }
+    if (staleIds.isNotEmpty) {
+      await (_db.delete(
+        _t,
+      )..where((r) => r.userId.equals(userId) & r.id.isIn(staleIds))).go();
+    }
+    for (final n in planned) {
+      if (presentIds.contains(n.id)) continue;
+      await _db
+          .into(_t)
+          .insert(_companion(n, n.at), mode: InsertMode.insertOrIgnore);
+    }
+  });
 
   /// Ghi một thông báo vừa hiện (trên web, nơi không có lịch sẵn), kèm dọn
   /// mục quá 30 ngày.
@@ -104,7 +103,9 @@ class NotificationLogRepository {
           .into(_t)
           .insert(_companion(n, at), mode: InsertMode.insertOrIgnore);
       await (_db.delete(_t)..where(
-            (r) => r.userId.equals(userId) & r.at.isSmallerOrEqualValue(_cutoff(at)),
+            (r) =>
+                r.userId.equals(userId) &
+                r.at.isSmallerOrEqualValue(_cutoff(at)),
           ))
           .go();
     });
