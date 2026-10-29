@@ -50,4 +50,27 @@ void main() {
     SharedPreferences.setMockInitialValues({key: '{'});
     expect(await store.load('u1'), isNull);
   });
+
+  test('sai kiểu, thiếu trường hay giờ hỏng: coi như chưa thấy', () async {
+    final store = SharedPreferencesRecommendationSeenStore();
+    for (final raw in [
+      '[]',
+      '"chuỗi"',
+      '{"cat":1,"drillId":"d1","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":7,"at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"d1","at":20260922}',
+      '{"cat":"bank","drillId":"d1"}',
+      '{"cat":"bank","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"","at":"2026-09-22T10:00:00.000"}',
+      '{"cat":"bank","drillId":"d1","at":"không phải giờ"}',
+    ]) {
+      SharedPreferences.setMockInitialValues({key: raw});
+      expect(await store.load('u1'), isNull, reason: raw);
+    }
+    // Đối chứng: cùng dạng mà đủ và đúng thì đọc được.
+    SharedPreferences.setMockInitialValues({
+      key: '{"cat":"bank","drillId":"d1","at":"2026-09-22T10:00:00.000"}',
+    });
+    expect(await store.load('u1'), isNotNull);
+  });
 }

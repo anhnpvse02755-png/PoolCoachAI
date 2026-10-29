@@ -469,16 +469,16 @@ void main() {
       final container = containerWith();
       await settleSource(container);
 
-      expect(
-        container
-            .read(recommendationSourceProvider)
-            .requireValue
-            .inputs
-            .recommendFor(today)
-            .drill
-            ?.id,
-        container.read(todayRecommendationProvider).value!.drill?.id,
-      );
+      final fromSource = container
+          .read(recommendationSourceProvider)
+          .requireValue
+          .inputs
+          .recommendFor(today);
+      final home = container.read(todayRecommendationProvider).value!;
+      expect(fromSource.drill, isNotNull);
+      expect(fromSource.cat, home.cat);
+      expect(fromSource.drill?.id, home.drill?.id);
+      expect(fromSource.reason, home.reason);
     });
 
     test('đổi tài khoản khi đang đọc: cặp của u1 không lọt sang u2', () async {

@@ -505,6 +505,48 @@ void main() {
       },
     );
 
+    // Riverpod tạm dừng tab ẩn nên dữ liệu đổi không dựng lại nó; nhưng thứ
+    // khác (xoay máy, bàn phím: chỗ nút Coach đổi) vẫn dựng lại được. Lúc đó
+    // gợi ý mới nhất hiện ra trong build mà người chơi không thấy: không được
+    // ghi.
+    testWidgets('tab ẩn dựng lại vì đổi khổ màn: gợi ý mới không được ghi', (
+      tester,
+    ) async {
+      final store = FakeRecommendationSeenStore();
+      final logs = StreamController<List<DrillLog>>.broadcast();
+      addTearDown(logs.close);
+      final container = await openHome(
+        tester,
+        drills: twoDrills,
+        seenStore: store,
+        logsStream: () async* {
+          yield const <DrillLog>[];
+          yield* logs.stream;
+        }(),
+      );
+      final first = store.saved['u1']!;
+
+      await tester.tap(find.text(Vi.tabTraining));
+      await tester.pumpAndSettle();
+      logs.add([
+        for (var i = 0; i < 3; i++)
+          DrillLog(
+            id: 'kem-$i',
+            drillId: 'd8',
+            date: testToday.subtract(Duration(days: 3 - i)),
+            score: 1,
+            attempts: 10,
+          ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(container.read(todayRecommendationProvider).value!.drill!.id, 'd8');
+
+      // Khổ điện thoại: shell có nút Coach nổi, Trang chủ (ẩn) dựng lại.
+      tester.view.physicalSize = const Size(400, 1000);
+      await tester.pumpAndSettle();
+      expect(store.saved['u1'], first);
+    });
+
     testWidgets('không có bài gợi ý: không ghi', (tester) async {
       final store = FakeRecommendationSeenStore();
       await openHome(tester, drills: const [], seenStore: store);
