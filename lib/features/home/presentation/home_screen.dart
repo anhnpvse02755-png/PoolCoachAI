@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/recommendation_provider.dart';
+import 'package:poolcoachai/domain/recommendation.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
@@ -16,12 +19,40 @@ import 'package:poolcoachai/features/roadmap/presentation/roadmap_home_line.dart
 /// AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
 ///
 /// Đọc [todayRecommendationProvider] và dựng các khối tiến độ, lịch và gợi ý.
-class HomeScreen extends ConsumerWidget {
+///
+/// Khi Trang chủ là tab đang mở và hiện một bài gợi ý, ghi cặp (nhóm, bài) đó
+/// là "đã thấy" để thông báo không nhắc lại đúng cái người chơi vừa xem.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  ({SkillCategory cat, String drillId})? _recorded;
+  bool _wasVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
     final recommendation = ref.watch(todayRecommendationProvider);
+
+    final drill = recommendation.value?.drill;
+    if (recommendation is AsyncData<TodayRecommendation> && drill != null) {
+      final pair = (cat: recommendation.value.cat, drillId: drill.id);
+      // Tab không mở thì ticker bị tắt: gợi ý đổi ngầm không tính là đã thấy.
+      final visible = TickerMode.valuesOf(context).enabled;
+      if (visible && (!_wasVisible || pair != _recorded)) {
+        _recorded = pair;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ref
+              .read(recommendationSeenProvider.notifier)
+              .markSeen(pair.cat, pair.drillId);
+        });
+      }
+      _wasVisible = visible;
+    }
 
     return PcRootScaffold(
       title: Vi.homeTitle,

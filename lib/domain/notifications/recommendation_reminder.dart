@@ -67,6 +67,20 @@ final class SeenRecommendation {
   int get hashCode => Object.hash(cat, drillId, at);
 }
 
+/// Mọi thứ dịch vụ thông báo cần để lập gợi ý: tài khoản, đầu vào gợi ý và
+/// cặp người chơi đã thấy lần cuối ([seen] null: chưa thấy lần nào).
+final class RecommendationSource {
+  const RecommendationSource({
+    required this.userId,
+    required this.inputs,
+    required this.seen,
+  });
+
+  final String userId;
+  final RecommendationInputs inputs;
+  final SeenRecommendation? seen;
+}
+
 /// Khoá của thông báo gợi ý: `năm-tháng-ngày:nhóm:idBài`, không đệm số 0.
 /// Id bài là mọi thứ sau dấu `:` thứ hai.
 String recommendationKey(DateTime day, SkillCategory cat, String drillId) =>

@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/core/providers/player_intelligence_provider.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -17,6 +21,8 @@ import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
+import '../../support/fake_auth.dart';
+import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/match_fixtures.dart';
 import '../../support/roadmap_fixtures.dart';
 
@@ -70,6 +76,8 @@ void main() {
     Stream<List<ScheduleSlot>>? scheduleStream,
     Stream<List<PoolMatch>>? matchStream,
     AsyncValue<BuResult?> latestBu = const AsyncData<BuResult?>(null),
+    FakeRecommendationSeenStore? seenStore,
+    FakeAuthRepository? auth,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -93,6 +101,12 @@ void main() {
           (ref) => matchStream ?? Stream.value(const <PoolMatch>[]),
         ),
         latestBuResultProvider.overrideWithValue(latestBu),
+        recommendationSeenStoreProvider.overrideWithValue(
+          seenStore ?? FakeRecommendationSeenStore(),
+        ),
+        authRepositoryProvider.overrideWithValue(
+          auth ?? FakeAuthRepository.signedIn(),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -350,6 +364,121 @@ void main() {
       final rec = container.read(todayRecommendationProvider).requireValue;
       expect(rec.reason, PickReason.weakest);
       expect(rec.cat, SkillCategory.bank);
+    });
+  });
+
+  group('recommendationSourceProvider', () {
+    Future<void> settleSource(ProviderContainer container) async {
+      container.listen(recommendationSourceProvider, (_, _) {});
+      container.listen(todayRecommendationProvider, (_, _) {});
+      await pumpEventQueue();
+    }
+
+    test('nguồn gợi ý null khi một nguồn đang tải lại', () async {
+      final container = ProviderContainer(
+        overrides: [
+          nowProvider.overrideWithValue(() => today),
+          drillsProvider.overrideWith((ref) => Stream.value(drills)),
+          knowledgeProvider.overrideWith((ref) => Stream.value(knowledge)),
+          drillLogsProvider.overrideWith(
+            (ref) => Stream.value(const <DrillLog>[]),
+          ),
+          timerSessionsProvider.overrideWith(
+            (ref) => Stream.value(const <TimerSession>[]),
+          ),
+          scheduleProvider.overrideWith(
+            (ref) => Stream.value(const <ScheduleSlot>[]),
+          ),
+          matchesProvider.overrideWithValue(
+            // ignore: invalid_use_of_internal_member
+            const AsyncLoading<List<PoolMatch>>().copyWithPrevious(
+              AsyncData(matchesWeakAt(SkillCategory.position, at: today)),
+            ),
+          ),
+          latestBuResultProvider.overrideWithValue(
+            const AsyncData<BuResult?>(null),
+          ),
+          recommendationSeenStoreProvider.overrideWithValue(
+            FakeRecommendationSeenStore(),
+          ),
+          authRepositoryProvider.overrideWithValue(
+            FakeAuthRepository.signedIn(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await settleSource(container);
+
+      expect(container.read(recommendationSourceProvider), isNull);
+    });
+
+    test(
+      'nguồn gợi ý có userId, inputs và cặp đã thấy khi mọi thứ sẵn sàng',
+      () async {
+        final seen = SeenRecommendation(
+          cat: SkillCategory.bank,
+          drillId: 'd8',
+          at: today,
+        );
+        final store = FakeRecommendationSeenStore()..saved['u1'] = seen;
+        final container = containerWith(seenStore: store);
+        await settleSource(container);
+
+        final source = container.read(recommendationSourceProvider)!;
+        expect(source.userId, 'u1');
+        expect(source.seen, seen);
+        expect(source.inputs.drills, drills);
+      },
+    );
+
+    test('chưa từng thấy gì: nguồn vẫn sẵn sàng với seen null', () async {
+      final container = containerWith();
+      await settleSource(container);
+
+      final source = container.read(recommendationSourceProvider)!;
+      expect(source.seen, isNull);
+    });
+
+    test('Home và nguồn dùng cùng inputs: recommendFor(now) bằng gợi ý Home',
+        () async {
+      final container = containerWith();
+      await settleSource(container);
+
+      expect(
+        container
+            .read(recommendationSourceProvider)!
+            .inputs
+            .recommendFor(today)
+            .drill
+            ?.id,
+        container.read(todayRecommendationProvider).value!.drill?.id,
+      );
+    });
+
+    test('đổi tài khoản khi đang đọc: cặp của u1 không lọt sang u2', () async {
+      final auth = FakeAuthRepository.signedIn();
+      final store = FakeRecommendationSeenStore();
+      final seenOfU1 = SeenRecommendation(
+        cat: SkillCategory.bank,
+        drillId: 'd8',
+        at: today,
+      );
+      store.saved['u1'] = seenOfU1;
+      final gate = Completer<void>();
+      store.hold = gate;
+      final container = containerWith(seenStore: store, auth: auth);
+      await settleSource(container);
+      expect(container.read(recommendationSeenProvider).isLoading, isTrue);
+
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'B'));
+      await pumpEventQueue();
+      gate.complete();
+      await pumpEventQueue();
+
+      final state = container.read(recommendationSeenProvider);
+      expect(state.hasValue && !state.isLoading, isTrue);
+      expect(state.value, isNull);
+      expect(container.read(recommendationSourceProvider)?.seen, isNull);
     });
   });
 

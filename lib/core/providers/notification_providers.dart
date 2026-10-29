@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
+import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 
 final notificationPrefsStoreProvider = Provider<NotificationPrefsStore>(
   (ref) => SharedPreferencesNotificationPrefsStore(),
@@ -58,6 +63,73 @@ class NotificationPrefsController
     }
   }
 }
+
+final recommendationSeenStoreProvider = Provider<RecommendationSeenStore>(
+  (ref) => SharedPreferencesRecommendationSeenStore(),
+);
+
+/// Cặp gợi ý người đang đăng nhập thấy lần cuối trên Trang chủ.
+///
+/// [AsyncLoading] tới khi đọc xong; `AsyncData(null)` là chưa thấy lần nào.
+final recommendationSeenProvider =
+    NotifierProvider<
+      RecommendationSeenController,
+      AsyncValue<SeenRecommendation?>
+    >(RecommendationSeenController.new);
+
+class RecommendationSeenController
+    extends Notifier<AsyncValue<SeenRecommendation?>> {
+  @override
+  AsyncValue<SeenRecommendation?> build() {
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) return const AsyncData(null);
+    // Mỗi lần build một cờ riêng: Notifier giữ nguyên instance khi build lại.
+    var disposed = false;
+    ref.onDispose(() => disposed = true);
+    ref
+        .read(recommendationSeenStoreProvider)
+        .load(userId)
+        .then<SeenRecommendation?>(
+          (seen) => seen,
+          onError: (Object _) => null,
+        )
+        .then((seen) {
+          // Đã ghi trong lúc đang đọc thì giữ cặp mới nhất.
+          if (!disposed && state is AsyncLoading) state = AsyncData(seen);
+        });
+    return const AsyncLoading();
+  }
+
+  Future<void> markSeen(SkillCategory cat, String drillId) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final seen = SeenRecommendation(
+      cat: cat,
+      drillId: drillId,
+      at: ref.read(nowProvider)(),
+    );
+    state = AsyncData(seen);
+    try {
+      await ref.read(recommendationSeenStoreProvider).save(userId, seen);
+    } on Object {
+      // Không lưu được thì chỉ nhớ tới khi mở lại app.
+    }
+  }
+}
+
+/// Đủ dữ liệu để dịch vụ lập thông báo gợi ý; null khi chưa có tài khoản hoặc
+/// còn nguồn đang tải, đang tải lại hay lỗi.
+final recommendationSourceProvider = Provider<RecommendationSource?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final inputs = ref.watch(recommendationInputsProvider);
+  final seen = ref.watch(recommendationSeenProvider);
+  if (userId == null || gate<Object?>([inputs, seen]) != null) return null;
+  return RecommendationSource(
+    userId: userId,
+    inputs: inputs.requireValue,
+    seen: seen.requireValue,
+  );
+});
 
 /// Dịch vụ giữ thông báo của hệ điều hành/trình duyệt khớp với kế hoạch.
 final notificationServiceProvider = Provider<NotificationService>((ref) {

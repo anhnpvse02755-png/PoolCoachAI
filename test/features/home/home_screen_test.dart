@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show Size;
 
 import 'package:drift/drift.dart' show Value;
@@ -13,6 +14,7 @@ import 'package:flutter/material.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/data/database/database.dart';
@@ -35,6 +37,7 @@ import 'package:poolcoachai/features/training/presentation/skill_test_screen.dar
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 
+import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/layout_sweep.dart';
 import '../../support/roadmap_fixtures.dart';
 import '../../support/skill_test_fixtures.dart';
@@ -42,7 +45,7 @@ import '../../support/test_data.dart';
 
 /// AI Home — mục 6.1 của thiết kế.
 void main() {
-  Future<void> openHome(
+  Future<ProviderContainer> openHome(
     WidgetTester tester, {
     List<Drill>? drills,
     List<KnowledgeArticle>? knowledge,
@@ -54,6 +57,8 @@ void main() {
     BuResult? buResult,
     Stream<List<BuTest>>? buTestsStream,
     List<SkillTest>? skillTests,
+    FakeRecommendationSeenStore? seenStore,
+    Stream<List<DrillLog>>? logsStream,
   }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
@@ -68,6 +73,8 @@ void main() {
       buResult: buResult,
       buTestsStream: buTestsStream,
       skillTests: skillTests,
+      seenStore: seenStore,
+      logsStream: logsStream,
     );
     addTearDown(container.dispose);
 
@@ -83,6 +90,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return container;
   }
 
   testWidgets('bài BU đọc lỗi: Home vẫn hiện gợi ý, không báo lỗi', (
@@ -430,5 +438,78 @@ void main() {
     await tester.pump();
     expect(find.byType(ListTile), findsNothing);
     expect(find.text(Vi.skillTestDataError), findsNothing);
+  });
+  group('ghi cặp gợi ý đã thấy', () {
+    const bankDrill = Drill(
+      id: 'd8',
+      cat: SkillCategory.bank,
+      name: 'Cân bi một băng',
+      level: 4,
+      unit: 'lần trúng / 10',
+      passThreshold: 0.5,
+      goal: 'Mục tiêu.',
+      steps: ['Bước 1'],
+    );
+    final twoDrills = [...testDrills, bankDrill];
+
+    testWidgets('Trang chủ hiện bài gợi ý: ghi (nhóm, bài) đã thấy cho u1', (
+      tester,
+    ) async {
+      final store = FakeRecommendationSeenStore();
+      final container = await openHome(tester, seenStore: store);
+
+      final rec = container.read(todayRecommendationProvider).value!;
+      expect(rec.drill, isNotNull);
+      expect(store.saved['u1']!.sameAs(rec.cat, rec.drill!.id), isTrue);
+      expect(store.saved['u1']!.at, testToday);
+    });
+
+    testWidgets(
+      'đang ở tab khác: gợi ý đổi không được ghi; quay lại Trang chủ thì ghi',
+      (tester) async {
+        final store = FakeRecommendationSeenStore();
+        final logs = StreamController<List<DrillLog>>.broadcast();
+        addTearDown(logs.close);
+        final container = await openHome(
+          tester,
+          drills: twoDrills,
+          seenStore: store,
+          logsStream: () async* {
+            yield const <DrillLog>[];
+            yield* logs.stream;
+          }(),
+        );
+        final first = store.saved['u1']!;
+        expect(first.drillId, 'd1');
+
+        await tester.tap(find.text(Vi.tabTraining));
+        await tester.pumpAndSettle();
+        logs.add([
+          for (var i = 0; i < 3; i++)
+            DrillLog(
+              id: 'kem-$i',
+              drillId: 'd8',
+              date: testToday.subtract(Duration(days: 3 - i)),
+              score: 1,
+              attempts: 10,
+            ),
+        ]);
+        await tester.pumpAndSettle();
+        final changed = container.read(todayRecommendationProvider).value!;
+        expect(changed.drill!.id, 'd8');
+        expect(store.saved['u1'], first);
+
+        await tester.tap(find.text(Vi.tabHome));
+        await tester.pumpAndSettle();
+        expect(store.saved['u1']!.sameAs(changed.cat, 'd8'), isTrue);
+      },
+    );
+
+    testWidgets('không có bài gợi ý: không ghi', (tester) async {
+      final store = FakeRecommendationSeenStore();
+      await openHome(tester, drills: const [], seenStore: store);
+
+      expect(store.saved, isEmpty);
+    });
   });
 }
