@@ -2,21 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-/// Dựng lại [builder] một lần khi tới giờ [at] (cộng một giây cho chắc).
+/// Dựng lại [builder] khi tới giờ kế tiếp mà [nextAt] trả về (cộng một giây
+/// cho chắc), rồi đặt tiếp cho giờ sau đó.
 ///
 /// Dành cho thứ phụ thuộc vào "đã tới giờ chưa" mà không có sự kiện nào báo
-/// khi giờ tới. Timer thuộc về widget: đổi [at] hoặc [now] thì đặt lại, bỏ
-/// widget thì huỷ. [at] null là không đặt timer.
+/// khi giờ tới. Timer thuộc về widget: widget đổi thì đặt lại, bỏ widget thì
+/// huỷ. [nextAt] nhận "bây giờ" theo [clock] và trả về giờ kế tiếp sau đó,
+/// hoặc null là không đặt timer.
 class PcRebuildAt extends StatefulWidget {
   const PcRebuildAt({
-    required this.at,
-    required this.now,
+    required this.clock,
+    required this.nextAt,
     required this.builder,
     super.key,
   });
 
-  final DateTime? at;
-  final DateTime now;
+  final DateTime Function() clock;
+  final DateTime? Function(DateTime now) nextAt;
   final WidgetBuilder builder;
 
   @override
@@ -26,34 +28,44 @@ class PcRebuildAt extends StatefulWidget {
 class _PcRebuildAtState extends State<PcRebuildAt> {
   Timer? _timer;
 
+  /// Máy ngủ thì timer đứng yên: lúc quay lại, giờ có thể đã qua mà timer
+  /// chưa chạy. Quay lại app thì dựng lại và đặt timer theo đồng hồ mới.
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _due);
     _schedule();
   }
 
   @override
   void didUpdateWidget(PcRebuildAt old) {
     super.didUpdateWidget(old);
-    if (old.at != widget.at || old.now != widget.now) _schedule();
+    _schedule();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _lifecycle.dispose();
     super.dispose();
+  }
+
+  void _due() {
+    if (!mounted) return;
+    setState(() {});
+    _schedule();
   }
 
   void _schedule() {
     _timer?.cancel();
     _timer = null;
-    final at = widget.at;
-    if (at == null) return;
-    var wait = at.difference(widget.now) + const Duration(seconds: 1);
-    if (wait.isNegative) wait = Duration.zero;
-    _timer = Timer(wait, () {
-      if (mounted) setState(() {});
-    });
+    final now = widget.clock();
+    final at = widget.nextAt(now);
+    // Giờ không ở phía sau "bây giờ" thì không đặt, kẻo timer 0 giây lặp mãi.
+    if (at == null || !at.isAfter(now)) return;
+    _timer = Timer(at.difference(now) + const Duration(seconds: 1), _due);
   }
 
   @override

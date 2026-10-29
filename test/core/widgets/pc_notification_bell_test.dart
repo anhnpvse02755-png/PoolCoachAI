@@ -109,6 +109,29 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
+  // Máy ngủ thì timer đứng yên: khi mở máy, giờ đã qua mà timer chưa chạy.
+  testWidgets('máy ngủ qua giờ giao: quay lại app thì huy hiệu đúng ngay', (
+    tester,
+  ) async {
+    await add(1, clock.add(const Duration(minutes: 1)));
+    await open(tester);
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+
+    clock = clock.add(const Duration(hours: 8));
+    for (final state in const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pump();
+    expect(find.text('1'), findsOneWidget);
+  });
+
   testWidgets('chạm chuông mở màn Thông báo', (tester) async {
     await open(tester);
     await tester.tap(find.byType(IconButton));

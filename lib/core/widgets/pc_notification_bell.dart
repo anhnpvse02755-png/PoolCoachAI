@@ -22,10 +22,10 @@ class PcNotificationBell extends ConsumerWidget {
     final all = ready ? log.requireValue : const <NotificationLogEntry>[];
     final clock = ref.watch(nowProvider);
     return PcRebuildAt(
-      at: nextDelivery(all, clock()),
-      now: clock(),
+      clock: clock,
+      nextAt: (now) => nextDelivery(all, now),
       builder: (context) {
-        final n = unreadCount(all, ref.read(nowProvider)());
+        final n = unreadCount(all, clock());
         return IconButton(
           tooltip: Vi.notificationsBellTooltip(n),
           icon: Badge(

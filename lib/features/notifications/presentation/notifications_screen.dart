@@ -59,15 +59,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     ref.read(notificationLogRepositoryProvider)?.markRead(ids, at: now);
   }
 
-  Widget _sent(DateTime now) {
+  Widget _sent() {
     final log = ref.watch(notificationLogProvider);
     final all = log.hasValue && !log.isLoading
         ? log.requireValue
         : const <NotificationLogEntry>[];
     final clock = ref.watch(nowProvider);
     return PcRebuildAt(
-      at: nextDelivery(all, now),
-      now: now,
+      clock: clock,
+      nextAt: (now) => nextDelivery(all, now),
       builder: (context) {
         final current = clock();
         final entries = inboxEntries(all, current);
@@ -135,7 +135,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           _permissionCard(),
-          _sent(now),
+          _sent(),
           const PcSectionHeader(title: Vi.notificationsSettingsTitle),
           PcCard(
             padding: EdgeInsets.zero,
