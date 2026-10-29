@@ -549,9 +549,8 @@ void main() {
       forgetChatInFlight: (_) {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
-    expect((await db.select(db.notificationLogRows).get()).map((r) => r.userId), [
-      'u2',
-    ]);
+    final rows = await db.select(db.notificationLogRows).get();
+    expect(rows.map((r) => r.userId), ['u2']);
   });
 
   test('đăng xuất quên cặp gợi ý đã thấy của người đó, giữ của người khác',

@@ -137,7 +137,8 @@ ProviderContainer testContainer({
       // Không dựng AppDatabase thật trong widget test: không có kho nhật ký.
       notificationLogRepositoryProvider.overrideWithValue(null),
       notificationLogProvider.overrideWith(
-        (ref) => Stream.value(notificationLog ?? const <NotificationLogEntry>[]),
+        (ref) =>
+            Stream.value(notificationLog ?? const <NotificationLogEntry>[]),
       ),
       // Cho test chứng minh màn hình dùng trạng thái do provider đưa ra, không
       // tự tính lại: ép trạng thái khác với ngày thật của giải.

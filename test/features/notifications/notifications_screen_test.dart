@@ -615,7 +615,10 @@ void main() {
       expect(tester.takeException(), isNull);
       await scrollThroughAll(tester);
       expect(tester.takeException(), isNull);
-      expect(find.text(Vi.notificationsSentTitle.toUpperCase()), findsOneWidget);
+      expect(
+        find.text(Vi.notificationsSentTitle.toUpperCase()),
+        findsOneWidget,
+      );
     },
   );
 }

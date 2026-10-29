@@ -406,7 +406,8 @@ class CoachChatTurnRows extends Table {
   BoolColumn get insufficient => boolean().withDefault(const Constant(false))();
 }
 
-/// Nhật ký thông báo đã lập/đã hiện — chỉ trên máy này, không đồng bộ (spec P6a §4).
+/// Nhật ký thông báo đã lập/đã hiện — chỉ trên máy này, không đồng bộ
+/// (spec P6a §4).
 class NotificationLogRows extends Table {
   TextColumn get userId => text()();
   IntColumn get id => integer()();

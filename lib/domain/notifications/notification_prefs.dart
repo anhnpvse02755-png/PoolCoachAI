@@ -67,5 +67,6 @@ class NotificationPrefs {
       other.streak == streak;
 
   @override
-  int get hashCode => Object.hash(recommendation, maintenance, schedule, streak);
+  int get hashCode =>
+      Object.hash(recommendation, maintenance, schedule, streak);
 }

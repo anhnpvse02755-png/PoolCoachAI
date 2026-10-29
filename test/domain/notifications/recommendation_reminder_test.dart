@@ -171,7 +171,10 @@ void main() {
         Vi.pickReason(rec.reason, Vi.skill(rec.cat), signal: rec.matchSignal),
       ),
     );
-    expect(n.key, recommendationKey(DateTime(2026, 10, 13), rec.cat, rec.drill!.id));
+    expect(
+      n.key,
+      recommendationKey(DateTime(2026, 10, 13), rec.cat, rec.drill!.id),
+    );
     expect(n.validUntil, DateTime(2026, 10, 14));
   });
 
@@ -236,7 +239,11 @@ void main() {
   });
 
   test('khoá gợi ý: đọc lại được; khoá rác thì null', () {
-    final k = recommendationKey(DateTime(2026, 10, 3), SkillCategory.bank, 'd:7');
+    final k = recommendationKey(
+      DateTime(2026, 10, 3),
+      SkillCategory.bank,
+      'd:7',
+    );
     expect(parseRecommendationKey(k), (
       day: DateTime(2026, 10, 3),
       cat: SkillCategory.bank,

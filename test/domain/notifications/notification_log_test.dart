@@ -75,11 +75,7 @@ void main() {
       1,
       DateTime(2026, 10, 12, 8),
       kind: NotificationKind.recommendation,
-      key: recommendationKey(
-        DateTime(2026, 10, 12),
-        SkillCategory.bank,
-        'b1',
-      ),
+      key: recommendationKey(DateTime(2026, 10, 12), SkillCategory.bank, 'b1'),
     );
     final broken = entry(
       2,
@@ -108,7 +104,11 @@ void main() {
     expect(got.at, DateTime(2026, 10, 12, 8));
 
     expect(
-      recommendationBaseline(shownOnHome: home, log: [broken, future], now: now),
+      recommendationBaseline(
+        shownOnHome: home,
+        log: [broken, future],
+        now: now,
+      ),
       home,
     );
     expect(recommendationBaseline(log: const [], now: now), isNull);
@@ -118,7 +118,11 @@ void main() {
       at: DateTime(2026, 10, 13, 8),
     );
     expect(
-      recommendationBaseline(shownOnHome: newerHome, log: [delivered], now: now),
+      recommendationBaseline(
+        shownOnHome: newerHome,
+        log: [delivered],
+        now: now,
+      ),
       newerHome,
     );
   });

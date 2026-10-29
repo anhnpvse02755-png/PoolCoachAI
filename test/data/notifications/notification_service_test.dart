@@ -398,7 +398,9 @@ void main() {
       );
 
       // Chạm vào một thông báo khác loại cùng khoá: không động tới dòng này.
-      platform.onTap!(notificationPayload(NotificationKind.streak, rows.single.key));
+      platform.onTap!(
+        notificationPayload(NotificationKind.streak, rows.single.key),
+      );
       await pumpEventQueue();
       expect((await logRows()).single.readAt, isNull);
 
@@ -553,7 +555,10 @@ void main() {
       s.setTapHandler(got.add);
       expect(got, [const NotificationTap(NotificationKind.streak, 'k1')]);
       scheduler.onTapHandler!('schedule|s1:2026-9-22');
-      expect(got.last, const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'));
+      expect(
+        got.last,
+        const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'),
+      );
     });
 
     test('Android/iOS: thông báo đặt vào lịch mang tài khoản trong payload',
@@ -1061,7 +1066,8 @@ void main() {
       final pendingReco = recommendations().map((n) => n.id).toSet();
       final futureRows = {
         for (final r in await logRows())
-          if (r.at.isAfter(now) && r.kind == NotificationKind.recommendation.name)
+          if (r.at.isAfter(now) &&
+              r.kind == NotificationKind.recommendation.name)
             r.id,
       };
       // Lịch hệ điều hành và nhật ký khớp nhau. Lần lỗi đã xoá gợi ý, nên
@@ -1172,8 +1178,9 @@ void main() {
       await pumpEventQueue();
       scheduler.everScheduled.clear();
 
-      final s = scheduling(scheduleVersion: _FakeScheduleVersionStore()..fail = true)
-        ..start();
+      final s = scheduling(
+        scheduleVersion: _FakeScheduleVersionStore()..fail = true,
+      )..start();
       addTearDown(s.dispose);
       await pumpEventQueue();
       await saveSlot(time: '18:00');

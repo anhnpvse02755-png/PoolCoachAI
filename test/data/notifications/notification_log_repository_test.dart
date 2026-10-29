@@ -38,26 +38,35 @@ void main() {
     final a = planned(1, DateTime(2026, 10, 14, 8));
     await repo.syncPlanned([a], now: now);
     await repo.markRead([1], at: now); // dấu đã đọc phải còn sau lần lập tiếp
-    await repo.syncPlanned([a, planned(2, DateTime(2026, 10, 15, 8))], now: now);
+    await repo.syncPlanned([
+      a,
+      planned(2, DateTime(2026, 10, 15, 8)),
+    ], now: now);
     final all = await repo.watchAll().first;
     expect(all.map((e) => e.id).toList()..sort(), [1, 2]);
-    expect(all.firstWhere((e) => e.id == 1).readAt, now, reason: 'mục đã có được giữ nguyên');
+    expect(
+      all.firstWhere((e) => e.id == 1).readAt,
+      now,
+      reason: 'mục đã có được giữ nguyên',
+    );
     final e2 = all.firstWhere((e) => e.id == 2);
     expect([e2.title, e2.body, e2.kind], ['T2', 'B2', NotificationKind.streak]);
   });
 
   test('mục tương lai bị huỷ thì xoá; mục đã tới giờ được giữ', () async {
-    await db.into(db.notificationLogRows).insert(
-      NotificationLogRowsCompanion.insert(
-        userId: 'u1',
-        id: 9,
-        kind: 'streak',
-        key: 'k',
-        at: DateTime(2026, 10, 13, 8),
-        title: 'cũ',
-        body: 'cũ',
-      ),
-    );
+    await db
+        .into(db.notificationLogRows)
+        .insert(
+          NotificationLogRowsCompanion.insert(
+            userId: 'u1',
+            id: 9,
+            kind: 'streak',
+            key: 'k',
+            at: DateTime(2026, 10, 13, 8),
+            title: 'cũ',
+            body: 'cũ',
+          ),
+        );
     await repo.syncPlanned([
       planned(1, DateTime(2026, 10, 14, 8)),
       planned(2, DateTime(2026, 10, 15, 8)),
@@ -66,26 +75,28 @@ void main() {
     expect(await ids(), [2, 9]);
   });
 
-  test('mục đã qua giờ mà bị huỷ khi còn chờ thì xoá; người khác không đụng',
-      () async {
-    final other = NotificationLogRepository(db, userId: 'u2');
-    final past = DateTime(2026, 10, 13, 8);
-    for (final r in [repo, other]) {
-      await r.recordShown(planned(1, past), at: past);
-      await r.recordShown(planned(2, past), at: past);
-    }
-    // Id 3 bị huỷ nhưng vẫn nằm trong kế hoạch (đặt lại): giữ.
-    await repo.syncPlanned(
-      [planned(3, DateTime(2026, 10, 14, 8))],
-      now: now,
-      cancelled: {1, 3},
-    );
-    expect(await ids(), [2, 3]);
-    expect(
-      (await other.watchAll().first).map((e) => e.id).toList()..sort(),
-      [1, 2],
-    );
-  });
+  test(
+    'mục đã qua giờ mà bị huỷ khi còn chờ thì xoá; người khác không đụng',
+    () async {
+      final other = NotificationLogRepository(db, userId: 'u2');
+      final past = DateTime(2026, 10, 13, 8);
+      for (final r in [repo, other]) {
+        await r.recordShown(planned(1, past), at: past);
+        await r.recordShown(planned(2, past), at: past);
+      }
+      // Id 3 bị huỷ nhưng vẫn nằm trong kế hoạch (đặt lại): giữ.
+      await repo.syncPlanned(
+        [planned(3, DateTime(2026, 10, 14, 8))],
+        now: now,
+        cancelled: {1, 3},
+      );
+      expect(await ids(), [2, 3]);
+      expect((await other.watchAll().first).map((e) => e.id).toList()..sort(), [
+        1,
+        2,
+      ]);
+    },
+  );
 
   test('không đổi gì thì không ghi: luồng theo dõi không phát lại', () async {
     final plan = [planned(1, DateTime(2026, 10, 14, 8))];
@@ -119,29 +130,20 @@ void main() {
     }
     await repo.markReadByKey(NotificationKind.recommendation, 'x', now: now);
     var mine = await repo.watchAll().first;
-    expect({for (final e in mine) e.id: e.readAt}, {
-      1: now,
-      2: null,
-      3: null,
-    });
+    expect({for (final e in mine) e.id: e.readAt}, {1: now, 2: null, 3: null});
     final theirs = await other.watchAll().first;
     expect(theirs.every((e) => e.readAt == null), isTrue);
 
     final later = now.add(const Duration(hours: 1));
     await repo.markRead([1, 2], at: later);
     mine = await repo.watchAll().first;
-    expect({for (final e in mine) e.id: e.readAt}, {
-      1: now,
-      2: later,
-      3: null,
-    });
+    expect({for (final e in mine) e.id: e.readAt}, {1: now, 2: later, 3: null});
     // Cùng id (id không chứa tài khoản) mà của người khác: không bị đụng.
     final theirsAfter = await other.watchAll().first;
-    expect({for (final e in theirsAfter) e.id: e.readAt}, {
-      1: null,
-      2: null,
-      3: null,
-    });
+    expect(
+      {for (final e in theirsAfter) e.id: e.readAt},
+      {1: null, 2: null, 3: null},
+    );
   });
 
   test('mục cũ hơn 30 ngày bị dọn khi ghi', () async {
@@ -151,34 +153,41 @@ void main() {
     await repo.recordShown(planned(2, now), at: now);
     expect(await ids(), [2]);
 
-    await repo.recordShown(planned(3, old), at: old.subtract(const Duration(days: 1)));
+    await repo.recordShown(
+      planned(3, old),
+      at: old.subtract(const Duration(days: 1)),
+    );
     await repo.syncPlanned([], now: now);
     expect(await ids(), [2]);
   });
 
   test('dòng có loại lạ bị bỏ qua, dòng của người khác không thấy', () async {
-    await db.into(db.notificationLogRows).insert(
-      NotificationLogRowsCompanion.insert(
-        userId: 'u1',
-        id: 1,
-        kind: 'khongBiet',
-        key: 'k',
-        at: now,
-        title: 't',
-        body: 'b',
-      ),
-    );
-    await db.into(db.notificationLogRows).insert(
-      NotificationLogRowsCompanion.insert(
-        userId: 'u2',
-        id: 2,
-        kind: 'streak',
-        key: 'k',
-        at: now,
-        title: 't',
-        body: 'b',
-      ),
-    );
+    await db
+        .into(db.notificationLogRows)
+        .insert(
+          NotificationLogRowsCompanion.insert(
+            userId: 'u1',
+            id: 1,
+            kind: 'khongBiet',
+            key: 'k',
+            at: now,
+            title: 't',
+            body: 'b',
+          ),
+        );
+    await db
+        .into(db.notificationLogRows)
+        .insert(
+          NotificationLogRowsCompanion.insert(
+            userId: 'u2',
+            id: 2,
+            kind: 'streak',
+            key: 'k',
+            at: now,
+            title: 't',
+            body: 'b',
+          ),
+        );
     await repo.recordShown(planned(3, now), at: now);
     expect(await ids(), [3]);
   });

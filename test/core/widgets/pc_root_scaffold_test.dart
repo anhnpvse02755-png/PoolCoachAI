@@ -9,7 +9,8 @@ import 'package:poolcoachai/domain/notifications/notification_log.dart';
 
 import '../../support/layout_sweep.dart';
 
-/// Chuông trên thanh tiêu đề đọc nhật ký thông báo: mọi lần dựng cần một nhật ký.
+/// Chuông trên thanh tiêu đề đọc nhật ký thông báo: mọi lần dựng cần một
+/// nhật ký.
 Widget _scoped(Widget child) => ProviderScope(
   overrides: [
     notificationLogProvider.overrideWith(

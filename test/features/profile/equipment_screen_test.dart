@@ -551,7 +551,9 @@ void main() {
 
     testWidgets('x1.0: nút nằm cùng hàng với chữ như cũ', (tester) async {
       await openWithReminder(tester, textScale: 1.0, cues: 1);
-      final text = tester.getRect(find.text(Vi.equipmentReminderPrompt(inBackground: false)));
+      final text = tester.getRect(
+        find.text(Vi.equipmentReminderPrompt(inBackground: false)),
+      );
       final button = tester.getRect(find.text(Vi.equipmentReminderEnable));
       expect(
         button.top,

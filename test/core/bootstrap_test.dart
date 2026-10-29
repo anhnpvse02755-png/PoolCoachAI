@@ -105,7 +105,10 @@ void main() {
     final source = File('lib/core/bootstrap.dart').readAsStringSync();
     final body = source.substring(source.indexOf('void startSync('));
     expect(body, contains('startNotifications(container)'));
-    expect(body, isNot(contains('container.read(notificationServiceProvider)')));
+    expect(
+      body,
+      isNot(contains('container.read(notificationServiceProvider)')),
+    );
   });
 
   test('main nạp seed xong mới dựng app', () {

@@ -539,7 +539,8 @@ void main() {
           ),
       ]);
       await tester.pumpAndSettle();
-      expect(container.read(todayRecommendationProvider).value!.drill!.id, 'd8');
+      final changed = container.read(todayRecommendationProvider).value!;
+      expect(changed.drill!.id, 'd8');
 
       // Khổ điện thoại: shell có nút Coach nổi, Trang chủ (ẩn) dựng lại.
       tester.view.physicalSize = const Size(400, 1000);

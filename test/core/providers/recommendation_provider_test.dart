@@ -449,7 +449,9 @@ void main() {
         final container = containerWith(seenStore: store);
         await settleSource(container);
 
-        final source = container.read(recommendationSourceProvider).requireValue;
+        final source = container
+            .read(recommendationSourceProvider)
+            .requireValue;
         expect(source.userId, 'u1');
         expect(source.seen, seen);
         expect(source.inputs.drills, drills);

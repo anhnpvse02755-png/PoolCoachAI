@@ -49,10 +49,7 @@ void main() {
     if (read) await repo.markRead([id], at: at);
   }
 
-  Future<GoRouter> open(
-    WidgetTester tester, {
-    ProviderContainer? using,
-  }) async {
+  Future<GoRouter> open(WidgetTester tester, {ProviderContainer? using}) async {
     final container = using ?? dbContainer(db, clock: () => clock);
     addTearDown(container.dispose);
     final router = GoRouter(

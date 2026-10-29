@@ -40,8 +40,7 @@ void main() {
           }
           return next;
         },
-        builder: (_) =>
-            Text('${due.where((at) => !at.isAfter(clock)).length}'),
+        builder: (_) => Text('${due.where((at) => !at.isAfter(clock)).length}'),
       ),
     ),
   );
