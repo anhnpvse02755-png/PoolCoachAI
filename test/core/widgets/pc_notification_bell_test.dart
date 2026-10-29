@@ -218,6 +218,53 @@ void main() {
     );
   });
 
+  for (final c in const [
+    (Size(360, 640), 1.0, 1),
+    (Size(360, 640), 1.0, 120),
+    (Size(360, 640), 1.5, 1),
+    (Size(360, 640), 1.5, 120),
+    (Size(320, 640), 1.2, 1),
+    (Size(320, 640), 1.2, 120),
+  ]) {
+    testWidgets(
+      'huy hiệu ở góc chuông, không che biểu tượng: ${c.$1} x${c.$2}, ${c.$3} mục',
+      (tester) async {
+        applyScreen(tester, c.$1, textScale: c.$2);
+        for (var i = 1; i <= c.$3; i++) {
+          await add(i, past.subtract(Duration(minutes: i)));
+        }
+        await open(tester);
+        final label = Vi.notificationsUnreadBadge(c.$3);
+        final badge = tester.getRect(
+          find
+              .ancestor(of: find.text(label), matching: find.byType(DecoratedBox))
+              .first,
+        );
+        final appBar = tester.getRect(find.byType(AppBar));
+        final screen = Offset.zero & c.$1;
+        expect(badge.width, greaterThan(0));
+        for (final outer in [appBar, screen]) {
+          expect(
+            outer.contains(badge.topLeft) && outer.contains(badge.bottomRight),
+            isTrue,
+            reason: 'huy hiệu $badge phải nằm trong $outer',
+          );
+        }
+        final icon = tester.getRect(find.byIcon(Icons.notifications_none));
+        final overlap = icon.intersect(badge);
+        final area = overlap.width <= 0 || overlap.height <= 0
+            ? 0.0
+            : overlap.width * overlap.height;
+        expect(
+          area,
+          lessThan(icon.width * icon.height * 0.25),
+          reason: 'huy hiệu $badge che biểu tượng $icon',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('chạm chuông mở màn Thông báo', (tester) async {
     await open(tester);
     await tester.tap(find.byType(IconButton));
