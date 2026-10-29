@@ -1,3 +1,4 @@
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 
 /// Đặt lịch thông báo của hệ điều hành (Android/iOS). Tách khỏi plugin để
@@ -12,8 +13,12 @@ abstract class NotificationScheduler {
   /// Id các thông báo đang chờ trong hệ điều hành.
   Future<Set<int>> pendingIds();
 
-  /// Đặt một thông báo vào giờ [PlannedNotification.at].
-  Future<void> schedule(PlannedNotification notification);
+  /// Đặt một thông báo vào giờ [PlannedNotification.at], kèm [payload]
+  /// (`notificationPayload`) để nhận ra nó khi chạm.
+  Future<void> schedule(
+    PlannedNotification notification, {
+    required String payload,
+  });
 
   /// Huỷ một thông báo đang chờ.
   Future<void> cancel(int id);
@@ -37,10 +42,14 @@ abstract class NotificationScheduler {
 /// đã quá giờ nhưng hệ điều hành chưa giao).
 ///
 /// [replaceAll]: đặt lại cả cái đang chờ đúng id (cái cũ thiếu thứ bản mới
-/// cần, như payload). Id trả về vẫn chỉ là cái huỷ mà không đặt lại.
+/// cần, như payload, hoặc là của tài khoản trước). Id trả về vẫn chỉ là cái
+/// huỷ mà không đặt lại.
+///
+/// Payload mang [userId]: chạm thông báo của tài khoản khác thì bị bỏ qua.
 Future<Set<int>> reconcileNotifications(
   NotificationScheduler scheduler,
   List<PlannedNotification> desired, {
+  required String userId,
   Set<int> keep = const {},
   bool replaceAll = false,
 }) async {
@@ -51,7 +60,12 @@ Future<Set<int>> reconcileNotifications(
     await scheduler.cancel(id);
   }
   for (final n in desired) {
-    if (replaceAll || !pending.contains(n.id)) await scheduler.schedule(n);
+    if (replaceAll || !pending.contains(n.id)) {
+      await scheduler.schedule(
+        n,
+        payload: notificationPayload(n.kind, n.key, userId: userId),
+      );
+    }
   }
   return cancelled;
 }

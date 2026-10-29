@@ -26,6 +26,7 @@ import 'package:poolcoachai/features/notifications/presentation/notifications_sc
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_auth.dart';
+import '../../support/idle_notification_scheduler.dart';
 import '../../support/layout_sweep.dart';
 import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/test_data.dart';
@@ -297,7 +298,7 @@ void main() {
 
     testWidgets('điện thoại: ghi chú nền và giới hạn gợi ý, không có ghi chú '
         'web', (tester) async {
-      platform.scheduler = _IdleScheduler();
+      platform.scheduler = IdleNotificationScheduler();
       await open(tester, withService());
       expect(find.text(Vi.notificationsBackgroundNote), findsOneWidget);
       expect(find.text(Vi.notificationsRecommendationLimit), findsOneWidget);
@@ -313,7 +314,7 @@ void main() {
     testWidgets('360x640 x1.5 điện thoại: hai ghi chú đủ chữ, không tràn', (
       tester,
     ) async {
-      platform.scheduler = _IdleScheduler();
+      platform.scheduler = IdleNotificationScheduler();
       await openNarrow(tester);
       expect(find.text(Vi.notificationsBackgroundNote), findsOneWidget);
       expect(find.text(Vi.notificationsRecommendationLimit), findsOneWidget);
@@ -518,29 +519,3 @@ void main() {
   );
 }
 
-/// Bộ đặt lịch giả: chỉ cần có mặt để nền tảng đặt lịch được ở nền.
-class _IdleScheduler implements NotificationScheduler {
-  @override
-  Future<bool> hasPermission() async => false;
-
-  @override
-  Future<bool> requestPermission() async => true;
-
-  @override
-  Future<Set<int>> pendingIds() async => {};
-
-  @override
-  Future<void> schedule(PlannedNotification notification) async {}
-
-  @override
-  Future<void> cancel(int id) async {}
-
-  @override
-  Future<void> cancelAll() async {}
-
-  @override
-  set onTap(void Function(String payload)? handler) {}
-
-  @override
-  Future<String?> launchPayload() async => null;
-}

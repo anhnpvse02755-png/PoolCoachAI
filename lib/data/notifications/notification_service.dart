@@ -141,6 +141,10 @@ class NotificationService {
     final tap = parseNotificationPayload(payload);
     if (tap == null || _disposed) return;
     final userId = _userId;
+    // Thông báo gửi cho tài khoản khác (đã đăng xuất, đổi tài khoản trên máy
+    // này): không mở màn, không đánh dấu gì. Payload bản cũ không mang tài
+    // khoản thì coi như của người đang đăng nhập.
+    if (tap.userId != null && tap.userId != userId) return;
     if (userId != null) {
       unawaited(
         NotificationLogRepository(_db, userId: userId)
@@ -298,6 +302,7 @@ class NotificationService {
           final cancelled = await reconcileNotifications(
             scheduler,
             plan,
+            userId: userId,
             keep: dueEarlierToday(current, now),
             replaceAll: replaceAll,
           );
@@ -379,7 +384,7 @@ class NotificationService {
         title: n.title,
         body: n.body,
         tag: key,
-        payload: notificationPayload(n.kind, n.key),
+        payload: notificationPayload(n.kind, n.key, userId: _userId),
       );
       _platform.writeValue(key, now.toIso8601String());
       unawaited(log.recordShown(n, at: now).catchError((Object _) {}));
@@ -413,6 +418,9 @@ class NotificationService {
     final scheduler = _scheduler;
     if (previous != null && scheduler != null && !_disposed) {
       _forgetFuture(previous, scheduler);
+      // Đổi thẳng tài khoản: thông báo trùng id (cùng nội dung) vẫn mang
+      // payload của người trước, chạm vào sẽ bị bỏ qua. Đặt lại hết.
+      if (userId != null) _scheduleOutdated = Future.value(true);
     }
     for (final subscription in _dataSubscriptions) {
       unawaited(subscription.cancel());

@@ -388,7 +388,11 @@ void main() {
       // Gửi kèm payload của (loại, khoá) đó.
       expect(
         platform.notifications.single.payload,
-        notificationPayload(NotificationKind.schedule, rows.single.key),
+        notificationPayload(
+          NotificationKind.schedule,
+          rows.single.key,
+          userId: 'u1',
+        ),
       );
 
       // Chạm vào một thông báo khác loại cùng khoá: không động tới dòng này.
@@ -437,6 +441,42 @@ void main() {
       expect((await logRows()).single.readAt, now);
     });
 
+    test('payload mang tài khoản; chạm thông báo của tài khoản khác: bỏ qua',
+        () async {
+      final s = await shownSchedule();
+      final shown = parseNotificationPayload(
+        platform.notifications.single.payload,
+      )!;
+      expect(shown.userId, 'u1');
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+
+      platform.onTap!(
+        notificationPayload(shown.kind, shown.key, userId: 'u2'),
+      );
+      await pumpEventQueue();
+      expect(got, isEmpty);
+      expect((await logRows()).single.readAt, isNull);
+
+      // Bản cũ không có tài khoản: coi như của người đang đăng nhập.
+      platform.onTap!(notificationPayload(shown.kind, shown.key));
+      await pumpEventQueue();
+      expect(got, hasLength(1));
+      expect((await logRows()).single.readAt, now);
+    });
+
+    test('đã đăng xuất: chạm thông báo có tài khoản thì bỏ qua', () async {
+      final s = await shownSchedule();
+      final payload = platform.notifications.single.payload;
+      auth.emit(const SignedOut());
+      await pumpEventQueue();
+      final got = <NotificationTap>[];
+      s.setTapHandler(got.add);
+      platform.onTap!(payload);
+      await pumpEventQueue();
+      expect(got, isEmpty);
+    });
+
     test('payload rác: không gọi handler, không đổi dòng nào', () async {
       final s = await shownSchedule();
       final got = <NotificationTap>[];
@@ -460,6 +500,22 @@ void main() {
       expect(got, [const NotificationTap(NotificationKind.streak, 'k1')]);
       scheduler.onTapHandler!('schedule|s1:2026-9-22');
       expect(got.last, const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'));
+    });
+
+    test('Android/iOS: thông báo đặt vào lịch mang tài khoản trong payload',
+        () async {
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final scheduler = _FakeScheduler()..granted = true;
+      final s = service(using: _SchedulingPlatform(scheduler))..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      expect(scheduler.payloads.values, hasLength(2));
+      for (final entry in scheduler.pending.entries) {
+        expect(
+          parseNotificationPayload(scheduler.payloads[entry.key]),
+          NotificationTap(entry.value.kind, entry.value.key, userId: 'u1'),
+        );
+      }
     });
   });
 
@@ -1112,6 +1168,37 @@ void main() {
       expect(recommendations(), isEmpty);
       expect(await logRows('u2'), isEmpty);
     });
+
+    test('đổi tài khoản: thông báo trùng id được đặt lại với tài khoản mới',
+        () async {
+      scheduler.granted = true;
+      // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
+      for (final user in ['u1', 'u2']) {
+        for (final day in [11, 12]) {
+          await DriftTimerSessionRepository(db, userId: user).add(
+            TimerSession(
+              id: '$user-$day',
+              date: DateTime(2026, 10, day, 10),
+              durationSec: 600,
+            ),
+          );
+        }
+      }
+      final s = scheduling()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      final ids = scheduler.pending.keys.toSet();
+      expect(ids, hasLength(1));
+      expect(parseNotificationPayload(scheduler.payloads[ids.single])?.userId,
+          'u1');
+
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await pumpEventQueue();
+      expect(scheduler.pending.keys.toSet(), ids);
+      for (final id in ids) {
+        expect(parseNotificationPayload(scheduler.payloads[id])?.userId, 'u2');
+      }
+    });
   });
 
   group('reconcileNotifications', () {
@@ -1128,10 +1215,14 @@ void main() {
     test('cancels stale ids, schedules missing ones, keeps the rest', () async {
       final scheduler = _FakeScheduler()
         ..pending = {1: n(1), 2: n(2)};
-      await reconcileNotifications(scheduler, [n(2), n(3)]);
+      await reconcileNotifications(scheduler, [n(2), n(3)], userId: 'u1');
       expect(scheduler.pending.keys, {2, 3});
       expect(scheduler.cancelled, [1]);
       expect(scheduler.scheduleCalls, 1);
+      expect(
+        scheduler.payloads[3],
+        notificationPayload(NotificationKind.schedule, '3', userId: 'u1'),
+      );
     });
 
     test('keep: còn chờ thì để yên; trả về id đã huỷ', () async {
@@ -1140,6 +1231,7 @@ void main() {
       final cancelled = await reconcileNotifications(
         scheduler,
         [n(3)],
+        userId: 'u1',
         keep: {1, 5},
       );
       expect(cancelled, {2, 4});
@@ -1153,6 +1245,7 @@ void main() {
       final cancelled = await reconcileNotifications(
         scheduler,
         [n(2), n(3)],
+        userId: 'u1',
         keep: {1},
         replaceAll: true,
       );
@@ -1214,23 +1307,32 @@ class _FakeScheduler implements NotificationScheduler {
     return pending.keys.toSet();
   }
 
+  /// Payload của mỗi thông báo đang chờ.
+  final payloads = <int, String>{};
+
   @override
-  Future<void> schedule(PlannedNotification notification) async {
+  Future<void> schedule(
+    PlannedNotification notification, {
+    required String payload,
+  }) async {
     scheduleCalls++;
     everScheduled.add(notification);
     pending[notification.id] = notification;
+    payloads[notification.id] = payload;
   }
 
   @override
   Future<void> cancel(int id) async {
     cancelled.add(id);
     pending.remove(id);
+    payloads.remove(id);
   }
 
   @override
   Future<void> cancelAll() async {
     cancelAllCalls++;
     pending = {};
+    payloads.clear();
   }
 
   void Function(String payload)? onTapHandler;

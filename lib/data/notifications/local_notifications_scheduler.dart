@@ -4,7 +4,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
-import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -108,7 +107,10 @@ class LocalNotificationsScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<void> schedule(PlannedNotification notification) async {
+  Future<void> schedule(
+    PlannedNotification notification, {
+    required String payload,
+  }) async {
     await _ensureInit();
     final at = notification.at;
     await _plugin.zonedSchedule(
@@ -133,7 +135,7 @@ class LocalNotificationsScheduler implements NotificationScheduler {
         iOS: const DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      payload: notificationPayload(notification.kind, notification.key),
+      payload: payload,
     );
   }
 

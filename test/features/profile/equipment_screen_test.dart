@@ -19,12 +19,12 @@ import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
-import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 import 'package:poolcoachai/features/profile/presentation/equipment_screen.dart';
 
+import '../../support/idle_notification_scheduler.dart';
 import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
@@ -434,7 +434,7 @@ void main() {
               auth: ref.watch(authRepositoryProvider),
               now: ref.watch(nowProvider),
               platform: _PromptPlatform(
-                scheduler: background ? _IdleScheduler() : null,
+                scheduler: background ? IdleNotificationScheduler() : null,
               ),
             ),
           ),
@@ -594,31 +594,4 @@ class _PromptPlatform extends NotificationPlatform {
 
   @override
   Future<String?> requestPermission() async => 'granted';
-}
-
-/// Bộ đặt lịch giả: chỉ cần có mặt để nền tảng đặt lịch được ở nền.
-class _IdleScheduler implements NotificationScheduler {
-  @override
-  Future<bool> hasPermission() async => false;
-
-  @override
-  Future<bool> requestPermission() async => true;
-
-  @override
-  Future<Set<int>> pendingIds() async => {};
-
-  @override
-  Future<void> schedule(PlannedNotification notification) async {}
-
-  @override
-  Future<void> cancel(int id) async {}
-
-  @override
-  Future<void> cancelAll() async {}
-
-  @override
-  set onTap(void Function(String payload)? handler) {}
-
-  @override
-  Future<String?> launchPayload() async => null;
 }
