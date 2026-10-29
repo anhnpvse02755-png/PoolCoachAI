@@ -51,7 +51,9 @@ NotificationTap? parseNotificationPayload(String? payload) {
     if (cut <= 0) return null;
     try {
       userId = Uri.decodeComponent(body.substring(0, cut));
-    } on ArgumentError {
+    } on Object {
+      // ArgumentError khi "%" sai dạng, FormatException khi hex đúng mà các
+      // byte không phải UTF-8 (%FF, %E0%A4). Chuỗi hỏng: không đi đâu cả.
       return null;
     }
     rest = body.substring(cut + 1);

@@ -43,6 +43,8 @@ void main() {
       'v2|u1|nope|k',
       'v2|u1|streak|',
       'v2|%E0%A4%A|streak|k', // mã hoá hỏng
+      'v2|%FF|streak|k', // hex đúng mà không phải UTF-8
+      'v2|%E0%A4|streak|k', // UTF-8 thiếu byte
     ]) {
       expect(parseNotificationPayload(bad), isNull, reason: '$bad');
     }
