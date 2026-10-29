@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
@@ -537,16 +538,26 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
           sliver: SliverToBoxAdapter(child: _maintenanceReminderCard()),
         ),
         if (cues.isEmpty)
+          // Có thân cuộn: vùng bị chặn ở trên hai nút nổi (đệm đáy). Chữ lớn
+          // mà vùng ấy không đủ chỗ cho cả khối thì chỉ giữ câu chính, thay
+          // vì để khối tràn xuống dưới nút Thêm cơ.
           SliverFillRemaining(
-            hasScrollBody: false,
             child: Padding(
               padding: EdgeInsets.only(bottom: padding.bottom),
-              child: const Center(
-                child: PcEmptyState(
-                  icon: Icons.sports,
-                  title: Vi.equipmentTitle,
-                  body: Vi.equipmentEmpty,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = MediaQuery.textScalerOf(context).scale(1);
+                  // Biểu tượng + tiêu đề + hai dòng thân + đệm của khối đủ.
+                  final fullHeight =
+                      44 + AppSpacing.md + 15 * 1.4 * scale + AppSpacing.sm +
+                      13 * 1.5 * 2 * scale + 2 * AppSpacing.xxl;
+                  return PcEmptyState(
+                    icon: Icons.sports,
+                    title: Vi.equipmentTitle,
+                    body: Vi.equipmentEmpty,
+                    compact: constraints.maxHeight < fullHeight,
+                  );
+                },
               ),
             ),
           )
