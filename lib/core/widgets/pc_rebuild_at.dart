@@ -14,12 +14,17 @@ class PcRebuildAt extends StatefulWidget {
     required this.clock,
     required this.nextAt,
     required this.builder,
+    this.onDue,
     super.key,
   });
 
   final DateTime Function() clock;
   final DateTime? Function(DateTime now) nextAt;
   final WidgetBuilder builder;
+
+  /// Gọi ngay trước khi dựng lại vì tới giờ (hay vì app quay lại), cho thứ
+  /// cần làm khi một mục vừa tới giờ (như đánh dấu đã đọc lúc màn đang mở).
+  final VoidCallback? onDue;
 
   @override
   State<PcRebuildAt> createState() => _PcRebuildAtState();
@@ -54,6 +59,7 @@ class _PcRebuildAtState extends State<PcRebuildAt> {
 
   void _due() {
     if (!mounted) return;
+    widget.onDue?.call();
     setState(() {});
     _schedule();
   }

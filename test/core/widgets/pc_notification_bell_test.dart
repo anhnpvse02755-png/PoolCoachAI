@@ -1,16 +1,23 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
+import 'package:poolcoachai/domain/auth.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 
+import '../../support/fake_auth.dart';
 import '../../support/layout_sweep.dart';
 import '../../support/test_data.dart';
 
@@ -42,8 +49,11 @@ void main() {
     if (read) await repo.markRead([id], at: at);
   }
 
-  Future<GoRouter> open(WidgetTester tester) async {
-    final container = dbContainer(db, clock: () => clock);
+  Future<GoRouter> open(
+    WidgetTester tester, {
+    ProviderContainer? using,
+  }) async {
+    final container = using ?? dbContainer(db, clock: () => clock);
     addTearDown(container.dispose);
     final router = GoRouter(
       routes: [
@@ -130,6 +140,60 @@ void main() {
     }
     await tester.pump();
     expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('đọc một mục thì số giảm theo', (tester) async {
+    await add(1, past);
+    await add(2, past.subtract(const Duration(minutes: 5)));
+    await open(tester);
+    expect(find.text('2'), findsOneWidget);
+
+    await repo.markRead([1], at: clock);
+    await tester.pumpAndSettle();
+    expect(find.text('1'), findsOneWidget);
+    expect(find.byTooltip(Vi.notificationsBellTooltip(1)), findsOneWidget);
+  });
+
+  // Nhật ký của tài khoản mới đang tải: provider còn giữ giá trị của người
+  // trước, không được hiện.
+  testWidgets('đổi tài khoản khi nhật ký đang tải lại: không hiện số cũ', (
+    tester,
+  ) async {
+    final auth = FakeAuthRepository.signedIn();
+    final never = StreamController<List<NotificationLogEntry>>();
+    addTearDown(never.close);
+    final ofU1 = [
+      for (final id in [1, 2])
+        NotificationLogEntry(
+          id: id,
+          kind: NotificationKind.schedule,
+          key: 'k$id',
+          at: past,
+          title: 'T$id',
+          body: 'B$id',
+        ),
+    ];
+    final container = dbContainer(
+      db,
+      auth: auth,
+      clock: () => clock,
+      extraOverrides: [
+        notificationLogProvider.overrideWith(
+          (ref) => ref.watch(currentUserIdProvider) == 'u1'
+              ? Stream.value(ofU1)
+              : never.stream,
+        ),
+      ],
+    );
+    await open(tester, using: container);
+    expect(find.text('2'), findsOneWidget);
+
+    auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+    await tester.pump();
+    await tester.pump();
+    final log = container.read(notificationLogProvider);
+    expect(log.isLoading && log.hasValue, isTrue, reason: 'đang tải lại');
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
   });
 
   testWidgets('chạm chuông mở màn Thông báo', (tester) async {

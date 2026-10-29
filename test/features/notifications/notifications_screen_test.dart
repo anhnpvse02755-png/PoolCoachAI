@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
@@ -16,6 +17,7 @@ import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
+import 'package:poolcoachai/domain/auth.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
@@ -417,9 +419,16 @@ void main() {
           tester.getTopLeft(find.text('Tiêu đề 2')).dy,
           lessThan(tester.getTopLeft(find.text('Tiêu đề 1')).dy),
         );
+        final sentAt = find.text(Vi.notificationsSentAt(hourAgo, testToday));
+        expect(sentAt, findsOneWidget);
+        // Giờ gửi ở dòng dưới tiêu đề, không chiếm cột trái.
         expect(
-          find.text(Vi.notificationsSentAt(hourAgo, testToday)),
-          findsOneWidget,
+          tester.getTopLeft(sentAt).dy,
+          greaterThan(tester.getTopLeft(find.text('Tiêu đề 2')).dy),
+        );
+        expect(
+          tester.getTopLeft(sentAt).dx,
+          tester.getTopLeft(find.text('Tiêu đề 2')).dx,
         );
         expect(find.text(Vi.notificationsSentEmpty), findsNothing);
       },
@@ -438,6 +447,79 @@ void main() {
           tester.widget<Text>(find.text(t)).style!.fontWeight;
       expect(weight('Tiêu đề 1'), FontWeight.w700);
       expect(weight('Tiêu đề 2'), FontWeight.w400);
+    });
+
+    testWidgets('một mục tới giờ khi màn đang mở: hiện đậm và được đánh dấu '
+        'đã đọc', (tester) async {
+      var clock = testToday;
+      await add(1, testToday.add(const Duration(minutes: 1)));
+      await open(tester, dbContainer(db, drills: const [], clock: () => clock));
+      expect(find.text('Tiêu đề 1'), findsNothing);
+
+      clock = testToday.add(const Duration(minutes: 2));
+      await tester.pump(const Duration(minutes: 2));
+      await tester.pumpAndSettle();
+      expect(find.text('Tiêu đề 1'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.text('Tiêu đề 1')).style!.fontWeight,
+        FontWeight.w700,
+      );
+      expect((await repo.all()).single.readAt, isNotNull);
+    });
+
+    // Nhật ký của tài khoản mới đang tải: giá trị cũ (của người trước) không
+    // được hiện, cũng không được đánh dấu đọc vào kho của người mới (id
+    // không chứa tài khoản, nên cùng id có thể là dòng của người mới).
+    testWidgets('đổi tài khoản khi nhật ký đang tải lại: không hiện, không '
+        'đánh dấu đọc', (tester) async {
+      final auth = FakeAuthRepository.signedIn();
+      final never = StreamController<List<NotificationLogEntry>>();
+      addTearDown(never.close);
+      final u2 = NotificationLogRepository(db, userId: 'u2');
+      await u2.recordShown(
+        PlannedNotification(
+          id: 1,
+          kind: NotificationKind.schedule,
+          key: 's1:2026-9-22',
+          at: hourAgo,
+          validUntil: testToday,
+          title: 'Của u2',
+          body: 'b',
+        ),
+        at: hourAgo,
+      );
+      final container = dbContainer(
+        db,
+        auth: auth,
+        drills: const [],
+        extraOverrides: [
+          notificationLogProvider.overrideWith(
+            (ref) => ref.watch(currentUserIdProvider) == 'u1'
+                ? Stream.value([
+                    NotificationLogEntry(
+                      id: 1,
+                      kind: NotificationKind.schedule,
+                      key: 's1:2026-9-22',
+                      at: hourAgo,
+                      title: 'Của u1',
+                      body: 'b',
+                    ),
+                  ])
+                : never.stream,
+          ),
+        ],
+      );
+      // Nhật ký của u1 đã nạp, rồi đổi sang u2 khi luồng của u2 chưa phát.
+      container.listen(notificationLogProvider, (_, _) {});
+      await tester.pump();
+      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+      await tester.pump();
+      final log = container.read(notificationLogProvider);
+      expect(log.isLoading && log.hasValue, isTrue, reason: 'đang tải lại');
+
+      await open(tester, container);
+      expect(find.text('Của u1'), findsNothing);
+      expect((await u2.all()).single.readAt, isNull);
     });
 
     testWidgets('trống: nói chưa có trong 30 ngày', (tester) async {

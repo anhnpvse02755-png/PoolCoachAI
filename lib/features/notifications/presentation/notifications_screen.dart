@@ -19,9 +19,12 @@ import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 
 /// Màn Thông báo, mở đè lên shell từ chuông trên thanh tiêu đề.
 ///
-/// Có Scaffold và AppBar riêng vì nó nằm ngoài shell 5 tab. Ba phần:
-/// quyền thông báo, loại thông báo bật/tắt, và danh sách sẽ gửi trong
-/// 7 ngày tới — chính kế hoạch mà dịch vụ gửi, không phải bản sao.
+/// Có Scaffold và AppBar riêng vì nó nằm ngoài shell 5 tab. Bốn phần:
+/// - quyền thông báo (kèm ghi chú theo nền tảng);
+/// - "Đã gửi": nhật ký 30 ngày, mục chưa đọc in đậm, mở màn là đã đọc;
+/// - loại thông báo bật/tắt;
+/// - danh sách sẽ gửi trong 7 ngày tới — chính kế hoạch mà dịch vụ gửi,
+///   không phải bản sao.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -83,6 +86,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return PcRebuildAt(
       clock: clock,
       nextAt: (now) => nextDelivery(all, now),
+      // Một mục vừa tới giờ khi màn đang mở cũng là đã thấy.
+      onDue: () => _markSeen(ref.read(notificationLogProvider)),
       builder: (context) {
         final current = clock();
         final entries = inboxEntries(all, current);
@@ -102,11 +107,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               for (final e in entries) ...[
                 PcCard(
                   padding: EdgeInsets.zero,
+                  // Giờ gửi nằm trên dòng riêng, không ở cột trái: chữ lớn
+                  // trên điện thoại thì cột trái ép tiêu đề và nội dung hẹp.
                   child: ListTile(
-                    leading: Text(
-                      Vi.notificationsSentAt(e.at, current),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
                     title: Text(
                       e.title,
                       style: TextStyle(
@@ -115,7 +118,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                             : FontWeight.w400,
                       ),
                     ),
-                    subtitle: Text(e.body),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          Vi.notificationsSentAt(e.at, current),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(e.body),
+                      ],
+                    ),
                     onTap: () {
                       final route = notificationRoute(
                         NotificationTap(e.kind, e.key),
