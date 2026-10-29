@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:poolcoachai/core/router/routes.dart';
-import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_layout.dart';
+import 'package:poolcoachai/core/widgets/pc_notification_bell.dart';
 import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
 
 /// Khung của một màn gốc trong shell 5 tab.
@@ -35,13 +33,7 @@ class PcRootScaffold extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            tooltip: Vi.notificationsTitle,
-            onPressed: () => context.push(Routes.notifications),
-          ),
-        ],
+        actions: const [PcNotificationBell()],
       ),
       body: maxBodyWidth.isFinite
           ? PcReadableWidth(maxWidth: maxBodyWidth, child: body)

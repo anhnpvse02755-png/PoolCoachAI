@@ -1,0 +1,130 @@
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poolcoachai/core/router/routes.dart';
+import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
+import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
+import 'package:poolcoachai/domain/notifications/notification_plan.dart';
+import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+
+import '../../support/layout_sweep.dart';
+import '../../support/test_data.dart';
+
+void main() {
+  late AppDatabase db;
+  late NotificationLogRepository repo;
+  late DateTime clock;
+
+  setUp(() {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    repo = NotificationLogRepository(db, userId: 'u1');
+    clock = testToday;
+  });
+  tearDown(() => db.close());
+
+  Future<void> add(int id, DateTime at, {bool read = false}) async {
+    await repo.recordShown(
+      PlannedNotification(
+        id: id,
+        kind: NotificationKind.schedule,
+        key: 'k$id',
+        at: at,
+        validUntil: at.add(const Duration(hours: 1)),
+        title: 'Tiêu đề $id',
+        body: 'Nội dung $id',
+      ),
+      at: at,
+    );
+    if (read) await repo.markRead([id], at: at);
+  }
+
+  Future<GoRouter> open(WidgetTester tester) async {
+    final container = dbContainer(db, clock: () => clock);
+    addTearDown(container.dispose);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) =>
+              const PcRootScaffold(title: 'Thống kê', body: SizedBox()),
+        ),
+        GoRoute(
+          path: Routes.notifications,
+          builder: (_, _) => const Scaffold(body: Text('màn thông báo')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return router;
+  }
+
+  final past = testToday.subtract(const Duration(hours: 1));
+
+  testWidgets(
+    'hai mục chưa đọc đã tới giờ: huy hiệu 2; mục tương lai và đã đọc không tính',
+    (tester) async {
+      await add(1, past);
+      await add(2, past.subtract(const Duration(minutes: 5)));
+      await add(3, past, read: true);
+      await add(4, testToday.add(const Duration(hours: 1)));
+      await open(tester);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.byTooltip(Vi.notificationsBellTooltip(2)), findsOneWidget);
+    },
+  );
+
+  testWidgets('không có mục chưa đọc: không hiện số', (tester) async {
+    await add(1, past, read: true);
+    await open(tester);
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+    expect(find.byTooltip(Vi.notificationsTitle), findsOneWidget);
+  });
+
+  testWidgets('trên 99: hiện 99+', (tester) async {
+    for (var i = 1; i <= 100; i++) {
+      await add(i, past.subtract(Duration(minutes: i)));
+    }
+    await open(tester);
+    expect(find.text('99+'), findsOneWidget);
+    expect(find.byTooltip(Vi.notificationsBellTooltip(100)), findsOneWidget);
+  });
+
+  testWidgets('tới giờ của mục tương lai thì huy hiệu tự tăng', (tester) async {
+    await add(1, clock.add(const Duration(minutes: 1)));
+    await open(tester);
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+    clock = clock.add(const Duration(minutes: 2));
+    await tester.pump(const Duration(minutes: 2));
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('chạm chuông mở màn Thông báo', (tester) async {
+    await open(tester);
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+    expect(find.text('màn thông báo'), findsOneWidget);
+  });
+
+  testWidgets('360×640 chữ x1.5: huy hiệu 99+ không tràn thanh tiêu đề', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640), textScale: 1.5);
+    for (var i = 1; i <= 100; i++) {
+      await add(i, past.subtract(Duration(minutes: i)));
+    }
+    await open(tester);
+    expect(find.text('99+'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}

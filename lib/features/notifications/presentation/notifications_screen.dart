@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/router/notification_tap_listener.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
 import 'package:poolcoachai/core/widgets/pc_card.dart';
 import 'package:poolcoachai/core/widgets/pc_readable_width.dart';
+import 'package:poolcoachai/core/widgets/pc_rebuild_at.dart';
 import 'package:poolcoachai/core/widgets/pc_section_header.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
+import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 
@@ -25,6 +30,92 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  /// Mục chưa đọc lúc mở màn: in đậm suốt lượt xem này dù đã đánh dấu đọc.
+  final _bold = <int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      notificationLogProvider,
+      (_, next) => _markSeen(next),
+      fireImmediately: true,
+    );
+  }
+
+  /// Chỉ đọc nhật ký khi đã có giá trị và không đang tải lại: nhật ký cũ của
+  /// tài khoản trước không được đánh dấu đọc cho tài khoản sau.
+  void _markSeen(AsyncValue<List<NotificationLogEntry>> log) {
+    if (!log.hasValue || log.isLoading) return;
+    final now = ref.read(nowProvider)();
+    final ids = [
+      for (final e in inboxEntries(log.requireValue, now))
+        if (e.readAt == null && !_bold.contains(e.id)) e.id,
+    ];
+    if (ids.isEmpty) return;
+    _bold.addAll(ids);
+    if (mounted) setState(() {});
+    ref.read(notificationLogRepositoryProvider)?.markRead(ids, at: now);
+  }
+
+  Widget _sent(DateTime now) {
+    final log = ref.watch(notificationLogProvider);
+    final all = log.hasValue && !log.isLoading
+        ? log.requireValue
+        : const <NotificationLogEntry>[];
+    final clock = ref.watch(nowProvider);
+    return PcRebuildAt(
+      at: nextDelivery(all, now),
+      now: now,
+      builder: (context) {
+        final current = clock();
+        final entries = inboxEntries(all, current);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const PcSectionHeader(title: Vi.notificationsSentTitle),
+            if (entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  Vi.notificationsSentEmpty,
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
+              )
+            else
+              for (final e in entries) ...[
+                PcCard(
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: Text(
+                      Vi.notificationsSentAt(e.at, current),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    title: Text(
+                      e.title,
+                      style: TextStyle(
+                        fontWeight: _bold.contains(e.id)
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                      ),
+                    ),
+                    subtitle: Text(e.body),
+                    onTap: () {
+                      final route = notificationRoute(
+                        NotificationTap(e.kind, e.key),
+                      );
+                      if (route != null) context.go(route);
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _enable() async {
     await ref.read(notificationServiceProvider).requestPermission();
     if (mounted) setState(() {});
@@ -43,6 +134,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           _permissionCard(),
+          _sent(now),
           const PcSectionHeader(title: Vi.notificationsSettingsTitle),
           PcCard(
             padding: EdgeInsets.zero,

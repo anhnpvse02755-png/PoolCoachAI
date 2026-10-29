@@ -9,6 +9,8 @@ import 'package:poolcoachai/domain/coach/hints.dart';
 import 'package:poolcoachai/domain/coach/reference.dart';
 import 'package:poolcoachai/domain/coach/reveal.dart';
 import 'package:poolcoachai/domain/coach/verdict.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart'
+    show notificationInboxDays;
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/assessment/bu_layouts.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
@@ -680,6 +682,16 @@ abstract final class Vi {
   static String notificationsTime(DateTime at) =>
       '${at.hour.toString().padLeft(2, '0')}:'
       '${at.minute.toString().padLeft(2, '0')}';
+  static const notificationsSentTitle = 'Đã gửi';
+  static const notificationsSentEmpty =
+      'Chưa có thông báo nào trong $notificationInboxDays ngày qua.';
+  static String notificationsUnreadBadge(int n) => n > 99 ? '99+' : '$n';
+  static String notificationsBellTooltip(int unread) => unread == 0
+      ? notificationsTitle
+      : '$notificationsTitle, $unread chưa đọc';
+  static String notificationsSentAt(DateTime at, DateTime now) =>
+      '${at.year == now.year && at.month == now.month && at.day == now.day ? notificationsToday : notificationsDay(at)}, '
+      '${notificationsTime(at)}';
   static const notificationsPermissionTitle = 'Quyền thông báo';
   static const notificationsPermissionGranted = 'Đã bật thông báo.';
   static const notificationsPermissionDenied =

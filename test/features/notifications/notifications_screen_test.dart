@@ -4,7 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/core/router/app_router.dart';
+import 'package:poolcoachai/core/router/routes.dart';
+import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
+import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
@@ -21,6 +26,7 @@ import 'package:poolcoachai/features/notifications/presentation/notifications_sc
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_auth.dart';
+import '../../support/layout_sweep.dart';
 import '../../support/fake_recommendation_seen_store.dart';
 import '../../support/test_data.dart';
 
@@ -280,4 +286,161 @@ void main() {
     expect(find.text(Vi.notificationsPermissionUnsupported), findsOneWidget);
     expect(find.text(Vi.equipmentReminderEnable), findsNothing);
   });
+
+  group('Đã gửi', () {
+    late AppDatabase db;
+    late NotificationLogRepository repo;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      repo = NotificationLogRepository(db, userId: 'u1');
+    });
+    tearDown(() => db.close());
+
+    Future<void> add(
+      int id,
+      DateTime at, {
+      NotificationKind kind = NotificationKind.schedule,
+      String? key,
+      bool read = false,
+    }) async {
+      await repo.recordShown(
+        PlannedNotification(
+          id: id,
+          kind: kind,
+          key: key ?? 's1:2026-9-22',
+          at: at,
+          validUntil: at.add(const Duration(hours: 1)),
+          title: 'Tiêu đề $id',
+          body: 'Nội dung $id',
+        ),
+        at: at,
+      );
+      if (read) await repo.markRead([id], at: at);
+    }
+
+    Future<void> openDb(WidgetTester tester) async {
+      final container = dbContainer(db, drills: const []);
+      await open(tester, container);
+    }
+
+    final hourAgo = testToday.subtract(const Duration(hours: 1));
+
+    testWidgets(
+      'mục đã tới giờ trong 30 ngày, mới nhất trước; không có mục tương lai hay quá 30 ngày',
+      (tester) async {
+        await add(1, testToday.subtract(const Duration(days: 2)));
+        await add(2, hourAgo);
+        await add(3, testToday.add(const Duration(hours: 1)));
+        await add(4, testToday.subtract(const Duration(days: 31)));
+        await openDb(tester);
+        expect(find.text('Tiêu đề 2'), findsOneWidget);
+        expect(find.text('Tiêu đề 1'), findsOneWidget);
+        expect(find.text('Tiêu đề 3'), findsNothing);
+        expect(find.text('Tiêu đề 4'), findsNothing);
+        expect(
+          tester.getTopLeft(find.text('Tiêu đề 2')).dy,
+          lessThan(tester.getTopLeft(find.text('Tiêu đề 1')).dy),
+        );
+        expect(
+          find.text(Vi.notificationsSentAt(hourAgo, testToday)),
+          findsOneWidget,
+        );
+        expect(find.text(Vi.notificationsSentEmpty), findsNothing);
+      },
+    );
+
+    testWidgets('mở màn: chưa đọc in đậm và được đánh dấu đã đọc, vẫn đậm trong '
+        'lượt xem này', (tester) async {
+      await add(1, hourAgo);
+      await add(2, hourAgo.subtract(const Duration(minutes: 5)), read: true);
+      await add(3, testToday.add(const Duration(hours: 1)));
+      await openDb(tester);
+      final rows = {for (final e in await repo.all()) e.id: e.readAt};
+      expect(rows[1], isNotNull);
+      expect(rows[3], isNull);
+      FontWeight? weight(String t) =>
+          tester.widget<Text>(find.text(t)).style!.fontWeight;
+      expect(weight('Tiêu đề 1'), FontWeight.w700);
+      expect(weight('Tiêu đề 2'), FontWeight.w400);
+    });
+
+    testWidgets('trống: nói chưa có trong 30 ngày', (tester) async {
+      await openDb(tester);
+      expect(find.text(Vi.notificationsSentEmpty), findsOneWidget);
+    });
+
+    testWidgets('chạm mục Lịch tập: mở Lịch tập', (tester) async {
+      await add(1, hourAgo);
+      final container = dbContainer(db, drills: const []);
+      addTearDown(container.dispose);
+      final router = createAppRouter(auth: signedInGate());
+      addTearDown(router.dispose);
+      tester.view.physicalSize = const Size(900, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: PoolCoachApp(router: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      router.go(Routes.notifications);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tiêu đề 1'));
+      await tester.pumpAndSettle();
+      expect(
+        router.routerDelegate.currentConfiguration.uri.path,
+        Routes.schedule,
+      );
+    });
+  });
+
+  testWidgets('có công tắc Gợi ý tập mới, bật mặc định', (tester) async {
+    await open(tester, containerWith());
+    expect(
+      tester
+          .widget<SwitchListTile>(switchOf(NotificationKind.recommendation))
+          .value,
+      isTrue,
+    );
+  });
+
+  testWidgets(
+    '360×640 chữ x1.5: màn Thông báo có Đã gửi và Sắp tới không tràn',
+    (tester) async {
+      applyScreen(tester, const Size(360, 640), textScale: 1.5);
+      SharedPreferences.setMockInitialValues({});
+      final long = 'Nội dung rất dài ' * 12;
+      final container = testContainer(
+        drills: testDrills,
+        notificationLog: [
+          for (var i = 1; i <= 3; i++)
+            NotificationLogEntry(
+              id: i,
+              kind: NotificationKind.schedule,
+              key: 's1:2026-9-22',
+              at: testToday.subtract(Duration(hours: i)),
+              title: 'Tiêu đề rất dài số $i ' * 4,
+              body: long,
+              readAt: i == 3 ? testToday : null,
+            ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: NotificationsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await scrollThroughAll(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.text(Vi.notificationsSentTitle.toUpperCase()), findsOneWidget);
+    },
+  );
 }
