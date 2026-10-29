@@ -117,7 +117,7 @@ void main() {
     ]);
 
     // d1 đạt khi trúng 8 trên 10 → trúng 9 là 1.125 lần mục tiêu.
-    expect(find.text('113%'), findsOneWidget);
+    expect(find.text(Vi.statsPercent(113)), findsOneWidget);
     expect(find.text('9.0'), findsNothing);
   });
 
@@ -129,8 +129,8 @@ void main() {
       log(id: 'moi', date: DateTime(2026, 9, 21), score: 8),
     ]);
 
-    expect(find.text('100%'), findsOneWidget);
-    expect(find.text('50%'), findsNothing);
+    expect(find.text(Vi.statsPercent(100)), findsOneWidget);
+    expect(find.text(Vi.statsPercent(50)), findsNothing);
   });
 
   testWidgets('danh sách bài hiện số buổi đạt liên tiếp gần nhất', (

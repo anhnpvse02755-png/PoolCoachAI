@@ -1,9 +1,22 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/core/providers/auth_providers.dart';
+import 'package:poolcoachai/core/providers/database_provider.dart';
+import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
+import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/notifications/notification_platform.dart';
+import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
+import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/pool_match.dart';
@@ -378,4 +391,140 @@ void main() {
     expect(find.byType(DatePickerDialog), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  group('thẻ nhắc bảo dưỡng ở 360x640', () {
+    const coachInset = 72.0;
+
+    Future<void> openWithReminder(
+      WidgetTester tester, {
+      required double textScale,
+      int cues = 6,
+    }) async {
+      applyScreen(tester, const Size(360, 640), textScale: textScale);
+      final fontBytes = File('test/fixtures/fonts/roboto-regular.ttf')
+          .readAsBytesSync();
+      await tester.runAsync(
+        () => (FontLoader(
+          _family,
+        )..addFont(Future.value(ByteData.sublistView(fontBytes)))).load(),
+      );
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final repo = DriftCueEquipmentRepository(db, userId: 'u1');
+      for (var i = 0; i < cues; i++) {
+        await repo.save(
+          CueEquipment(
+            id: 'c$i',
+            name: 'Cơ số $i',
+            type: CueType.playing,
+            skillCategories: const [],
+          ),
+        );
+      }
+      final container = dbContainer(
+        db,
+        extraOverrides: [
+          notificationServiceProvider.overrideWith(
+            (ref) => NotificationService(
+              db: ref.watch(appDatabaseProvider),
+              auth: ref.watch(authRepositoryProvider),
+              now: ref.watch(nowProvider),
+              platform: _PromptPlatform(),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: ThemeData(fontFamily: _family),
+            home: const PcFabInset(
+              extent: coachInset,
+              child: EquipmentScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('x1.5: cột chữ của thẻ không bị bóp từng từ', (tester) async {
+      await openWithReminder(tester, textScale: 1.5);
+      final textWidth = tester
+          .getSize(find.text(Vi.equipmentReminderPrompt))
+          .width;
+      expect(textWidth, greaterThanOrEqualTo(12 * 1.5 * 11));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('x1.5: thẻ cuộn cùng danh sách, cơ cuối tới được và nằm '
+        'trên nút Coach', (tester) async {
+      await openWithReminder(tester, textScale: 1.5);
+      final scrollable = find.byType(Scrollable).first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      // ListView dựng lười nên cực đại cuộn lớn dần: nhảy tới khi ổn định.
+      for (var i = 0; i < 6; i++) {
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+      }
+      final last = find.text('Cơ số 5');
+      expect(last, findsOneWidget);
+      final card = find.ancestor(of: last, matching: find.byType(Card)).first;
+      expect(
+        tester.getBottomLeft(card).dy,
+        lessThanOrEqualTo(640 - coachInset),
+      );
+      final addFab = find.byType(FloatingActionButton);
+      expect(
+        tester.getBottomLeft(card).dy,
+        lessThanOrEqualTo(tester.getTopLeft(addFab).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('x1.0: nút nằm cùng hàng với chữ như cũ', (tester) async {
+      await openWithReminder(tester, textScale: 1.0, cues: 1);
+      final text = tester.getRect(find.text(Vi.equipmentReminderPrompt));
+      final button = tester.getRect(find.text(Vi.equipmentReminderEnable));
+      expect(
+        button.top,
+        lessThan(text.bottom),
+        reason: 'nút cùng hàng với chữ',
+      );
+      expect(button.left, greaterThan(text.left + 100));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('chưa có cơ: trạng thái trống nằm giữa phần còn lại dưới thẻ, '
+        'trên chỗ nút nổi', (tester) async {
+      await openWithReminder(tester, textScale: 1.0, cues: 0);
+      final card = tester.getRect(find.byType(Card).first);
+      final empty = tester.getCenter(find.text(Vi.equipmentEmpty));
+      // Vùng còn lại: dưới thẻ tới trên chỗ nút Thêm cơ và nút Coach (88+72).
+      final middle = (card.bottom + (640 - 88 - coachInset)) / 2;
+      final centreOfBlock = tester.getCenter(find.byType(PcEmptyState)).dy;
+      expect(centreOfBlock, closeTo(middle, 6));
+      expect(empty.dy, greaterThan(card.bottom));
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+const _family = 'RobotoEquipment';
+
+/// Trình duyệt giả: hỗ trợ thông báo, chưa được cấp quyền.
+class _PromptPlatform extends NotificationPlatform {
+  @override
+  NotificationScheduler? get scheduler => null;
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  String? get permission => 'default';
+
+  @override
+  Future<String?> requestPermission() async => 'granted';
 }

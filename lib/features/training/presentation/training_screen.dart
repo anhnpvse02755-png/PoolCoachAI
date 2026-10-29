@@ -256,9 +256,15 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> {
                               Vi.drillRatioUnknown,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            _Scored(:final ratio) => Text(
-                              Vi.drillRatioPercent(ratio),
-                              style: Theme.of(context).textTheme.titleMedium,
+                            // "113% mục tiêu" dài hơn số trần: giới hạn bề rộng
+                            // để chữ xuống hai dòng thay vì nuốt cả hàng.
+                            _Scored(:final ratio) => ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 88),
+                              child: Text(
+                                Vi.statsPercent((ratio * 100).round()),
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
                             ),
                           },
                           onTap: () => context.go(Routes.drill(drill.id)),

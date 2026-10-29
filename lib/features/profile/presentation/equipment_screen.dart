@@ -5,6 +5,7 @@ import 'package:poolcoachai/core/providers/now_provider.dart';
 import 'package:poolcoachai/core/providers/repository_providers.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/widgets/pc_action_tile.dart';
 import 'package:poolcoachai/core/widgets/pc_empty_state.dart';
 import 'package:poolcoachai/core/widgets/pc_fab_inset.dart';
 import 'package:poolcoachai/core/widgets/pc_root_scaffold.dart';
@@ -522,28 +523,48 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         }
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
-    return Column(
-      children: [
-        _maintenanceReminderCard(),
-        Expanded(
-          child: cues.isEmpty
-              ? const Center(
-                  child: PcEmptyState(
-                    icon: Icons.sports,
-                    title: Vi.equipmentTitle,
-                    body: Vi.equipmentEmpty,
-                  ),
-                )
-              : ListView(
-                  padding: pcScrollPadding(
-                    context,
-                    const EdgeInsets.fromLTRB(12, 8, 12, 88),
-                  ),
-                  children: sortedCues
-                      .map((cue) => _cueCard(cue, now, sessions, winRates))
-                      .toList(growable: false),
-                ),
+    // Thẻ nhắc nằm trong vùng cuộn: ở chữ lớn nó cao hơn màn hình, và nếu
+    // đứng yên trên danh sách thì danh sách bị ép về 0, không cuộn tới được.
+    // Trạng thái trống lấp phần còn lại và nằm giữa nó.
+    final padding = pcScrollPadding(
+      context,
+      const EdgeInsets.fromLTRB(12, 8, 12, 88),
+    );
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
+          sliver: SliverToBoxAdapter(child: _maintenanceReminderCard()),
         ),
+        if (cues.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: padding.bottom),
+              child: const Center(
+                child: PcEmptyState(
+                  icon: Icons.sports,
+                  title: Vi.equipmentTitle,
+                  body: Vi.equipmentEmpty,
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              padding.left,
+              0,
+              padding.right,
+              padding.bottom,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                for (final cue in sortedCues)
+                  _cueCard(cue, now, sessions, winRates),
+              ]),
+            ),
+          ),
       ],
     );
   }
@@ -557,20 +578,28 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         : permission == 'denied'
         ? Vi.equipmentReminderDenied
         : Vi.equipmentReminderPrompt;
+    const icon = Icon(Icons.notifications_active_outlined);
+    const title = Text(Vi.equipmentReminderTitle);
+    final canEnable = permission != 'granted' && permission != 'denied';
+    if (!canEnable) {
+      return Card(
+        child: ListTile(
+          leading: icon,
+          title: title,
+          subtitle: Text(message),
+          trailing: permission == 'granted'
+              ? const Icon(Icons.check_circle_outline)
+              : null,
+        ),
+      );
+    }
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: ListTile(
-        leading: const Icon(Icons.notifications_active_outlined),
-        title: const Text(Vi.equipmentReminderTitle),
-        subtitle: Text(message),
-        trailing: permission != 'granted' && permission != 'denied'
-            ? TextButton(
-                onPressed: _requestMaintenanceNotifications,
-                child: const Text(Vi.equipmentReminderEnable),
-              )
-            : permission == 'granted'
-            ? const Icon(Icons.check_circle_outline)
-            : null,
+      child: PcActionTile(
+        icon: icon,
+        title: Vi.equipmentReminderTitle,
+        body: message,
+        actionLabel: Vi.equipmentReminderEnable,
+        onAction: _requestMaintenanceNotifications,
       ),
     );
   }

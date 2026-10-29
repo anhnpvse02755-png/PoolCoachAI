@@ -504,6 +504,26 @@ void main() {
   });
 
   testWidgets(
+    'thông báo buổi không đồng bộ cuộn cùng Hồ sơ, không ghim trên danh sách',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await openProfile(tester, unsyncable: 2);
+
+      expect(
+        find.ancestor(
+          of: find.text(Vi.unsyncableTitle(2)),
+          matching: find.byType(Scrollable),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'đăng xuất khi có lần kiểm tra dở: cảnh báo sẽ mất, Vẫn đăng xuất thì xoá',
     (tester) async {
       final (db, auth, _) = await openProfile(tester);
