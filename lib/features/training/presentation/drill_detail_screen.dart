@@ -265,7 +265,7 @@ class _HistoryRow extends StatelessWidget {
       dense: true,
       leading: const Icon(Icons.history),
       title: Text(
-        ratio == null ? Vi.drillRatioUnknown : Vi.drillRatioPercent(ratio),
+        ratio == null ? Vi.drillRatioUnknown : Vi.drillRatioOfGoal(ratio),
       ),
       subtitle: Text(Vi.shortDate(log.date)),
     );

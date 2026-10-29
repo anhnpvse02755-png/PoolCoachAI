@@ -144,7 +144,10 @@ void main() {
     );
 
     expect(find.text(Vi.drillHistoryTitle), findsOneWidget);
-    expect(find.text('113%'), findsOneWidget);
+    // Hàng lịch sử nói rõ đây là phần trăm của mục tiêu, không phải tỉ lệ thành công: 9/10 so với ngưỡng 0.8 là 113%.
+    expect(find.text(Vi.drillRatioOfGoal(1.125)), findsOneWidget);
+    expect(find.textContaining('113%'), findsOneWidget);
+    expect(find.text('113%'), findsNothing);
     expect(find.text(Vi.shortDate(DateTime(2026, 9, 20))), findsOneWidget);
   });
 
