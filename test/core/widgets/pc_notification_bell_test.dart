@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show ByteData, FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -49,7 +52,12 @@ void main() {
     if (read) await repo.markRead([id], at: at);
   }
 
-  Future<GoRouter> open(WidgetTester tester, {ProviderContainer? using}) async {
+  Future<GoRouter> open(
+    WidgetTester tester, {
+    ProviderContainer? using,
+    String title = 'Thống kê',
+    String? fontFamily,
+  }) async {
     final container = using ?? dbContainer(db, clock: () => clock);
     addTearDown(container.dispose);
     final router = GoRouter(
@@ -57,7 +65,7 @@ void main() {
         GoRoute(
           path: '/',
           builder: (_, _) =>
-              const PcRootScaffold(title: 'Thống kê', body: SizedBox()),
+              PcRootScaffold(title: title, body: const SizedBox()),
         ),
         GoRoute(
           path: Routes.notifications,
@@ -69,7 +77,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: fontFamily == null ? null : ThemeData(fontFamily: fontFamily),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -263,6 +274,41 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final c in const [
+    (Size(360, 640), 1.5),
+    (Size(320, 640), 1.2),
+  ]) {
+    for (final unread in const [0, 120]) {
+      testWidgets(
+        'tiêu đề gốc không bị cắt vì chuông: ${c.$1} x${c.$2}, $unread mục',
+        (tester) async {
+          applyScreen(tester, c.$1, textScale: c.$2);
+          const family = 'RobotoBellTitle';
+          final bytes = File(
+            'test/fixtures/fonts/roboto-regular.ttf',
+          ).readAsBytesSync();
+          await tester.runAsync(
+            () => (FontLoader(
+              family,
+            )..addFont(Future.value(ByteData.sublistView(bytes)))).load(),
+          );
+          for (var i = 1; i <= unread; i++) {
+            await add(i, past.subtract(Duration(minutes: i)));
+          }
+          await open(tester, title: Vi.trainingTitle, fontFamily: family);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.byType(AppBar),
+              matching: find.text(Vi.trainingTitle),
+            ),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   testWidgets('chạm chuông mở màn Thông báo', (tester) async {
