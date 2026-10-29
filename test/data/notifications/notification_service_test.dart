@@ -6,6 +6,7 @@ import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
+import 'package:poolcoachai/data/notifications/notification_schedule_version_store.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
@@ -56,6 +57,7 @@ void main() {
   NotificationService service({
     NotificationPrefs? prefs = const NotificationPrefs(),
     NotificationPlatform? using,
+    NotificationScheduleVersionStore? scheduleVersion,
   }) => NotificationService(
     db: db,
     auth: auth,
@@ -66,6 +68,7 @@ void main() {
       return now;
     },
     platform: using ?? platform,
+    scheduleVersion: scheduleVersion,
   )..setPrefs(prefs);
 
   Future<void> saveCue({String id = 'cue-1', DateTime? dueDate}) =>
@@ -465,7 +468,12 @@ void main() {
 
     NotificationService scheduling({
       NotificationPrefs? prefs = const NotificationPrefs(),
-    }) => service(prefs: prefs, using: _SchedulingPlatform(scheduler));
+      NotificationScheduleVersionStore? scheduleVersion,
+    }) => service(
+      prefs: prefs,
+      using: _SchedulingPlatform(scheduler),
+      scheduleVersion: scheduleVersion,
+    );
 
     setUp(() => scheduler = _FakeScheduler());
     tearDown(
@@ -965,6 +973,59 @@ void main() {
       expect(scheduler.scheduled, hasLength(2));
     });
 
+    test('nâng cấp từ bản cũ: đặt lại mọi thông báo đang chờ, một lần', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      // Bản cũ đã đặt hai thông báo bảo dưỡng (không có payload).
+      final old = scheduling()..start();
+      await pumpEventQueue();
+      old.dispose();
+      await pumpEventQueue();
+      final ids = scheduler.pending.keys.toSet();
+      expect(ids, hasLength(2));
+      scheduler.everScheduled.clear();
+
+      final store = _FakeScheduleVersionStore();
+      final s = scheduling(scheduleVersion: store)..start();
+      await pumpEventQueue();
+      expect(scheduler.everScheduled.map((n) => n.id).toSet(), ids);
+      expect(scheduler.pending.keys.toSet(), ids);
+      expect(store.version, notificationScheduleVersion);
+      expect(
+        (await logRows()).map((x) => x.id).toSet(),
+        ids,
+        reason: 'đặt lại không xoá dòng nhật ký của chính nó',
+      );
+      s.dispose();
+      await pumpEventQueue();
+
+      scheduler.everScheduled.clear();
+      final again = scheduling(scheduleVersion: store)..start();
+      addTearDown(again.dispose);
+      await pumpEventQueue();
+      expect(scheduler.everScheduled, isEmpty, reason: 'chỉ một lần');
+    });
+
+    test('nâng cấp: lỗi đọc cờ thì không đặt lại (không lặp)', () async {
+      scheduler.granted = true;
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      final old = scheduling()..start();
+      await pumpEventQueue();
+      old.dispose();
+      await pumpEventQueue();
+      scheduler.everScheduled.clear();
+
+      final s = scheduling(scheduleVersion: _FakeScheduleVersionStore()..fail = true)
+        ..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      await saveSlot(time: '18:00');
+      await pumpEventQueue();
+      expect(scheduler.everScheduled.map((n) => n.kind), [
+        NotificationKind.schedule,
+      ]);
+    });
+
     test('nhiều thay đổi dồn dập: số lần đồng bộ có giới hạn', () async {
       scheduler.granted = true;
       final s = scheduling()
@@ -1055,6 +1116,21 @@ void main() {
       expect(scheduler.pending.keys, {1, 3});
       expect(scheduler.scheduleCalls, 1, reason: 'keep không được đặt mới');
     });
+
+    test('replaceAll: đặt lại cả cái đang chờ đúng id, keep để yên', () async {
+      final scheduler = _FakeScheduler()
+        ..pending = {1: n(1), 2: n(2), 4: n(4)};
+      final cancelled = await reconcileNotifications(
+        scheduler,
+        [n(2), n(3)],
+        keep: {1},
+        replaceAll: true,
+      );
+      expect(cancelled, {4}, reason: 'chỉ cái huỷ mà không đặt lại');
+      expect(scheduler.cancelled.toSet(), {2, 4});
+      expect(scheduler.everScheduled.map((x) => x.id), [2, 3]);
+      expect(scheduler.pending.keys.toSet(), {1, 2, 3});
+    });
   });
 }
 
@@ -1136,6 +1212,20 @@ class _FakeScheduler implements NotificationScheduler {
 
   @override
   Future<String?> launchPayload() async => launch;
+}
+
+class _FakeScheduleVersionStore implements NotificationScheduleVersionStore {
+  int? version;
+  bool fail = false;
+
+  @override
+  Future<int?> load() async {
+    if (fail) throw StateError('không đọc được');
+    return version;
+  }
+
+  @override
+  Future<void> save(int version) async => this.version = version;
 }
 
 class _SchedulingPlatform extends NotificationPlatform {

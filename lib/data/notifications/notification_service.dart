@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
 import 'package:poolcoachai/data/database/database.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
+import 'package:poolcoachai/data/notifications/notification_schedule_version_store.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
@@ -38,10 +39,14 @@ class NotificationService {
     required this._auth,
     required this._now,
     NotificationPlatform? platform,
+    this._scheduleVersion,
     this._checkEvery = const Duration(minutes: 1),
   }) : _platform = platform ?? createNotificationPlatform();
 
   final AppDatabase _db;
+
+  /// Null: không kiểm phiên bản đặt lịch (không bao giờ đặt lại hết).
+  final NotificationScheduleVersionStore? _scheduleVersion;
   final AuthRepository _auth;
   final DateTime Function() _now;
   final NotificationPlatform _platform;
@@ -179,6 +184,29 @@ class NotificationService {
   late final Future<void> _permissionLoaded = _platform.loadPermission();
   Future<void> _syncChain = Future.value();
 
+  /// Lịch hệ điều hành do bản cũ đặt (thiếu thứ bản này cần) thì lần đồng bộ
+  /// có quyền đầu tiên đặt lại hết. Đọc cờ lỗi thì coi như không cũ: thà
+  /// thiếu payload còn hơn đặt lại mỗi lần mở app.
+  late Future<bool> _scheduleOutdated = () async {
+    final store = _scheduleVersion;
+    if (store == null) return false;
+    try {
+      final version = await store.load();
+      return version == null || version < notificationScheduleVersion;
+    } on Object {
+      return false;
+    }
+  }();
+
+  Future<void> _markScheduleCurrent() async {
+    _scheduleOutdated = Future.value(false);
+    try {
+      await _scheduleVersion?.save(notificationScheduleVersion);
+    } on Object {
+      // Không ghi được thì lần mở app sau đặt lại thêm một lần.
+    }
+  }
+
   /// Kế hoạch lúc [now]. [current] là nhật ký vừa đọc thẳng từ DB
   /// (Android/iOS); thiếu thì dùng bản của luồng theo dõi.
   List<PlannedNotification> _plan(
@@ -258,14 +286,18 @@ class NotificationService {
           final current = await log.all();
           if (_disposed || _userId != userId) return;
           final plan = _plan(now, current: current);
+          final replaceAll = await _scheduleOutdated;
+          if (_disposed || _userId != userId) return;
           // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
           // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
           final cancelled = await reconcileNotifications(
             scheduler,
             plan,
             keep: dueEarlierToday(current, now),
+            replaceAll: replaceAll,
           );
           await log.syncPlanned(plan, now: now, cancelled: cancelled);
+          if (replaceAll) await _markScheduleCurrent();
         } else {
           // Không có quyền thì không đặt gì: nhật ký không giữ mục tương lai.
           await log.syncPlanned(const [], now: now);

@@ -7,6 +7,7 @@ import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
+import 'package:poolcoachai/data/notifications/notification_schedule_version_store.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
@@ -158,12 +159,19 @@ final notificationLogProvider = StreamProvider<List<NotificationLogEntry>>(
       Stream.value(const []),
 );
 
+/// Cờ phiên bản đặt lịch thông báo của máy này.
+final notificationScheduleVersionStoreProvider =
+    Provider<NotificationScheduleVersionStore>(
+      (ref) => SharedPreferencesNotificationScheduleVersionStore(),
+    );
+
 /// Dịch vụ giữ thông báo của hệ điều hành/trình duyệt khớp với kế hoạch.
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   final service = NotificationService(
     db: ref.watch(appDatabaseProvider),
     auth: ref.watch(authRepositoryProvider),
     now: ref.watch(nowProvider),
+    scheduleVersion: ref.watch(notificationScheduleVersionStoreProvider),
   );
   ref.listen(
     notificationPrefsProvider,
