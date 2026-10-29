@@ -3,8 +3,10 @@ import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/maintenance_schedule.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/recommendation.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
+import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
 
 /// Số thông báo chờ tối đa. iOS giữ tối đa 64 thông báo cục bộ; chừa
@@ -74,6 +76,10 @@ StreakState streakStateOf({
 /// - Chuỗi: 20:00 hôm nay nếu chuỗi từ [streakReminderMinDays] ngày mà
 ///   hôm nay chưa tập.
 ///
+/// - Gợi ý tập mới: 08:00 hôm nay (nếu chưa tới) và 08:00 ngày mai, chỉ
+///   khi gợi ý của ngày đó có bài và khác cặp (nhóm, bài) đã thấy lần cuối
+///   [lastSeenRecommendation] hoặc của ngày liền trước trong cùng kế hoạch.
+///
 /// Loại bị tắt trong [prefs] không có mặt.
 List<PlannedNotification> planNotifications({
   required List<CueEquipment> cues,
@@ -81,9 +87,51 @@ List<PlannedNotification> planNotifications({
   required StreakState streak,
   required NotificationPrefs prefs,
   required DateTime now,
+  RecommendationInputs? recommendation,
+  SeenRecommendation? lastSeenRecommendation,
   int limit = maxPendingNotifications,
 }) {
   final drafts = <_Draft>[];
+
+  if (prefs.recommendation && recommendation != null) {
+    // Cặp đã báo/đã thấy; nối tiếp từ ngày này sang ngày sau.
+    SkillCategory? baseCat = lastSeenRecommendation?.cat;
+    String? baseDrillId = lastSeenRecommendation?.drillId;
+    for (var offset = 0; offset <= 1; offset++) {
+      final day = DateTime(now.year, now.month, now.day + offset);
+      final at = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        recommendationReminderHour,
+      );
+      if (!at.isAfter(now)) continue;
+      final rec = recommendation.recommendFor(at);
+      final drill = rec.drill;
+      if (drill == null) continue;
+      if (baseCat == rec.cat && baseDrillId == drill.id) continue;
+      drafts.add(
+        _Draft(
+          kind: NotificationKind.recommendation,
+          key: recommendationKey(day, rec.cat, drill.id),
+          at: at,
+          validUntil: DateTime(day.year, day.month, day.day + 1),
+          title: Vi.recommendationReminderTitle,
+          body: Vi.recommendationReminderBody(
+            drill.name,
+            rec.cat,
+            Vi.pickReason(
+              rec.reason,
+              Vi.skill(rec.cat),
+              signal: rec.matchSignal,
+            ),
+          ),
+        ),
+      );
+      baseCat = rec.cat;
+      baseDrillId = drill.id;
+    }
+  }
 
   if (prefs.maintenance) {
     for (final r in computeMaintenanceSchedule(cues, now: now)) {

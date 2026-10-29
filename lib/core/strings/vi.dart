@@ -633,11 +633,14 @@ abstract final class Vi {
   // Thông báo — nội dung do bộ lập lịch (lib/domain/notifications) điền
   // từ dữ liệu thật của người chơi.
   static String notificationKind(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation => 'Gợi ý tập mới',
     NotificationKind.maintenance => 'Bảo dưỡng đầu cơ',
     NotificationKind.schedule => 'Lịch tập',
     NotificationKind.streak => 'Chuỗi ngày tập',
   };
   static String notificationKindHint(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation =>
+      'Lúc ${recommendationReminderHour.toString().padLeft(2, '0')}:00, khi gợi ý tập của ngày khác với gợi ý bạn thấy lần cuối ở Trang chủ.',
     NotificationKind.maintenance =>
       'Lúc 09:00, 7 ngày trước và đúng ngày đến hạn bảo dưỡng đầu cơ.',
     NotificationKind.schedule =>
@@ -645,6 +648,12 @@ abstract final class Vi {
     NotificationKind.streak =>
       'Lúc $streakReminderHour:00 nếu bạn có chuỗi từ $streakReminderMinDays ngày trở lên mà hôm nay chưa ghi buổi tập.',
   };
+  static const recommendationReminderTitle = 'Có gợi ý tập mới';
+  static String recommendationReminderBody(
+    String drillName,
+    SkillCategory cat,
+    String reason,
+  ) => '${skill(cat)} · $drillName. $reason';
   static const scheduleReminderTitle = 'Sắp đến giờ tập';
   static String scheduleReminderBody(
     String label,

@@ -11,6 +11,21 @@ void main() {
     expect(prefs, const NotificationPrefs());
   });
 
+  test('Gợi ý tập mới lưu theo tài khoản', () async {
+    final store = SharedPreferencesNotificationPrefsStore();
+    await store.save('u1', const NotificationPrefs(recommendation: false));
+
+    expect(
+      await store.load('u1'),
+      const NotificationPrefs(recommendation: false),
+    );
+    final raw = await SharedPreferences.getInstance();
+    expect(
+      raw.getBool('poolcoachai:notification-prefs:v1:u1:recommendation'),
+      false,
+    );
+  });
+
   test('saves per account and does not leak between accounts', () async {
     final store = SharedPreferencesNotificationPrefsStore();
     await store.save('u1', const NotificationPrefs(streak: false));

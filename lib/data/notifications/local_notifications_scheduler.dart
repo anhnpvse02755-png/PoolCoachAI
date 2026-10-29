@@ -19,6 +19,7 @@ class LocalNotificationsScheduler implements NotificationScheduler {
 
   /// 'cue_maintenance' giữ nguyên để kênh cũ của người đã cài vẫn dùng được.
   static String _channelId(NotificationKind kind) => switch (kind) {
+    NotificationKind.recommendation => 'recommendation_reminder',
     NotificationKind.maintenance => 'cue_maintenance',
     NotificationKind.schedule => 'schedule_reminder',
     NotificationKind.streak => 'streak_reminder',

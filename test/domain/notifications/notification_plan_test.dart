@@ -4,9 +4,12 @@ import 'package:poolcoachai/domain/cue_equipment.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 import 'package:poolcoachai/domain/timer_session.dart';
+
+import '../../support/test_data.dart';
 
 void main() {
   // Thứ Ba 2026-10-13 (weekday 2 -> day index 1).
@@ -37,6 +40,7 @@ void main() {
     StreakState streak = noStreak,
     NotificationPrefs prefs = const NotificationPrefs(),
     DateTime? at,
+    RecommendationInputs? recommendation,
     int limit = maxPendingNotifications,
   }) => planNotifications(
     cues: cues,
@@ -44,7 +48,17 @@ void main() {
     streak: streak,
     prefs: prefs,
     now: at ?? now,
+    recommendation: recommendation,
     limit: limit,
+  );
+
+  final recoInputs = RecommendationInputs(
+    drills: testDrills,
+    logs: const [],
+    knowledge: const [],
+    timerSessions: const [],
+    schedule: const [],
+    matches: const [],
   );
 
   group('maintenance', () {
@@ -259,6 +273,7 @@ void main() {
         cues: inputs.cues,
         slots: inputs.slots,
         streak: inputs.streak,
+        recommendation: recoInputs,
       );
       final first = run();
 
@@ -295,7 +310,9 @@ void main() {
           cues: [cue('c1', DateTime(2026, 10, 21))],
           slots: [slot('s1', 1, '18:00')],
           streak: const StreakState(days: 4, practicedToday: false),
+          recommendation: recoInputs,
           prefs: const NotificationPrefs(
+            recommendation: false,
             maintenance: false,
             schedule: false,
             streak: false,
@@ -310,9 +327,12 @@ void main() {
         cues: [cue('c1', DateTime(2026, 10, 14))],
         slots: [slot('s1', 1, '18:00')],
         streak: const StreakState(days: 4, practicedToday: false),
+        recommendation: recoInputs,
       );
       for (final n in all) {
         switch (n.kind) {
+          case NotificationKind.recommendation:
+            expect(n.validUntil, DateTime(2026, 10, 15));
           case NotificationKind.schedule:
             expect(n.validUntil, DateTime(2026, 10, 13, 18));
           case NotificationKind.maintenance:
