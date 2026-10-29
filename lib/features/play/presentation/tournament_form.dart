@@ -153,6 +153,11 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
         width: 400,
         child: Form(
           key: _formKey,
+          // Sau lần Lưu hỏng đầu tiên, ô được kiểm lại mỗi khi người dùng gõ,
+          // nên lỗi biến mất ngay khi ô hợp lệ thay vì nằm đó tới lần Lưu sau.
+          autovalidateMode: _attempted
+              ? AutovalidateMode.onUserInteraction
+              : AutovalidateMode.disabled,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
