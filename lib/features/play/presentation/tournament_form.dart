@@ -207,7 +207,7 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 key: const Key('tournament-location'),
                 controller: _location,
                 decoration: const InputDecoration(
-                  labelText: Vi.tournamentLocation,
+                  label: Text(Vi.tournamentLocation, maxLines: 2),
                 ),
                 inputFormatters: [
                   _RuneLimit(TournamentConstants.locationMaxLength),
@@ -243,7 +243,7 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 key: const Key('tournament-result'),
                 controller: _result,
                 decoration: const InputDecoration(
-                  labelText: Vi.tournamentResultNote,
+                  label: Text(Vi.tournamentResultNote, maxLines: 2),
                   helperText: Vi.tournamentResultHint,
                 ),
                 inputFormatters: [
@@ -260,7 +260,7 @@ class _TournamentFormDialogState extends State<_TournamentFormDialog> {
                 key: const Key('tournament-notes'),
                 controller: _notes,
                 decoration: const InputDecoration(
-                  labelText: Vi.tournamentNotes,
+                  label: Text(Vi.tournamentNotes, maxLines: 2),
                 ),
                 maxLines: 3,
                 inputFormatters: [
