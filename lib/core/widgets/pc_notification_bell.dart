@@ -26,16 +26,20 @@ class PcNotificationBell extends ConsumerWidget {
       nextAt: (now) => nextDelivery(all, now),
       builder: (context) {
         final n = unreadCount(all, clock());
-        return IconButton(
-          tooltip: Vi.notificationsBellTooltip(n),
-          icon: Badge(
-            isLabelVisible: n > 0,
-            // Chữ lớn làm huy hiệu rộng ra phía phải; kéo vào để không chạm mép.
-            offset: const Offset(-6, 0),
-            label: Text(Vi.notificationsUnreadBadge(n)),
-            child: const Icon(Icons.notifications_none),
+        // Huy hiệu ở góc trên-phải chuông, rộng ra phía phải khi chữ lớn hoặc
+        // "99+": chừa lề phải cho nó thay vì kéo nó vào đè lên biểu tượng.
+        return Padding(
+          padding: const EdgeInsetsDirectional.only(end: 44),
+          child: IconButton(
+            tooltip: Vi.notificationsBellTooltip(n),
+            icon: Badge(
+              isLabelVisible: n > 0,
+              offset: const Offset(12, -4),
+              label: Text(Vi.notificationsUnreadBadge(n)),
+              child: const Icon(Icons.notifications_none),
+            ),
+            onPressed: () => context.push(Routes.notifications),
           ),
-          onPressed: () => context.push(Routes.notifications),
         );
       },
     );
