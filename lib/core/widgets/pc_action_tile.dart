@@ -95,9 +95,7 @@ class _RenderActionLayout extends RenderBox
     with
         ContainerRenderObjectMixin<RenderBox, _ActionParentData>,
         RenderBoxContainerDefaultsMixin<RenderBox, _ActionParentData> {
-  _RenderActionLayout({required double chrome, required double minTextWidth})
-    : _chrome = chrome,
-      _minTextWidth = minTextWidth;
+  _RenderActionLayout({required this._chrome, required this._minTextWidth});
 
   static const _gap = 8.0;
 
