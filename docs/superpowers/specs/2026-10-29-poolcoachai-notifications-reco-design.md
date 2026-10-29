@@ -71,7 +71,7 @@ Lý do: ứng dụng không biết chắc lúc hệ điều hành giao thông b�
 
 ## 5. Chạm thông báo mở đúng màn
 
-Payload của thông báo là `kind|key`. Khi chạm (ứng dụng đang mở, chạy nền hay khởi động từ thông báo), ứng dụng mở màn tương ứng:
+Payload của thông báo là `v2|<userId>|kind|key` (sửa sau review cuối: mang tài khoản để chạm thông báo của tài khoản khác thì bỏ qua; dạng cũ `kind|key` vẫn đọc được và coi là tài khoản hiện tại). Khi chạm (ứng dụng đang mở, chạy nền hay khởi động từ thông báo), ứng dụng mở màn tương ứng:
 
 | Loại | Mở |
 |---|---|
