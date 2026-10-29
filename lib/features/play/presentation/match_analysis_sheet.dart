@@ -129,6 +129,8 @@ Future<void> showMatchAnalysis(BuildContext context, PoolMatch match) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    // Navigator gốc: sheet phủ cả nút Coach của shell chứ không nằm dưới nó.
+    useRootNavigator: true,
     useSafeArea: true,
     builder: (sheetContext) => SingleChildScrollView(
       padding: const EdgeInsets.all(16),

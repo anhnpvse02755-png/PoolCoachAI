@@ -38,6 +38,8 @@ class RankBadgeLine extends StatelessWidget {
 Future<void> showRankInfoSheet(BuildContext context) => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // Navigator gốc: sheet phủ cả nút Coach của shell chứ không nằm dưới nó.
+      useRootNavigator: true,
       builder: (_) => const RankInfoSheet(),
     );
 

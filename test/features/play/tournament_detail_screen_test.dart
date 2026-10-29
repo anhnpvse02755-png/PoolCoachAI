@@ -250,6 +250,27 @@ void main() {
     expect(find.byType(MatchAnalysisView), findsOneWidget);
   });
 
+  testWidgets('phân tích trận mở trên navigator gốc: nút Coach nằm sau tấm chắn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640));
+    await open(
+      tester,
+      testContainer(
+        tournaments: [on],
+        matches: [m('a', won: 3, lost: 2, at: DateTime(2026, 9, 21, 9))],
+      ),
+      'on',
+    );
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('tournament-match-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament-match-a')));
+    await tester.pumpAndSettle();
+    expect(find.byType(MatchAnalysisView), findsOneWidget);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsNothing);
+  });
+
   testWidgets('bấm trận đang đánh sang Thi đấu', (tester) async {
     await open(
       tester,

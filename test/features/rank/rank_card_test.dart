@@ -223,6 +223,18 @@ void main() {
     expect(find.byType(TestScreen), findsOneWidget);
   });
 
+  testWidgets('ⓘ mở trên navigator gốc: nút Coach nằm sau tấm chắn', (
+    tester,
+  ) async {
+    applyScreen(tester, const Size(360, 640));
+    await pump(tester, Routes.profile, rank: verifiedD);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip(Vi.rankInfo));
+    await tester.pumpAndSettle();
+    expect(find.text(Vi.rankDisclaimer), findsOneWidget);
+    expect(find.byTooltip(Vi.coachTitle).hitTestable(), findsNothing);
+  });
+
   testWidgets('ⓘ mở câu miễn trừ, bảng quy đổi và nguồn BU', (tester) async {
     await pump(tester, Routes.profile, rank: verifiedD);
     await tester.tap(find.byTooltip(Vi.rankInfo));
