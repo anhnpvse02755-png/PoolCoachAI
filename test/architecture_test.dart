@@ -473,4 +473,16 @@ void main() {
       expect(source, isNot(contains('warningRank')));
     },
   );
+
+  test('bộ giải mã Directus thuần: không import drift, database, sync hay Flutter', () {
+    final files = dartFilesIn('lib/data/remote/codecs');
+    expect(files, isNotEmpty);
+    for (final f in files) {
+      expect(
+        codeOnly(f.readAsStringSync()),
+        isNot(matches(RegExp(r"package:(drift|flutter)|database\.dart|/sync/"))),
+        reason: f.path,
+      );
+    }
+  });
 }

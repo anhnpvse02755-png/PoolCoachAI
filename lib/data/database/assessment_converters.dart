@@ -2,12 +2,16 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/remote/codecs/assessment_codecs.dart';
 import 'package:poolcoachai/domain/assessment/bu_placement.dart';
 import 'package:poolcoachai/domain/assessment/bu_test.dart';
 import 'package:poolcoachai/domain/assessment/drill_attempts.dart';
 import 'package:poolcoachai/domain/assessment/player_rank.dart';
 import 'package:poolcoachai/domain/assessment/questionnaire.dart';
 import 'package:poolcoachai/domain/rank.dart';
+
+export 'package:poolcoachai/data/remote/codecs/remote_fields.dart'
+    show remoteResultFields, remoteTestFields;
 
 // Tên enum lạ thì byName ném — hàng hỏng phải ồn ào ngay lúc đọc, như
 // _parseCategory của converters.dart.
@@ -62,7 +66,7 @@ BuTest toBuTest(BuTestRow r) => BuTest(
     );
 
 DrillAttempts attemptsOfRow(BuDrillResultRow r) =>
-    DrillAttempts.fromJson(jsonDecode(r.attempts));
+    drillAttemptsFromJson(r.attempts);
 
 // ─── Directus (spec mục 6.2; tên collection theo D9 của kế hoạch) ─────────
 //
@@ -70,9 +74,6 @@ DrillAttempts attemptsOfRow(BuDrillResultRow r) =>
 
 const remoteRankFields = 'id,rank,source,bu_score,test_id,warning_rank,'
     'warning_test_id,questionnaire_answers,onboarding_state,updated_at';
-const remoteTestFields = 'id,started_at,completed_at,cancelled_at,table_size,'
-    'exam_i_score,exam_ii_version,exam_ii_score,total_score,result_rank';
-const remoteResultFields = 'id,test_id,drill_id,attempts,score,recorded_at';
 
 String? _iso(DateTime? d) => d?.toUtc().toIso8601String();
 DateTime? _local(Object? s) => s == null ? null : DateTime.parse(s as String).toLocal();
@@ -146,13 +147,15 @@ Map<String, Object?> toRemoteResult(BuDrillResultRow r) => {
     };
 
 BuDrillResultRowsCompanion fromRemoteResult(Map<String, Object?> j,
-        {required DateTime syncedAt}) =>
-    BuDrillResultRowsCompanion.insert(
-      id: j['id']! as String,
-      testId: j['test_id']! as String,
-      drillId: j['drill_id']! as String,
-      attempts: jsonEncode(j['attempts']),
-      score: drift.Value(j['score'] as int?),
-      recordedAt: _local(j['recorded_at'])!,
-      syncedAt: drift.Value(syncedAt),
-    );
+    {required DateTime syncedAt}) {
+  final r = buDrillResultFromRemote(j);
+  return BuDrillResultRowsCompanion.insert(
+    id: r.id,
+    testId: r.testId,
+    drillId: r.drillId,
+    attempts: r.attemptsJson,
+    score: drift.Value(r.score),
+    recordedAt: r.recordedAt,
+    syncedAt: drift.Value(syncedAt),
+  );
+}

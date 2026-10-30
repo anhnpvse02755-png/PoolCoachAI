@@ -325,19 +325,15 @@ class DriftMatchRepository implements MatchRepository {
     return match;
   }
 
-  PoolMatch _toDomain(PoolMatchRow row) => PoolMatch(
+  PoolMatch _toDomain(PoolMatchRow row) => poolMatchFromColumns(
     id: row.id,
-    gameType: PoolGameType.values.firstWhere(
-      (type) => type.name == row.gameType,
-      orElse: () =>
-          throw FormatException('Unknown PoolGameType: ${row.gameType}'),
-    ),
+    gameType: row.gameType,
     playerName: row.playerName,
     opponentName: row.opponentName,
     targetRacks: row.targetRacks,
-    rackWinners: decodeMatchWinners(row.rackWinners),
+    rackWinnersJson: row.rackWinners,
+    shotsJson: row.shots,
     startedAt: row.startedAt,
-    shots: decodeMatchShots(row.shots),
     completedAt: row.completedAt,
     cueId: row.cueId,
     tournamentId: row.tournamentId,

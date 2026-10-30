@@ -4,28 +4,25 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/category_compat.dart';
 import 'package:poolcoachai/data/database/database.dart';
-import 'package:poolcoachai/data/database/match_codec.dart';
 import 'package:poolcoachai/data/database/tournament_converters.dart';
+import 'package:poolcoachai/data/remote/codecs/practice_codecs.dart';
+import 'package:poolcoachai/data/remote/codecs/remote_fields.dart';
+import 'package:poolcoachai/data/remote/codecs/remote_values.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/auth.dart';
-import 'package:poolcoachai/domain/pool_match.dart';
-import 'package:poolcoachai/domain/skill_category.dart';
+
+export 'package:poolcoachai/data/remote/codecs/remote_fields.dart'
+    show
+        poolMatchRemoteFields,
+        scheduleSlotRemoteFields,
+        timerSessionRemoteFields;
 
 const _matchesPath = '/items/pool_matches';
 const _timersPath = '/items/timer_sessions';
 const _slotsPath = '/items/schedule_slots';
 const _tournamentsPath = '/items/tournaments';
-
-const poolMatchRemoteFields =
-    'id,user_created,game_type,player_name,opponent_name,target_racks,'
-    'rack_winners,shots,cue_id,started_at,completed_at,updated_at,is_deleted,'
-    'tournament_id,round_label';
-const timerSessionRemoteFields =
-    'id,user_created,date,duration_sec,cat,cat_ext,cue_id';
-const scheduleSlotRemoteFields =
-    'id,user_created,day,time,label,cat,cat_ext,cat_ext_at,updated_at,is_deleted';
 
 /// Mã Directus khi `POST` một id đã có: đã lên từ lần trước, hoặc máy khác
 /// của cùng người đã ghi cùng bản ghi.
@@ -206,7 +203,7 @@ class PracticeSyncService {
 
   Future<void> _syncMatches(String userId) async {
     final remoteItems = await _fetch(_matchesPath, poolMatchRemoteFields, userId);
-    final remoteById = {for (final item in remoteItems) _id(item): item};
+    final remoteById = {for (final item in remoteItems) remoteString(item, 'id'): item};
     final pending =
         await (_db.select(_db.poolMatchRows)
               ..where((r) => r.userId.equals(userId) & r.syncedAt.isNull())
@@ -222,7 +219,7 @@ class PracticeSyncService {
       final localUpdatedAt = row.updatedAt;
       if (remote != null &&
           (localUpdatedAt == null ||
-              !localUpdatedAt.isAfter(_date(remote, 'updated_at')))) {
+              !localUpdatedAt.isAfter(remoteInstant(remote, 'updated_at')))) {
         continue;
       }
       final sentAt = localUpdatedAt ?? _now();
@@ -277,7 +274,7 @@ class PracticeSyncService {
       _checkAlive();
       _checkUser(userId);
       final remote = _matchFromRemote(item, userId: userId, syncedAt: receivedAt);
-      final remoteUpdatedAt = _date(item, 'updated_at');
+      final remoteUpdatedAt = remoteInstant(item, 'updated_at');
       await _db.transaction(() async {
         final local = await (_db.select(
           _db.poolMatchRows,
@@ -301,45 +298,23 @@ class PracticeSyncService {
     required String userId,
     required DateTime syncedAt,
   }) {
-    final gameType = _string(item, 'game_type');
-    if (!PoolGameType.values.any((type) => type.name == gameType)) {
-      throw const FormatException('Loại trận từ server không hợp lệ');
-    }
-    final player = _string(item, 'player_name');
-    final opponent = _string(item, 'opponent_name');
-    final target = item['target_racks'];
-    if (player.trim().isEmpty ||
-        opponent.trim().isEmpty ||
-        target is! int ||
-        target <= 0) {
-      throw const FormatException('Trận từ server không hợp lệ');
-    }
-    final winners = item['rack_winners'];
-    final shots = item['shots'];
-    if (winners is! List<Object?> || shots is! List<Object?>) {
-      throw const FormatException('Kết quả trận từ server không hợp lệ');
-    }
-    final winnersJson = jsonEncode(winners);
-    final shotsJson = jsonEncode(shots);
-    // Giải mã thử: hỏng thì ném, không lưu dòng hỏng.
-    decodeMatchWinners(winnersJson);
-    decodeMatchShots(shotsJson);
+    final m = poolMatchFromRemote(item);
     return PoolMatchRowsCompanion(
-      id: Value(_id(item)),
+      id: Value(m.id),
       userId: Value(userId),
-      gameType: Value(gameType),
-      playerName: Value(player),
-      opponentName: Value(opponent),
-      targetRacks: Value(target),
-      rackWinners: Value(winnersJson),
-      shots: Value(shotsJson),
-      cueId: Value(_nullableString(item, 'cue_id')),
-      startedAt: Value(_date(item, 'started_at').toLocal()),
-      completedAt: Value(_nullableDate(item, 'completed_at')),
-      updatedAt: Value(_date(item, 'updated_at')),
-      isDeleted: Value(item['is_deleted'] == true),
-      tournamentId: Value(_nullableString(item, 'tournament_id')),
-      roundLabel: Value(_nullableString(item, 'round_label')),
+      gameType: Value(m.gameType),
+      playerName: Value(m.playerName),
+      opponentName: Value(m.opponentName),
+      targetRacks: Value(m.targetRacks),
+      rackWinners: Value(m.rackWinnersJson),
+      shots: Value(m.shotsJson),
+      cueId: Value(m.cueId),
+      startedAt: Value(m.startedAt),
+      completedAt: Value(m.completedAt),
+      updatedAt: Value(m.updatedAtUtc),
+      isDeleted: Value(m.isDeleted),
+      tournamentId: Value(m.tournamentId),
+      roundLabel: Value(m.roundLabel),
       syncedAt: Value(syncedAt),
     );
   }
@@ -386,18 +361,12 @@ class PracticeSyncService {
     for (final item in remoteItems) {
       _checkAlive();
       _checkUser(userId);
-      final id = _id(item);
-      final duration = item['duration_sec'];
-      final cat = _nullableString(item, 'cat');
-      if (duration is! int || duration <= 0) {
-        throw const FormatException('Thời lượng buổi tập từ server không hợp lệ');
-      }
-      if (cat != null && !SkillCategory.values.any((c) => c.name == cat)) {
-        throw const FormatException('Nhóm kỹ năng từ server không hợp lệ');
-      }
-      final joinedCat = joinCategoryName(cat, item['cat_ext']);
-      final date = _date(item, 'date').toLocal();
-      final cueId = _nullableString(item, 'cue_id');
+      final session = timerSessionFromRemote(item);
+      final id = session.id;
+      final duration = session.durationSec;
+      final joinedCat = session.cat?.name;
+      final date = session.date;
+      final cueId = session.cueId;
       await _db.transaction(() async {
         final local = await (_db.select(
           _db.timerSessionRows,
@@ -431,7 +400,7 @@ class PracticeSyncService {
 
   Future<void> _syncSlots(String userId) async {
     final remoteItems = await _fetch(_slotsPath, scheduleSlotRemoteFields, userId);
-    final remoteById = {for (final item in remoteItems) _id(item): item};
+    final remoteById = {for (final item in remoteItems) remoteString(item, 'id'): item};
     final pending = await (_db.select(_db.scheduleSlotRows)
           ..where((r) => r.userId.equals(userId) & r.syncedAt.isNull())
           ..orderBy([(r) => OrderingTerm.asc(r.updatedAt)]))
@@ -446,7 +415,7 @@ class PracticeSyncService {
       final localUpdatedAt = row.updatedAt;
       if (remote != null &&
           (localUpdatedAt == null ||
-              !localUpdatedAt.isAfter(_date(remote, 'updated_at')))) {
+              !localUpdatedAt.isAfter(remoteInstant(remote, 'updated_at')))) {
         continue;
       }
       final sentAt = localUpdatedAt ?? _now();
@@ -499,33 +468,14 @@ class PracticeSyncService {
     for (final item in remoteItems) {
       _checkAlive();
       _checkUser(userId);
-      final id = _id(item);
-      final day = item['day'];
-      final time = _string(item, 'time');
-      final label = _string(item, 'label');
-      final cat = _nullableString(item, 'cat');
-      final deleted = item['is_deleted'];
-      if (day is! int ||
-          day < 0 ||
-          day > 6 ||
-          !RegExp(r'^(?:[01]\d|2[0-3]):[0-5]\d$').hasMatch(time) ||
-          label.trim().isEmpty ||
-          deleted is! bool ||
-          (cat != null && !SkillCategory.values.any((c) => c.name == cat))) {
-        throw const FormatException('Lịch tập từ server không hợp lệ');
-      }
-      final remoteUpdatedAt = _date(item, 'updated_at');
-      // Chỉ tin cat_ext khi cat_ext_at == updated_at, tức là chính bản mới
-      // ghi lần sửa cuối. Bản cũ sửa dòng (kể cả chỉ đổi tên) gửi cat theo
-      // những gì nó thấy, nên dòng đó mang đúng nhóm bản cũ hiển thị.
-      final extAt = item['cat_ext_at'];
-      final extTrusted =
-          extAt is String &&
-          DateTime.parse(extAt).toUtc().isAtSameMomentAs(remoteUpdatedAt);
-      final joinedCat = joinCategoryName(
-        cat,
-        extTrusted ? item['cat_ext'] : null,
-      );
+      final decoded = scheduleSlotFromRemote(item);
+      final id = decoded.slot.id;
+      final day = decoded.slot.day;
+      final time = decoded.slot.time;
+      final label = decoded.slot.label;
+      final deleted = decoded.isDeleted;
+      final remoteUpdatedAt = decoded.updatedAtUtc;
+      final joinedCat = decoded.slot.cat?.name;
       await _db.transaction(() async {
         final local = await (_db.select(
           _db.scheduleSlotRows,
@@ -566,7 +516,7 @@ class PracticeSyncService {
       tournamentRemoteFields,
       userId,
     );
-    final remoteById = {for (final item in remoteItems) _id(item): item};
+    final remoteById = {for (final item in remoteItems) remoteString(item, 'id'): item};
     final pending = await (_db.select(_db.tournamentRows)
           ..where((r) => r.userId.equals(userId) & r.syncedAt.isNull())
           ..orderBy([(r) => OrderingTerm.asc(r.updatedAt)]))
@@ -578,7 +528,8 @@ class PracticeSyncService {
       final key = 'tournament:${row.id}:${_tournamentRevision(row)}';
       if (_rejected.contains(key)) continue;
       final remote = remoteById[row.id];
-      if (remote != null && !row.updatedAt.isAfter(_date(remote, 'updated_at'))) {
+      if (remote != null &&
+          !row.updatedAt.isAfter(remoteInstant(remote, 'updated_at'))) {
         continue;
       }
       final ok = await _upsert(
@@ -648,7 +599,7 @@ class PracticeSyncService {
           if (item is! Map<String, Object?>) {
             throw const FormatException('Directus trả bản ghi sai định dạng');
           }
-          if (_owner(item) != userId) {
+          if (remoteOwner(item) != userId) {
             throw const FormatException(
               'Directus trả bản ghi không thuộc tài khoản hiện tại',
             );
@@ -724,39 +675,6 @@ class PracticeSyncService {
     };
     return userId != null && revision.startsWith('$userId:');
   }
-
-  String _owner(Map<String, Object?> item) {
-    final owner = item['user_created'];
-    if (owner is String) return owner;
-    if (owner is Map<String, Object?> && owner['id'] is String) {
-      return owner['id']! as String;
-    }
-    throw const FormatException('Chủ bản ghi từ server không hợp lệ');
-  }
-
-  String _id(Map<String, Object?> item) => _string(item, 'id');
-
-  String _string(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value is String && value.isNotEmpty) return value;
-    throw FormatException('Trường $key từ server không hợp lệ');
-  }
-
-  String? _nullableString(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value == null) return null;
-    if (value is String) return value;
-    throw FormatException('Trường $key từ server không hợp lệ');
-  }
-
-  DateTime _date(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value is String) return DateTime.parse(value).toUtc();
-    throw FormatException('Ngày $key từ server không hợp lệ');
-  }
-
-  DateTime? _nullableDate(Map<String, Object?> item, String key) =>
-      item[key] == null ? null : _date(item, key).toLocal();
 
   bool _stillSignedInAs(String userId) => switch (_auth.current) {
     SignedIn(userId: final id) => id == userId,

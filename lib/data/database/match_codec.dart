@@ -91,6 +91,39 @@ List<MatchShot> decodeMatchShots(String json) {
       .toList(growable: true);
 }
 
+/// Dựng [PoolMatch] từ các cột của một dòng trận. Kho lưu trữ và helper máy
+/// chủ cùng gọi hàm này nên hai nơi đọc một dòng giống hệt nhau.
+PoolMatch poolMatchFromColumns({
+  required String id,
+  required String gameType,
+  required String playerName,
+  required String opponentName,
+  required int targetRacks,
+  required String rackWinnersJson,
+  required String shotsJson,
+  required DateTime startedAt,
+  DateTime? completedAt,
+  String? cueId,
+  String? tournamentId,
+  String? roundLabel,
+}) => PoolMatch(
+  id: id,
+  gameType: PoolGameType.values.firstWhere(
+    (type) => type.name == gameType,
+    orElse: () => throw FormatException('Unknown PoolGameType: $gameType'),
+  ),
+  playerName: playerName,
+  opponentName: opponentName,
+  targetRacks: targetRacks,
+  rackWinners: decodeMatchWinners(rackWinnersJson),
+  startedAt: startedAt,
+  shots: decodeMatchShots(shotsJson),
+  completedAt: completedAt,
+  cueId: cueId,
+  tournamentId: tournamentId,
+  roundLabel: roundLabel,
+);
+
 List<RackWinner> decodeMatchWinners(String json) {
   final decoded = jsonDecode(json);
   if (decoded is! List || decoded.any((winner) => winner is! String)) {
