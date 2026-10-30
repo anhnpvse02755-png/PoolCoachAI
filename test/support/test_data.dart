@@ -49,6 +49,7 @@ import 'package:poolcoachai/domain/pool_match.dart';
 
 import 'coach_fixtures.dart';
 import 'fake_coach_chat.dart';
+import 'fake_notification_settings_stores.dart';
 import 'fake_recommendation_seen_store.dart';
 import 'planner_tables.dart';
 import 'fake_auth.dart';
@@ -176,6 +177,9 @@ ProviderContainer testContainer({
       ),
       recommendationSeenStoreProvider.overrideWithValue(
         seenStore ?? FakeRecommendationSeenStore(),
+      ),
+      notificationSettingsMetaStoreProvider.overrideWithValue(
+        FakeNotificationSettingsMetaStore(),
       ),
       timerSessionsProvider.overrideWith(
         (ref) => Stream.value(timerSessions ?? const <TimerSession>[]),
@@ -321,6 +325,9 @@ ProviderContainer dbContainer(
       coachChatBackendProvider.overrideWithValue(FakeCoachChat()),
       recommendationSeenStoreProvider.overrideWithValue(
         seenStore ?? FakeRecommendationSeenStore(),
+      ),
+      notificationSettingsMetaStoreProvider.overrideWithValue(
+        FakeNotificationSettingsMetaStore(),
       ),
       nowProvider.overrideWithValue(clock ?? () => now ?? testToday),
       drillsProvider.overrideWith((ref) => Stream.value(drills ?? testDrills)),

@@ -7,9 +7,11 @@ import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
 import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
+import 'package:poolcoachai/data/notifications/notification_settings_meta_store.dart';
 import 'package:poolcoachai/data/notifications/notification_schedule_version_store.dart';
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
+import 'package:poolcoachai/data/sync/notification_settings_sync.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
@@ -64,6 +66,20 @@ class NotificationPrefsController
     } on Object {
       // Không lưu được thì lựa chọn chỉ có hiệu lực tới khi mở lại app.
     }
+    try {
+      await ref
+          .read(notificationSettingsSyncProvider)
+          .localPrefsChanged(userId);
+    } on Object {
+      // Đồng bộ là việc phụ: lỗi ở đây không được làm hỏng công tắc.
+    }
+  }
+
+  /// Nhận cài đặt từ server (máy khác đổi). Chỉ nhận cho người đang đăng
+  /// nhập, và không đánh dấu bẩn nên không đẩy ngược lên.
+  void adopt(String userId, NotificationPrefs prefs) {
+    if (ref.read(currentUserIdProvider) != userId) return;
+    state = AsyncData(prefs);
   }
 }
 
@@ -117,8 +133,50 @@ class RecommendationSeenController
     } on Object {
       // Không lưu được thì chỉ nhớ tới khi mở lại app.
     }
+    try {
+      await ref.read(notificationSettingsSyncProvider).localSeenChanged(userId);
+    } on Object {
+      // Đồng bộ là việc phụ: lỗi ở đây không được làm hỏng việc ghi nhớ.
+    }
+  }
+
+  /// Nhận cặp đã thấy từ server. Chỉ cho người đang đăng nhập, không đẩy ngược.
+  void adopt(String userId, SeenRecommendation seen) {
+    if (ref.read(currentUserIdProvider) != userId) return;
+    state = AsyncData(seen);
   }
 }
+
+final notificationSettingsMetaStoreProvider =
+    Provider<NotificationSettingsMetaStore>(
+      (ref) => SharedPreferencesNotificationSettingsMetaStore(),
+    );
+
+/// Đồng bộ công tắc và cặp gợi ý đã thấy với Directus. Không tự chạy:
+/// `startSync` giữ nó và gọi `start()`. Chỉ xem các provider ổn định.
+final notificationSettingsSyncProvider =
+    Provider<NotificationSettingsSyncService>((ref) {
+      final service = NotificationSettingsSyncService(
+        auth: ref.watch(authRepositoryProvider),
+        api: ref.watch(directusClientProvider),
+        prefs: ref.watch(notificationPrefsStoreProvider),
+        seen: ref.watch(recommendationSeenStoreProvider),
+        meta: ref.watch(notificationSettingsMetaStoreProvider),
+        now: ref.watch(nowProvider),
+        // Task 16 nối vào nền tảng đẩy.
+        timeZone: () => null,
+        onAdopted: (userId, {prefs, seen}) {
+          if (prefs != null) {
+            ref.read(notificationPrefsProvider.notifier).adopt(userId, prefs);
+          }
+          if (seen != null) {
+            ref.read(recommendationSeenProvider.notifier).adopt(userId, seen);
+          }
+        },
+      );
+      ref.onDispose(service.dispose);
+      return service;
+    });
 
 /// Đủ dữ liệu để dịch vụ lập thông báo gợi ý.
 ///

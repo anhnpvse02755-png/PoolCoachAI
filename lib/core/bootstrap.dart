@@ -34,6 +34,11 @@ void startSync(ProviderContainer container) {
   container.read(cueEquipmentSyncProvider);
   container.read(practiceSyncProvider);
   startNotifications(container);
+  // Giữ đăng ký nghe: `read` đóng ngay nên provider autoDispose sẽ bị huỷ.
+  container
+      .listen(notificationSettingsSyncProvider, (_, _) {})
+      .read()
+      .start();
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);
   container.read(coachSyncProvider);
