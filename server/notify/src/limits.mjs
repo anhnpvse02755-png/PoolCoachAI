@@ -12,8 +12,8 @@ export const STALE_DEVICE_DAYS = 60;
 export const DELIVERY_KEEP_DAYS = 30;
 export const HORIZON_MS = 24 * 3_600_000;
 export const HELPER_TIMEOUT_MS = 10_000;
-// Số yêu cầu tối đa cùng bay tới helper (và số người dùng cùng đọc Directus)
-// trong một chu kỳ; phần vượt xếp hàng trong planner.
+// Số yêu cầu tối đa cùng bay tới helper; phần vượt xếp hàng trong planner.
+// Chỉ giới hạn helper, không giới hạn các lần đọc Directus.
 export const HELPER_MAX_INFLIGHT = 4;
 export const MAX_BODY_BYTES = 8192;
 export const MAX_ACK_BYTES = 2048;
