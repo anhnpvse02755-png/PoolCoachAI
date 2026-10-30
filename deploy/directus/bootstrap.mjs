@@ -14,6 +14,9 @@
 
 import fs from 'node:fs';
 
+// Đọc trước mọi thay đổi: thiếu file thì dừng khi chưa đổi gì.
+const pushFields = JSON.parse(fs.readFileSync(new URL('./push_service_fields.json', import.meta.url), 'utf8'));
+
 const base = must('DIRECTUS_URL').replace(/\/$/, '');
 
 function must(name) {
@@ -846,7 +849,6 @@ if (!serviceToken) {
 // server/push (Node) đọc dữ liệu tập luyện của người chơi để lập kế hoạch và
 // ghi push_devices/push_deliveries bằng token tĩnh của một user riêng. Danh
 // sách trường được đọc nằm ở push_service_fields.json (test khoá nó với helper).
-const pushFields = JSON.parse(fs.readFileSync(new URL('./push_service_fields.json', import.meta.url), 'utf8'));
 const pushRole = await findOrCreate('/roles', 'PushService', {
   name: 'PushService',
   icon: 'notifications',

@@ -54,4 +54,22 @@ void main() {
     final appFields = split(notificationSettingsRemoteFields)..add('user_created');
     expect(appFields.containsAll(split(notifyPlanSettingsFields)), isTrue);
   });
+
+  test('danh sách trường Player trong bootstrap.mjs khớp hằng số Dart', () {
+    final boot = File('deploy/directus/bootstrap.mjs').readAsStringSync();
+    String literal(String name) {
+      final m = RegExp("const $name = '([^']*)'\.split").firstMatch(boot);
+      expect(m, isNotNull, reason: name);
+      return m!.group(1)!;
+    }
+
+    expect(
+      split(literal('notificationSettingsFields')),
+      split(notificationSettingsRemoteFields),
+    );
+    expect(
+      split(literal('pushDeliveryFields')),
+      split(pushDeliveryRemoteFields),
+    );
+  });
 }

@@ -995,16 +995,27 @@ try {
     aDevGet.status === 403 ? ok('A không đọc được push_devices') : fail(`A đọc push_devices → ${aDevGet.status}`);
     const aDevPost = await call('POST', '/items/push_devices', deviceRow(devA, aId), a.access_token);
     aDevPost.status === 403 ? ok('A không tạo được push_devices') : fail(`A tạo push_devices → ${aDevPost.status}`);
-    const aDevPatch = await call('PATCH', `/items/push_devices/${devA}`, { mode: 'all' }, a.access_token);
-    aDevPatch.status === 403 ? ok('A không sửa được push_devices') : fail(`A sửa push_devices → ${aDevPatch.status}`);
 
     // (e) Dịch vụ có đủ CRUD trên push_devices.
     const sDevMake = await call('POST', '/items/push_devices', deviceRow(devA, aId), pToken);
     sDevMake.status === 200 ? ok('dịch vụ push tạo được push_devices') : fail(`dịch vụ tạo push_devices → ${sDevMake.status} ${sDevMake.code}`);
+    // Các kiểm tra của A trên dòng đã tồn tại (không phải dòng ma).
+    const aDevGetOne = await call('GET', `/items/push_devices/${devA}`, undefined, a.access_token);
+    aDevGetOne.status === 403 ? ok('A không đọc được dòng push_devices có thật') : fail(`A đọc dòng push_devices có thật → ${aDevGetOne.status}`);
+    const aDevPatch = await call('PATCH', `/items/push_devices/${devA}`, { mode: 'all' }, a.access_token);
+    aDevPatch.status === 403 ? ok('A không sửa được push_devices') : fail(`A sửa push_devices → ${aDevPatch.status}`);
     const sDevGet = await call('GET', `/items/push_devices/${devA}`, undefined, pToken);
     sDevGet.status === 200 ? ok('dịch vụ push đọc được push_devices') : fail(`dịch vụ đọc push_devices → ${sDevGet.status}`);
     const sDevPatch = await call('PATCH', `/items/push_devices/${devA}`, { failure_count: 1 }, pToken);
     sDevPatch.status === 200 ? ok('dịch vụ push sửa được push_devices') : fail(`dịch vụ sửa push_devices → ${sDevPatch.status}`);
+    // Xoá trên một thiết bị thứ hai; devA phải còn lại cho kiểm tra CASCADE.
+    const devA2 = `verify-${tag}-devA2`;
+    const sDev2Make = await call('POST', '/items/push_devices', deviceRow(devA2, aId), pToken);
+    sDev2Make.status === 200 ? ok('dịch vụ push tạo được thiết bị thứ hai') : fail(`dịch vụ tạo thiết bị thứ hai → ${sDev2Make.status} ${sDev2Make.code}`);
+    const sDev2Del = await call('DELETE', `/items/push_devices/${devA2}`, undefined, pToken);
+    sDev2Del.status >= 200 && sDev2Del.status < 300 ? ok('dịch vụ push xoá được push_devices') : fail(`dịch vụ xoá push_devices → ${sDev2Del.status} ${sDev2Del.code}`);
+    const sDev2Gone = await call('GET', `/items/push_devices/${devA2}`, undefined, admin.access_token);
+    sDev2Gone.status === 403 || sDev2Gone.status === 404 ? ok('thiết bị đã xoá không còn') : fail(`thiết bị đã xoá vẫn đọc được → ${sDev2Gone.status}`);
 
     // (b) push_deliveries: dịch vụ ghi, mỗi Player chỉ đọc dòng của mình, không ghi được.
     const sDelA = await call('POST', '/items/push_deliveries', deliveryRow(delA, aId, devA), pToken);
@@ -1024,6 +1035,9 @@ try {
     const aDelPatch = await call('PATCH', `/items/push_deliveries/${delA}`, { shown_at: nowIso }, a.access_token);
     aDelPatch.status === 403 ? ok('A không sửa được push_deliveries') : fail(`A sửa push_deliveries → ${aDelPatch.status}`);
 
+    const aSentAt = await call('GET', '/items/push_deliveries?fields=sent_at', undefined, a.access_token);
+    aSentAt.status === 403 ? ok('A không đọc được push_deliveries.sent_at') : fail(`A đọc push_deliveries.sent_at → ${aSentAt.status}`);
+
     // (c) notification_settings: id phải là id của chính người tạo.
     const settingsRow = (id) => ({
       id,
@@ -1036,7 +1050,11 @@ try {
     const aSetMade = await call('POST', '/items/notification_settings', settingsRow(aId), a.access_token);
     aSetMade.status === 200 ? ok('A tạo được notification_settings với id = A') : fail(`A tạo notification_settings → ${aSetMade.status} ${aSetMade.code}`);
     const aSetOther = await call('POST', '/items/notification_settings', settingsRow(bId), a.access_token);
-    aSetOther.status === 403 ? ok('A không tạo được notification_settings với id = B') : fail(`A tạo notification_settings id = B → ${aSetOther.status}`);
+    // Directus trả 400 FAILED_VALIDATION khi luật validation sai, nên chấp nhận mọi 4xx
+    // rồi xác nhận bằng admin rằng không có dòng id = B.
+    aSetOther.status >= 400 && aSetOther.status < 500 ? ok(`A không tạo được notification_settings với id = B (${aSetOther.status})`) : fail(`A tạo notification_settings id = B → ${aSetOther.status}`);
+    const strayB = await call('GET', `/items/notification_settings?filter[id][_eq]=${bId}`, undefined, admin.access_token);
+    (strayB.data ?? []).length === 0 ? ok('không có dòng notification_settings với id = B') : fail('có dòng notification_settings với id = B dù A bị từ chối');
     const aSetGet = await call('GET', `/items/notification_settings/${aId}`, undefined, a.access_token);
     aSetGet.status === 200 ? ok('A đọc được notification_settings của mình') : fail(`A đọc notification_settings → ${aSetGet.status}`);
     const aSetPatch = await call('PATCH', `/items/notification_settings/${aId}`, { streak: false }, a.access_token);
@@ -1058,6 +1076,17 @@ try {
       );
       r.status === 200 ? ok(`dịch vụ push đọc được ${collection} với đúng danh sách trường`) : fail(`dịch vụ push đọc ${collection} → ${r.status} ${r.code}`);
     }
+    const sExtraField = await call(
+      'GET',
+      `/items/pool_matches?fields=${encodeURIComponent(pushFields.pool_matches + ',date_created')}&filter[user_created][_eq]=${aId}`,
+      undefined,
+      pToken,
+    );
+    sExtraField.status === 403 ? ok('dịch vụ push bị từ chối khi xin trường ngoài danh sách') : fail(`dịch vụ push xin trường ngoài danh sách → ${sExtraField.status}`);
+    const sOtherColl = await call('GET', '/items/player_ranks', undefined, pToken);
+    sOtherColl.status === 403 ? ok('dịch vụ push không đọc được collection ngoài danh sách') : fail(`dịch vụ push đọc player_ranks → ${sOtherColl.status}`);
+    const sUsers = await call('GET', '/users', undefined, pToken);
+    sUsers.status === 403 ? ok('dịch vụ push không đọc được directus_users') : fail(`dịch vụ push đọc directus_users → ${sUsers.status}`);
     const sDrillPatch = await call('PATCH', `/items/drill_logs/${logId}`, { score: 1 }, pToken);
     sDrillPatch.status === 403 ? ok('dịch vụ push không sửa được drill_logs') : fail(`dịch vụ push sửa drill_logs → ${sDrillPatch.status}`);
     const sDrillDelete = await call('DELETE', `/items/drill_logs/${logId}`, undefined, pToken);
@@ -1125,6 +1154,15 @@ try {
 } finally {
   // Dọn user thử; CASCADE xoá luôn buổi tập của họ (và user dịch vụ tạm, nếu có).
   const ids = (await call('GET', `/users?filter[email][_starts_with]=verify-${tag}&fields=id`, undefined, admin.access_token)).data.map((u) => u.id);
+  // Trước khi xoá user: các dòng phải có thật, để kiểm tra CASCADE bên dưới không rỗng.
+  const devBefore = await call('GET', `/items/push_devices?filter[id][_starts_with]=verify-${tag}`, undefined, admin.access_token);
+  const delBefore = await call('GET', `/items/push_deliveries?filter[id][_starts_with]=verify-${tag}`, undefined, admin.access_token);
+  // Dọn dòng notification_settings của user thử nếu còn sót (kể cả dòng id = B lẽ ra bị từ chối).
+  if (ids.length) {
+    const strayRows = await call('GET', `/items/notification_settings?filter[id][_in]=${ids.join(',')}&fields=id`, undefined, admin.access_token);
+    const strayIds = (strayRows.data ?? []).map((r) => r.id);
+    if (strayIds.length) await call('DELETE', '/items/notification_settings', strayIds, admin.access_token);
+  }
   if (ids.length) await call('DELETE', '/users', ids, admin.access_token);
 
   // Xoá user A (chủ dòng coach_chat_usage) phải CASCADE xoá luôn dòng đó.
@@ -1135,11 +1173,15 @@ try {
 
   // (f) Xoá user A (chủ push_devices/push_deliveries) phải CASCADE xoá luôn các dòng đó.
   const devAfter = await call('GET', `/items/push_devices?filter[id][_starts_with]=verify-${tag}`, undefined, admin.access_token);
-  (devAfter.data ?? []).length === 0
+  (devBefore.data ?? []).length === 0
+    ? fail('không có dòng push_devices nào trước khi xoá user — không kiểm được CASCADE')
+    : (devAfter.data ?? []).length === 0
     ? ok('xoá user kéo theo xoá push_devices (CASCADE theo trường user)')
     : fail(`còn ${devAfter.data?.length} dòng push_devices sau khi xoá user — CASCADE chưa đúng`);
   const delAfter = await call('GET', `/items/push_deliveries?filter[id][_starts_with]=verify-${tag}`, undefined, admin.access_token);
-  (delAfter.data ?? []).length === 0
+  (delBefore.data ?? []).length === 0
+    ? fail('không có dòng push_deliveries nào trước khi xoá user — không kiểm được CASCADE')
+    : (delAfter.data ?? []).length === 0
     ? ok('xoá user kéo theo xoá push_deliveries (CASCADE theo trường user)')
     : fail(`còn ${delAfter.data?.length} dòng push_deliveries sau khi xoá user — CASCADE chưa đúng`);
 }
