@@ -12,3 +12,10 @@ test('env rỗng: không khởi động, stderr nêu tên biến, không lộ gi
   for (const n of ['PUSH_SERVICE_TOKEN', 'DIRECTUS_URL', 'PUSH_ENABLED']) assert.match(r.stderr, new RegExp(n));
   assert.doesNotMatch(r.stdout + r.stderr, /very-secret-value/);
 });
+
+test('placeholder planner: không báo helper ok, info() từ chối', async () => {
+  const { createPlaceholderPlanner } = await import('../src/placeholders.mjs');
+  const p = createPlaceholderPlanner();
+  assert.equal(p.healthy, false);
+  await assert.rejects(p.info(), /planner not wired \(Task 8\)/);
+});

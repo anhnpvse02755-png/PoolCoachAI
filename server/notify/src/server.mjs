@@ -10,9 +10,8 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
     log(JSON.stringify({ method, path, status, at: new Date().toISOString(), ms: Date.now() - startedAt, ...(error ? { error } : {}) }));
   }
 
-  async function dispatch(req, res, startedAt) {
+  async function dispatch(req, res, startedAt, path) {
     const origin = req.headers.origin;
-    const path = new URL(req.url, 'http://notify.internal').pathname;
 
     if (req.method === 'GET' && path === '/healthz') {
       sendJson(res, 200, {
@@ -34,7 +33,16 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
 
   return function handler(req, res) {
     const startedAt = Date.now();
-    dispatch(req, res, startedAt).catch(() => {
+    // Phân tích URL đúng một lần; request target hỏng → 400, không ném tiếp.
+    let path;
+    try {
+      path = new URL(req.url, 'http://notify.internal').pathname;
+    } catch {
+      sendJson(res, 400, { error: 'bad_request' }, undefined, config.allowedOrigins);
+      writeLog({ method: req.method, path: '-', status: 400, startedAt, error: 'bad_request' });
+      return;
+    }
+    dispatch(req, res, startedAt, path).catch(() => {
       if (!res.headersSent) {
         try {
           sendJson(res, 500, { error: 'internal' }, req.headers.origin, config.allowedOrigins);
@@ -42,7 +50,6 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
           // Mất kết nối trước khi trả lời được.
         }
       }
-      const path = new URL(req.url, 'http://notify.internal').pathname;
       writeLog({ method: req.method, path, status: res.statusCode, startedAt, error: 'internal' });
     });
   };

@@ -5,17 +5,17 @@ on:
     branches: [main]
     paths:
       - 'server/notify/**'
-      - 'web/push/**'
+      - 'lib/**'
       - 'bin/notify_plan.dart'
-      - 'lib/server/**'
+      - 'pubspec.yaml'
       - '.github/workflows/notify.yml'
   pull_request:
     branches: [main]
     paths:
       - 'server/notify/**'
-      - 'web/push/**'
+      - 'lib/**'
       - 'bin/notify_plan.dart'
-      - 'lib/server/**'
+      - 'pubspec.yaml'
       - '.github/workflows/notify.yml'
   workflow_dispatch:
 

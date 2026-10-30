@@ -57,7 +57,7 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
       }
       if (method === 'GET') {
         const row = (state.items[coll] ?? []).find((r) => r.id === decodeURIComponent(id));
-        return row ? jsonResponse(200, { data: row }) : errorResponse(403, 'FORBIDDEN');
+        return row ? jsonResponse(200, { data: row }) : errorResponse(404, 'NOT_FOUND');
       }
       if (method === 'POST') return jsonResponse(200, { data: body });
       if (method === 'PATCH') return jsonResponse(200, { data: { id, ...body } });

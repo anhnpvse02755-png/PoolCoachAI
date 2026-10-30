@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { createApp } from '../src/server.mjs';
 import { SYSTEM_PROMPT } from '../src/prompt.mjs';
 import { DIRECTUS, SERVICE_TOKEN, fakeDirectus, fakeFetch, claudeStream, claudeError } from './fakes.mjs';
@@ -243,4 +244,18 @@ test('lỗi không lường được (vd. lỗi lập trình trong auth/quota): 
   assert.deepEqual([line.method, line.path, line.status, line.error], ['POST', '/v1/coach-chat', 500, 'internal']);
   assert.equal(typeof line.ms, 'number');
   assertIsoAt(line.at);
+});
+
+test('request target hỏng: trả 400 và máy chủ vẫn sống', async (t) => {
+  const s = await start(t);
+  const port = Number(new URL(s.base).port);
+  const raw = await new Promise((resolve, reject) => {
+    const sock = net.connect(port, '127.0.0.1', () => sock.write('GET http://%zz/ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n'));
+    let data = '';
+    sock.on('data', (c) => { data += c; });
+    sock.on('end', () => resolve(data));
+    sock.on('error', reject);
+  });
+  assert.match(raw, /^HTTP\/1\.1 400/);
+  assert.equal((await fetch(`${s.base}/healthz`)).status, 200);
 });

@@ -35,11 +35,16 @@ async function readJsonBody(response) {
 }
 
 /// Thời gian chờ trước lần thử lại, từ `Retry-After` (giây), có chặn trên.
-function retryDelayMs(response) {
-  const raw = response.headers.get('retry-after');
-  const seconds = raw !== null && /^\d+$/.test(raw.trim()) ? Number.parseInt(raw, 10) : null;
-  if (seconds === null) return DEFAULT_RETRY_MS;
-  return Math.min(Math.max(seconds * 1000, 1), MAX_RETRY_MS);
+function retryDelayMs(response, nowMs) {
+  const raw = response.headers.get('retry-after')?.trim();
+  let ms = null;
+  if (raw && /^\d+$/.test(raw)) ms = Number.parseInt(raw, 10) * 1000;
+  else if (raw) {
+    const at = Date.parse(raw);
+    if (!Number.isNaN(at)) ms = at - nowMs();
+  }
+  if (ms === null) return DEFAULT_RETRY_MS;
+  return Math.min(Math.max(ms, 1), MAX_RETRY_MS);
 }
 
 const sleepReal = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,7 +54,7 @@ const USER_DATA = ['drill_logs', 'timer_sessions', 'schedule_slots', 'cue_equipm
 const q = encodeURIComponent;
 
 /// Tạo client. [fetch] và [sleep] được tiêm để test không dùng mạng hay giờ thật.
-export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, sleep = sleepReal }) {
+export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, sleep = sleepReal, nowMs = Date.now }) {
   async function request(path, { token = serviceToken, method = 'GET', body } = {}) {
     for (let attempt = 1; ; attempt += 1) {
       let response;
@@ -67,7 +72,7 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
         throw new DirectusError(0, 'unreachable');
       }
       if (response.status === 429 && attempt < MAX_ATTEMPTS) {
-        await sleep(retryDelayMs(response));
+        await sleep(retryDelayMs(response, nowMs));
         continue;
       }
       return response;
@@ -101,10 +106,10 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
   const listServerDevices = () => getData(`/items/push_devices?filter[mode][_eq]=server&limit=-1`);
   const devicesOfUser = (userId) => getData(`/items/push_devices?filter[user][_eq]=${q(userId)}&limit=-1`);
 
-  /// Một thiết bị theo id; không có (Directus trả 403/404 cho dòng không tồn tại) → `null`.
+  /// Một thiết bị theo id; chỉ 404 là `null`, 403 và lỗi khác ném (403 là quyền hỏng).
   async function getDevice(id) {
     const response = await request(`/items/push_devices/${q(id)}`);
-    if (response.status === 403 || response.status === 404) return null;
+    if (response.status === 404) return null;
     if (!response.ok) throw await fail(response);
     return (await readJsonBody(response)).data ?? null;
   }
@@ -117,6 +122,9 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
 
   /// Đọc dữ liệu tập của người chơi: mỗi collection một GET theo `fields[c]`.
   async function readUserData(userId, fields) {
+    for (const c of USER_DATA) {
+      if (typeof fields?.[c] !== 'string' || fields[c] === '') throw new Error(`Thiếu fields cho ${c}`);
+    }
     const entries = await Promise.all(USER_DATA.map(async (c) => [
       c,
       await getData(`/items/${c}?filter[user_created][_eq]=${q(userId)}&fields=${q(fields[c])}&limit=-1`),
@@ -144,7 +152,7 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
   }
   async function getDelivery(id) {
     const response = await request(`/items/push_deliveries/${q(id)}`);
-    if (response.status === 403 || response.status === 404) return null;
+    if (response.status === 404) return null;
     if (!response.ok) throw await fail(response);
     return (await readJsonBody(response)).data ?? null;
   }

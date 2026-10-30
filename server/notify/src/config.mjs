@@ -21,9 +21,9 @@ function parsePort(raw) {
   return n >= 1 && n <= 65535 ? n : null;
 }
 
-function isHttpsUrl(raw) {
+function hasProtocol(raw, protocols) {
   try {
-    return new URL(raw.trim()).protocol === 'https:';
+    return protocols.includes(new URL(raw.trim()).protocol);
   } catch {
     return false;
   }
@@ -41,15 +41,16 @@ export function loadConfig(env) {
   };
 
   const directusUrl = need('DIRECTUS_URL');
-  const serviceToken = need('PUSH_SERVICE_TOKEN');
+  if (directusUrl !== '' && !hasProtocol(directusUrl, ['http:', 'https:'])) bad.push('DIRECTUS_URL');
+  const serviceToken = need('PUSH_SERVICE_TOKEN').trim();
   const origins = isBlank(env.ALLOWED_ORIGINS) ? [] : parseAllowedOrigins(env.ALLOWED_ORIGINS);
   if (origins.length === 0) bad.push('ALLOWED_ORIGINS');
 
   const publicUrl = need('PUBLIC_URL');
-  if (publicUrl !== '' && !isHttpsUrl(publicUrl)) bad.push('PUBLIC_URL');
+  if (publicUrl !== '' && !hasProtocol(publicUrl, ['https:'])) bad.push('PUBLIC_URL');
 
-  const publicKey = need('VAPID_PUBLIC_KEY');
-  const privateKey = need('VAPID_PRIVATE_KEY');
+  const publicKey = need('VAPID_PUBLIC_KEY').trim();
+  const privateKey = need('VAPID_PRIVATE_KEY').trim();
   const subject = need('VAPID_SUBJECT');
   if (subject !== '' && !/^(https:|mailto:)\S+$/.test(subject.trim())) bad.push('VAPID_SUBJECT');
 

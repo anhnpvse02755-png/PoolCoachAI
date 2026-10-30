@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { createApp } from '../src/server.mjs';
 
 const WEB = 'https://poolcoachai.kjdybl.easypanel.host';
@@ -50,4 +51,19 @@ test('đường dẫn lạ: 404 not_found', async (t) => {
   assert.deepEqual([r.status, await r.json()], [404, { error: 'not_found' }]);
   const p = await fetch(`${base}/healthz`, { method: 'POST' });
   assert.equal(p.status, 404);
+});
+
+test('request target hỏng: trả 400 và máy chủ vẫn sống', async (t) => {
+  const base = await start(t);
+  const port = Number(new URL(base).port);
+  const raw = await new Promise((resolve, reject) => {
+    const s = net.connect(port, '127.0.0.1', () => s.write('GET http://%zz/ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n'));
+    let data = '';
+    s.on('data', (c) => { data += c; });
+    s.on('end', () => resolve(data));
+    s.on('error', reject);
+  });
+  assert.match(raw, /^HTTP\/1\.1 400/);
+  const r = await fetch(`${base}/healthz`);
+  assert.equal(r.status, 200);
 });

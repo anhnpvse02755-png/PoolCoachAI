@@ -316,10 +316,8 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     writeLog({ method: 'OPTIONS', path, status: 204, startedAt });
   }
 
-  async function dispatch(req, res, startedAt) {
+  async function dispatch(req, res, startedAt, path) {
     const origin = req.headers.origin;
-    const url = new URL(req.url, 'http://coach-chat.internal');
-    const path = url.pathname;
 
     if (req.method === 'OPTIONS') {
       handleOptions(req, res, origin, path, startedAt);
@@ -347,7 +345,16 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
 
   return function handler(req, res) {
     const startedAt = Date.now();
-    dispatch(req, res, startedAt).catch((err) => {
+    // Phân tích URL đúng một lần; request target hỏng → 400, không ném tiếp.
+    let path;
+    try {
+      path = new URL(req.url, 'http://coach-chat.internal').pathname;
+    } catch {
+      sendJson(res, 400, { error: 'bad_request' }, undefined, config.allowedOrigins);
+      writeLog({ method: req.method, path: '-', status: 400, error: 'bad_request', startedAt });
+      return;
+    }
+    dispatch(req, res, startedAt, path).catch((err) => {
       if (!res.headersSent) {
         try {
           sendJson(res, 500, { error: 'internal' }, req.headers.origin, config.allowedOrigins);
@@ -357,7 +364,6 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       }
       // Lỗi không lường được (vd. lỗi lập trình) vẫn chỉ một dòng nhật ký
       // mỗi-yêu-cầu, mã lỗi chứ không phải nội dung (controller ruling 5, 6).
-      const path = new URL(req.url, 'http://coach-chat.internal').pathname;
       writeLog({ method: req.method, path, status: res.statusCode, error: 'internal', startedAt });
     });
   };

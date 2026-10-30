@@ -25,7 +25,13 @@ src="$(git rev-parse --short HEAD)"
 # biên dịch chéo được và cho ra bundle/bin/notify_plan + bundle/lib/.
 out="$(mktemp -d)"
 stage="$(mktemp -d)"
-trap 'git worktree remove --force "$stage" 2>/dev/null || true; rm -rf "$out"' EXIT
+cleanup() {
+  git worktree remove --force "$stage" 2>/dev/null || true
+  git worktree prune
+  git branch -D deploy-notify-tmp >/dev/null 2>&1 || true
+  rm -rf "$out" "$stage"
+}
+trap cleanup EXIT
 "$DART" build cli -t bin/notify_plan.dart -o "$out" --target-os linux --target-arch x64
 
 bin="$out/bundle/bin/notify_plan"
@@ -58,7 +64,11 @@ fi
   cp -r "$root/server/notify/src" src
   git add -A
   git add --chmod=+x bin/notify_plan
-  git commit -qm "deploy: notify từ $src" || echo "Bundle không đổi."
+  if git diff --cached --quiet && git rev-parse --verify -q HEAD >/dev/null; then
+    echo "Không có gì để commit — bundle không đổi."
+  else
+    git commit -qm "deploy: notify từ $src"
+  fi
   git push origin HEAD:refs/heads/deploy-notify
 )
 echo "Đã đẩy deploy-notify (nguồn $src)."

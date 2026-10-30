@@ -6,14 +6,8 @@ import http from 'node:http';
 import { loadConfig } from './config.mjs';
 import { createDirectus } from './directus.mjs';
 import { createApp } from './server.mjs';
+import { createPlaceholderPlanner, createPlaceholderScheduler } from './placeholders.mjs';
 
-// Tạm: Task 8 thay bằng planner thật (helper Dart), Task 11 thay bằng scheduler thật.
-function createPlaceholderPlanner() {
-  return { healthy: true, info: async () => ({}), close: () => {} };
-}
-function createPlaceholderScheduler() {
-  return { lastCycleAt: null, start: () => {}, stop: () => {} };
-}
 
 async function main() {
   let config;

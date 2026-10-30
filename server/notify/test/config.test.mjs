@@ -60,3 +60,13 @@ test('PORT phải là số nguyên 1–65535', () => {
   }
   assert.equal(loadConfig({ ...base, PORT: '' }).port, 8080);
 });
+test('bí mật và URL được cắt khoảng trắng, xuống dòng', () => {
+  const c = loadConfig({ ...base, PUSH_SERVICE_TOKEN: ' tok\n', VAPID_PUBLIC_KEY: 'pub\n', VAPID_PRIVATE_KEY: '\tpriv ' });
+  assert.deepEqual([c.serviceToken, c.vapid.publicKey, c.vapid.privateKey], ['tok', 'pub', 'priv']);
+});
+test('DIRECTUS_URL phải là http(s)', () => {
+  for (const bad of ['directus.test', 'ftp://x.test', 'không phải url']) {
+    assert.throws(() => loadConfig({ ...base, DIRECTUS_URL: bad }), (e) => /DIRECTUS_URL/.test(e.message) && !e.message.includes(bad));
+  }
+  assert.equal(loadConfig({ ...base, DIRECTUS_URL: 'http://directus:8055' }).directusUrl, 'http://directus:8055');
+});

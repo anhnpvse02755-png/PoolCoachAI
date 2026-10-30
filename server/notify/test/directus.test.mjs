@@ -61,9 +61,13 @@ test('thiết bị: danh sách server, theo người chơi, một dòng, tạo, 
   await directus.deleteDevices([]);
   assert.equal(d.calls.length, n);
 });
-test('getDevice: không có dòng (403 hoặc 404) thì null', async () => {
+test('getDevice: chỉ 404 là null, 403 là lỗi', async () => {
   const { directus } = setup({ items: { push_devices: [] } });
   assert.equal(await directus.getDevice('none'), null);
+  const { d: d2, directus: dir2 } = setup();
+  d2.reply = () => errorResponse(403, 'FORBIDDEN');
+  await assert.rejects(dir2.getDevice('x'), (e) => e.status === 403);
+  await assert.rejects(dir2.getDelivery('x'), (e) => e.status === 403);
 });
 test('nhật ký gửi: theo người chơi và mốc, sửa, xoá trước một mốc', async () => {
   const { d, directus } = setup({ items: { push_deliveries: [{ id: 'x1' }] } });
@@ -121,10 +125,30 @@ test('429 không có hoặc có Retry-After quá lớn: chờ có chặn trên',
   };
   await directus.listServerDevices();
   assert.equal(sleeps.length, 2);
-  assert.ok(sleeps.every((ms) => ms > 0 && ms <= 30_000));
+  assert.deepEqual(sleeps, [1000, 10_000]);
 });
 test('thân không phải JSON: DirectusError(502, BAD_BODY)', async () => {
   const { d, directus } = setup();
   d.reply = () => new Response('<html>', { status: 200 });
   await assert.rejects(directus.listServerDevices(), (e) => e.status === 502 && e.code === 'BAD_BODY');
+});
+test('thiếu fields của một collection: ném lỗi, không gọi Directus', async () => {
+  const { d, directus } = setup();
+  const { bu_tests, ...partial } = FIELDS;
+  await assert.rejects(directus.readUserData('user-a', partial), /bu_tests/);
+  assert.equal(d.calls.length, 0);
+  void bu_tests;
+});
+test('Retry-After dạng ngày HTTP được hiểu', async () => {
+  const fixedNow = Date.parse('2026-10-30T03:00:00Z');
+  const { d, directus, sleeps } = setup({ items: { push_devices: [] } }, { nowMs: () => fixedNow });
+  let n = 0;
+  d.reply = () => (++n === 1 ? errorResponse(429, 'REQUESTS_EXCEEDED', { 'retry-after': new Date(fixedNow + 4000).toUTCString() }) : undefined);
+  await directus.listServerDevices();
+  assert.deepEqual(sleeps, [4000]);
+});
+test('hết giờ chờ: DirectusError(0, unreachable)', async () => {
+  const slow = (url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
+  const directus = createDirectus({ url: DIRECTUS, serviceToken: SERVICE_TOKEN, fetch: slow, timeoutMs: 20 });
+  await assert.rejects(directus.listServerDevices(), (e) => e instanceof DirectusError && e.status === 0 && e.code === 'unreachable');
 });
