@@ -36,6 +36,23 @@ const plan = (data) => JSON.stringify({
   seen: null, sentRecommendations: [], data,
 });
 
+test('real helper nhận múi giờ Asia/Ho_Chi_Minh và America/Argentina/Buenos_Aires (không bad_tz)', { skip, timeout: 60_000 }, async () => {
+  const { c, ask } = run();
+  try {
+    const info = await ask('{"v":1,"op":"info","reqId":"i"}');
+    const data = Object.fromEntries(Object.keys(info.fields).map((k) => [k, []]));
+    for (const tz of ['Asia/Ho_Chi_Minh', 'America/Argentina/Buenos_Aires', 'UTC']) {
+      const r = await ask(plan(data).replace('"tz":"UTC"', `"tz":"${tz}"`));
+      assert.equal(r.ok, true, tz);
+    }
+    const bad = await ask(plan(data).replace('"tz":"UTC"', '"tz":"asia/ho_chi_minh"'));
+    assert.equal(bad.error, 'bad_tz');
+    c.stdin.end();
+  } finally {
+    c.kill();
+  }
+});
+
 test('real helper', { skip, timeout: 60_000 }, async () => {
   const { c, ask } = run();
   try {

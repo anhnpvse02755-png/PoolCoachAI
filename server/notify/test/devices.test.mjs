@@ -24,7 +24,7 @@ test('validateRegister: thân mẫu hợp lệ, đọc keys.p256dh/keys.auth', (
   assert.equal(v.endpoint, f.endpoint);
   assert.equal(v.p256dh, f.keys.p256dh);
   assert.equal(v.auth, f.keys.auth);
-  assert.equal(v.timezone, canon('Asia/Ho_Chi_Minh'));
+  assert.equal(v.timezone, 'Asia/Ho_Chi_Minh');
   assert.equal(v.seedFingerprint, 'seed-fp-0001');
   assert.equal(v.vapidPublicKey, 'pub-key');
   assert.deepEqual(v.shownToday, f.shownToday);
@@ -68,14 +68,12 @@ test('validateRegister: shownToday', () => {
   assert.equal(validateRegister({ ...fixture(), shownToday: ok }).shownToday.length, 50);
 });
 
-const canon = (z) => new Intl.DateTimeFormat('en', { timeZone: z }).resolvedOptions().timeZone;
-test('múi giờ: chuẩn hoá về tên IANA đúng chữ, từ chối độ lệch và tên lạ', () => {
+test('múi giờ: giữ nguyên chữ người gửi, phải đúng chữ hoa/thường IANA, từ chối độ lệch và tên lạ', () => {
   const tz = (timezone) => validateRegister({ ...fixture(), timezone }).timezone;
-  assert.equal(tz('Asia/Ho_Chi_Minh'), canon('Asia/Ho_Chi_Minh'));
-  assert.equal(tz('asia/ho_chi_minh'), canon('Asia/Ho_Chi_Minh'));
+  assert.equal(tz('Asia/Ho_Chi_Minh'), 'Asia/Ho_Chi_Minh');
   assert.equal(tz('UTC'), 'UTC');
-  assert.equal(tz('utc'), 'UTC');
-  for (const bad of ['+07:00', '-0500', 'GMT+7', 'EST5EDT', 'Mars/Base', '', 'Asia', 'Asia/', '/Asia/Saigon', 'a'.repeat(70)]) {
+  assert.equal(tz('America/Argentina/Buenos_Aires'), 'America/Argentina/Buenos_Aires');
+  for (const bad of ['asia/ho_chi_minh', 'utc', 'ASIA/HO_CHI_MINH', 'Asia/ho_chi_minh', 'A/B/C/D', '+07:00', '-0500', 'GMT+7', 'EST5EDT', 'Mars/Base', '', 'Asia', 'Asia/', '/Asia/Saigon', 'a'.repeat(70)]) {
     assert.deepEqual(field({ ...fixture(), timezone: bad }), ['timezone', 'invalid'], bad);
   }
 });

@@ -41,18 +41,34 @@ export function serverKindsFor({ seedFingerprint, enabled, helperFingerprint }) 
 
 const isB64 = (v) => typeof v === 'string' && v.length >= 1 && v.length <= MAX_KEY_CHARS && B64URL.test(v);
 
-// Tên IANA dạng Area/Location (hoặc UTC); loại độ lệch như +07:00 và tên cũ không '/' (EST5EDT).
-const IANA_NAME = /^(?:UTC|[A-Za-z][A-Za-z_]*(?:\/[A-Za-z0-9_+-]+)+)$/i;
+// Tên IANA đúng chữ hoa/thường: UTC hoặc Area/Location(/Sub). Loại độ lệch (+07:00),
+// tên cũ không '/' (EST5EDT) và tên sai chữ (asia/ho_chi_minh).
+const IANA_NAME = /^(?:UTC|[A-Z][A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+){1,2})$/;
 
-/// Tên múi chuẩn (đúng chữ hoa/thường) hoặc `null` nếu không phải tên IANA.
-/// Helper Dart dùng cùng bảng múi nên nhận đúng tên này (xem TzWallClock).
-function canonicalTimezone(tz) {
-  if (typeof tz !== 'string' || tz.length === 0 || tz.length > 64 || !IANA_NAME.test(tz)) return null;
+// Intl nhận tên sai chữ hoa/thường nhưng bảng múi của Dart thì không. Mỗi đoạn tên
+// IANA bắt đầu bằng chữ hoa, và không có đoạn nào toàn chữ hoa dài hơn 3 ký tự;
+// ngoài ra tên có trong danh sách của Intl phải khớp từng chữ.
+const KNOWN_ZONES = new Map(Intl.supportedValuesOf('timeZone').map((z) => [z.toLowerCase(), z]));
+function caseExact(tz) {
+  if (tz === 'UTC') return true;
+  for (const seg of tz.split('/')) {
+    if (!/^[A-Z]/.test(seg) || (seg.length > 3 && seg === seg.toUpperCase())) return false;
+  }
+  const known = KNOWN_ZONES.get(tz.toLowerCase());
+  return known === undefined || known === tz;
+}
+
+/// Lưu NGUYÊN VĂN, không chuẩn hoá qua ICU: ICU đổi Asia/Ho_Chi_Minh thành
+/// Asia/Saigon, còn bảng múi của helper Dart có thể thiếu tên cũ. Chỉ cần Intl
+/// nhận tên và tên đúng dạng, nên helper (cùng bảng IANA) nhận được.
+function validTimezone(tz) {
+  if (typeof tz !== 'string' || tz.length > 64 || !IANA_NAME.test(tz)) return false;
+  if (!caseExact(tz)) return false;
   try {
-    const resolved = new Intl.DateTimeFormat('en', { timeZone: tz }).resolvedOptions().timeZone;
-    return IANA_NAME.test(resolved) ? resolved : null;
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -109,8 +125,8 @@ export function validateRegister(body) {
   if (keys === null || typeof keys !== 'object' || Array.isArray(keys)) throw new RequestError('keys');
   if (!isB64(keys.p256dh)) throw new RequestError('keys.p256dh');
   if (!isB64(keys.auth)) throw new RequestError('keys.auth');
-  const timezone = canonicalTimezone(body.timezone);
-  if (timezone === null) throw new RequestError('timezone');
+  if (!validTimezone(body.timezone)) throw new RequestError('timezone');
+  const timezone = body.timezone;
   const seed = body.seedFingerprint ?? null;
   if (seed !== null && (typeof seed !== 'string' || seed.length > 64)) throw new RequestError('seedFingerprint');
   const vapid = body.vapidPublicKey;

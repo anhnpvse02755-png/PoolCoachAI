@@ -98,7 +98,6 @@ const post = (base, path, body, token = 'tok-a', extra = {}) => fetch(`${base}${
 });
 const writes = (fake, coll) => fake.calls.filter((c) => c.path.startsWith(`/items/${coll}`) && c.method !== 'GET');
 const ID = deviceIdFor(BODY().endpoint);
-const CANON_HCM = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh' }).resolvedOptions().timeZone;
 
 test('đăng ký mới: 200, deviceId = sha256(endpoint), lease 6 giờ, đủ bốn loại khi dấu vân tay khớp', async (t) => {
   const { base, fake } = await startPush(t);
@@ -111,7 +110,7 @@ test('đăng ký mới: 200, deviceId = sha256(endpoint), lease 6 giờ, đủ b
   const create = fake.calls.find((c) => c.method === 'POST' && c.path === '/items/push_devices');
   assert.deepEqual(create.body, {
     id: ID, user: 'user-a', channel: 'web', platform: 'web', endpoint: BODY().endpoint,
-    key_p256dh: BODY().keys.p256dh, key_auth: BODY().keys.auth, timezone: CANON_HCM,
+    key_p256dh: BODY().keys.p256dh, key_auth: BODY().keys.auth, timezone: 'Asia/Ho_Chi_Minh',
     seed_fingerprint: 'seed-fp-0001', mode: 'server', server_kinds: ['recommendation', 'maintenance', 'schedule', 'streak'],
     lease_until: '2026-10-30T09:00:00.000Z', last_seen_at: '2026-10-30T03:00:00.000Z', failure_count: 0, created_at: '2026-10-30T03:00:00.000Z',
   });
@@ -406,10 +405,14 @@ test('shownToday: khoá không đệm số 0 (ngày 5), ghi song song tối đa 
   assert.equal(fake.items.push_deliveries.length, 12);
   assert.ok(peak > 1 && peak <= 4, `peak=${peak}`);
 });
-test('múi giờ được chuẩn hoá trước khi lưu', async (t) => {
+test('múi giờ lưu nguyên văn; sai chữ hoa/thường hoặc độ lệch thì 400', async (t) => {
   const { base, fake } = await startPush(t);
-  assert.equal((await post(base, '/push/devices', { ...BODY(), timezone: 'asia/ho_chi_minh' })).status, 200);
-  assert.equal(fake.items.push_devices[0].timezone, CANON_HCM);
+  assert.equal((await post(base, '/push/devices', BODY())).status, 200);
+  assert.equal(fake.items.push_devices[0].timezone, 'Asia/Ho_Chi_Minh');
+  for (const timezone of ['asia/ho_chi_minh', '+07:00']) {
+    const r = await post(base, '/push/devices', { ...BODY(), timezone });
+    assert.deepEqual([r.status, await r.json()], [400, { error: 'invalid', field: 'timezone' }]);
+  }
 });
 test('Vary: Origin trên mọi phản hồi của route có CORS, kể cả origin lạ và không origin', async (t) => {
   const { base } = await startPush(t);
