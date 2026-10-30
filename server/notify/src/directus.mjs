@@ -106,13 +106,14 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
   const listServerDevices = () => getData(`/items/push_devices?filter[mode][_eq]=server&limit=-1`);
   const devicesOfUser = (userId) => getData(`/items/push_devices?filter[user][_eq]=${q(userId)}&limit=-1`);
 
-  /// Một thiết bị theo id; chỉ 404 là `null`, 403 và lỗi khác ném (403 là quyền hỏng).
-  async function getDevice(id) {
-    const response = await request(`/items/push_devices/${q(id)}`);
-    if (response.status === 404) return null;
-    if (!response.ok) throw await fail(response);
-    return (await readJsonBody(response)).data ?? null;
+  /// Một dòng theo id bằng truy vấn DANH SÁCH: Directus thật trả 403 (không phải
+  /// 404) cho dòng đơn không tồn tại, nên chỉ danh sách rỗng mới là `null`; mọi
+  /// lỗi (kể cả 403 trên danh sách, tức quyền hỏng) đều ném.
+  async function getById(collection, id) {
+    const rows = await getData(`/items/${collection}?filter[id][_eq]=${q(id)}&limit=1&fields=*`);
+    return rows?.[0] ?? null;
   }
+  const getDevice = (id) => getById('push_devices', id);
   const createDevice = (row) => send('/items/push_devices', 'POST', row);
   const updateDevice = (id, patch) => send(`/items/push_devices/${q(id)}`, 'PATCH', patch);
   async function deleteDevices(ids) {
@@ -150,12 +151,7 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
     if (code === 'RECORD_NOT_UNIQUE') return false;
     throw new DirectusError(response.status, code);
   }
-  async function getDelivery(id) {
-    const response = await request(`/items/push_deliveries/${q(id)}`);
-    if (response.status === 404) return null;
-    if (!response.ok) throw await fail(response);
-    return (await readJsonBody(response)).data ?? null;
-  }
+  const getDelivery = (id) => getById('push_deliveries', id);
   const updateDelivery = (id, patch) => send(`/items/push_deliveries/${q(id)}`, 'PATCH', patch);
   const deleteDeliveriesBefore = (iso) =>
     send('/items/push_deliveries', 'DELETE', { query: { filter: { at: { _lt: iso } } } });

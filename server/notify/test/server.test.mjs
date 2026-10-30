@@ -98,6 +98,7 @@ const post = (base, path, body, token = 'tok-a', extra = {}) => fetch(`${base}${
 });
 const writes = (fake, coll) => fake.calls.filter((c) => c.path.startsWith(`/items/${coll}`) && c.method !== 'GET');
 const ID = deviceIdFor(BODY().endpoint);
+const CANON_HCM = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh' }).resolvedOptions().timeZone;
 
 test('đăng ký mới: 200, deviceId = sha256(endpoint), lease 6 giờ, đủ bốn loại khi dấu vân tay khớp', async (t) => {
   const { base, fake } = await startPush(t);
@@ -110,7 +111,7 @@ test('đăng ký mới: 200, deviceId = sha256(endpoint), lease 6 giờ, đủ b
   const create = fake.calls.find((c) => c.method === 'POST' && c.path === '/items/push_devices');
   assert.deepEqual(create.body, {
     id: ID, user: 'user-a', channel: 'web', platform: 'web', endpoint: BODY().endpoint,
-    key_p256dh: BODY().keys.p256dh, key_auth: BODY().keys.auth, timezone: 'Asia/Ho_Chi_Minh',
+    key_p256dh: BODY().keys.p256dh, key_auth: BODY().keys.auth, timezone: CANON_HCM,
     seed_fingerprint: 'seed-fp-0001', mode: 'server', server_kinds: ['recommendation', 'maintenance', 'schedule', 'streak'],
     lease_until: '2026-10-30T09:00:00.000Z', last_seen_at: '2026-10-30T03:00:00.000Z', failure_count: 0, created_at: '2026-10-30T03:00:00.000Z',
   });
@@ -248,7 +249,7 @@ test('DELETE và ack bị giới hạn theo IP', async (t) => {
   assert.equal(last.status, 429);
 });
 test('ack đúng endpoint: ghi shown_at và last_ack_at một lần', async (t) => {
-  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, shown_at: null }] } });
+  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, sent_at: '2026-10-30T02:00:00Z', shown_at: null }] } });
   const r = await ack(base, { endpoint: BODY().endpoint, deliveryId: DID });
   assert.equal(r.status, 204);
   const dp = fake.calls.find((c) => c.method === 'PATCH' && c.path === `/items/push_deliveries/${DID}`);
@@ -258,12 +259,12 @@ test('ack đúng endpoint: ghi shown_at và last_ack_at một lần', async (t) 
   assert.equal(fake.calls.some((c) => c.auth !== `Bearer ${SERVICE_TOKEN}`), false);
 });
 test('ack đã có shown_at: 204, không ghi lại', async (t) => {
-  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, shown_at: '2026-10-30T02:00:00Z' }] } });
+  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, sent_at: '2026-10-30T01:00:00Z', shown_at: '2026-10-30T02:00:00Z' }] } });
   assert.equal((await ack(base, { endpoint: BODY().endpoint, deliveryId: DID })).status, 204);
   assert.equal(writes(fake, 'push_deliveries').length + writes(fake, 'push_devices').length, 0);
 });
 test('ack giả (endpoint khác), id sai dạng, bản ghi không có: 204, không ghi', async (t) => {
-  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, shown_at: null }] } });
+  const { base, fake } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, sent_at: '2026-10-30T02:00:00Z', shown_at: null }] } });
   assert.equal((await ack(base, { endpoint: 'https://fcm.googleapis.com/fcm/send/other', deliveryId: DID })).status, 204);
   assert.equal((await ack(base, { endpoint: BODY().endpoint, deliveryId: 'x' })).status, 204);
   assert.equal((await ack(base, { endpoint: BODY().endpoint, deliveryId: 'a'.repeat(64) })).status, 204);
@@ -299,7 +300,7 @@ test('CORS: chỉ origin được phép có Access-Control-Allow-Origin; OPTIONS
 });
 
 test('nhật ký không chứa endpoint, khoá hay token', async (t) => {
-  const { base, lines } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, shown_at: null }] } });
+  const { base, lines } = await startPush(t, { items: { push_deliveries: [{ id: DID, device: ID, sent_at: '2026-10-30T02:00:00Z', shown_at: null }] } });
   await post(base, '/push/devices', BODY());
   await post(base, '/push/devices', { ...BODY(), endpoint: 'https://evil.example/x' });
   await post(base, '/push/devices', BODY(), 'bad-token-xyz');
@@ -315,4 +316,132 @@ test('nhật ký không chứa endpoint, khoá hay token', async (t) => {
   assert.match(first.user, /^[0-9a-f]{16}$/);
   assert.equal(typeof first.ms, 'number');
   assert.ok(lines.some((l) => JSON.parse(l).path === '/push/devices/:id'));
+});
+
+// ─── Task 10 vòng sửa 1 ───────────────────────────────────────────────────
+test('Directus thật trả 403 cho dòng đơn không có: đăng ký thiết bị mới vẫn 200 (tạo dòng)', async (t) => {
+  const { base, fake } = await startPush(t);
+  assert.equal((await post(base, '/push/devices', BODY())).status, 200);
+  assert.equal(fake.items.push_devices.length, 1);
+  assert.equal(fake.calls.some((c) => c.method === 'GET' && /^\/items\/push_devices\/[^/]+$/.test(c.path)), false, 'không đọc dòng đơn');
+});
+test('đăng ký chạy đua cho một endpoint: POST đụng RECORD_NOT_UNIQUE thì PATCH', async (t) => {
+  const { base, fake } = await startPush(t);
+  let first = true;
+  fake.reply = ({ method, path }) => {
+    if (method === 'POST' && path === '/items/push_devices' && first) {
+      first = false;
+      fake.items.push_devices = [{ id: ID, user: 'user-b' }];
+      return new Response(JSON.stringify({ errors: [{ extensions: { code: 'RECORD_NOT_UNIQUE' } }] }), { status: 400, headers: { 'content-type': 'application/json' } });
+    }
+    return undefined;
+  };
+  assert.equal((await post(base, '/push/devices', BODY())).status, 200);
+  assert.equal(fake.items.push_devices[0].user, 'user-a');
+  assert.equal(fake.calls.filter((c) => c.method === 'PATCH' && c.path === `/items/push_devices/${ID}`).length, 1);
+});
+test('DELETE dòng không có và dòng của người khác: cùng 204, cùng dạng gọi Directus, không ghi', async (t) => {
+  const missing = await startPush(t);
+  const other = await startPush(t, { items: { push_devices: [{ id: ID, user: 'user-b' }] } });
+  const a = await del(missing.base, ID);
+  const b = await del(other.base, ID);
+  assert.deepEqual([a.status, b.status], [204, 204]);
+  assert.equal(await a.text(), await b.text());
+  const shape = (f) => f.calls.map((c) => [c.method, c.path, c.query]);
+  assert.deepEqual(shape(missing.fake), shape(other.fake));
+  assert.equal(writes(other.fake, 'push_devices').length, 0);
+  assert.equal(other.fake.items.push_devices.length, 1);
+});
+test('đăng ký 61 lần/phút từ một IP với token ngẫu nhiên: bị 429, Directus chỉ bị hỏi 60 lần', async (t) => {
+  const { base, fake } = await startPush(t);
+  let last;
+  for (let i = 0; i < 61; i += 1) last = await post(base, '/push/devices', BODY(), `rand-${i}`);
+  assert.equal(last.status, 429);
+  assert.equal(fake.calls.filter((c) => c.path === '/users/me').length, 60);
+});
+test('ack bản ghi giành trước (sent_at rỗng): 204, không ghi', async (t) => {
+  const pre = { id: DID, device: ID, sent_at: null, shown_at: null };
+  const { base, fake } = await startPush(t, { items: { push_deliveries: [pre] } });
+  assert.equal((await ack(base, { endpoint: BODY().endpoint, deliveryId: DID })).status, 204);
+  assert.equal(writes(fake, 'push_deliveries').length + writes(fake, 'push_devices').length, 0);
+});
+test('shownToday: bỏ trùng, chỉ giữ khoá của hôm nay theo múi giờ máy; bảo trì (ngày đến hạn) không ràng ngày', async (t) => {
+  // 2026-10-29T20:00Z = 03:00 ngày 30 ở Việt Nam. Khoá không đệm số 0 như app.
+  const { base, fake } = await startPush(t, { now: () => new Date('2026-10-29T20:00:00Z') });
+  const body = {
+    ...BODY(),
+    shownToday: [
+      { kind: 'streak', key: '2026-10-30' }, { kind: 'streak', key: '2026-10-30' }, { kind: 'streak', key: '2026-10-29' },
+      { kind: 'schedule', key: 'slot1:2026-10-30' }, { kind: 'schedule', key: 'slot1:2026-10-29' },
+      { kind: 'recommendation', key: '2026-10-30:technique:d1' }, { kind: 'recommendation', key: '2026-10-29:technique:d1' },
+      { kind: 'maintenance', key: 'cue1:2026-11-3:7' }, { kind: 'streak', key: 'khong-co-ngay' },
+    ],
+  };
+  assert.equal((await post(base, '/push/devices', body)).status, 200);
+  const keys = fake.calls.filter((c) => c.method === 'POST' && c.path === '/items/push_deliveries').map((c) => `${c.body.kind}|${c.body.key}`).sort();
+  assert.deepEqual(keys, ['maintenance|cue1:2026-11-3:7', 'recommendation|2026-10-30:technique:d1', 'schedule|slot1:2026-10-30', 'streak|2026-10-30']);
+});
+test('shownToday: khoá không đệm số 0 (ngày 5), ghi song song tối đa 4', async (t) => {
+  const fake = fakeDirectus({});
+  let inflight = 0;
+  let peak = 0;
+  const inner = fakeFetch({ directus: fake });
+  const slow = async (input, init) => {
+    const isClaim = String(input).endsWith('/items/push_deliveries') && init?.method === 'POST';
+    if (isClaim) { inflight += 1; peak = Math.max(peak, inflight); await new Promise((r) => setTimeout(r, 15)); }
+    try { return await inner(input, init); } finally { if (isClaim) inflight -= 1; }
+  };
+  const directus = createDirectus({ url: DIRECTUS, serviceToken: SERVICE_TOKEN, fetch: slow, sleep: async () => {} });
+  const handler = createApp({
+    config: { enabled: true, vapid: { publicKey: 'pub-key', privateKey: 'p', subject: 'mailto:a@b.test' }, allowedOrigins: [WEB] },
+    directus, planner: { healthy: true, info: async () => ({ fingerprint: 'x' }) }, scheduler: {}, now: () => new Date('2026-10-05T03:00:00Z'), log: () => {},
+  });
+  const server = http.createServer(handler);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const shownToday = Array.from({ length: 12 }, (_, i) => ({ kind: 'schedule', key: `s${i}:2026-10-5` }));
+  shownToday.push({ kind: 'streak', key: '2026-10-05' }); // đệm số 0: không phải khoá app sinh ra
+  const r = await post(`http://127.0.0.1:${server.address().port}`, '/push/devices', { ...BODY(), shownToday });
+  assert.equal(r.status, 200);
+  assert.equal(fake.items.push_deliveries.length, 12);
+  assert.ok(peak > 1 && peak <= 4, `peak=${peak}`);
+});
+test('múi giờ được chuẩn hoá trước khi lưu', async (t) => {
+  const { base, fake } = await startPush(t);
+  assert.equal((await post(base, '/push/devices', { ...BODY(), timezone: 'asia/ho_chi_minh' })).status, 200);
+  assert.equal(fake.items.push_devices[0].timezone, CANON_HCM);
+});
+test('Vary: Origin trên mọi phản hồi của route có CORS, kể cả origin lạ và không origin', async (t) => {
+  const { base } = await startPush(t);
+  for (const origin of ['https://evil.test', undefined, WEB]) {
+    const h = origin ? { origin } : {};
+    const rs = [
+      await post(base, '/push/devices', BODY(), 'tok-a', h),
+      await fetch(`${base}/push/devices/${ID}`, { method: 'DELETE', headers: { authorization: 'Bearer tok-a', ...h } }),
+      await fetch(`${base}/push/ack`, { method: 'POST', body: '{}', headers: h }),
+      await fetch(`${base}/push/devices`, { method: 'OPTIONS', headers: h }),
+      await fetch(`${base}/push/config`, { headers: h }),
+    ];
+    for (const r of rs) assert.equal(r.headers.get('vary'), 'Origin');
+  }
+});
+test('cắt tỉa: không đụng dòng của người khác dù Directus trả lẫn', async (t) => {
+  const mine = Array.from({ length: 10 }, (_, i) => ({ id: `d${i}`, user: 'user-a', last_seen_at: `2026-10-${String(10 + i).padStart(2, '0')}T00:00:00Z` }));
+  const theirs = [{ id: 'b0', user: 'user-b', last_seen_at: '2026-01-01T00:00:00Z' }, { id: 'b1', user: 'user-b', last_seen_at: '2026-01-02T00:00:00Z' }];
+  const { base, fake } = await startPush(t, { items: { push_devices: [...theirs, ...mine] } });
+  assert.equal((await post(base, '/push/devices', BODY())).status, 200);
+  const ids = fake.items.push_devices.map((d) => d.id);
+  assert.deepEqual(ids.filter((i) => i.startsWith('b')).sort(), ['b0', 'b1']);
+  assert.equal(ids.includes('d0'), false);
+  assert.equal(ids.includes(ID), true);
+});
+test('cắt tỉa: máy của chính mình đăng ký lại khi là lâu-không-thấy nhất trong 11 thì được giữ, xoá máy cũ kế tiếp', async (t) => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({ id: `d${i}`, user: 'user-a', last_seen_at: `2026-10-${String(10 + i).padStart(2, '0')}T00:00:00Z` }));
+  rows.push({ id: ID, user: 'user-a', last_seen_at: '2026-01-01T00:00:00Z' });
+  const { base, fake } = await startPush(t, { items: { push_devices: rows } });
+  assert.equal((await post(base, '/push/devices', BODY())).status, 200);
+  const ids = fake.items.push_devices.map((d) => d.id);
+  assert.equal(ids.includes(ID), true);
+  assert.equal(ids.length, 10);
+  assert.equal(ids.includes('d0'), false);
 });

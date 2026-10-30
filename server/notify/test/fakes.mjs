@@ -55,13 +55,29 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
         const rows = state.items[coll] ?? [];
         return jsonResponse(200, { data: wanted === null ? rows : rows.filter((r) => r.id === wanted) });
       }
-      if (method === 'GET') {
-        const row = (state.items[coll] ?? []).find((r) => r.id === decodeURIComponent(id));
-        return row ? jsonResponse(200, { data: row }) : errorResponse(404, 'NOT_FOUND');
+      // Directus thật: một dòng đơn không có (hoặc không đọc được) trả 403, KHÔNG phải 404.
+      const rows = (state.items[coll] ??= []);
+      const idx = id === undefined ? -1 : rows.findIndex((r) => r.id === decodeURIComponent(id));
+      if (method === 'GET') return idx >= 0 ? jsonResponse(200, { data: rows[idx] }) : errorResponse(403, 'FORBIDDEN');
+      if (method === 'POST') {
+        if (body?.id !== undefined && rows.some((r) => r.id === body.id)) return errorResponse(400, 'RECORD_NOT_UNIQUE');
+        rows.push({ ...body });
+        return jsonResponse(200, { data: body });
       }
-      if (method === 'POST') return jsonResponse(200, { data: body });
-      if (method === 'PATCH') return jsonResponse(200, { data: { id, ...body } });
-      if (method === 'DELETE') return new Response(null, { status: 204 });
+      if (method === 'PATCH') {
+        if (idx < 0) return errorResponse(403, 'FORBIDDEN');
+        Object.assign(rows[idx], body);
+        return jsonResponse(200, { data: rows[idx] });
+      }
+      if (method === 'DELETE') {
+        if (id !== undefined) {
+          if (idx < 0) return errorResponse(403, 'FORBIDDEN');
+          rows.splice(idx, 1);
+        } else if (Array.isArray(body)) {
+          state.items[coll] = rows.filter((r) => !body.includes(r.id));
+        }
+        return new Response(null, { status: 204 });
+      }
     }
     return errorResponse(404, 'NOT_FOUND');
   }

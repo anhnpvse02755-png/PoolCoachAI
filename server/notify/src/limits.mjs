@@ -28,3 +28,9 @@ export const PUSH_HOSTS = [
 // Trần theo IP cho ack và DELETE (R-F14), cửa sổ một phút.
 export const ACK_PER_MIN = 60;
 export const DELETE_PER_MIN = 60;
+// Trần theo IP cho đăng ký, kiểm TRƯỚC khi hỏi Directus về token (chặn lũ token ngẫu nhiên).
+export const REGISTER_IP_PER_MIN = 60;
+// Trần số khoá của mỗi bộ đếm giới hạn.
+export const LIMITER_MAX_KEYS = 10_000;
+// Số dòng giành trước ghi song song khi đăng ký.
+export const CLAIM_CONCURRENCY = 4;

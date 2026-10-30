@@ -6,10 +6,11 @@ import { createAuth } from './auth.mjs';
 import { DirectusError } from './directus.mjs';
 import { hashUserId } from './log.mjs';
 import {
-  HEX64, RequestError, createRateLimiter, deliveryIdFor, deviceIdFor, serverKindsFor, validateRegister,
+  HEX64, RequestError, createRateLimiter, deliveryIdFor, deviceIdFor, ipBucket, serverKindsFor, shownTodayOf, validateRegister,
 } from './devices.mjs';
 import {
-  ACK_PER_MIN, DELETE_PER_MIN, LEASE_MS, MAX_ACK_BYTES, MAX_BODY_BYTES, MAX_DEVICES, REGISTER_PER_HOUR,
+  ACK_PER_MIN, CLAIM_CONCURRENCY, DELETE_PER_MIN, LEASE_MS, MAX_ACK_BYTES, MAX_BODY_BYTES, MAX_DEVICES, REGISTER_IP_PER_MIN,
+  REGISTER_PER_HOUR,
 } from './limits.mjs';
 
 const DEVICE_PATH = /^\/push\/devices\/([^/]+)$/;
@@ -18,14 +19,15 @@ const DEVICE_PATH = /^\/push\/devices\/([^/]+)$/;
 /// khách không giả được), không có thì địa chỉ socket.
 function clientIp(req) {
   const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string' && xff.trim() !== '') return xff.split(',').at(-1).trim();
-  return req.socket?.remoteAddress ?? '-';
+  if (typeof xff === 'string' && xff.trim() !== '') return ipBucket(xff.split(',').at(-1).trim());
+  return ipBucket(req.socket?.remoteAddress ?? '-');
 }
 
 export function createApp({ config, directus, planner, scheduler, now = () => new Date(), log = (l) => process.stdout.write(`${l}\n`), fetch = globalThis.fetch }) {
   void fetch;
   const auth = createAuth({ directus, now });
   const registerLimiter = createRateLimiter({ max: REGISTER_PER_HOUR, windowMs: 3_600_000, now });
+  const registerIpLimiter = createRateLimiter({ max: REGISTER_IP_PER_MIN, windowMs: 60_000, now });
   const ackLimiter = createRateLimiter({ max: ACK_PER_MIN, windowMs: 60_000, now });
   const deleteLimiter = createRateLimiter({ max: DELETE_PER_MIN, windowMs: 60_000, now });
 
@@ -53,6 +55,8 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
       if (!(e instanceof RequestError)) throw e;
       return [400, e.code === 'unsupported_channel' ? { error: 'unsupported_channel' } : { error: 'invalid', field: e.field }];
     }
+    // Trần theo IP TRƯỚC khi hỏi Directus về token: lũ token ngẫu nhiên không tốn lượt gọi /users/me.
+    if (!registerIpLimiter.hit(clientIp(req))) return [429, { error: 'rate_limited' }];
     const userId = await auth.userFor(req.headers.authorization);
     if (userId === null) return [401, { error: 'unauthorized' }];
     const user = hashUserId(userId);
@@ -80,28 +84,41 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
       lease_until: leaseUntil, last_seen_at: nowIso, failure_count: 0,
     };
     const existing = await directus.getDevice(deviceId);
-    if (existing) await directus.updateDevice(deviceId, fields);
-    else await directus.createDevice({ id: deviceId, ...fields, created_at: nowIso });
+    if (existing) {
+      await directus.updateDevice(deviceId, fields);
+    } else {
+      try {
+        await directus.createDevice({ id: deviceId, ...fields, created_at: nowIso });
+      } catch (e) {
+        // Hai đăng ký đầu tiên chạy đua: người thua sửa dòng người thắng vừa tạo.
+        if (!(e instanceof DirectusError) || e.code !== 'RECORD_NOT_UNIQUE') throw e;
+        await directus.updateDevice(deviceId, fields);
+      }
+    }
 
     // Quá MAX_DEVICES thiết bị: bỏ những máy lâu không thấy nhất (không bao giờ bỏ máy này).
     const mine = await directus.devicesOfUser(userId);
-    const others = (mine ?? []).filter((d) => d.id !== deviceId)
+    const others = (mine ?? []).filter((d) => d.id !== deviceId && d.user === userId)
       .sort((a, b) => String(a.last_seen_at ?? '').localeCompare(String(b.last_seen_at ?? '')));
     const surplus = others.length - (MAX_DEVICES - 1);
     if (surplus > 0) await directus.deleteDevices(others.slice(0, surplus).map((d) => d.id));
 
     // Thông báo máy này đã hiện hôm nay: giành trước để server không gửi lại.
-    // Lỗi ở đây không làm hỏng đăng ký (tệ nhất là gửi trùng một lần).
-    for (const s of v.shownToday) {
-      if (!serverKinds.includes(s.kind)) continue;
-      try {
-        await directus.claimDelivery({
-          id: deliveryIdFor(deviceId, s.kind, s.key), user: userId, device: deviceId, notification_id: 0,
-          kind: s.kind, key: s.key, title: '', body: '', at: nowIso, sent_at: null,
-        });
-      } catch {
-        // bỏ qua
-      }
+    // Lỗi ở đây không làm hỏng đăng ký (tệ nhất là gửi trùng một lần). Dòng
+    // giành trước có `sent_at` rỗng nên ack không bao giờ chạm tới chúng. Nên
+    // bộ lập lịch KHÔNG tính chúng vào trần ngày (chỉ dòng có sent_at mới tính).
+    const preClaims = shownTodayOf(v.shownToday, v.timezone, nowDate).filter((s) => serverKinds.includes(s.kind));
+    for (let i = 0; i < preClaims.length; i += CLAIM_CONCURRENCY) {
+      await Promise.all(preClaims.slice(i, i + CLAIM_CONCURRENCY).map(async (s) => {
+        try {
+          await directus.claimDelivery({
+            id: deliveryIdFor(deviceId, s.kind, s.key), user: userId, device: deviceId, notification_id: 0,
+            kind: s.kind, key: s.key, title: '', body: '', at: nowIso, sent_at: null,
+          });
+        } catch {
+          // bỏ qua
+        }
+      }));
     }
     return [200, { deviceId, serverKinds, leaseUntil, serverNow: nowIso, enabled: config.enabled }, user];
   }
@@ -137,7 +154,7 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
     const deviceId = deviceIdFor(endpoint);
     try {
       const delivery = await directus.getDelivery(deliveryId);
-      if (delivery && delivery.device === deviceId && !delivery.shown_at) {
+      if (delivery && delivery.device === deviceId && delivery.sent_at && !delivery.shown_at) {
         const at = now().toISOString();
         await directus.updateDelivery(deliveryId, { shown_at: at });
         await directus.updateDevice(deviceId, { last_ack_at: at });
@@ -154,7 +171,7 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
 
     if (req.method === 'OPTIONS' && (path === '/push/devices' || path === '/push/ack' || deviceMatch)) {
       const cors = corsHeaders(origin, config.allowedOrigins);
-      sendNoBody(res, 204, Object.keys(cors).length === 0 ? {} : {
+      sendNoBody(res, 204, !cors['Access-Control-Allow-Origin'] ? cors : {
         ...cors, 'Access-Control-Allow-Methods': 'GET, POST, DELETE', 'Access-Control-Allow-Headers': 'authorization, content-type',
       });
       writeLog({ method: 'OPTIONS', path: deviceMatch ? '/push/devices/:id' : path, status: 204, startedAt });

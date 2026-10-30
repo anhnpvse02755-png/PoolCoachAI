@@ -50,7 +50,9 @@ test('thiết bị: danh sách server, theo người chơi, một dòng, tạo, 
   await directus.devicesOfUser('user-a');
   assert.equal(last(d).params.get('filter[user][_eq]'), 'user-a');
   assert.deepEqual(await directus.getDevice('dev1'), { id: 'dev1' });
-  assert.equal(last(d).path, '/items/push_devices/dev1');
+  assert.equal(last(d).path, '/items/push_devices');
+  assert.equal(last(d).params.get('filter[id][_eq]'), 'dev1');
+  assert.equal(last(d).params.get('limit'), '1');
   await directus.createDevice({ id: 'dev2', user: 'user-a' });
   assert.deepEqual([last(d).method, last(d).path, last(d).body], ['POST', '/items/push_devices', { id: 'dev2', user: 'user-a' }]);
   await directus.updateDevice('dev1', { failure_count: 2 });
@@ -61,9 +63,10 @@ test('thiết bị: danh sách server, theo người chơi, một dòng, tạo, 
   await directus.deleteDevices([]);
   assert.equal(d.calls.length, n);
 });
-test('getDevice: chỉ 404 là null, 403 là lỗi', async () => {
-  const { directus } = setup({ items: { push_devices: [] } });
+test('getDevice/getDelivery dùng truy vấn danh sách: [] là null, 403 trên danh sách là lỗi thật', async () => {
+  const { directus } = setup({ items: { push_devices: [], push_deliveries: [] } });
   assert.equal(await directus.getDevice('none'), null);
+  assert.equal(await directus.getDelivery('none'), null);
   const { d: d2, directus: dir2 } = setup();
   d2.reply = () => errorResponse(403, 'FORBIDDEN');
   await assert.rejects(dir2.getDevice('x'), (e) => e.status === 403);
@@ -80,7 +83,7 @@ test('nhật ký gửi: theo người chơi và mốc, sửa, xoá trước mộ
   assert.equal(last(d).method, 'DELETE');
   assert.equal(last(d).path, '/items/push_deliveries');
   assert.deepEqual(last(d).body, { query: { filter: { at: { _lt: '2026-09-30T00:00:00.000Z' } } } });
-  assert.deepEqual(await directus.getDelivery('x1'), { id: 'x1' });
+  assert.deepEqual(await directus.getDelivery('x1'), { id: 'x1', shown_at: 'now' });
 });
 test('claimDelivery: true khi tạo được, false khi RECORD_NOT_UNIQUE, lỗi khác ném', async () => {
   const { d, directus } = setup();

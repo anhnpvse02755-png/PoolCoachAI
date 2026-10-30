@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { deviceIdFor, serverKindsFor, validateRegister, RequestError } from '../src/devices.mjs';
+import { deviceIdFor, serverKindsFor, validateRegister, RequestError, createRateLimiter, ipBucket } from '../src/devices.mjs';
 import { KINDS } from '../src/limits.mjs';
 
 const fixture = () => JSON.parse(readFileSync(new URL('../../../test/fixtures/push_register_body.json', import.meta.url), 'utf8'));
@@ -24,7 +24,7 @@ test('validateRegister: thân mẫu hợp lệ, đọc keys.p256dh/keys.auth', (
   assert.equal(v.endpoint, f.endpoint);
   assert.equal(v.p256dh, f.keys.p256dh);
   assert.equal(v.auth, f.keys.auth);
-  assert.equal(v.timezone, 'Asia/Ho_Chi_Minh');
+  assert.equal(v.timezone, canon('Asia/Ho_Chi_Minh'));
   assert.equal(v.seedFingerprint, 'seed-fp-0001');
   assert.equal(v.vapidPublicKey, 'pub-key');
   assert.deepEqual(v.shownToday, f.shownToday);
@@ -66,4 +66,38 @@ test('validateRegister: shownToday', () => {
   for (const shownToday of bad) assert.deepEqual(field({ ...fixture(), shownToday }), ['shownToday', 'invalid']);
   const ok = Array.from({ length: 50 }, (_, i) => ({ kind: 'streak', key: `k${i}` }));
   assert.equal(validateRegister({ ...fixture(), shownToday: ok }).shownToday.length, 50);
+});
+
+const canon = (z) => new Intl.DateTimeFormat('en', { timeZone: z }).resolvedOptions().timeZone;
+test('múi giờ: chuẩn hoá về tên IANA đúng chữ, từ chối độ lệch và tên lạ', () => {
+  const tz = (timezone) => validateRegister({ ...fixture(), timezone }).timezone;
+  assert.equal(tz('Asia/Ho_Chi_Minh'), canon('Asia/Ho_Chi_Minh'));
+  assert.equal(tz('asia/ho_chi_minh'), canon('Asia/Ho_Chi_Minh'));
+  assert.equal(tz('UTC'), 'UTC');
+  assert.equal(tz('utc'), 'UTC');
+  for (const bad of ['+07:00', '-0500', 'GMT+7', 'EST5EDT', 'Mars/Base', '', 'Asia', 'Asia/', '/Asia/Saigon', 'a'.repeat(70)]) {
+    assert.deepEqual(field({ ...fixture(), timezone: bad }), ['timezone', 'invalid'], bad);
+  }
+});
+test('ipBucket: IPv4 giữ nguyên, IPv6 gộp theo /64, ánh xạ IPv4 về IPv4', () => {
+  assert.equal(ipBucket('203.0.113.9'), '203.0.113.9');
+  assert.equal(ipBucket('::ffff:203.0.113.9'), '203.0.113.9');
+  assert.equal(ipBucket('2001:db8:1:2:aaaa:bbbb:cccc:dddd'), ipBucket('2001:0DB8:0001:0002::1'));
+  assert.notEqual(ipBucket('2001:db8:1:2::1'), ipBucket('2001:db8:1:3::1'));
+});
+test('rateLimiter: cửa sổ trượt, trần số khoá, quét hết hạn mỗi cửa sổ, loại khoá cũ nhất', () => {
+  let t = 0;
+  const lim = createRateLimiter({ max: 2, windowMs: 1000, now: () => new Date(t), maxKeys: 3 });
+  assert.deepEqual([lim.hit('a'), lim.hit('a'), lim.hit('a')], [true, true, false]);
+  t = 1001;
+  assert.equal(lim.hit('a'), true);
+  for (const k of ['b', 'c', 'd', 'e']) lim.hit(k);
+  assert.ok(lim.size() <= 3, 'trần số khoá');
+  t = 5000;
+  lim.hit('z');
+  assert.equal(lim.size(), 1, 'đã quét các khoá hết hạn');
+  const l2 = createRateLimiter({ max: 1, windowMs: 100000, now: () => new Date(t), maxKeys: 2 });
+  l2.hit('x'); l2.hit('y'); l2.hit('w');
+  assert.equal(l2.hit('x'), true, 'x là khoá cũ nhất nên đã bị loại');
+  assert.equal(l2.hit('w'), false, 'w còn trong bộ đếm');
 });

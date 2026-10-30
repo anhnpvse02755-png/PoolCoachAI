@@ -23,10 +23,12 @@ export function readRawBody(req, maxBytes) {
 
 /// Tiêu đề CORS cho [origin], chỉ khi nằm trong [allowedOrigins].
 export function corsHeaders(origin, allowedOrigins) {
+  // Vary: Origin luôn có, kể cả khi origin lạ hay vắng, để bộ đệm chung không
+  // lưu nhầm bản không-CORS cho mọi người.
   if (origin && allowedOrigins.includes(origin)) {
     return { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' };
   }
-  return {};
+  return { Vary: 'Origin' };
 }
 
 export function sendJson(res, status, body, origin, allowedOrigins) {
