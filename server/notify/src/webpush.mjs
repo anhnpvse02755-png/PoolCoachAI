@@ -1,7 +1,8 @@
 // Hợp đồng deviceFault (Task 11 dựa vào đây): mọi kết quả `failed` mang
 // `deviceFault: boolean`. true chỉ khi lỗi do thiết bị: bad_endpoint, khoá
 // thuê bao hỏng (bad_request) và HTTP 400. false cho 'auth' (401/403, lỗi VAPID
-// của server), payload_too_large (kể cả 413), bad_message, network, timeout.
+// của server), bad_options (options của người gọi sai, kiểm trước web-push, nên
+// bad_request chỉ còn nghĩa là web-push từ chối khoá thuê bao), payload_too_large (kể cả 413), bad_message, network, timeout.
 // 404/410 là `gone`; 429/5xx là `retry`. Chỉ deviceFault true mới được tính
 // vào failure_count.
 //
@@ -18,6 +19,7 @@ const MAX_RETRY_AFTER_MS = 60_000;
 const DEFAULT_RETRY_AFTER_MS = 5_000;
 const MIN_TTL_SECONDS = 60;
 const MAX_TTL_SECONDS = 2_419_200;
+const URGENCIES = ['very-low', 'low', 'normal', 'high'];
 
 /// Chủ đề Web Push: base64url(sha256(`kind:key`)) cắt còn 32 ký tự.
 export function pushTopic(kind, key) {
@@ -88,8 +90,12 @@ function retryAfterMs(response) {
 
 export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
   assertVapid(vapid);
-  async function send(device, message, { ttlSeconds: ttl, topic, urgency } = {}) {
+  async function sendUnsafe(device, message, options) {
+    const { ttlSeconds: ttl, topic, urgency } = options ?? {};
     if (!endpointAllowed(device?.endpoint)) return failed('bad_endpoint', true);
+    if (!Number.isInteger(ttl) || ttl < 0 || ttl > MAX_TTL_SECONDS
+      || (topic !== undefined && !(typeof topic === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(topic)))
+      || (urgency !== undefined && !URGENCIES.includes(urgency))) return failed('bad_options', false);
     let json;
     try {
       json = JSON.stringify(message);
@@ -123,6 +129,7 @@ export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
       return failed(timedOut ? 'timeout' : 'network', false);
     }
 
+    if (typeof response?.status !== 'number') return failed('network', false);
     try {
       await response.body?.cancel();
     } catch {
@@ -135,6 +142,14 @@ export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
     if (code === 401 || code === 403) return failed('auth', false);
     if (code === 413) return failed('payload_too_large', false);
     return { status: 'failed', code, deviceFault: code === 400 };
+  }
+  /// Không bao giờ reject: lỗi bất ngờ thành failed 'internal', không kèm thông điệp.
+  async function send(device, message, options) {
+    try {
+      return await sendUnsafe(device, message, options);
+    } catch {
+      return failed('internal', false);
+    }
   }
   return { send };
 }

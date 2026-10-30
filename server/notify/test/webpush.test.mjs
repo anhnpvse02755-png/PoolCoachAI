@@ -294,3 +294,37 @@ test('endpoint viết hoa hoặc có dấu chấm cuối bị từ chối (dạn
   }
   assert.equal(calls.length, 0);
 });
+
+test('send không bao giờ reject: options null, fetch trả về lạ, lỗi bất ngờ', async () => {
+  const r = receiver();
+  const make = (fetch) => createWebPushSender({ vapid: VAPID, fetch });
+  // options null: không ném; ttl thiếu nên bị từ chối bởi kiểm tra options.
+  const nullOpts = await make(capturing().fetch).send(r.device, MESSAGE, null);
+  assert.deepEqual(nullOpts, { status: 'failed', code: 'bad_options', deviceFault: false });
+  const undefOpts = await make(capturing().fetch).send(r.device, MESSAGE);
+  assert.equal(undefOpts.code, 'bad_options');
+  for (const odd of [async () => ({}), async () => undefined, async () => null, async () => ({ status: '201' })]) {
+    assert.deepEqual(await make(odd).send(r.device, MESSAGE, { ttlSeconds: 60 }), { status: 'failed', code: 'network', deviceFault: false });
+  }
+  const device = { get endpoint() { throw new Error('bí mật ' + VAPID.privateKey); } };
+  const res = await make(capturing().fetch).send(device, MESSAGE, { ttlSeconds: 60 });
+  assert.deepEqual(res, { status: 'failed', code: 'internal', deviceFault: false });
+});
+
+test('options của người gọi được kiểm trước web-push: bad_options, không gọi fetch', async () => {
+  const r = receiver();
+  const { fetch, calls } = capturing();
+  const sender = createWebPushSender({ vapid: VAPID, fetch });
+  const bad = [
+    { ttlSeconds: -1 }, { ttlSeconds: 2_419_201 }, { ttlSeconds: 1.5 }, { ttlSeconds: '60' }, {},
+    { ttlSeconds: 60, topic: '' }, { ttlSeconds: 60, topic: 'x'.repeat(33) }, { ttlSeconds: 60, topic: 'a b' },
+    { ttlSeconds: 60, urgency: 'urgent' },
+  ];
+  for (const o of bad) {
+    assert.deepEqual(await sender.send(r.device, MESSAGE, o), { status: 'failed', code: 'bad_options', deviceFault: false }, JSON.stringify(o));
+  }
+  assert.equal(calls.length, 0);
+  for (const o of [{ ttlSeconds: 0 }, { ttlSeconds: 2_419_200, topic: 'a_b-1', urgency: 'very-low' }, { ttlSeconds: 5, urgency: 'low' }, { ttlSeconds: 5, urgency: 'normal' }]) {
+    assert.equal((await sender.send(r.device, MESSAGE, o)).status, 'sent', JSON.stringify(o));
+  }
+});
