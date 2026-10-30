@@ -131,13 +131,16 @@ class NotificationSettingsSyncService {
   Future<NotificationSettingsMeta> _mutate(
     String userId,
     NotificationSettingsMeta Function(NotificationSettingsMeta) change,
-  ) {
-    final result = _metaQueue.then((_) async {
-      final before = await _meta.load(userId);
-      final after = change(before);
-      if (after != before) await _meta.save(userId, after);
-      return after;
-    });
+  ) => _enqueue(() async {
+    final before = await _meta.load(userId);
+    final after = change(before);
+    if (after != before) await _meta.save(userId, after);
+    return after;
+  });
+
+  /// Chạy [op] sau mọi việc đã xếp hàng trước nó.
+  Future<T> _enqueue<T>(Future<T> Function() op) {
+    final result = _metaQueue.then((_) => op());
     _metaQueue = result.then<void>((_) {}, onError: (Object _) {});
     return result;
   }
@@ -155,15 +158,18 @@ class NotificationSettingsSyncService {
     } on _Stopped {
       return SyncOutcome.stopped;
     } on AuthFailure catch (f) {
+      _dirty = true;
       return switch (f) {
         AuthFailure.network => SyncOutcome.offline,
         AuthFailure.sessionExpired => SyncOutcome.signedOut,
         _ => SyncOutcome.failed,
       };
     } on DirectusUnreachable {
+      _dirty = true;
       return SyncOutcome.offline;
     } on Object {
       // syncNow() chạy từ timer: không bao giờ ném.
+      _dirty = true;
       return SyncOutcome.failed;
     }
   }
@@ -244,6 +250,33 @@ class NotificationSettingsSyncService {
     return null;
   }
 
+  static bool _sameSeen(SeenRecommendation? a, SeenRecommendation? b) =>
+      a == null || b == null
+      ? a == b
+      : a.sameAs(b.cat, b.drillId) && a.at.isAtSameMomentAs(b.at);
+
+  /// Có mốc gửi gợi ý (08:00 giờ máy) nào trong khoảng ([from], [to]] không.
+  /// Cùng một cặp được thấy lại sau mốc đó thì bản trên server phải cập nhật,
+  /// kẻo nền tảng của server lệch với máy (một lần mỗi ngày là cùng).
+  static bool _crossesReminder(DateTime from, DateTime to) {
+    final end = to.toLocal();
+    var boundary = DateTime(
+      end.year,
+      end.month,
+      end.day,
+      recommendationReminderHour,
+    );
+    if (boundary.isAfter(end)) {
+      boundary = DateTime(
+        end.year,
+        end.month,
+        end.day - 1,
+        recommendationReminderHour,
+      );
+    }
+    return from.isBefore(boundary);
+  }
+
   static bool _sameMoment(DateTime? a, DateTime? b) =>
       a == null || b == null ? a == b : a.isAtSameMomentAs(b);
 
@@ -284,6 +317,7 @@ class NotificationSettingsSyncService {
     final patch = <String, Object?>{};
     var prefsAt = meta.prefsUpdatedAt;
     var seenAt = seen?.at;
+    var pending = false;
 
     // Nhóm công tắc.
     final remotePrefsAt = _remoteTime(remote['prefs_updated_at']);
@@ -297,36 +331,61 @@ class NotificationSettingsSyncService {
     } else if (remotePrefsAt != null &&
         (localAt == null || remotePrefsAt.isAfter(localAt))) {
       final adopted = _remotePrefs(remote);
-      await _mutate(
-        userId,
-        (m) => NotificationSettingsMeta(
-          prefsUpdatedAt: remotePrefsAt,
-          seenDirty: m.seenDirty,
-        ),
-      );
-      if (adopted != prefs) {
-        await _prefs.save(userId, adopted);
-        _checkAlive(userId);
-        _onAdopted(userId, prefs: adopted);
+      // Một việc trên hàng đợi: đọc lại dấu vết và công tắc, và bỏ nhận nếu
+      // người chơi vừa đổi trong lúc lượt chạy (lượt sau sẽ đẩy bản của họ).
+      final applied = await _enqueue(() async {
+        final m = await _meta.load(userId);
+        final cur = await _prefs.load(userId);
+        if (m.prefsDirty != meta.prefsDirty ||
+            !_sameMoment(m.prefsUpdatedAt, meta.prefsUpdatedAt) ||
+            cur != prefs) {
+          return false;
+        }
+        await _meta.save(
+          userId,
+          NotificationSettingsMeta(
+            prefsUpdatedAt: remotePrefsAt,
+            seenDirty: m.seenDirty,
+          ),
+        );
+        if (adopted != cur) await _prefs.save(userId, adopted);
+        return true;
+      });
+      _checkAlive(userId);
+      if (applied) {
+        if (adopted != prefs) _onAdopted(userId, prefs: adopted);
+        prefsAt = remotePrefsAt;
+      } else {
+        pending = true;
       }
-      prefsAt = remotePrefsAt;
     }
 
     // Nhóm cặp đã thấy: bản có `at` mới hơn thắng.
     final remoteSeen = _remoteSeen(remote);
     if (seen != null &&
         (remoteSeen == null ||
-            (!remoteSeen.sameAs(seen.cat, seen.drillId) &&
-                seen.at.isAfter(remoteSeen.at)))) {
+            (remoteSeen.sameAs(seen.cat, seen.drillId)
+                ? seen.at.isAfter(remoteSeen.at) &&
+                      _crossesReminder(remoteSeen.at, seen.at)
+                : seen.at.isAfter(remoteSeen.at)))) {
       patch.addAll(_seenBody(seen));
     } else if (remoteSeen != null &&
         (seen == null ||
             (!seen.sameAs(remoteSeen.cat, remoteSeen.drillId) &&
                 remoteSeen.at.isAfter(seen.at)))) {
-      await _seen.save(userId, remoteSeen);
+      final applied = await _enqueue(() async {
+        final cur = await _seen.load(userId);
+        if (!_sameSeen(cur, seen)) return false;
+        await _seen.save(userId, remoteSeen);
+        return true;
+      });
       _checkAlive(userId);
-      _onAdopted(userId, seen: remoteSeen);
-      seenAt = remoteSeen.at;
+      if (applied) {
+        _onAdopted(userId, seen: remoteSeen);
+        seenAt = remoteSeen.at;
+      } else {
+        pending = true;
+      }
     }
 
     // Múi giờ.
@@ -341,7 +400,8 @@ class NotificationSettingsSyncService {
       );
       _checkAlive(userId);
     }
-    return _settle(userId, prefsAt: prefsAt, seenAt: seenAt);
+    final stillDirty = await _settle(userId, prefsAt: prefsAt, seenAt: seenAt);
+    return stillDirty || pending;
   }
 
   /// Bỏ cờ "bẩn" của phần vừa khớp server, nhưng chỉ khi trong lúc chờ người

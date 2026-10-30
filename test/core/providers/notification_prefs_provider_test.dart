@@ -91,4 +91,34 @@ void main() {
       expect(metaStore.saved['u1']?.seenDirty, true);
     },
   );
+
+  test(
+    'lưu kho công tắc lỗi: không đánh dấu bẩn, không đóng dấu giờ mới',
+    () async {
+      final c = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(auth),
+          notificationPrefsStoreProvider.overrideWithValue(
+            _FailingPrefsStore(),
+          ),
+          recommendationSeenStoreProvider.overrideWithValue(seenStore),
+          notificationSettingsMetaStoreProvider.overrideWithValue(metaStore),
+          nowProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.listen(notificationPrefsProvider, (_, _) {});
+      await pumpEventQueue();
+      await c
+          .read(notificationPrefsProvider.notifier)
+          .setEnabled(NotificationKind.streak, false);
+      expect(metaStore.saved, isEmpty);
+    },
+  );
+}
+
+class _FailingPrefsStore extends FakeNotificationPrefsStore {
+  @override
+  Future<void> save(String userId, NotificationPrefs prefs) =>
+      Future.error(StateError('đầy bộ nhớ'));
 }

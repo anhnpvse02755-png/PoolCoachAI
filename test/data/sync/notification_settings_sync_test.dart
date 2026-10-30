@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poolcoachai/data/notifications/notification_prefs_store.dart';
 import 'package:poolcoachai/data/notifications/notification_settings_meta_store.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/sync/notification_settings_sync.dart';
@@ -28,11 +29,16 @@ void main() {
   final older = DateTime.utc(2026, 10, 30, 8);
   final newer = DateTime.utc(2026, 10, 30, 10);
 
-  NotificationSettingsSyncService build({String? Function()? timeZone}) {
+  NotificationSettingsSyncService build({
+    String? Function()? timeZone,
+    NotificationPrefsStore? prefsStore,
+    Duration retryEvery = const Duration(seconds: 30),
+  }) {
     final s = NotificationSettingsSyncService(
       auth: auth,
+      retryEvery: retryEvery,
       api: DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl),
-      prefs: prefs,
+      prefs: prefsStore ?? prefs,
       seen: seen,
       meta: meta,
       now: () => now,
@@ -303,4 +309,264 @@ void main() {
     await pumpEventQueue();
     expect(server.sent('POST', '/items/notification_settings'), hasLength(1));
   });
+
+  group('vòng sửa 1', () {
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 150));
+
+    test(
+      'A: cài đặt bẩn còn từ phiên trước, mở app khi mất mạng, có mạng lại: '
+      'PATCH trong một nhịp thử lại',
+      () async {
+        remote = [row(prefsAt: older)];
+        meta.saved['u1'] = NotificationSettingsMeta(
+          prefsUpdatedAt: newer,
+          prefsDirty: true,
+        );
+        prefs.saved['u1'] = const NotificationPrefs(maintenance: false);
+        server.offline = true;
+        final s = build(retryEvery: const Duration(milliseconds: 20));
+        s.start();
+        await settle();
+        server.offline = false;
+        await settle();
+        final patch = server.sent('PATCH', '/items/notification_settings/u1');
+        expect(patch, isNotEmpty);
+        expect(FakeDirectus.body(patch.first)['maintenance'], false);
+      },
+    );
+
+    test(
+      'A2: chưa có dòng, đăng nhập lần đầu khi mất mạng, có mạng lại: POST',
+      () async {
+        server.offline = true;
+        final s = build(retryEvery: const Duration(milliseconds: 20));
+        s.start();
+        await settle();
+        server.offline = false;
+        await settle();
+        expect(server.sent('POST', '/items/notification_settings'), isNotEmpty);
+      },
+    );
+
+    test(
+      'B: đổi công tắc trong lúc một lượt đang nhận bản máy chủ: giữ lựa chọn '
+      'và PATCH sau đó',
+      () async {
+        remote = [row(prefsAt: newer)];
+        meta.saved['u1'] = NotificationSettingsMeta(prefsUpdatedAt: older);
+        final gated = _GatedPrefsStore(prefs);
+        final s = build(prefsStore: gated);
+        final pass = s.syncNow();
+        await pumpEventQueue();
+        // Người chơi tắt công tắc khi lượt đang chờ.
+        prefs.saved['u1'] = const NotificationPrefs(maintenance: false);
+        await s.localPrefsChanged('u1');
+        gated.gate.complete();
+        await pass;
+
+        expect(prefs.saved['u1'], const NotificationPrefs(maintenance: false));
+        expect(adopted.where((a) => a.prefs != null), isEmpty);
+        expect(meta.saved['u1']?.prefsDirty, true);
+
+        await s.syncNow();
+        final patch = FakeDirectus.body(
+          server.sent('PATCH', '/items/notification_settings/u1').single,
+        );
+        expect(patch['maintenance'], false);
+        expect(patch['prefs_updated_at'], now.toIso8601String());
+      },
+    );
+
+    test(
+      'M6: đổi công tắc trong lúc PATCH đang bay: cờ bẩn không bị xoá',
+      () async {
+        remote = [row(prefsAt: older)];
+        meta.saved['u1'] = NotificationSettingsMeta(
+          prefsUpdatedAt: DateTime.utc(2026, 10, 30, 9),
+          prefsDirty: true,
+        );
+        prefs.saved['u1'] = const NotificationPrefs(streak: false);
+        final hold = Completer<void>();
+        server.routes['PATCH /items/notification_settings/u1'] = (_) async {
+          await hold.future;
+          return FakeDirectus.ok(remote!.first);
+        };
+        final s = build();
+        final pass = s.syncNow();
+        await pumpEventQueue();
+        prefs.saved['u1'] = const NotificationPrefs(schedule: false);
+        await s.localPrefsChanged('u1');
+        hold.complete();
+        await pass;
+        expect(meta.saved['u1']?.prefsDirty, true);
+        expect(meta.saved['u1']?.prefsUpdatedAt, now);
+      },
+    );
+
+    test(
+      'M7: đổi cặp đã thấy trong lúc PATCH đang bay: cờ bẩn không bị xoá',
+      () async {
+        remote = [
+          row(prefsAt: older, cat: 'aiming', drill: 'd1', seenAt: older),
+        ];
+        meta.saved['u1'] = NotificationSettingsMeta(
+          prefsUpdatedAt: older,
+          seenDirty: true,
+        );
+        seen.saved['u1'] = SeenRecommendation(
+          cat: SkillCategory.kick,
+          drillId: 'd2',
+          at: newer,
+        );
+        final hold = Completer<void>();
+        server.routes['PATCH /items/notification_settings/u1'] = (_) async {
+          await hold.future;
+          return FakeDirectus.ok(remote!.first);
+        };
+        final s = build();
+        final pass = s.syncNow();
+        await pumpEventQueue();
+        seen.saved['u1'] = SeenRecommendation(
+          cat: SkillCategory.kick,
+          drillId: 'd3',
+          at: now,
+        );
+        await s.localSeenChanged('u1');
+        hold.complete();
+        await pass;
+        expect(meta.saved['u1']?.seenDirty, true);
+      },
+    );
+
+    test(
+      'R-F18: cùng cặp trong một ngày: không PATCH; qua mốc 08:00: đúng một '
+      'PATCH (P→Q→P)',
+      () async {
+        final p1 = DateTime(2026, 10, 29, 20);
+        remote = [
+          row(prefsAt: older, cat: 'kick', drill: 'dP', seenAt: p1.toUtc()),
+        ];
+        meta.saved['u1'] = NotificationSettingsMeta(prefsUpdatedAt: older);
+        seen.saved['u1'] = SeenRecommendation(
+          cat: SkillCategory.kick,
+          drillId: 'dP',
+          at: DateTime(2026, 10, 29, 22),
+        );
+        final s = build();
+        await s.syncNow();
+        expect(
+          server.sent('PATCH', '/items/notification_settings/u1'),
+          isEmpty,
+          reason: 'cùng ngày, chưa qua 08:00',
+        );
+
+        // Q được gửi lúc 08:00 ngày sau; 09:00 người chơi thấy lại P.
+        seen.saved['u1'] = SeenRecommendation(
+          cat: SkillCategory.kick,
+          drillId: 'dP',
+          at: DateTime(2026, 10, 30, 9),
+        );
+        await s.syncNow();
+        await s.syncNow();
+        final patches = server.sent('PATCH', '/items/notification_settings/u1');
+        expect(patches, hasLength(1));
+        expect(
+          DateTime.parse(
+            FakeDirectus.body(patches.single)['last_seen_at']! as String,
+          ).isAtSameMomentAs(DateTime(2026, 10, 30, 9)),
+          true,
+        );
+
+        // Lại thấy P lúc 15:00 cùng ngày: không PATCH thêm.
+        seen.saved['u1'] = SeenRecommendation(
+          cat: SkillCategory.kick,
+          drillId: 'dP',
+          at: DateTime(2026, 10, 30, 15),
+        );
+        await s.syncNow();
+        expect(
+          server.sent('PATCH', '/items/notification_settings/u1'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test('M11: nhịp thử lại chạy khi còn bẩn rồi dừng khi sạch', () async {
+      remote = [row(prefsAt: older)];
+      meta.saved['u1'] = NotificationSettingsMeta(
+        prefsUpdatedAt: newer,
+        prefsDirty: true,
+      );
+      final s = build(retryEvery: const Duration(milliseconds: 20));
+      server.routes['PATCH /items/notification_settings/u1'] = (_) =>
+          FakeDirectus.error(500, 'INTERNAL_SERVER_ERROR');
+      s.start();
+      await settle();
+      final tries = server.sent('PATCH', '/items/notification_settings/u1');
+      expect(tries.length, greaterThan(1));
+      serve();
+      await settle();
+      final after = server.requests.length;
+      await settle();
+      expect(server.requests.length, after, reason: 'sạch thì ngừng thử');
+    });
+
+    test(
+      'M12: PATCH timezone khi timeZone() khác null và khác bản máy chủ',
+      () async {
+        remote = [row(prefsAt: older, tz: 'UTC')];
+        meta.saved['u1'] = NotificationSettingsMeta(prefsUpdatedAt: older);
+        final s = build(timeZone: () => 'Asia/Ho_Chi_Minh');
+        await s.syncNow();
+        final patch = FakeDirectus.body(
+          server.sent('PATCH', '/items/notification_settings/u1').single,
+        );
+        expect(patch, {'timezone': 'Asia/Ho_Chi_Minh'});
+        await s.syncNow();
+        expect(
+          server.sent('PATCH', '/items/notification_settings/u1'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test('localPrefsChanged gọi syncNow sau start(), không gọi trước', () async {
+      remote = [row(prefsAt: older)];
+      meta.saved['u1'] = NotificationSettingsMeta(prefsUpdatedAt: older);
+      final s = build();
+      await s.localPrefsChanged('u1');
+      await pumpEventQueue();
+      expect(server.requests, isEmpty);
+
+      s.start();
+      await pumpEventQueue();
+      server.requests.clear();
+      await s.localPrefsChanged('u1');
+      await pumpEventQueue();
+      expect(server.sent('GET', '/items/notification_settings'), isNotEmpty);
+    });
+  });
+}
+
+/// Kho công tắc giữ lần [load] đầu tới khi [gate] hoàn tất.
+class _GatedPrefsStore implements NotificationPrefsStore {
+  _GatedPrefsStore(this._inner);
+
+  final FakeNotificationPrefsStore _inner;
+  final gate = Completer<void>();
+  bool _first = true;
+
+  @override
+  Future<NotificationPrefs> load(String userId) async {
+    if (_first) {
+      _first = false;
+      await gate.future;
+    }
+    return _inner.load(userId);
+  }
+
+  @override
+  Future<void> save(String userId, NotificationPrefs prefs) =>
+      _inner.save(userId, prefs);
 }

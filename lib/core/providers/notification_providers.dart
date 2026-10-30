@@ -63,15 +63,13 @@ class NotificationPrefsController
     if (userId == null) return;
     try {
       await ref.read(notificationPrefsStoreProvider).save(userId, next);
-    } on Object {
-      // Không lưu được thì lựa chọn chỉ có hiệu lực tới khi mở lại app.
-    }
-    try {
+      // Chỉ đánh dấu bẩn khi đã lưu được: kẻo đóng dấu giờ mới lên bản cũ.
       await ref
           .read(notificationSettingsSyncProvider)
           .localPrefsChanged(userId);
     } on Object {
-      // Đồng bộ là việc phụ: lỗi ở đây không được làm hỏng công tắc.
+      // Không lưu được thì lựa chọn chỉ có hiệu lực tới khi mở lại app;
+      // đồng bộ là việc phụ, lỗi ở đó không được làm hỏng công tắc.
     }
   }
 
@@ -130,13 +128,9 @@ class RecommendationSeenController
     state = AsyncData(seen);
     try {
       await ref.read(recommendationSeenStoreProvider).save(userId, seen);
-    } on Object {
-      // Không lưu được thì chỉ nhớ tới khi mở lại app.
-    }
-    try {
       await ref.read(notificationSettingsSyncProvider).localSeenChanged(userId);
     } on Object {
-      // Đồng bộ là việc phụ: lỗi ở đây không được làm hỏng việc ghi nhớ.
+      // Không lưu được thì chỉ nhớ tới khi mở lại app; đồng bộ là việc phụ.
     }
   }
 
