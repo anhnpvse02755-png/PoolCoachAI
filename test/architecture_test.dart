@@ -44,18 +44,29 @@ void main() {
     expect(offenders, isEmpty);
   });
 
-  test('ngoài upsertSeed, không nơi nào trong lib đọc thẳng dữ liệu seed', () {
+  test('ngoài upsertSeed, chỉ bin/notify_plan.dart (helper máy chủ, không có DB) được đọc seed', () {
     final offenders = <String>[];
-    for (final file in dartFilesIn('lib')) {
+    final readers = <String>[];
+    for (final file in [...dartFilesIn('lib'), ...dartFilesIn('bin')]) {
       final path = file.path.replaceAll(r'\', '/');
       if (path.contains('lib/data/seed/')) continue;
-      if (path.endsWith('lib/data/database/upsert_seed.dart')) continue;
 
       final source = file.readAsStringSync();
-      if (source.contains('seedDrills') || source.contains('seedKnowledge')) {
-        offenders.add(path);
+      if (!source.contains('seedDrills') && !source.contains('seedKnowledge')) {
+        continue;
       }
+      readers.add(path);
+      if (path.endsWith('lib/data/database/upsert_seed.dart')) continue;
+      if (path.endsWith('bin/notify_plan.dart')) continue;
+      offenders.add(path);
     }
+
+    expect(
+      readers.where((p) => p.endsWith('bin/notify_plan.dart')),
+      isNotEmpty,
+      reason: 'bin/notify_plan.dart là nơi duy nhất nạp seed cho helper; '
+          'mất khỏi bin/ thì luật này xanh một cách vô nghĩa',
+    );
 
     expect(
       offenders,
@@ -486,10 +497,12 @@ void main() {
     }
   });
 
-  test('lib/server thuần: không Flutter, dart:ui, drift, database hay sync (biên dịch AOT được)', () {
-    final files = dartFilesIn('lib/server');
-    expect(files, isNotEmpty);
-    for (final f in files) {
+  test('lib/server và bin thuần: không Flutter, dart:ui, drift, database hay sync; lib/server không đọc seed', () {
+    final server = dartFilesIn('lib/server');
+    final bin = dartFilesIn('bin');
+    expect(server, isNotEmpty);
+    expect(bin, isNotEmpty);
+    for (final f in [...server, ...bin]) {
       expect(
         codeOnly(f.readAsStringSync()),
         isNot(
@@ -497,6 +510,11 @@ void main() {
         ),
         reason: f.path,
       );
+    }
+    for (final f in server) {
+      final source = f.readAsStringSync();
+      expect(source, isNot(contains('seedDrills')), reason: f.path);
+      expect(source, isNot(contains('seedKnowledge')), reason: f.path);
     }
   });
 }
