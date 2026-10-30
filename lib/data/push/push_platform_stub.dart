@@ -12,7 +12,10 @@ class PushPlatform {
   Future<PushSubscriptionInfo?> current() async => null;
 
   Future<PushSubscriptionInfo> subscribe(String vapidPublicKey) =>
-      throw UnsupportedError('Nền tảng này chưa hỗ trợ push');
+      throw const PushPlatformException(
+        PushFailure.unsupported,
+        'Chưa có push ở nền tảng này',
+      );
 
   Future<void> unsubscribe() async {}
 

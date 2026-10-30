@@ -9,6 +9,17 @@ set -euo pipefail
 
 : "${VAPID_PUBLIC_KEY:?Thiếu VAPID_PUBLIC_KEY (khoá công khai, đặt trong settings.local.json)}"
 
+# Khoá VAPID công khai phải là base64url của điểm P-256 không nén: 65 byte,
+# byte đầu 0x04. Khoá sai (khoá riêng, bị cắt, có đệm) sẽ làm mọi máy lặng lẽ
+# không đăng ký được push, nên dừng ngay.
+vapid_b64="$(printf '%s' "$VAPID_PUBLIC_KEY" | tr '_-' '/+')"
+while [ $(( ${#vapid_b64} % 4 )) -ne 0 ]; do vapid_b64="${vapid_b64}="; done
+vapid_hex="$(printf '%s' "$vapid_b64" | base64 -d 2>/dev/null | od -An -v -tx1 | tr -d ' \n' || true)"
+if [ "${#vapid_hex}" -ne 130 ] || [ "${vapid_hex:0:2}" != "04" ]; then
+  echo "VAPID_PUBLIC_KEY không phải khoá công khai P-256 (base64url của 65 byte, byte đầu 0x04)." >&2
+  exit 1
+fi
+
 FLUTTER="${FLUTTER:-flutter}"
 DART="${DART:-dart}"
 root="$(git rev-parse --show-toplevel)"

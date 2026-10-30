@@ -90,7 +90,7 @@ void main() {
     expect(r.serverKinds, isEmpty);
   });
 
-  test('shownToday cắt ở 50 mục, seedFingerprint null được gửi', () async {
+  test('shownToday tối đa 50 mục, seedFingerprint null được gửi', () async {
     late Map<String, Object?> body;
     final c = NotifyClient(
       client: MockClient((req) async {
@@ -233,6 +233,115 @@ void main() {
       c.unregister(token: 't', deviceId: 'x'),
       throwsA(isA<NotifyError>().having((e) => e.status, 'status', 401)),
     );
+  });
+
+  test('leaseUntil hoặc serverNow không đọc được → NotifyError', () async {
+    for (final bad in [
+      {...okBody(), 'leaseUntil': 'not-a-date'},
+      {...okBody(), 'serverNow': 'not-a-date'},
+      {...okBody(), 'serverNow': null},
+    ]) {
+      final c = NotifyClient(
+        client: MockClient((_) async => json(200, bad)),
+        baseUrl: base,
+      );
+      await expectLater(doRegister(c), throwsA(isA<NotifyError>()));
+    }
+  });
+
+  test('config thân hỏng → NotifyError', () async {
+    for (final bad in [
+      <String, Object?>{'enabled': 'yes', 'publicKey': 'PK'},
+      <String, Object?>{'enabled': true, 'publicKey': 5},
+    ]) {
+      final c = NotifyClient(
+        client: MockClient((_) async => json(200, bad)),
+        baseUrl: base,
+      );
+      await expectLater(c.config(), throwsA(isA<NotifyError>()));
+    }
+    final notJson = NotifyClient(
+      client: MockClient((_) async => http.Response('oops', 200)),
+      baseUrl: base,
+    );
+    await expectLater(notJson.config(), throwsA(isA<NotifyError>()));
+  });
+
+  test('baseUrl có đường dẫn, có hoặc không dấu / cuối', () async {
+    final seen = <String>[];
+    for (final b in ['https://h.example.invalid/api', 'https://h.example.invalid/api/']) {
+      final c = NotifyClient(
+        client: MockClient((req) async {
+          seen.add(req.url.toString());
+          return json(200, {'enabled': false, 'publicKey': null});
+        }),
+        baseUrl: Uri.parse(b),
+      );
+      await c.config();
+    }
+    expect(seen, everyElement('https://h.example.invalid/api/push/config'));
+  });
+
+  test('lỗi truyền tải khác (Socket, Handshake) → NotifyUnreachable', () async {
+    for (final e in <Exception>[
+      const SocketException('x'),
+      const HandshakeException('x'),
+    ]) {
+      final c = NotifyClient(
+        client: MockClient((_) async => throw e),
+        baseUrl: base,
+      );
+      await expectLater(doRegister(c), throwsA(isA<NotifyUnreachable>()));
+    }
+  });
+
+  test('hết giờ: một giới hạn duy nhất và yêu cầu bị huỷ', () async {
+    late Future<void> trigger;
+    final c = NotifyClient(
+      client: MockClient.streaming((req, _) async {
+        trigger = (req as http.Abortable).abortTrigger!;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(jsonEncode(okBody()))),
+          200,
+        );
+      }),
+      baseUrl: base,
+      timeout: const Duration(milliseconds: 30),
+    );
+    final sw = Stopwatch()..start();
+    await expectLater(doRegister(c), throwsA(isA<NotifyUnreachable>()));
+    expect(sw.elapsedMilliseconds, lessThan(150));
+    await trigger.timeout(const Duration(seconds: 1));
+  });
+
+  test('shownToday: bỏ khoá rỗng hoặc dài quá 200, giữ 50 mục MỚI NHẤT '
+      '(cuối danh sách)', () async {
+    late Map<String, Object?> body;
+    final c = NotifyClient(
+      client: MockClient((req) async {
+        body = jsonDecode(req.body) as Map<String, Object?>;
+        return json(200, okBody());
+      }),
+      baseUrl: base,
+    );
+    await c.register(
+      token: 't',
+      subscription: sub,
+      timezone: 'UTC',
+      seedFingerprint: null,
+      vapidPublicKey: 'k',
+      shownToday: [
+        for (var i = 0; i < 60; i++)
+          PushShownRef(kind: NotificationKind.schedule, key: 'k$i'),
+        const PushShownRef(kind: NotificationKind.streak, key: ''),
+        PushShownRef(kind: NotificationKind.streak, key: 'x' * 201),
+      ],
+    );
+    final keys = [for (final e in body['shownToday'] as List) (e as Map)['key']];
+    expect(keys.length, 50);
+    expect(keys.first, 'k10');
+    expect(keys.last, 'k59');
   });
 
   test('config: GET /push/config', () async {

@@ -12,7 +12,10 @@ class PushPlatform {
   Future<PushSubscriptionInfo?> current() async => null;
 
   Future<PushSubscriptionInfo> subscribe(String vapidPublicKey) =>
-      throw UnsupportedError('Push native chưa có (P6b-2)');
+      throw const PushPlatformException(
+        PushFailure.unsupported,
+        'Chưa có push ở nền tảng này',
+      );
 
   Future<void> unsubscribe() async {}
 

@@ -21,6 +21,9 @@ final class PushSubscriptionInfo {
   final String? applicationServerKey;
 }
 
+/// Giới hạn miền của Date (±8.64e15 ms).
+const _maxEpochMs = 8640000000000000;
+
 /// Một thông báo mà worker push vừa hiện ra trên máy này.
 final class PushShown {
   const PushShown({
@@ -41,10 +44,15 @@ final class PushShown {
   final String body;
   final DateTime shownAt;
 
-  /// Đọc thông điệp `{type:'shown', ...}` của worker; null khi hỏng.
-  /// `shownAt` là mili giây epoch hoặc chuỗi ISO 8601.
+  /// Đọc thông điệp BroadcastChannel của worker; null khi hỏng, không ném.
+  ///
+  /// Hợp đồng (phiên bản 1):
+  /// `{v: 1, type: 'shown', deliveryId: String, notificationId: int,
+  /// kind: String (tên NotificationKind), key: String, title: String,
+  /// body: String, shownAt: chuỗi ISO 8601 hoặc mili giây epoch}`.
+  /// `v` khác 1 (hoặc thiếu) bị từ chối.
   static PushShown? fromMessage(Object? data) {
-    if (data is! Map) return null;
+    if (data is! Map || data['v'] != 1 || data['type'] != 'shown') return null;
     final deliveryId = data['deliveryId'];
     final id = data['notificationId'];
     final kindName = data['kind'];
@@ -54,6 +62,7 @@ final class PushShown {
     final at = data['shownAt'];
     if (deliveryId is! String || deliveryId.isEmpty) return null;
     if (id is! num || !id.isFinite || id != id.truncate()) return null;
+    if (id.abs() > 9007199254740991) return null;
     if (kindName is! String || key is! String || key.isEmpty) return null;
     if (title is! String || body is! String) return null;
     NotificationKind? kind;
@@ -62,7 +71,8 @@ final class PushShown {
     }
     if (kind == null) return null;
     final DateTime? shownAt = switch (at) {
-      num() when at.isFinite => DateTime.fromMillisecondsSinceEpoch(at.toInt()),
+      num() when at.isFinite && at.abs() <= _maxEpochMs =>
+        DateTime.fromMillisecondsSinceEpoch(at.toInt()),
       String() => DateTime.tryParse(at),
       _ => null,
     };
@@ -93,4 +103,27 @@ Uint8List decodeVapidKey(String key) {
     throw const FormatException('Khoá VAPID phải là điểm P-256 65 byte');
   }
   return bytes;
+}
+/// Vì sao một lệnh push thất bại, để mã dùng chung phân loại mà không cần
+/// biết về interop.
+enum PushFailure {
+  /// Người dùng hoặc trình duyệt từ chối (quyền, chế độ riêng tư).
+  denied,
+
+  /// Nền tảng không có web push / FCM.
+  unsupported,
+
+  /// Mạng, hết giờ, push service bận: thử lại sau được.
+  transient,
+}
+
+/// Mọi lỗi của `PushPlatform` được gói thành kiểu này.
+class PushPlatformException implements Exception {
+  const PushPlatformException(this.kind, [this.message]);
+
+  final PushFailure kind;
+  final String? message;
+
+  @override
+  String toString() => 'PushPlatformException(${kind.name}, $message)';
 }

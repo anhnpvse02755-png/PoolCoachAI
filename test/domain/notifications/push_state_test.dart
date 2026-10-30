@@ -102,6 +102,7 @@ void main() {
 
   group('PushShown.fromMessage', () {
     Map<String, Object?> good() => {
+      'v': 1,
       'type': 'shown',
       'deliveryId': 'dl1',
       'notificationId': 7,
@@ -132,6 +133,25 @@ void main() {
     test('không phải map: null', () {
       expect(PushShown.fromMessage('x'), isNull);
       expect(PushShown.fromMessage(null), isNull);
+    });
+    test('shownAt ISO 8601 được đọc', () {
+      final s = PushShown.fromMessage({
+        ...good(),
+        'shownAt': '2026-10-30T08:00:00.000Z',
+      })!;
+      expect(s.shownAt, DateTime.utc(2026, 10, 30, 8));
+    });
+    test('shownAt số ngoài miền Date: null, không ném', () {
+      expect(PushShown.fromMessage({...good(), 'shownAt': 1e20}), isNull);
+      expect(PushShown.fromMessage({...good(), 'shownAt': -1e20}), isNull);
+    });
+    test('v khác 1 hoặc thiếu: null', () {
+      expect(PushShown.fromMessage({...good(), 'v': 2}), isNull);
+      expect(PushShown.fromMessage({...good()}..remove('v')), isNull);
+    });
+    test('notificationId không nguyên hoặc quá lớn: null', () {
+      expect(PushShown.fromMessage({...good(), 'notificationId': 1.5}), isNull);
+      expect(PushShown.fromMessage({...good(), 'notificationId': 1e300}), isNull);
     });
     test('shownAt hỏng: null', () {
       expect(PushShown.fromMessage({...good(), 'shownAt': 'abc'}), isNull);

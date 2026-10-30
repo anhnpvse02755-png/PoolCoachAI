@@ -83,7 +83,12 @@ class NotifyClient {
     String? token,
     Object? body,
   }) async {
-    final request = http.Request(method, _uri(path));
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      _uri(path),
+      abortTrigger: abort.future,
+    );
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
     if (body != null) {
       request.headers['Content-Type'] = 'application/json';
@@ -91,12 +96,15 @@ class NotifyClient {
     }
     final http.Response response;
     try {
-      response = await http.Response.fromStream(
-        await _client.send(request).timeout(_timeout),
-      ).timeout(_timeout);
-    } on TimeoutException {
-      throw const NotifyUnreachable();
-    } on http.ClientException {
+      // Một giới hạn duy nhất cho cả gửi lẫn nhận thân.
+      response = await (() async =>
+          http.Response.fromStream(await _client.send(request)))().timeout(
+        _timeout,
+      );
+    } on Exception {
+      // Hết giờ, ClientException, SocketException, HandshakeException...:
+      // mọi lỗi truyền tải đều là "không tới được". Huỷ yêu cầu còn treo.
+      if (!abort.isCompleted) abort.complete();
       throw const NotifyUnreachable();
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -136,8 +144,21 @@ class NotifyClient {
     return NotifyConfig(enabled: enabled, publicKey: key as String?);
   }
 
+  /// Bỏ mục máy chủ sẽ từ chối cả đăng ký (khoá rỗng hoặc dài quá 200) rồi
+  /// giữ [maxShownToday] mục CUỐI: người gọi truyền từ cũ đến mới.
+  static List<PushShownRef> _newest(List<PushShownRef> list) {
+    final ok = [
+      for (final s in list)
+        if (s.key.isNotEmpty && s.key.length <= 200) s,
+    ];
+    return ok.length <= maxShownToday
+        ? ok
+        : ok.sublist(ok.length - maxShownToday);
+  }
+
   /// `POST /push/devices`. [shownToday] là các thông báo máy này đã hiện hôm
-  /// nay (cắt ở [maxShownToday]).
+  /// nay, xếp TỪ CŨ ĐẾN MỚI (mục không có mốc giờ nên thứ tự là mốc); chỉ
+  /// [maxShownToday] mục cuối được gửi.
   Future<NotifyRegistration> register({
     required String token,
     required PushSubscriptionInfo subscription,
@@ -158,7 +179,7 @@ class NotifyClient {
         'seedFingerprint': seedFingerprint,
         'vapidPublicKey': vapidPublicKey,
         'shownToday': [
-          for (final s in shownToday.take(maxShownToday))
+          for (final s in _newest(shownToday))
             {'kind': s.kind.name, 'key': s.key},
         ],
       },
