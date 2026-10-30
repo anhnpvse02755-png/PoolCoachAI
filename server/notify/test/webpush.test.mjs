@@ -28,9 +28,12 @@ function hkdfExpand(prk, info, len) {
 // RFC 8291 §3.4 giải mã bên nhận.
 function decrypt(body, { ecdh, auth }) {
   const salt = body.subarray(0, 16);
+  const rs = body.readUInt32BE(16);
   const idlen = body[20];
+  assert.equal(idlen, 65);
   const asPub = body.subarray(21, 21 + idlen);
   const cipher = body.subarray(21 + idlen);
+  assert.ok(cipher.length <= rs, 'bản ghi không vượt rs');
   const uaPub = ecdh.getPublicKey();
   const secret = ecdh.computeSecret(asPub);
   const prkKey = hmac(auth, secret);
@@ -128,11 +131,14 @@ test('201 → sent; 404, 410 → gone; 429 có Retry-After, 503 → retry; 400 �
   assert.deepEqual(await run(429, { 'retry-after': '3600' }), { status: 'retry', code: 429, retryAfterMs: 60_000 });
   assert.equal((await run(503)).status, 'retry');
   assert.equal((await run(503)).code, 503);
-  assert.deepEqual(await run(400), { status: 'failed', code: 400 });
-  assert.deepEqual(await run(401), { status: 'failed', code: 401 });
+  assert.deepEqual(await run(400), { status: 'failed', code: 400, deviceFault: true });
+  assert.deepEqual(await run(401), { status: 'failed', code: 'auth', deviceFault: false });
   const net = await run(0, {}, async () => { throw new TypeError('fetch failed'); });
   assert.equal(net.status, 'failed');
   assert.equal(net.code, 'network');
+  assert.equal(net.deviceFault, false);
+  assert.deepEqual(await run(403), { status: 'failed', code: 'auth', deviceFault: false });
+  assert.deepEqual(await run(413), { status: 'failed', code: 'payload_too_large', deviceFault: false });
 });
 
 test('hết giờ chờ: failed timeout', async () => {
@@ -141,7 +147,7 @@ test('hết giờ chờ: failed timeout', async () => {
     init.signal.addEventListener('abort', () => reject(init.signal.reason));
   });
   const res = await createWebPushSender({ vapid: VAPID, fetch, timeoutMs: 20 }).send(r.device, MESSAGE, { ttlSeconds: 60 });
-  assert.deepEqual(res, { status: 'failed', code: 'timeout' });
+  assert.deepEqual(res, { status: 'failed', code: 'timeout', deviceFault: false });
 });
 
 test('payload quá 3000 byte: failed payload_too_large, không gọi fetch', async () => {
@@ -149,7 +155,7 @@ test('payload quá 3000 byte: failed payload_too_large, không gọi fetch', asy
   const { fetch, calls } = capturing();
   const big = { ...MESSAGE, body: 'x'.repeat(3000) };
   const res = await createWebPushSender({ vapid: VAPID, fetch }).send(r.device, big, { ttlSeconds: 60 });
-  assert.deepEqual(res, { status: 'failed', code: 'payload_too_large' });
+  assert.deepEqual(res, { status: 'failed', code: 'payload_too_large', deviceFault: false });
   assert.equal(calls.length, 0);
 });
 
@@ -158,9 +164,10 @@ test('endpoint không https, có cổng, có userinfo hoặc ngoài danh sách: 
   const { fetch, calls } = capturing();
   const sender = createWebPushSender({ vapid: VAPID, fetch });
   for (const endpoint of ['http://fcm.googleapis.com/x', 'https://fcm.googleapis.com:8443/x', 'https://u:p@fcm.googleapis.com/x',
-    'https://evil.example/x', 'https://fcm.googleapis.com.evil.example/x', 'khong-phai-url', 'https://127.0.0.1/x']) {
+    'https://evil.example/x', 'https://fcm.googleapis.com.evil.example/x', 'khong-phai-url', 'https://127.0.0.1/x',
+    'https://fcm.googleapis.com:443/x', 'https://fcm.googleapis.com:/x', 'https://@fcm.googleapis.com/x']) {
     const res = await sender.send({ ...r.device, endpoint }, MESSAGE, { ttlSeconds: 60 });
-    assert.deepEqual(res, { status: 'failed', code: 'bad_endpoint' }, endpoint);
+    assert.deepEqual(res, { status: 'failed', code: 'bad_endpoint', deviceFault: true }, endpoint);
   }
   const ok = await sender.send({ ...r.device, endpoint: 'https://updates.push.services.mozilla.com/wpush/v2/x' }, MESSAGE, { ttlSeconds: 60 });
   assert.equal(ok.status, 'sent');
@@ -176,21 +183,114 @@ test('khoá riêng VAPID không lọt vào log, kết quả hay thông báo lỗ
     orig[m] = console[m];
     console[m] = (...a) => seen.push(a.map(String).join(' '));
   }
-  const results = [];
+  let res;
+  const errors = [];
   try {
-    // Lỗi mạng mà thông báo lỗi của fetch chứa khoá riêng.
-    results.push(await createWebPushSender({ vapid: VAPID, fetch: async () => { throw new Error(`boom ${secret}`); } })
-      .send(r.device, MESSAGE, { ttlSeconds: 60 }));
-    // Cấu hình VAPID hỏng khiến web-push ném lỗi.
-    results.push(await createWebPushSender({ vapid: { ...VAPID, subject: `không hợp lệ ${secret}` }, fetch: capturing().fetch })
-      .send(r.device, MESSAGE, { ttlSeconds: 60 }));
-    results.push(await createWebPushSender({ vapid: { ...VAPID, privateKey: `ngắn${secret.slice(0, 10)}` }, fetch: capturing().fetch })
-      .send(r.device, MESSAGE, { ttlSeconds: 60 }));
+    res = await createWebPushSender({ vapid: VAPID, fetch: async () => { throw new Error(`boom ${secret}`); } })
+      .send(r.device, MESSAGE, { ttlSeconds: 60 });
+    for (const bad of [{ ...VAPID, subject: `ftp://${secret}` }, { ...VAPID, privateKey: `ngan${secret.slice(0, 10)}` },
+      { ...VAPID, publicKey: webPush.generateVAPIDKeys().publicKey }, { ...VAPID, publicKey: secret }]) {
+      try { createWebPushSender({ vapid: bad, fetch: capturing().fetch }); } catch (e) { errors.push(String(e.message)); }
+    }
   } finally {
     for (const m of Object.keys(orig)) console[m] = orig[m];
   }
-  for (const res of results) assert.equal(res.status, 'failed');
-  assert.ok(!JSON.stringify(results).includes(secret));
-  assert.ok(!JSON.stringify(results).includes(secret.slice(0, 10)));
+  assert.deepEqual(res, { status: 'failed', code: 'network', deviceFault: false });
+  assert.equal(errors.length, 4);
+  for (const e of errors) assert.ok(!e.includes(secret) && !e.includes(secret.slice(0, 10)), e);
   assert.ok(!seen.join('\n').includes(secret));
+});
+
+test('VAPID cấu hình sai: ném lỗi ngay khi dựng sender, mỗi trường hợp một lỗi', () => {
+  const f = capturing().fetch;
+  const other = webPush.generateVAPIDKeys();
+  const point = Buffer.from(VAPID.publicKey, 'base64url');
+  const cases = {
+    'thiếu vapid': undefined,
+    'vapid null': null,
+    'khoá công khai không phải base64url': { ...VAPID, publicKey: '!!!' },
+    'khoá công khai sai độ dài': { ...VAPID, publicKey: point.subarray(0, 64).toString('base64url') },
+    'khoá công khai không bắt đầu 0x04': { ...VAPID, publicKey: Buffer.concat([Buffer.from([3]), point.subarray(1)]).toString('base64url') },
+    'khoá riêng sai độ dài': { ...VAPID, privateKey: Buffer.alloc(31, 1).toString('base64url') },
+    'khoá riêng không phải base64url': { ...VAPID, privateKey: '***' },
+    'khoá công khai không khớp khoá riêng': { ...VAPID, publicKey: other.publicKey },
+    'subject http': { ...VAPID, subject: 'http://example.com' },
+    'subject thiếu': { ...VAPID, subject: undefined },
+  };
+  for (const [name, vapid] of Object.entries(cases)) {
+    assert.throws(() => createWebPushSender({ vapid, fetch: f }), Error, name);
+  }
+});
+
+test('VAPID hợp lệ (cặp mới sinh, subject https hoặc mailto) dựng được', () => {
+  const k = webPush.generateVAPIDKeys();
+  const f = capturing().fetch;
+  assert.doesNotThrow(() => createWebPushSender({ vapid: { publicKey: k.publicKey, privateKey: k.privateKey, subject: 'https://example.com/c' }, fetch: f }));
+  assert.doesNotThrow(() => createWebPushSender({ vapid: VAPID, fetch: f }));
+});
+
+test('deviceFault: khoá thuê bao hỏng và 400 là lỗi thiết bị; 401/403/413, mạng, hết giờ thì không', async () => {
+  const r = receiver();
+  const { fetch } = capturing();
+  const sender = createWebPushSender({ vapid: VAPID, fetch });
+  const badKeys = await sender.send({ ...r.device, key_p256dh: 'abc' }, MESSAGE, { ttlSeconds: 60 });
+  assert.deepEqual(badKeys, { status: 'failed', code: 'bad_request', deviceFault: true });
+  const noAuth = await sender.send({ ...r.device, key_auth: '' }, MESSAGE, { ttlSeconds: 60 });
+  assert.equal(noAuth.deviceFault, true);
+  const at = async (status) => createWebPushSender({ vapid: VAPID, fetch: capturing(status).fetch }).send(r.device, MESSAGE, { ttlSeconds: 60 });
+  assert.equal((await at(400)).deviceFault, true);
+  assert.equal((await at(401)).deviceFault, false);
+  assert.equal((await at(413)).code, 'payload_too_large');
+  assert.equal((await at(503)).deviceFault, undefined);
+});
+
+test('send không bao giờ ném lỗi: vòng tròn và BigInt cho failed bad_message', async () => {
+  const r = receiver();
+  const { fetch, calls } = capturing();
+  const sender = createWebPushSender({ vapid: VAPID, fetch });
+  const circular = { ...MESSAGE };
+  circular.self = circular;
+  assert.deepEqual(await sender.send(r.device, circular, { ttlSeconds: 60 }), { status: 'failed', code: 'bad_message', deviceFault: false });
+  assert.deepEqual(await sender.send(r.device, { ...MESSAGE, n: 1n }, { ttlSeconds: 60 }), { status: 'failed', code: 'bad_message', deviceFault: false });
+  assert.equal(calls.length, 0);
+});
+
+test('thân phản hồi được đọc hoặc huỷ trên mọi đường', async () => {
+  const r = receiver();
+  for (const status of [201, 404, 429, 500, 400]) {
+    let cancelled = false;
+    const body = new ReadableStream({ cancel() { cancelled = true; } });
+    const fetch = async () => ({ status, headers: new Headers(), body });
+    await createWebPushSender({ vapid: VAPID, fetch }).send(r.device, MESSAGE, { ttlSeconds: 60 });
+    assert.ok(cancelled, `status ${status}`);
+  }
+});
+
+test('Retry-After: mặc định 5000 ms khi thiếu, 5xx có Retry-After', async () => {
+  const r = receiver();
+  const at = (status, headers) => createWebPushSender({ vapid: VAPID, fetch: capturing(status, headers).fetch }).send(r.device, MESSAGE, { ttlSeconds: 60 });
+  assert.deepEqual(await at(429), { status: 'retry', code: 429, retryAfterMs: 5000 });
+  assert.deepEqual(await at(503, { 'retry-after': '12' }), { status: 'retry', code: 503, retryAfterMs: 12_000 });
+});
+
+test('đúng 3000 byte vẫn được gửi', async () => {
+  const r = receiver();
+  const { fetch, calls } = capturing();
+  const pad = 3000 - Buffer.byteLength(JSON.stringify({ ...MESSAGE, body: '' }));
+  const msg = { ...MESSAGE, body: 'x'.repeat(pad) };
+  assert.equal(Buffer.byteLength(JSON.stringify(msg)), 3000);
+  const res = await createWebPushSender({ vapid: VAPID, fetch }).send(r.device, msg, { ttlSeconds: 60 });
+  assert.deepEqual(res, { status: 'sent' });
+  assert.equal(calls.length, 1);
+});
+
+test('endpoint viết hoa hoặc có dấu chấm cuối bị từ chối (dạng không chuẩn)', async () => {
+  const r = receiver();
+  const { fetch, calls } = capturing();
+  const sender = createWebPushSender({ vapid: VAPID, fetch });
+  for (const endpoint of ['https://FCM.googleapis.com/x', 'https://fcm.googleapis.com./x', 'https://x.push.services.mozilla.com./x']) {
+    assert.deepEqual(await sender.send({ ...r.device, endpoint }, MESSAGE, { ttlSeconds: 60 }),
+      { status: 'failed', code: 'bad_endpoint', deviceFault: true }, endpoint);
+  }
+  assert.equal(calls.length, 0);
 });

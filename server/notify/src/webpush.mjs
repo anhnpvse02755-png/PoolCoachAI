@@ -1,8 +1,15 @@
+// Hợp đồng deviceFault (Task 11 dựa vào đây): mọi kết quả `failed` mang
+// `deviceFault: boolean`. true chỉ khi lỗi do thiết bị: bad_endpoint, khoá
+// thuê bao hỏng (bad_request) và HTTP 400. false cho 'auth' (401/403, lỗi VAPID
+// của server), payload_too_large (kể cả 413), bad_message, network, timeout.
+// 404/410 là `gone`; 429/5xx là `retry`. Chỉ deviceFault true mới được tính
+// vào failure_count.
+//
 // Gửi Web Push (VAPID + aes128gcm) bằng thư viện web-push ghim bản 3.6.7 và
 // `fetch` được tiêm vào. Kết quả luôn là một đối tượng, không bao giờ ném lỗi, và
 // không chứa thông điệp lỗi gốc để khoá riêng VAPID không có đường rò ra ngoài.
 
-import { createHash } from 'node:crypto';
+import { createECDH, createHash } from 'node:crypto';
 import webPush from 'web-push';
 import { PUSH_HOSTS } from './limits.mjs';
 
@@ -38,8 +45,40 @@ function endpointAllowed(endpoint) {
     return false;
   }
   if (url.protocol !== 'https:' || url.port !== '' || url.username !== '' || url.password !== '') return false;
+  if (!endpoint.startsWith(`${url.origin}/`)) return false;
   return PUSH_HOSTS.some((re) => re.test(url.hostname));
 }
+
+const B64URL = /^[A-Za-z0-9_-]+$/;
+
+function decodeKey(value, bytes) {
+  if (typeof value !== 'string' || !B64URL.test(value)) return null;
+  const buf = Buffer.from(value, 'base64url');
+  return buf.length === bytes ? buf : null;
+}
+
+/// Kiểm cấu hình VAPID lúc dựng sender; ném lỗi với thông điệp cố định, không
+/// bao giờ chứa nội dung khoá.
+function assertVapid(vapid) {
+  if (vapid === null || typeof vapid !== 'object') throw new Error('VAPID: thiếu cấu hình');
+  const pub = decodeKey(vapid.publicKey, 65);
+  if (!pub || pub[0] !== 0x04) throw new Error('VAPID: khoá công khai không hợp lệ');
+  const priv = decodeKey(vapid.privateKey, 32);
+  if (!priv) throw new Error('VAPID: khoá riêng không hợp lệ');
+  let derived;
+  try {
+    const ecdh = createECDH('prime256v1');
+    ecdh.setPrivateKey(priv);
+    derived = ecdh.getPublicKey();
+  } catch {
+    throw new Error('VAPID: khoá riêng không hợp lệ');
+  }
+  if (!derived.equals(pub)) throw new Error('VAPID: khoá công khai không khớp khoá riêng');
+  const subject = vapid.subject;
+  if (typeof subject !== 'string' || !/^(https:|mailto:)/.test(subject)) throw new Error('VAPID: subject phải là https: hoặc mailto:');
+}
+
+const failed = (code, deviceFault) => ({ status: 'failed', code, deviceFault });
 
 function retryAfterMs(response) {
   const raw = response.headers?.get('retry-after')?.trim();
@@ -48,10 +87,17 @@ function retryAfterMs(response) {
 }
 
 export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
+  assertVapid(vapid);
   async function send(device, message, { ttlSeconds: ttl, topic, urgency } = {}) {
-    if (!endpointAllowed(device?.endpoint)) return { status: 'failed', code: 'bad_endpoint' };
-    const json = JSON.stringify(message);
-    if (Buffer.byteLength(json, 'utf8') > MAX_MESSAGE_BYTES) return { status: 'failed', code: 'payload_too_large' };
+    if (!endpointAllowed(device?.endpoint)) return failed('bad_endpoint', true);
+    let json;
+    try {
+      json = JSON.stringify(message);
+    } catch {
+      return failed('bad_message', false);
+    }
+    if (typeof json !== 'string') return failed('bad_message', false);
+    if (Buffer.byteLength(json, 'utf8') > MAX_MESSAGE_BYTES) return failed('payload_too_large', false);
 
     let details;
     try {
@@ -61,7 +107,7 @@ export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
         { vapidDetails: vapid, TTL: ttl, topic, urgency, contentEncoding: 'aes128gcm' },
       );
     } catch {
-      return { status: 'failed', code: 'bad_request' };
+      return failed('bad_request', true);
     }
 
     let response;
@@ -74,14 +120,21 @@ export function createWebPushSender({ vapid, fetch, timeoutMs = 10_000 }) {
       });
     } catch (e) {
       const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
-      return { status: 'failed', code: timedOut ? 'timeout' : 'network' };
+      return failed(timedOut ? 'timeout' : 'network', false);
     }
 
+    try {
+      await response.body?.cancel();
+    } catch {
+      // thân phản hồi không đọc được thì bỏ qua
+    }
     const code = response.status;
     if (code >= 200 && code < 300) return { status: 'sent' };
     if (code === 404 || code === 410) return { status: 'gone', code };
     if (code === 429 || code >= 500) return { status: 'retry', code, retryAfterMs: retryAfterMs(response) };
-    return { status: 'failed', code };
+    if (code === 401 || code === 403) return failed('auth', false);
+    if (code === 413) return failed('payload_too_large', false);
+    return { status: 'failed', code, deviceFault: code === 400 };
   }
   return { send };
 }
