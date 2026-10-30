@@ -1,0 +1,47 @@
+name: notify / test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/notify/**'
+      - 'web/push/**'
+      - 'bin/notify_plan.dart'
+      - 'lib/server/**'
+      - '.github/workflows/notify.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/notify/**'
+      - 'web/push/**'
+      - 'bin/notify_plan.dart'
+      - 'lib/server/**'
+      - '.github/workflows/notify.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # Helper thuần Dart. `dart compile exe` từ chối dự án có build hook
+      # (objective_c), nên dùng `dart build cli`; bundle có bin/ và lib/.
+      - run: dart build cli -t bin/notify_plan.dart -o build/notify_plan
+      - run: build/notify_plan/bundle/bin/notify_plan --self-test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/notify/package-lock.json
+      - run: npm ci
+        working-directory: server/notify
+      - run: npm test
+        working-directory: server/notify
+        env:
+          NOTIFY_PLAN_BIN: ${{ github.workspace }}/build/notify_plan/bundle/bin/notify_plan

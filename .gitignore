@@ -52,3 +52,9 @@ server/coach-chat/node_modules/
 
 # Worktree cô lập do Claude Code tạo
 .claude/worktrees/
+
+# Dịch vụ notify
+server/notify/node_modules/
+server/notify/bin/
+*service-account*.json
+*firebase-adminsdk*.json
