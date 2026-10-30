@@ -12,6 +12,8 @@
 // Schema sống trong file này chứ không chỉ trên server: PoolOS mất toàn bộ
 // cấu hình khi server bị xoá, vì nó chưa từng được ghi lại ở đâu khác.
 
+import fs from 'node:fs';
+
 const base = must('DIRECTUS_URL').replace(/\/$/, '');
 
 function must(name) {
@@ -429,6 +431,63 @@ await ensureCollection('tournaments', 'Giải người chơi tự ghi — xóa m
   required('is_deleted', 'boolean'),
 ]);
 
+// ─── 2b. Thông báo đẩy từ máy chủ (spec 2026-10-30 mục 3) ──────────────────
+// notification_settings: preferences thông báo, mỗi tài khoản một dòng, id = id
+// người dùng (Player chỉ tạo được dòng có id của chính mình). push_devices:
+// chỉ dịch vụ push (role PushService) đọc/ghi, Player không có quyền gì.
+// push_deliveries: dịch vụ ghi, Player chỉ đọc dòng của mình. Hai collection
+// sau owned: false (dịch vụ tạo thay người chơi), CASCADE theo trường `user`.
+const bool = (field) => ({ field, type: 'boolean', schema: { is_nullable: false, default_value: true } });
+const shortPk = { field: 'id', type: 'string', schema: { is_primary_key: true, is_nullable: false, max_length: 64 } };
+await ensureCollection('notification_settings', 'Preferences thông báo — mỗi tài khoản một dòng, id = id người dùng', [
+  pk,
+  bool('recommendation'),
+  bool('maintenance'),
+  bool('schedule'),
+  bool('streak'),
+  nullable('prefs_updated_at', 'timestamp'),
+  nullable('last_seen_cat', 'string'),
+  nullable('last_seen_drill_id', 'string'),
+  nullable('last_seen_at', 'timestamp'),
+  nullable('timezone', 'string'),
+]);
+await ensureCollection('push_devices', 'Thiết bị nhận thông báo đẩy — chỉ dịch vụ push ghi', [
+  shortPk,
+  required('user', 'uuid'),
+  required('channel', 'string'),
+  required('platform', 'string'),
+  nullable('endpoint', 'text'),
+  nullable('key_p256dh', 'string'),
+  nullable('key_auth', 'string'),
+  nullable('fcm_token', 'text'),
+  required('timezone', 'string'),
+  nullable('seed_fingerprint', 'string'),
+  required('mode', 'string'),
+  required('server_kinds', 'json'),
+  nullable('lease_until', 'timestamp'),
+  nullable('verified_at', 'timestamp'),
+  nullable('last_success_at', 'timestamp'),
+  nullable('last_ack_at', 'timestamp'),
+  required('last_seen_at', 'timestamp'),
+  { field: 'failure_count', type: 'integer', schema: { is_nullable: false, default_value: 0 } },
+  required('created_at', 'timestamp'),
+], { owned: false });
+await ensureUserRelation('push_devices', 'user');
+await ensureCollection('push_deliveries', 'Thông báo đẩy đã gửi — dịch vụ push ghi, người chơi đọc của mình', [
+  shortPk,
+  required('user', 'uuid'),
+  { field: 'device', type: 'string', schema: { is_nullable: false, max_length: 64 } },
+  required('notification_id', 'integer'),
+  required('kind', 'string'),
+  required('key', 'string'),
+  required('title', 'text'),
+  required('body', 'text'),
+  required('at', 'timestamp'),
+  nullable('sent_at', 'timestamp'),
+  nullable('shown_at', 'timestamp'),
+], { owned: false });
+await ensureUserRelation('push_deliveries', 'user');
+
 // ─── 2. Role Player và policy của nó ────────────────────────────────────────
 async function findOrCreate(path, name, payload) {
   const found = await api('GET', `${path}?filter[name][_eq]=${encodeURIComponent(name)}`, undefined, token);
@@ -473,6 +532,10 @@ async function replacePermissions(policyId, desired) {
 
 // ─── 3. Quyền Player policy (spec §3.3) ──────────────────────────────────────
 const self = { id: { _eq: '$CURRENT_USER' } };
+// Cùng danh sách với notificationSettingsRemoteFields / pushDeliveryRemoteFields
+// trong lib/data/remote/codecs/remote_fields.dart.
+const notificationSettingsFields = 'id,recommendation,maintenance,schedule,streak,prefs_updated_at,last_seen_cat,last_seen_drill_id,last_seen_at,timezone'.split(',');
+const pushDeliveryFields = 'id,device,notification_id,kind,key,title,body,at,shown_at'.split(',');
 const desiredPermissions = [
   {
     collection: 'drill_logs',
@@ -672,6 +735,29 @@ const desiredPermissions = [
     permissions: { user_created: self },
     validation: {},
   },
+  // Preferences thông báo: Player chỉ tạo được dòng có id = id của mình.
+  {
+    collection: 'notification_settings',
+    action: 'create',
+    fields: notificationSettingsFields,
+    permissions: {},
+    validation: { id: { _eq: '$CURRENT_USER' } },
+  },
+  { collection: 'notification_settings', action: 'read', fields: ['*'], permissions: { user_created: self } },
+  {
+    collection: 'notification_settings',
+    action: 'update',
+    fields: notificationSettingsFields.filter((f) => f !== 'id'),
+    permissions: { user_created: self },
+    validation: {},
+  },
+  // Nhật ký đã gửi: Player chỉ đọc dòng của mình. Không có quyền gì trên push_devices.
+  {
+    collection: 'push_deliveries',
+    action: 'read',
+    fields: [...pushDeliveryFields, 'user'],
+    permissions: { user: { _eq: '$CURRENT_USER' } },
+  },
 ];
 
 {
@@ -754,6 +840,84 @@ if (!existingServiceUser) {
 }
 if (!serviceToken) {
   console.log('NOTE người dùng dịch vụ coach-chat chưa có token — chạy lại với COACH_CHAT_SERVICE_TOKEN');
+}
+
+// ─── 3c. Role PushService và quyền trên các collection thông báo đẩy ───────
+// server/push (Node) đọc dữ liệu tập luyện của người chơi để lập kế hoạch và
+// ghi push_devices/push_deliveries bằng token tĩnh của một user riêng. Danh
+// sách trường được đọc nằm ở push_service_fields.json (test khoá nó với helper).
+const pushFields = JSON.parse(fs.readFileSync(new URL('./push_service_fields.json', import.meta.url), 'utf8'));
+const pushRole = await findOrCreate('/roles', 'PushService', {
+  name: 'PushService',
+  icon: 'notifications',
+  description: 'Dịch vụ thông báo đẩy (server/push) — đọc dữ liệu tập luyện, ghi push_devices/push_deliveries',
+});
+const pushPolicy = await findOrCreate('/policies', 'PushService', {
+  name: 'PushService',
+  icon: 'notifications',
+  admin_access: false,
+  app_access: false,
+  description: 'Quyền của dịch vụ thông báo đẩy',
+});
+const pushLinks = await api(
+  'GET',
+  `/access?filter[role][_eq]=${pushRole.id}&filter[policy][_eq]=${pushPolicy.id}`,
+  undefined,
+  token,
+);
+if (!pushLinks.length) {
+  await api('POST', '/access', { role: pushRole.id, policy: pushPolicy.id }, token);
+}
+
+{
+  const { newCount, oldCount } = await replacePermissions(pushPolicy.id, [
+    ...Object.entries(pushFields).map(([collection, fieldList]) => ({
+      collection,
+      action: 'read',
+      fields: fieldList.split(','),
+      permissions: {},
+    })),
+    ...['push_devices', 'push_deliveries'].flatMap((collection) =>
+      ['create', 'read', 'update', 'delete'].map((action) => ({
+        collection,
+        action,
+        fields: ['*'],
+        permissions: {},
+        ...(action === 'create' || action === 'update' ? { validation: {} } : {}),
+      })),
+    ),
+  ]);
+  console.log(`Đặt ${newCount} quyền cho PushService policy (xoá ${oldCount} quyền cũ)`);
+}
+
+// Người dùng dịch vụ push: email cố định, token tĩnh đặt qua PUSH_SERVICE_TOKEN
+// (tuỳ chọn). Không bao giờ in token ra log.
+const pushEmail = 'push-service@poolcoachai.example.com';
+const pushToken = process.env.PUSH_SERVICE_TOKEN;
+const existingPushUsers = await api(
+  'GET',
+  `/users?filter[email][_eq]=${encodeURIComponent(pushEmail)}&fields=id`,
+  undefined,
+  token,
+);
+const existingPushUser = existingPushUsers[0] ?? null;
+if (!existingPushUser) {
+  await api('POST', '/users', {
+    email: pushEmail,
+    role: pushRole.id,
+    status: 'active',
+    first_name: 'push',
+    ...(pushToken ? { token: pushToken } : {}),
+  }, token);
+  console.log(`Tạo người dùng dịch vụ ${pushEmail}`);
+} else if (pushToken) {
+  await api('PATCH', `/users/${existingPushUser.id}`, { token: pushToken, role: pushRole.id }, token);
+  console.log(`Cập nhật token và role người dùng dịch vụ ${pushEmail}`);
+} else {
+  console.log(`Người dùng dịch vụ ${pushEmail} đã có (bỏ qua — không đặt PUSH_SERVICE_TOKEN)`);
+}
+if (!pushToken) {
+  console.log('NOTE người dùng dịch vụ push chưa có token — chạy lại với PUSH_SERVICE_TOKEN');
 }
 
 // ─── 4. Đăng ký công khai ───────────────────────────────────────────────────

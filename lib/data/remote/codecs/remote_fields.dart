@@ -18,3 +18,11 @@ const remoteTestFields = 'id,started_at,completed_at,cancelled_at,table_size,'
 const remoteResultFields = 'id,test_id,drill_id,attempts,score,recorded_at';
 const drillLogRemoteFields =
     'id,drill_id,date,score,attempts,notes,duration_sec';
+
+// Preferences thông báo (một dòng mỗi tài khoản, id = id người dùng) và nhật
+// ký đã gửi/đã hiện của thông báo đẩy từ máy chủ.
+const notificationSettingsRemoteFields =
+    'id,recommendation,maintenance,schedule,streak,prefs_updated_at,'
+    'last_seen_cat,last_seen_drill_id,last_seen_at,timezone';
+const pushDeliveryRemoteFields =
+    'id,device,notification_id,kind,key,title,body,at,shown_at';
