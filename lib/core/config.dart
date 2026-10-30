@@ -32,6 +32,17 @@ const coachChatUrl = String.fromEnvironment(
   defaultValue: 'https://poolcoachai-coach.kjdybl.easypanel.host',
 );
 
+/// Địa chỉ dịch vụ notify (push từ máy chủ). Không phải bí mật.
+/// Đổi khi build: `--dart-define=NOTIFY_URL=…`.
+const notifyBaseUrl = String.fromEnvironment(
+  'NOTIFY_URL',
+  defaultValue: 'https://poolcoachai-notify.kjdybl.easypanel.host',
+);
+
+/// Khoá VAPID công khai (không phải bí mật). Rỗng thì không đăng ký push.
+/// Đặt khi build: `--dart-define=VAPID_PUBLIC_KEY=…`.
+const vapidPublicKey = String.fromEnvironment('VAPID_PUBLIC_KEY');
+
 Uri resetPasswordUrlFor({
   required bool isWeb,
   required Uri base,
