@@ -82,7 +82,8 @@ test('nhật ký gửi: theo người chơi và mốc, sửa, xoá trước mộ
   await directus.deleteDeliveriesBefore('2026-09-30T00:00:00.000Z');
   assert.equal(last(d).method, 'DELETE');
   assert.equal(last(d).path, '/items/push_deliveries');
-  assert.deepEqual(last(d).body, { query: { filter: { at: { _lt: '2026-09-30T00:00:00.000Z' } } } });
+  // limit -1: không có thì Directus chỉ xoá 100 dòng đầu mỗi lần.
+  assert.deepEqual(last(d).body, { query: { filter: { at: { _lt: '2026-09-30T00:00:00.000Z' } }, limit: -1 } });
   assert.deepEqual(await directus.getDelivery('x1'), { id: 'x1', shown_at: 'now' });
 });
 test('deleteDelivery: DELETE một dòng theo id; lỗi thì ném', async () => {

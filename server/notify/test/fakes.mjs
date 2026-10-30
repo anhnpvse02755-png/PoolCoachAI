@@ -36,6 +36,11 @@ function matchesParams(row, params) {
   }
   return true;
 }
+// Directus thật: không có `limit` thì chỉ 100 dòng (QUERY_LIMIT_DEFAULT); -1 là tất cả.
+function applyLimit(rows, raw) {
+  const n = raw === undefined || raw === null ? 100 : Number(raw);
+  return n < 0 ? rows : rows.slice(0, n);
+}
 function matchesFilter(row, filter) {
   return Object.entries(filter ?? {}).every(([f, ops]) => Object.entries(ops).every(([op, v]) => passes(row[f], op, v)));
 }
@@ -74,7 +79,10 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
       if (method === 'GET' && !id) {
         const wanted = url.searchParams.get('filter[id][_eq]');
         const rows = state.items[coll] ?? [];
-        if (filters) return jsonResponse(200, { data: rows.filter((r) => matchesParams(r, url.searchParams)).map((r) => ({ ...r })) });
+        if (filters) {
+          const hit = rows.filter((r) => matchesParams(r, url.searchParams)).map((r) => ({ ...r }));
+          return jsonResponse(200, { data: applyLimit(hit, url.searchParams.get('limit')) });
+        }
         return jsonResponse(200, { data: wanted === null ? rows : rows.filter((r) => r.id === wanted) });
       }
       // Directus thật: một dòng đơn không có (hoặc không đọc được) trả 403, KHÔNG phải 404.
@@ -98,7 +106,8 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
         } else if (Array.isArray(body)) {
           state.items[coll] = rows.filter((r) => !body.includes(r.id));
         } else if (filters && body?.query?.filter) {
-          state.items[coll] = rows.filter((r) => !matchesFilter(r, body.query.filter));
+          const doomed = new Set(applyLimit(rows.filter((r) => matchesFilter(r, body.query.filter)), body.query.limit));
+          state.items[coll] = rows.filter((r) => !doomed.has(r));
         }
         return new Response(null, { status: 204 });
       }

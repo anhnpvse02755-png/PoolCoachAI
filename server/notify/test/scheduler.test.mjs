@@ -4,7 +4,7 @@ import { createScheduler } from '../src/scheduler.mjs';
 import { createDirectus } from '../src/directus.mjs';
 import { deliveryIdFor, deviceIdFor } from '../src/devices.mjs';
 import { hashUserId } from '../src/log.mjs';
-import { CYCLE_MS, KINDS, TICK_MS, USER_CONCURRENCY } from '../src/limits.mjs';
+import { CYCLE_MS, KINDS, MAX_INCHAIN_RETRY_MS, TICK_MS, USER_CONCURRENCY } from '../src/limits.mjs';
 import { pushTopic, pushUrgency } from '../src/webpush.mjs';
 import { DIRECTUS, SERVICE_TOKEN, errorResponse, fakeDirectus, fakeFetch } from './fakes.mjs';
 
@@ -17,8 +17,9 @@ const COLLECTIONS = ['drill_logs', 'timer_sessions', 'schedule_slots', 'cue_equi
 const FIELDS = Object.fromEntries(COLLECTIONS.map((c, i) => [c, `id,f${i}`]));
 const SETTINGS_FIELDS = 'id,recommendation,maintenance,schedule,streak,prefs_updated_at,last_seen_cat,last_seen_drill_id,last_seen_at,timezone,user_created';
 
-function device(n, over = {}) {
-  const endpoint = `https://fcm.googleapis.com/fcm/send/dev-${n}`;
+const MOZ = 'https://updates.push.services.mozilla.com/wpush/v2';
+function device(n, over = {}, host = 'https://fcm.googleapis.com/fcm/send') {
+  const endpoint = `${host}/dev-${n}`;
   return {
     id: deviceIdFor(endpoint), user: 'user-a', channel: 'web', platform: 'web', endpoint, key_p256dh: 'p', key_auth: 'a',
     timezone: 'Asia/Ho_Chi_Minh', seed_fingerprint: 'fp1', mode: 'server', server_kinds: [...KINDS],
@@ -145,14 +146,75 @@ test('quá validUntil (máy chủ vừa sống lại): không gửi', async () =
 });
 
 test('thử lại sau 429/5xx không bao giờ gửi khi đã quá validUntil', async () => {
-  // Hết hạn sau 3 giây: lần chờ 2 giây còn kịp, lần chờ 8 giây thì không.
+  // Hết hạn sau 3 giây: lần chờ 2 giây còn kịp; lần chờ 8 giây sẽ qua hạn nên không chờ, nhả dòng.
   const h = harness({
     plan: dueOnly([item(1, { validUntilUtc: iso(T0 + 3000) })]),
     send: () => ({ status: 'retry', code: 503, retryAfterMs: 1000 }),
   });
   await h.s.cycle();
   assert.equal(h.sent.length, 2);
-  assert.deepEqual(h.sleeps, [2000, 8000]);
+  assert.deepEqual(h.sleeps, [2000]);
+  assert.deepEqual(h.rows('push_deliveries'), []);
+  h.advance(TICK_MS);
+  await h.s.tick();
+  assert.equal(h.sent.length, 2);
+});
+
+test('giành chậm (POST giành lâu) đẩy now qua validUntil: không gửi, nhả dòng', async () => {
+  const h = harness({ plan: dueOnly([item(1, { validUntilUtc: iso(T0 + 10_000) })]) });
+  h.fake.reply = ({ method, path }) => {
+    if (method === 'POST' && path === '/items/push_deliveries') h.advance(30_000); // 429 lặp / hết giờ chờ ở Directus
+    return undefined;
+  };
+  await h.s.cycle();
+  assert.deepEqual(h.sent, []);
+  assert.deepEqual(h.rows('push_deliveries'), [], 'dòng giành được nhả (chắc chắn chưa gửi)');
+});
+
+test('lease sắp hết (trừ 5 phút) ngay trước lần gửi: không gửi, nhả dòng', async () => {
+  const d = device(1, { lease_until: iso(T0 + 6 * MIN), failure_count: 1 });
+  const h = harness({ devices: [d], plan: dueOnly([item(1)]) });
+  h.fake.reply = ({ method, path }) => {
+    if (method === 'POST' && path === '/items/push_deliveries') h.advance(2 * MIN);
+    return undefined;
+  };
+  await h.s.cycle();
+  assert.deepEqual(h.sent, []);
+  assert.deepEqual(h.rows('push_deliveries'), []);
+});
+
+test('Retry-After vượt validUntil: không chờ, không gửi lại, nhả dòng', async () => {
+  const h = harness({
+    plan: dueOnly([item(1, { validUntilUtc: iso(T0 + 4000) })]),
+    send: () => ({ status: 'retry', code: 429, retryAfterMs: 5000 }),
+  });
+  await h.s.cycle();
+  assert.equal(h.sent.length, 1);
+  assert.deepEqual(h.sleeps, []);
+  assert.deepEqual(h.rows('push_deliveries'), []);
+});
+
+test(`Retry-After dài hơn ${MAX_INCHAIN_RETRY_MS} ms: không ngủ trong chuỗi, nhả dòng, nhịp sau (đã qua Retry-After) gửi lại`, async () => {
+  assert.equal(MAX_INCHAIN_RETRY_MS, 5000);
+  const h = harness({
+    plan: dueOnly([item(1)]),
+    send: (_d, _m, _o, n) => (n === 1 ? { status: 'retry', code: 429, retryAfterMs: 90_000 } : { status: 'sent' }),
+  });
+  await h.s.cycle();
+  assert.equal(h.sent.length, 1);
+  assert.deepEqual(h.sleeps, []);
+  assert.deepEqual(h.rows('push_deliveries'), []);
+  h.advance(TICK_MS);
+  await h.s.tick(); // mới 60 s < 90 s: chưa gửi lại, không giành
+  h.advance(10_000);
+  await h.s.cycle(); // chu kỳ lúc 70 s cũng chưa được gửi sớm
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.calls('POST', 'push_deliveries').length, 1);
+  h.advance(6 * MIN - 70_000); // chu kỳ sau Retry-After thì gửi lại
+  await h.s.cycle();
+  assert.equal(h.sent.length, 2);
+  assert.equal(h.sent[1].at, T0 + 6 * MIN);
+  assert.equal(h.rows('push_deliveries')[0].sent_at, iso(T0 + 6 * MIN));
 });
 
 // ─── Không trùng: giành rồi mới gửi ──────────────────────────────────────────
@@ -309,13 +371,17 @@ test('503 hai lần rồi 201: gửi được, chờ theo Retry-After, failure_c
     send: (_d, _m, _o, n) => (n < 3 ? { status: 'retry', code: 503, retryAfterMs: n === 1 ? 5000 : 1000 } : { status: 'sent' }),
   });
   await h.s.cycle();
+  // Lần thử lại 1 chờ 5 s trong chuỗi; lần 2 phải chờ 8 s (> 5 s) nên hoãn sang nhịp sau.
+  assert.equal(h.sent.length, 2);
+  assert.deepEqual(h.sleeps, [5000]);
+  h.advance(TICK_MS);
+  await h.s.tick();
   assert.equal(h.sent.length, 3);
-  assert.deepEqual(h.sleeps, [5000, 8000]);
   // TTL tính lại ở mỗi lần thử, luôn là số nguyên.
-  assert.deepEqual(h.sent.map((x) => x.opts.ttlSeconds), [3300, 3295, 3287]);
+  assert.deepEqual(h.sent.map((x) => x.opts.ttlSeconds), [3300, 3295, 3235]);
   assert.equal(deviceRow(h, d.id).failure_count, 0);
   const row = h.rows('push_deliveries')[0];
-  assert.equal(row.sent_at, iso(T0 + 13_000));
+  assert.equal(row.sent_at, iso(T0 + 65_000));
 });
 
 test('429/5xx hết lượt thử: không đụng thiết bị, nhả dòng giành để chu kỳ sau thử lại', async () => {
@@ -326,11 +392,17 @@ test('429/5xx hết lượt thử: không đụng thiết bị, nhả dòng già
     send: () => (down ? { status: 'retry', code: 503, retryAfterMs: 0 } : { status: 'sent' }),
   });
   await h.s.cycle();
+  assert.equal(h.sent.length, 2);
+  assert.deepEqual(h.sleeps, [2000]);
+  h.advance(TICK_MS);
+  await h.s.tick(); // lần thử lại thứ hai (đã hoãn 8 s): vẫn 503 → hết lượt
   assert.equal(h.sent.length, 3);
-  assert.deepEqual(h.sleeps, [2000, 8000]);
   assert.equal(deviceRow(h, d.id).failure_count, 0);
   assert.deepEqual(h.rows('push_deliveries'), []);
   assert.deepEqual(h.calls('PATCH', 'push_devices'), []);
+  h.advance(TICK_MS);
+  await h.s.tick(); // hết lượt thì không xếp lại: các nhịp sau không gửi thêm
+  assert.equal(h.sent.length, 3);
   down = false;
   h.advance(CYCLE_MS);
   await h.s.cycle();
@@ -381,10 +453,62 @@ test('failed deviceFault:false (auth): không đụng thiết bị, cờ push=au
   assert.equal(loud[0].level, 'error');
   assert.doesNotMatch(JSON.stringify(h.logs), /fcm\.googleapis|dev-1|user-a/);
   auth = false;
-  h.advance(CYCLE_MS);
+  h.advance(CYCLE_MS + MIN);
   await h.s.cycle();
-  assert.equal(h.s.pushStatus, 'ok');
+  assert.equal(h.s.pushStatus, 'ok', 'không có auth nào trong 15 phút qua');
   assert.equal(h.sent.filter((x) => x.msg.key === 'schedule:2026-10-30:1').length, 4);
+});
+
+test('pushStatus: auth_failing nếu BẤT KỲ push host nào trả auth trong 15 phút qua, không lật theo host khác', async () => {
+  const moz = device(1, {}, MOZ);
+  const fcm = device(2);
+  const h = harness({
+    devices: [moz, fcm],
+    plan: (req) => ({ ok: true, items: req.mode === 'due' ? [item(Math.floor((Date.parse(req.nowUtc) - T0) / MIN) + 1, { validUntilUtc: iso(T0 + 2 * H) })] : [] }),
+    send: (dev) => (dev.endpoint.startsWith(MOZ) ? { status: 'failed', code: 'auth', deviceFault: false } : { status: 'sent' }),
+  });
+  await h.s.cycle(); // moz trả auth rồi fcm gửi được ngay sau đó
+  assert.ok(h.sent.some((x) => x.device === fcm.id), 'fcm gửi sau moz');
+  assert.equal(h.s.pushStatus, 'auth_failing');
+  h.advance(10 * MIN);
+  h.fake.items.push_devices = h.fake.items.push_devices.filter((d) => d.id === fcm.id); // moz thôi nhận
+  await h.s.cycle();
+  assert.ok(h.sent.some((x) => x.device === fcm.id && x.at === h.now), 'host fcm vừa gửi được');
+  assert.equal(h.s.pushStatus, 'auth_failing', 'auth của moz mới 10 phút');
+  h.advance(6 * MIN);
+  assert.equal(h.s.pushStatus, 'ok', 'auth cuối đã quá 15 phút');
+});
+
+test('host push trả 429/5xx: bỏ các lần gửi còn lại tới host đó trong nhịp này, host khác vẫn gửi; nhịp sau gửi nốt', async () => {
+  const f1 = device(1);
+  const f2 = device(2);
+  const m1 = device(3, {}, MOZ);
+  let fcmDown = true;
+  const h = harness({
+    devices: [f1, f2, m1], plan: dueOnly([item(1), item(2)]),
+    send: (dev) => (dev.endpoint.startsWith(MOZ) || !fcmDown ? { status: 'sent' } : { status: 'retry', code: 503, retryAfterMs: 0 }),
+  });
+  await h.s.cycle();
+  const fcmCalls = h.sent.filter((x) => x.device !== m1.id);
+  // Một mục tới f1: lần đầu + một lần thử lại 2 s trong chuỗi, rồi ngắt host fcm cho cả lượt.
+  assert.equal(fcmCalls.length, 2);
+  assert.equal(new Set(fcmCalls.map((x) => `${x.device}|${x.msg.key}`)).size, 1);
+  assert.deepEqual(h.sent.filter((x) => x.device === m1.id).map((x) => x.msg.key), ['schedule:2026-10-30:1', 'schedule:2026-10-30:2']);
+  assert.equal(h.calls('POST', 'push_deliveries').length, 3, 'không giành cho máy bị ngắt host');
+  fcmDown = false;
+  h.advance(TICK_MS);
+  await h.s.tick();
+  const delivered = h.rows('push_deliveries').filter((r) => r.sent_at);
+  assert.equal(delivered.length, 6, 'nhịp sau gửi nốt cả bốn lần tới fcm');
+});
+
+test('sender trả giá trị không phải đối tượng: không ném, giữ dòng (không rõ), các mục khác vẫn gửi', async () => {
+  const h = harness({ plan: dueOnly([item(1), item(2)]), send: (_d, msg) => (msg.key.endsWith(':1') ? undefined : { status: 'sent' }) });
+  await h.s.cycle();
+  assert.equal(h.sent.length, 2);
+  assert.ok(!h.logs.some((l) => l.event === 'user_failed'));
+  const rows = Object.fromEntries(h.rows('push_deliveries').map((r) => [r.key, r.sent_at]));
+  assert.deepEqual(rows, { 'schedule:2026-10-30:1': null, 'schedule:2026-10-30:2': iso(T0) });
 });
 
 test('kênh chưa có sender (fcm): không gửi, không đụng thiết bị', async () => {
@@ -394,6 +518,8 @@ test('kênh chưa có sender (fcm): không gửi, không đụng thiết bị', 
   assert.deepEqual(h.sent, []);
   assert.equal(deviceRow(h, d.id).failure_count, 0);
   assert.ok(h.logs.some((l) => l.event === 'push' && l.code === 'unsupported_channel'));
+  assert.equal(h.calls('POST', 'push_deliveries').length, 1);
+  assert.deepEqual(h.rows('push_deliveries'), [], 'nhả dòng: chắc chắn chưa gửi');
 });
 
 test('failure_count lên 5: xoá thiết bị; last_seen_at quá 60 ngày: xoá ở chu kỳ', async () => {
@@ -621,13 +747,22 @@ test('helper thật: 24 giờ chu kỳ + nhịp, mỗi mục gửi một lần, 
     });
     const h = harness({ devices: [d], fingerprint: info.fingerprint, extra: { schedule_slots: [slot('s1', 4, '18:07'), slot('s2', 5, '07:22')] } });
     const byDelivery = new Map();
+    const dueIds = new Set();
+    const upcomingIds = new Set();
     h.planner.info = () => real.info();
     h.planner.plan = async (req) => {
       h.planCalls.push(req);
       const reply = await real.plan(req);
-      if (reply.ok) for (const it of reply.items) byDelivery.set(deliveryIdFor(d.id, it.kind, it.key), it);
+      if (reply.ok) {
+        for (const it of reply.items) {
+          const id = deliveryIdFor(d.id, it.kind, it.key);
+          byDelivery.set(id, it);
+          (req.mode === 'due' ? dueIds : upcomingIds).add(id);
+        }
+      }
       return reply;
     };
+    const end = T0 + 24 * H;
     for (let minute = 0; minute < 24 * 60; minute += 1) {
       if (minute % 15 === 0) await h.s.cycle();
       await h.s.tick();
@@ -651,6 +786,18 @@ test('helper thật: 24 giờ chu kỳ + nhịp, mỗi mục gửi một lần, 
       assert.ok(lateBy >= 0 && lateBy < MIN, `trễ ${lateBy} ms`);
       assert.notEqual((x.at - T0) % CYCLE_MS, 0, 'do nhịp phút gửi, không phải chu kỳ');
     }
+    // Đủ: mọi mục helper trả ở lượt due đều được gửi đúng một lần; mọi mục upcoming
+    // tới hạn trong 24 giờ mô phỏng cũng vậy.
+    const sentIds = new Set(ids);
+    assert.deepEqual([...dueIds].filter((id) => !sentIds.has(id)), [], 'mục đến hạn bị bỏ sót');
+    const upcomingInWindow = [...upcomingIds].filter((id) => Date.parse(byDelivery.get(id).atUtc) < end);
+    assert.ok(upcomingInWindow.length >= 2);
+    assert.deepEqual(upcomingInWindow.filter((id) => !sentIds.has(id)), [], 'mục upcoming bị bỏ sót');
+    // Gợi ý: một mỗi ngày địa phương. Cửa sổ 09:00 thứ Sáu → 09:00 thứ Bảy (giờ VN) chỉ chứa gợi ý
+    // của thứ Sáu; gợi ý thứ Bảy mở lúc 09:00 thứ Bảy = cuối cửa sổ, nên đúng 1.
+    const recs = h.sent.filter((x) => x.msg.kind === 'recommendation');
+    assert.equal(recs.length, 1);
+    assert.match(recs[0].msg.key, /^2026-10-30:/);
     assert.deepEqual(h.logs.filter((l) => l.event === 'plan_failed'), []);
     assert.equal(h.rows('push_deliveries').filter((r) => r.sent_at).length, h.sent.length);
   } finally {
@@ -661,7 +808,7 @@ test('helper thật: 24 giờ chu kỳ + nhịp, mỗi mục gửi một lần, 
 test('mục tới hạn trong lúc lượt due chờ thử lại vẫn vào hàng đợi, nhịp phút kế tiếp gửi', async () => {
   const d1 = device(1);
   const d2 = device(2);
-  const soon = T0 + 5_000; // tới hạn trong lúc chờ 2 s + 8 s
+  const soon = T0 + 5_000; // tới hạn trong lúc chờ thử lại 5 s
   const later = item(2, { atUtc: iso(soon), validUntilUtc: iso(soon + H) });
   const h = harness({
     devices: [d1, d2],
@@ -670,11 +817,88 @@ test('mục tới hạn trong lúc lượt due chờ thử lại vẫn vào hàn
       if (req.mode === 'upcoming') return { ok: true, items: nowMs < soon ? [later] : [] };
       return { ok: true, items: nowMs >= soon ? [later] : [item(1)] };
     },
-    send: (dev, msg) => (dev.id === d1.id && msg.key === 'schedule:2026-10-30:1' ? { status: 'retry', code: 503, retryAfterMs: 0 } : { status: 'sent' }),
+    send: (dev, msg) => (dev.id === d1.id && msg.key === 'schedule:2026-10-30:1' ? { status: 'retry', code: 503, retryAfterMs: 5000 } : { status: 'sent' }),
   });
-  await h.s.cycle(); // lượt due chờ 10 s; upcoming được hỏi lúc T0+10s, khi mục 2 đã qua giờ
+  await h.s.cycle(); // lượt due chờ 5 s; mục 2 tới hạn trong lúc đó
   assert.ok(h.now >= soon);
   h.advance(TICK_MS);
   await h.s.tick();
   assert.deepEqual(h.sent.filter((x) => x.msg.key === 'schedule:2026-10-30:2').map((x) => x.device).sort(), [d1.id, d2.id].sort());
+});
+
+test('không gia hạn lease khi chưa có notification_settings (app quay về cục bộ khi lease hết)', async () => {
+  const d = device(1, { lease_until: iso(T0 + H) });
+  const h = harness({ devices: [d], settings: [] });
+  await h.s.cycle();
+  assert.equal(deviceRow(h, d.id).lease_until, iso(T0 + H));
+  assert.deepEqual(h.calls('PATCH', 'push_devices'), []);
+});
+
+test('không gia hạn lease cho múi mà lượt due hỏng (bad_data, helper lỗi); múi khác lập được thì vẫn gia hạn', async () => {
+  const badData = device(1, { lease_until: iso(T0 + H) });
+  const crashed = device(2, { lease_until: iso(T0 + H), timezone: 'UTC' });
+  const fine = device(3, { lease_until: iso(T0 + H), timezone: 'America/Argentina/Buenos_Aires' });
+  const h = harness({
+    devices: [badData, crashed, fine],
+    plan: (req) => {
+      if (req.tz === 'Asia/Ho_Chi_Minh') return { ok: false, error: 'bad_data', collection: 'drill_logs' };
+      if (req.tz === 'UTC') throw Object.assign(new Error('timeout'), { code: 'timeout' });
+      return { ok: true, items: [] };
+    },
+  });
+  await h.s.cycle();
+  assert.equal(deviceRow(h, badData.id).lease_until, iso(T0 + H));
+  assert.equal(deviceRow(h, crashed.id).lease_until, iso(T0 + H));
+  assert.equal(deviceRow(h, fine.id).lease_until, iso(T0 + 6 * H));
+});
+
+test('chu kỳ đọc lại thiết bị của người đó: máy vừa về local thì không gửi; seed mới thì server_kinds theo seed mới', async () => {
+  const goesLocal = device(1, { lease_until: iso(T0 + H) }); // ảnh cũ sẽ gia hạn nó
+  const reseeded = device(2, { seed_fingerprint: 'old', server_kinds: ['maintenance', 'schedule', 'streak'] });
+  const rec = item(1, { kind: 'recommendation', key: 'rec:2026-10-30' });
+  const h = harness({ devices: [goesLocal, reseeded], plan: dueOnly([rec]) });
+  h.fake.reply = ({ method, path, url }) => {
+    if (method === 'GET' && path === '/items/push_devices' && url.searchParams.get('filter[mode][_eq]') === 'server') {
+      const snapshot = h.fake.items.push_devices.map((r) => ({ ...r }));
+      // Ngay sau lúc liệt kê: máy 1 chuyển local, máy 2 đăng ký lại với seed khớp helper.
+      Object.assign(h.fake.items.push_devices[0], { mode: 'local' });
+      Object.assign(h.fake.items.push_devices[1], { seed_fingerprint: 'fp1' });
+      return new Response(JSON.stringify({ data: snapshot }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return undefined;
+  };
+  await h.s.cycle();
+  assert.deepEqual(h.sent.map((x) => x.device), [reseeded.id]);
+  assert.deepEqual(deviceRow(h, reseeded.id).server_kinds, [...KINDS]);
+  assert.equal(h.calls('PATCH', 'push_devices').filter((c) => c.path.endsWith(goesLocal.id)).length, 0, 'không đụng máy đã về local');
+  assert.equal(h.calls('GET', 'push_devices').filter((c) => c.params.get('filter[user][_eq]') === 'user-a').length, 1, 'một lần đọc thiết bị mỗi người');
+});
+
+test('nhịp phút: helper trả bad_tz cho múi của máy thì server_kinds [] cho máy đó, máy khác vẫn gửi', async () => {
+  const bad = device(1);
+  const good = device(2, { timezone: 'UTC' });
+  const atA = T0 + 10 * MIN;
+  let badTz = false;
+  const h = harness({
+    devices: [bad, good],
+    plan: (req) => {
+      if (badTz && req.tz === 'Asia/Ho_Chi_Minh') return { ok: false, error: 'bad_tz' };
+      const it = item(1, { atUtc: iso(atA), validUntilUtc: iso(atA + H) });
+      return { ok: true, items: req.mode === 'upcoming' ? [it] : Date.parse(req.nowUtc) >= atA ? [it] : [] };
+    },
+  });
+  await h.s.cycle();
+  badTz = true; // bảng múi của helper đổi giữa chừng
+  h.advance(10 * MIN);
+  await h.s.tick();
+  assert.deepEqual(deviceRow(h, bad.id).server_kinds, []);
+  assert.deepEqual(h.sent.map((x) => x.device), [good.id]);
+  assert.equal(h.logs.find((l) => l.event === 'bad_tz').device, bad.id.slice(0, 8));
+});
+
+test('dọn delivery cũ hết cả khi quá 100 dòng (Directus mặc định chỉ 100 dòng mỗi truy vấn)', async () => {
+  const old = Array.from({ length: 150 }, (_, i) => ({ id: `o${i}`, user: 'user-a', at: iso(T0 - 40 * DAY), sent_at: null }));
+  const h = harness({ enabled: false, deliveries: [...old, { id: 'keep', user: 'user-a', at: iso(T0 - DAY), sent_at: null }] });
+  await h.s.cycle();
+  assert.deepEqual(h.rows('push_deliveries').map((r) => r.id), ['keep']);
 });

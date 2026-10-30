@@ -6,7 +6,8 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import webPush from 'web-push';
 import { main, startService } from '../src/main.mjs';
-import { CYCLE_MS, KINDS, TICK_MS } from '../src/limits.mjs';
+import { CYCLE_MS, KINDS, SHUTDOWN_WAIT_MS, TICK_MS } from '../src/limits.mjs';
+import { validInfo } from '../src/planner.mjs';
 import { DIRECTUS, SERVICE_TOKEN, fakeDirectus, fakeFetch } from './fakes.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -177,6 +178,18 @@ test('tắt êm có giới hạn: chuỗi kẹt (Directus treo) thì vẫn đón
   assert.equal(service.server.listening, false);
   assert.equal(helper.children[0].killed, true);
   assert.ok(logs.some((l) => l.event === 'shutdown_timeout'));
+});
+
+test('chờ tắt êm ≤ 8 s: dưới thời gian ân hạn 10 s của Docker/Swarm trước SIGKILL', () => {
+  assert.equal(SHUTDOWN_WAIT_MS, 8_000);
+});
+
+test('validInfo (một bản duy nhất, planner.mjs): đủ ok, fingerprint, fields, settingsFields', () => {
+  const good = { ok: true, fingerprint: 'fp', fields: { a: 'id' }, settingsFields: 'id' };
+  assert.equal(validInfo(good), true);
+  for (const bad of [null, undefined, { ...good, ok: false }, { ...good, fingerprint: 1 }, { ...good, fields: null }, { ...good, settingsFields: undefined }]) {
+    assert.equal(validInfo(bad), false);
+  }
 });
 
 test('placeholders.mjs đã bỏ: main nối planner và scheduler thật', () => {

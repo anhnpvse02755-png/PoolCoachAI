@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { loadConfig } from './config.mjs';
 import { createDirectus } from './directus.mjs';
 import { SHUTDOWN_WAIT_MS } from './limits.mjs';
-import { createPlanner } from './planner.mjs';
+import { createPlanner, validInfo } from './planner.mjs';
 import { createScheduler } from './scheduler.mjs';
 import { createSenders } from './senders.mjs';
 import { createApp } from './server.mjs';
@@ -50,8 +50,7 @@ export async function startService({
     planner.close();
     throw new StartupError('helper không chạy (kiểm NOTIFY_PLAN_BIN)');
   }
-  if (info?.ok !== true || typeof info.fingerprint !== 'string' || info.fields === null || typeof info.fields !== 'object'
-    || typeof info.settingsFields !== 'string') {
+  if (!validInfo(info)) {
     planner.close();
     throw new StartupError('helper trả info không hợp lệ');
   }

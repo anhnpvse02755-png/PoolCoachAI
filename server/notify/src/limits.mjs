@@ -42,5 +42,11 @@ export const USER_CONCURRENCY = 4;
 export const LEASE_RENEW_BELOW_MS = LEASE_MS - 3_600_000;
 // Hai lần thử lại sau 429/5xx (★10): chờ ít nhất chừng này, hoặc Retry-After nếu dài hơn.
 export const RETRY_FLOORS_MS = [2_000, 8_000];
-// Tắt êm: đợi việc đang chạy của bộ lập lịch tối đa chừng này.
-export const SHUTDOWN_WAIT_MS = 20_000;
+// Chờ thử lại dài hơn chừng này thì không ngủ trong chuỗi (chu kỳ/nhịp bị giữ):
+// nhả dòng giành và để nhịp phút sau (đã qua Retry-After) giành lại, nếu mục còn hạn.
+export const MAX_INCHAIN_RETRY_MS = 5_000;
+// /healthz báo push=auth_failing khi BẤT KỲ push host nào trả 401/403 trong chừng này.
+export const AUTH_WINDOW_MS = 15 * 60_000;
+// Tắt êm: đợi việc đang chạy của bộ lập lịch tối đa chừng này, dưới thời gian ân
+// hạn 10 s của Docker/Swarm trước SIGKILL.
+export const SHUTDOWN_WAIT_MS = 8_000;

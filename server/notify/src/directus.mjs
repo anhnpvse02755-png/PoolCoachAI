@@ -156,7 +156,8 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
   /// Nhả dòng đã giành (chỉ dòng chính tiến trình này vừa tạo và chắc chắn chưa gửi).
   const deleteDelivery = (id) => send(`/items/push_deliveries/${q(id)}`, 'DELETE');
   const deleteDeliveriesBefore = (iso) =>
-    send('/items/push_deliveries', 'DELETE', { query: { filter: { at: { _lt: iso } } } });
+    // limit -1: không có thì Directus chỉ xoá QUERY_LIMIT_DEFAULT (100) dòng mỗi lần.
+    send('/items/push_deliveries', 'DELETE', { query: { filter: { at: { _lt: iso } }, limit: -1 } });
 
   return {
     userIdForToken, listServerDevices, devicesOfUser, getDevice, createDevice, updateDevice, deleteDevices,

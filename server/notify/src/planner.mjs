@@ -15,6 +15,11 @@ export class PlannerError extends Error {
 }
 
 const PROTOCOL_VERSION = 1;
+
+/// Trả lời `info` của helper dùng được: ok, có fingerprint, `fields` (theo
+/// collection) và `settingsFields`. Một bản duy nhất cho main và scheduler.
+export const validInfo = (info) => info?.ok === true && typeof info.fingerprint === 'string'
+  && info.fields !== null && typeof info.fields === 'object' && typeof info.settingsFields === 'string';
 const MAX_LINE_CHARS = 1024 * 1024;
 
 export function createPlanner({

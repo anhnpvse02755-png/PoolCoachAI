@@ -2,19 +2,25 @@
 // (server_kinds, lease), lượt `due` (bù sau khi khởi động lại) và lượt
 // `upcoming` (xếp giờ vào hàng đợi). Nhịp 1 phút: người nào tới giờ thì đọc lại
 // dữ liệu MỚI và chạy lượt `due`. Nội dung luôn do helper tính lúc gửi; quá
-// `validUntil` thì không gửi.
+// `validUntil` thì không gửi (kiểm lại ngay trước MỖI lần gửi, kể cả lần đầu).
 //
 // Không trùng: mỗi lần gửi trước hết GIÀNH một dòng push_deliveries có id cố
 // định (deliveryIdFor, cùng công thức với dòng giành trước của đăng ký).
 // RECORD_NOT_UNIQUE nghĩa là đã có người giành: bỏ qua. `sent_at` chỉ ghi sau
 // khi push service nhận.
 //
-// Dòng đã giành mà không gửi được:
-// - chắc chắn CHƯA tới push service (429/5xx hết lượt thử, auth, lỗi thiết bị,
-//   kênh chưa có, options/tin hỏng) → xoá dòng, để chu kỳ sau thử lại khi mục
-//   còn hiệu lực;
-// - không rõ (mạng, hết giờ, lỗi nội bộ) → GIỮ dòng: thà thiếu một lần còn hơn
-//   gửi hai lần (★10). Dòng có sent_at rỗng nên không bao giờ hiện "Đã gửi".
+// Dòng đã giành mà không gửi được (T11a(3)):
+// - chắc chắn CHƯA tới push service (429/5xx hết lượt hay hoãn, quá hạn/lease
+//   trước lần gửi, auth, lỗi thiết bị, kênh chưa có, options/tin hỏng) → xoá
+//   dòng, để nhịp hay chu kỳ sau giành lại khi mục còn hiệu lực;
+// - không rõ (mạng, hết giờ, lỗi nội bộ, sender trả kết quả lạ) → GIỮ dòng: thà
+//   thiếu một lần còn hơn gửi hai lần (★10). Dòng có sent_at rỗng nên không bao
+//   giờ hiện "Đã gửi".
+//
+// Thử lại 429/5xx: tối đa hai lần (★10). Chờ ≤ MAX_INCHAIN_RETRY_MS thì ngủ ngay
+// trong chuỗi; dài hơn thì nhả dòng và hẹn nhịp phút sau (sau Retry-After) giành
+// lại. Chờ mà quá validUntil thì thôi. Sau một 429/5xx, các lần gửi còn lại tới
+// cùng push host trong lượt này bị bỏ qua (ngắt theo host) và hẹn nhịp sau.
 //
 // Nhật ký chỉ có băm id người dùng và 8 ký tự đầu id thiết bị; không bao giờ
 // có endpoint, khoá, tiêu đề hay nội dung.
@@ -22,15 +28,16 @@
 import { deliveryIdFor, serverKindsFor } from './devices.mjs';
 import { hashUserId } from './log.mjs';
 import {
-  CYCLE_MS, DAILY_CAP, DELIVERY_KEEP_DAYS, FAILURES_TO_PRUNE, HORIZON_MS, LEASE_MARGIN_MS, LEASE_MS, LEASE_RENEW_BELOW_MS,
-  RETRY_FLOORS_MS, STALE_DEVICE_DAYS, TICK_MS, USER_CONCURRENCY,
+  AUTH_WINDOW_MS, CYCLE_MS, DAILY_CAP, DELIVERY_KEEP_DAYS, FAILURES_TO_PRUNE, HORIZON_MS, LEASE_MARGIN_MS, LEASE_MS,
+  LEASE_RENEW_BELOW_MS, MAX_INCHAIN_RETRY_MS, RETRY_FLOORS_MS, STALE_DEVICE_DAYS, TICK_MS, USER_CONCURRENCY,
 } from './limits.mjs';
+import { validInfo } from './planner.mjs';
 import { buildPlanRequest } from './requests.mjs';
 import { pushTopic, pushUrgency, ttlSeconds } from './webpush.mjs';
 
 const DAY_MS = 86_400_000;
 // Lỗi không rõ đã tới push service hay chưa: giữ dòng đã giành.
-const AMBIGUOUS = new Set(['network', 'timeout', 'internal']);
+const AMBIGUOUS = new Set(['network', 'timeout', 'internal', 'bad_result']);
 
 /// Giờ Directus (có thể thiếu đuôi múi) thành ms UTC, hoặc NaN.
 function ms(value) {
@@ -41,6 +48,15 @@ const iso = (t) => new Date(t).toISOString();
 const short = (deviceId) => String(deviceId).slice(0, 8);
 const kindsOf = (d) => (Array.isArray(d.server_kinds) ? d.server_kinds : []);
 const sameKinds = (a, b) => a.length === b.length && a.every((k) => b.includes(k));
+
+/// Push host của thiết bị (cho bộ ngắt theo host và cờ auth); không bao giờ ghi log.
+function hostOf(device) {
+  try {
+    return new URL(device.endpoint).host;
+  } catch {
+    return `channel:${device.channel}`;
+  }
+}
 
 function groupBy(list, key) {
   const out = new Map();
@@ -61,9 +77,6 @@ async function eachLimited(list, limit, fn) {
   await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
 }
 
-const validInfo = (info) => info?.ok === true && typeof info.fingerprint === 'string'
-  && info.fields !== null && typeof info.fields === 'object' && typeof info.settingsFields === 'string';
-
 export function createScheduler({
   directus, planner, senders, config, now = () => new Date(), log = () => {},
   setInterval = globalThis.setInterval, clearInterval = globalThis.clearInterval,
@@ -75,7 +88,9 @@ export function createScheduler({
   let timers = [];
   let lastCycleAt = null;
   let lastInfo = null;
-  let pushStatus = 'ok';
+  const authAt = new Map(); // push host -> lần cuối trả 401/403 (ms)
+  // deliveryId -> { used, notBefore, validUntil }: lần thử lại đã dùng của mục bị hoãn.
+  const retries = new Map();
   const queue = new Map(); // userId -> giờ (ms UTC) tăng dần trong 24 giờ tới
   const t = () => now().getTime();
 
@@ -96,6 +111,12 @@ export function createScheduler({
     return p;
   }
 
+  /// Hẹn người [userId] cho nhịp phút ở [times] (gộp, tăng dần, không trùng).
+  function requeue(userId, ...times) {
+    const merged = new Set([...(queue.get(userId) ?? []), ...times]);
+    queue.set(userId, [...merged].sort((a, b) => a - b));
+  }
+
   // ─── Đọc dữ liệu một người (một lần cho cả hai lượt) ──────────────────────
 
   async function load(userId, info) {
@@ -107,6 +128,14 @@ export function createScheduler({
       directus.deliveriesOfUser(userId, since),
     ]);
     return { settings, data, deliveries: [...(deliveries ?? [])] };
+  }
+
+  /// Thiết bị server của người đó, đọc MỚI (seed, mode, lease hiện tại); bỏ máy
+  /// sắp bị dọn (lỗi ≥ 5, lâu không thấy).
+  async function freshDevices(userId, nowMs) {
+    const staleBefore = nowMs - STALE_DEVICE_DAYS * DAY_MS;
+    return ((await directus.devicesOfUser(userId)) ?? []).filter((d) => d.user === userId && d.mode === 'server'
+      && (d.failure_count ?? 0) < FAILURES_TO_PRUNE && !(ms(d.last_seen_at) < staleBefore));
   }
 
   /// Gọi helper cho một múi: `{ items }`, `'bad_tz'`, hoặc null (đã log).
@@ -146,25 +175,40 @@ export function createScheduler({
 
   // ─── Gửi ─────────────────────────────────────────────────────────────────
 
-  function eligible(device, item, nowMs) {
-    return !device.removed
-      && device.mode === 'server'
-      && kindsOf(device).includes(item.kind)
-      && nowMs < ms(device.lease_until) - LEASE_MARGIN_MS
-      && ms(item.atUtc) <= nowMs && nowMs < ms(item.validUntilUtc);
-  }
+  /// Còn được gửi lúc [nowMs]: lease còn (trừ biên 5 phút) và at ≤ now < validUntil.
+  const sendable = (device, item, nowMs) => nowMs < ms(device.lease_until) - LEASE_MARGIN_MS
+    && ms(item.atUtc) <= nowMs && nowMs < ms(item.validUntilUtc);
 
-  async function sendWithRetry(sender, device, message, item) {
+  const eligible = (device, item, nowMs) => !device.removed && device.mode === 'server'
+    && kindsOf(device).includes(item.kind) && sendable(device, item, nowMs);
+
+  /// Gửi, thử lại 429/5xx theo ★10. Kết quả lạ (không phải đối tượng) thành
+  /// failed 'bad_result' (không rõ đã gửi chưa).
+  async function attemptSend(sender, device, message, item, deliveryId, run) {
     const options = () => ({ ttlSeconds: ttlSeconds(item.validUntilUtc, now()), topic: pushTopic(item.kind, item.key), urgency: pushUrgency(item.kind) });
-    let result = await sender.send(device, message, options());
-    for (const floor of RETRY_FLOORS_MS) {
-      if (result?.status !== 'retry') break;
-      await sleep(Math.max(floor, Number.isFinite(result.retryAfterMs) ? result.retryAfterMs : 0));
-      // Không bao giờ gửi sau validUntil, kể cả khi đang thử lại.
-      if (t() >= ms(item.validUntilUtc)) return { status: 'expired', code: result.code };
-      result = await sender.send(device, message, options());
+    const validUntil = ms(item.validUntilUtc);
+    let used = retries.get(deliveryId)?.used ?? 0;
+    retries.delete(deliveryId);
+    for (;;) {
+      // Lần giành (hay lần chờ) có thể lâu: kiểm lại hạn và lease ngay trước MỖI lần gửi.
+      if (!sendable(device, item, t())) return { status: 'expired' };
+      const result = await sender.send(device, message, options());
+      if (result === null || typeof result !== 'object' || typeof result.status !== 'string') {
+        return { status: 'failed', code: 'bad_result', deviceFault: false };
+      }
+      if (result.status !== 'retry') return result;
+      run.brokenHosts.add(hostOf(device));
+      if (used >= RETRY_FLOORS_MS.length) return { status: 'exhausted', code: result.code };
+      const delay = Math.max(RETRY_FLOORS_MS[used], Number.isFinite(result.retryAfterMs) ? result.retryAfterMs : 0);
+      used += 1;
+      const at = t() + delay;
+      if (at >= validUntil) return { status: 'expired', code: result.code }; // chờ xong thì đã hết hạn: không chờ
+      if (delay > MAX_INCHAIN_RETRY_MS) {
+        retries.set(deliveryId, { used, notBefore: at, validUntil });
+        return { status: 'deferred', code: result.code, at };
+      }
+      await sleep(delay);
     }
-    return result;
   }
 
   async function release(deliveryId) {
@@ -175,21 +219,20 @@ export function createScheduler({
     }
   }
 
-  async function deliver(userId, device, item, deliveryId, loaded) {
+  async function deliver(userId, device, item, deliveryId, loaded, run) {
     const message = {
       v: 1, deliveryId, notificationId: item.id, kind: item.kind, key: item.key,
       title: item.title, body: item.body, payload: item.payload, ackUrl: `${config.publicUrl}/push/ack`,
     };
     const sender = senders.senderFor(device.channel);
     const result = sender
-      ? await sendWithRetry(sender, device, message, item)
+      ? await attemptSend(sender, device, message, item, deliveryId, run)
       : { status: 'failed', code: 'unsupported_channel', deviceFault: false };
-    const status = result?.status ?? 'failed';
-    log({ event: 'push', user: hashUserId(userId), device: short(device.id), kind: item.kind, status, code: result?.code ?? null });
+    const { status } = result;
+    log({ event: 'push', user: hashUserId(userId), device: short(device.id), kind: item.kind, status, code: result.code ?? null });
 
     if (status === 'sent') {
       const at = now().toISOString();
-      pushStatus = 'ok';
       await directus.updateDelivery(deliveryId, { sent_at: at });
       await directus.updateDevice(device.id, { last_success_at: at, failure_count: 0 });
       device.failure_count = 0;
@@ -215,7 +258,7 @@ export function createScheduler({
     }
     // Lỗi phía server hoặc tạm thời: không bao giờ đụng thiết bị.
     if (status === 'failed' && result.code === 'auth') {
-      pushStatus = 'auth_failing';
+      authAt.set(hostOf(device), t());
       log({
         event: 'push_auth_failing', level: 'error', device: short(device.id),
         message: 'push service từ chối VAPID (401/403): kiểm khoá VAPID của dịch vụ',
@@ -223,10 +266,11 @@ export function createScheduler({
     }
     if (status === 'failed' && AMBIGUOUS.has(result.code)) return; // giữ dòng: gửi tối đa một lần
     await release(deliveryId);
+    if (status === 'deferred') requeue(userId, result.at);
   }
 
   /// Lượt `due`: gửi mục đến hạn tới từng máy đủ điều kiện, giành trước.
-  async function sendDue(userId, zones, plans, loaded) {
+  async function sendDue(userId, zones, plans, loaded, run) {
     const dayAgo = t() - DAY_MS;
     // ★8: chỉ dòng ĐÃ GỬI (sent_at) trong 24 giờ; dòng giành trước của đăng ký không tính.
     const counted = new Set(loaded.deliveries
@@ -241,11 +285,24 @@ export function createScheduler({
           if (!eligible(device, item, t())) continue;
           const deliveryId = deliveryIdFor(device.id, item.kind, item.key);
           if (known.has(deliveryId)) continue; // đã giành (kể cả giành trước của đăng ký)
+          const pending = retries.get(deliveryId);
+          if (pending && pending.notBefore > t()) {
+            requeue(userId, pending.notBefore); // chưa qua Retry-After: không giành
+            continue;
+          }
+          if (run.brokenHosts.has(hostOf(device))) {
+            requeue(userId, t() + 1); // host vừa 429/5xx: để nhịp phút sau
+            continue;
+          }
           const pair = `${item.kind}|${item.key}`;
           if (!counted.has(pair) && counted.size >= DAILY_CAP) {
             log({ event: 'cap_reached', user: hashUserId(userId), kind: item.kind });
             continue;
           }
+          // Chạy đua đã chấp nhận (T11a(3)): nếu đăng ký giành trước (shownToday) đúng
+          // lúc ta đang giữ dòng này, nó nhận RECORD_NOT_UNIQUE và bỏ qua; nếu sau đó
+          // ta nhả dòng (chắc chắn chưa gửi), lượt sau có thể gửi lại mục máy đã tự hiện.
+          // Hẹp (hai yêu cầu trong cùng vài giây) và tệ nhất là một thông báo trùng.
           const claimed = await directus.claimDelivery({
             id: deliveryId, user: userId, device: device.id, notification_id: item.id,
             kind: item.kind, key: item.key, title: item.title, body: item.body, at: item.atUtc, sent_at: null,
@@ -253,7 +310,7 @@ export function createScheduler({
           known.add(deliveryId);
           if (!claimed) continue;
           counted.add(pair);
-          await deliver(userId, device, item, deliveryId, loaded);
+          await deliver(userId, device, item, deliveryId, loaded, run);
         }
       }
     }
@@ -262,15 +319,18 @@ export function createScheduler({
   // ─── Chu kỳ ──────────────────────────────────────────────────────────────
 
   /// Giữ thiết bị: server_kinds theo vân tay helper (rỗng nếu múi hỏng), và
-  /// gia hạn lease cho máy khoẻ khi còn dưới 5 giờ. Một PATCH mỗi máy, chỉ khi cần.
-  async function maintain(devices, badZones, info, nowMs) {
+  /// gia hạn lease khi còn dưới 5 giờ cho máy khoẻ ở múi mà lượt due LẬP ĐƯỢC
+  /// (có dòng cài đặt và helper trả ok). Không lập được thì không gia hạn: lease
+  /// hết và app tự lo như P6a, thay vì cả hai bên cùng im (T11a(1), T11b).
+  /// Một PATCH mỗi máy, chỉ khi cần.
+  async function maintain(devices, badZones, okZones, info, nowMs) {
     for (const d of devices) {
       const bad = badZones.has(d.timezone);
       const kinds = bad ? [] : serverKindsFor({ seedFingerprint: d.seed_fingerprint, enabled: config.enabled, helperFingerprint: info.fingerprint });
       const patch = {};
       if (!sameKinds(kindsOf(d), kinds)) patch.server_kinds = kinds;
       const lease = ms(d.lease_until);
-      if (kinds.length > 0 && (d.failure_count ?? 0) === 0 && !(lease - nowMs >= LEASE_RENEW_BELOW_MS)) {
+      if (okZones.has(d.timezone) && kinds.length > 0 && (d.failure_count ?? 0) === 0 && !(lease - nowMs >= LEASE_RENEW_BELOW_MS)) {
         patch.lease_until = iso(nowMs + LEASE_MS);
       }
       if (Object.keys(patch).length === 0) continue;
@@ -280,24 +340,24 @@ export function createScheduler({
     }
   }
 
-  async function cycleUser(userId, devices, info) {
+  async function cycleUser(userId, info, run) {
     const nowMs = t();
+    queue.delete(userId); // dựng lại từ đầu; lượt due bên dưới hẹn lại các mục đang chờ thử lại
+    const devices = await freshDevices(userId, nowMs);
+    if (devices.length === 0) return;
     const zones = groupBy(devices, (d) => d.timezone);
     const loaded = await load(userId, info);
     const due = loaded ? await planAll(userId, zones, 'due', loaded) : new Map();
     const badZones = new Set([...due].filter(([, r]) => r === 'bad_tz').map(([tz]) => tz));
-    await maintain(devices, badZones, info, nowMs);
-    if (!loaded) {
-      queue.delete(userId);
-      return;
-    }
-    await sendDue(userId, zones, due, loaded);
+    const okZones = new Set([...due].filter(([, r]) => r !== null && r !== 'bad_tz').map(([tz]) => tz));
+    await maintain(devices, badZones, okZones, info, nowMs);
+    if (!loaded) return;
+    await sendDue(userId, zones, due, loaded, run);
 
     // Lượt upcoming lập từ ĐẦU chu kỳ, không phải sau lượt due (có thể đã chờ
     // thử lại): mục tới hạn trong lúc đó vẫn vào hàng đợi và nhịp phút kế tiếp
     // gửi ngay. Upcoming chỉ quyết định KHI NÀO; lượt due lúc đó tính lại từ dữ liệu mới.
-    const times = new Set();
-    const from = nowMs;
+    const times = [];
     for (const [tz, zoneDevices] of zones) {
       if (badZones.has(tz)) continue;
       const plan = await planZone(userId, tz, 'upcoming', loaded, iso(nowMs));
@@ -305,11 +365,10 @@ export function createScheduler({
       const live = zoneDevices.filter((d) => !d.removed && d.mode === 'server');
       for (const it of plan.items) {
         const at = ms(it.atUtc);
-        if (at > from && at <= from + HORIZON_MS && live.some((d) => kindsOf(d).includes(it.kind))) times.add(at);
+        if (at > nowMs && at <= nowMs + HORIZON_MS && live.some((d) => kindsOf(d).includes(it.kind))) times.push(at);
       }
     }
-    if (times.size > 0) queue.set(userId, [...times].sort((a, b) => a - b));
-    else queue.delete(userId);
+    if (times.length > 0) requeue(userId, ...times);
   }
 
   async function runCycle() {
@@ -319,9 +378,11 @@ export function createScheduler({
     } catch (e) {
       log({ event: 'prune_failed', error: e?.code ?? 'error' });
     }
+    for (const [id, r] of retries) if (r.validUntil <= nowMs) retries.delete(id);
     if (!config.enabled) {
       // Công tắc tắt: không gửi, không gia hạn; lease cũ hết hạn và app quay về cục bộ.
       queue.clear();
+      retries.clear();
       lastCycleAt = now();
       return;
     }
@@ -351,11 +412,13 @@ export function createScheduler({
     }
     lastInfo = info;
 
-    const byUser = groupBy(live, (d) => d.user);
-    for (const u of [...queue.keys()]) if (!byUser.has(u)) queue.delete(u);
-    await eachLimited([...byUser], userConcurrency, async ([userId, devices]) => {
+    // Danh sách chỉ để biết AI có máy; mỗi người đọc lại máy của mình ngay trước khi xử lý.
+    const users = [...new Set(live.map((d) => d.user))];
+    for (const u of [...queue.keys()]) if (!users.includes(u)) queue.delete(u);
+    const run = { brokenHosts: new Set() };
+    await eachLimited(users, userConcurrency, async (userId) => {
       try {
-        await cycleUser(userId, devices, info);
+        await cycleUser(userId, info, run);
       } catch (e) {
         log({ event: 'user_failed', user: hashUserId(userId), error: e?.code ?? e?.name ?? 'error' });
       }
@@ -365,24 +428,25 @@ export function createScheduler({
 
   // ─── Nhịp phút ──────────────────────────────────────────────────────────
 
-  async function tickUser(userId) {
-    const devices = ((await directus.devicesOfUser(userId)) ?? []).filter((d) => d.user === userId && d.mode === 'server');
+  async function tickUser(userId, run) {
+    const devices = await freshDevices(userId, t());
     if (devices.length === 0) return;
     const loaded = await load(userId, lastInfo);
     if (!loaded) return;
     const zones = groupBy(devices, (d) => d.timezone);
     const plans = await planAll(userId, zones, 'due', loaded);
     for (const [tz, r] of plans) if (r === 'bad_tz') await dropBadZone(zones.get(tz));
-    await sendDue(userId, zones, plans, loaded);
+    await sendDue(userId, zones, plans, loaded, run);
   }
 
   async function runTick() {
     if (!config.enabled || !lastInfo) return;
     const nowMs = t();
     const due = [...queue].filter(([, times]) => times[0] <= nowMs).map(([u]) => u);
+    const run = { brokenHosts: new Set() };
     await eachLimited(due, userConcurrency, async (userId) => {
       try {
-        await tickUser(userId);
+        await tickUser(userId, run);
       } catch (e) {
         log({ event: 'user_failed', user: hashUserId(userId), error: e?.code ?? e?.name ?? 'error' });
       } finally {
@@ -411,7 +475,12 @@ export function createScheduler({
       return chain;
     },
     get lastCycleAt() { return lastCycleAt; },
-    /// `'ok'` hoặc `'auth_failing'` (push service từ chối VAPID), cho /healthz.
-    get pushStatus() { return pushStatus; },
+    /// `'auth_failing'` khi BẤT KỲ push host nào trả 401/403 (VAPID bị từ chối) trong
+    /// AUTH_WINDOW_MS vừa qua, còn không thì `'ok'`; cho /healthz.
+    get pushStatus() {
+      const nowMs = t();
+      for (const [host, at] of authAt) if (nowMs - at >= AUTH_WINDOW_MS) authAt.delete(host);
+      return authAt.size > 0 ? 'auth_failing' : 'ok';
+    },
   };
 }
