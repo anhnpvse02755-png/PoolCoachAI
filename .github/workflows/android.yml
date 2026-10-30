@@ -40,6 +40,8 @@ jobs:
 
       - run: flutter test
 
+      - run: flutter test --platform chrome test/domain/notifications/notification_id_test.dart test/domain/notifications/seed_fingerprint_test.dart
+
       - run: flutter build apk --debug
 
       - uses: actions/upload-artifact@v4
