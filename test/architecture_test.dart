@@ -28,6 +28,22 @@ void main() {
       .where((line) => !line.trimLeft().startsWith('//'))
       .join('\n');
 
+  test('lib/domain, lib/core/strings, lib/data/seed không phụ thuộc Flutter (helper máy chủ biên dịch được)', () {
+    final files = [
+      ...dartFilesIn('lib/domain'),
+      ...dartFilesIn('lib/core/strings'),
+      ...dartFilesIn('lib/data/seed'),
+    ];
+    final offenders = [
+      for (final f in files)
+        if (RegExp(r"package:flutter|dart:ui")
+            .hasMatch(codeOnly(f.readAsStringSync())))
+          f.path.replaceAll(r'\', '/'),
+    ];
+    expect(files, isNotEmpty);
+    expect(offenders, isEmpty);
+  });
+
   test('ngoài upsertSeed, không nơi nào trong lib đọc thẳng dữ liệu seed', () {
     final offenders = <String>[];
     for (final file in dartFilesIn('lib')) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_spacing.dart';
+import 'package:poolcoachai/core/theme/skill_category_colors.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 /// Viên thuốc hiển thị một nhóm kỹ năng, màu theo đúng nhóm đó.
