@@ -38,7 +38,20 @@ jobs:
 
       - run: flutter analyze
 
+      # Helper thông báo của máy chủ: biên dịch AOT thuần Dart, nên Flutter
+      # lọt vào closure import là hỏng ngay ở đây. `dart compile exe` từ chối
+      # dự án có package chạy build hook (objective_c, kéo theo bởi Flutter),
+      # nên dùng `dart build cli`, cùng một bộ biên dịch AOT.
+      - run: dart build cli -t bin/notify_plan.dart -o build/notify_plan
+
+      - run: build/notify_plan/bundle/bin/notify_plan --self-test
+
       - run: flutter test
+
+      # Chỉ hai tệp domain nhẹ (không nạp test_data.dart hay cả app qua
+      # dart2js); có hạn giờ để một lần treo không giữ cả pipeline.
+      - run: flutter test --platform chrome test/domain/notifications/notification_id_test.dart test/domain/notifications/seed_fingerprint_test.dart
+        timeout-minutes: 10
 
       - run: flutter build apk --debug
 

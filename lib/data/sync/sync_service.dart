@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/remote/codecs/remote_fields.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/domain/auth.dart';
@@ -225,7 +226,7 @@ class SyncService {
     final token = await _tokenFor(userId);
     final items = await _api.get('/items/drill_logs', token: token, query: {
       'limit': '-1',
-      'fields': 'id,drill_id,date,score,attempts,notes,duration_sec',
+      'fields': drillLogRemoteFields,
     }) as List<Object?>;
     _checkAlive();
 

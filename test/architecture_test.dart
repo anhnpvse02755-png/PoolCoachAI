@@ -28,18 +28,45 @@ void main() {
       .where((line) => !line.trimLeft().startsWith('//'))
       .join('\n');
 
-  test('ngoài upsertSeed, không nơi nào trong lib đọc thẳng dữ liệu seed', () {
+  test('lib/domain, lib/core/strings, lib/data/seed không phụ thuộc Flutter (helper máy chủ biên dịch được)', () {
+    final files = [
+      ...dartFilesIn('lib/domain'),
+      ...dartFilesIn('lib/core/strings'),
+      ...dartFilesIn('lib/data/seed'),
+    ];
+    final offenders = [
+      for (final f in files)
+        if (RegExp(r"package:flutter|dart:ui")
+            .hasMatch(codeOnly(f.readAsStringSync())))
+          f.path.replaceAll(r'\', '/'),
+    ];
+    expect(files, isNotEmpty);
+    expect(offenders, isEmpty);
+  });
+
+  test('ngoài upsertSeed, chỉ bin/notify_plan.dart (helper máy chủ, không có DB) được đọc seed', () {
     final offenders = <String>[];
-    for (final file in dartFilesIn('lib')) {
+    final readers = <String>[];
+    for (final file in [...dartFilesIn('lib'), ...dartFilesIn('bin')]) {
       final path = file.path.replaceAll(r'\', '/');
       if (path.contains('lib/data/seed/')) continue;
-      if (path.endsWith('lib/data/database/upsert_seed.dart')) continue;
 
       final source = file.readAsStringSync();
-      if (source.contains('seedDrills') || source.contains('seedKnowledge')) {
-        offenders.add(path);
+      if (!source.contains('seedDrills') && !source.contains('seedKnowledge')) {
+        continue;
       }
+      readers.add(path);
+      if (path.endsWith('lib/data/database/upsert_seed.dart')) continue;
+      if (path.endsWith('bin/notify_plan.dart')) continue;
+      offenders.add(path);
     }
+
+    expect(
+      readers.where((p) => p.endsWith('bin/notify_plan.dart')),
+      isNotEmpty,
+      reason: 'bin/notify_plan.dart là nơi duy nhất nạp seed cho helper; '
+          'mất khỏi bin/ thì luật này xanh một cách vô nghĩa',
+    );
 
     expect(
       offenders,
@@ -457,4 +484,83 @@ void main() {
       expect(source, isNot(contains('warningRank')));
     },
   );
+
+  test('bộ giải mã Directus thuần: không import drift, database, sync hay Flutter', () {
+    final files = dartFilesIn('lib/data/remote/codecs');
+    expect(files, isNotEmpty);
+    for (final f in files) {
+      expect(
+        codeOnly(f.readAsStringSync()),
+        isNot(matches(RegExp(r"package:(drift|flutter)|database\.dart|/sync/"))),
+        reason: f.path,
+      );
+    }
+  });
+
+  test('lib/server và bin thuần: không Flutter, dart:ui, drift, database hay sync; lib/server không đọc seed', () {
+    final server = dartFilesIn('lib/server');
+    final bin = dartFilesIn('bin');
+    expect(server, isNotEmpty);
+    expect(bin, isNotEmpty);
+    for (final f in [...server, ...bin]) {
+      expect(
+        codeOnly(f.readAsStringSync()),
+        isNot(
+          matches(RegExp(r"package:(drift|flutter)|dart:ui|database\.dart|/sync/")),
+        ),
+        reason: f.path,
+      );
+    }
+    for (final f in server) {
+      final source = f.readAsStringSync();
+      expect(source, isNot(contains('seedDrills')), reason: f.path);
+      expect(source, isNot(contains('seedKnowledge')), reason: f.path);
+    }
+  });
+  test('closure import của bin/notify_plan.dart thuần Dart: không Flutter, drift, dart:ui/html, database.dart, sync', () {
+    final closure = <String>{};
+    final queue = ['bin/notify_plan.dart'];
+    final importRe = RegExp(r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''', multiLine: true);
+    while (queue.isNotEmpty) {
+      final path = queue.removeLast();
+      if (!closure.add(path)) continue;
+      final source = codeOnly(File(path).readAsStringSync());
+      for (final m in importRe.allMatches(source)) {
+        final uri = m.group(1)!;
+        // Gói ngoài và dart: thư viện được kiểm ở dưới, không đi sâu vào.
+        if (uri.startsWith('package:poolcoachai/')) {
+          queue.add('lib/${uri.substring('package:poolcoachai/'.length)}');
+        } else if (!uri.contains(':')) {
+          final dir = path.substring(0, path.lastIndexOf('/'));
+          queue.add(Uri.parse('$dir/$uri').normalizePath().path);
+        }
+      }
+    }
+
+    // Không vô nghĩa: phải thấy cả hai tệp dữ liệu "trông giống DB" mà helper
+    // dùng, và kiểm bằng chính nội dung của chúng.
+    expect(closure, contains('lib/data/database/match_codec.dart'));
+    expect(closure, contains('lib/data/database/category_compat.dart'));
+    expect(closure, contains('lib/server/notify_plan.dart'));
+
+    final offenders = <String>[];
+    for (final path in closure) {
+      final source = codeOnly(File(path).readAsStringSync());
+      for (final m in importRe.allMatches(source)) {
+        final uri = m.group(1)!;
+        final bad =
+            uri.startsWith('package:flutter') ||
+            uri.startsWith('package:drift') ||
+            uri.startsWith('package:riverpod') ||
+            uri.startsWith('package:flutter_riverpod') ||
+            uri == 'dart:ui' ||
+            uri == 'dart:html' ||
+            uri.startsWith('dart:js') ||
+            uri.endsWith('database.dart') ||
+            uri.contains('/sync/');
+        if (bad) offenders.add('$path -> $uri');
+      }
+    }
+    expect(offenders, isEmpty);
+  });
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/remote/codecs/practice_codecs.dart';
 import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/cue_equipment.dart';
@@ -95,15 +96,16 @@ DrillLogRowsCompanion fromRemoteDrillLog(
   required String userId,
   required DateTime syncedAt,
 }) {
+  final log = drillLogFromRemote(json);
   return DrillLogRowsCompanion.insert(
-    id: json['id']! as String,
+    id: log.id,
     userId: userId,
-    drillId: json['drill_id']! as String,
-    date: DateTime.parse(json['date']! as String).toLocal(),
-    score: (json['score']! as num).toDouble(),
-    attempts: drift.Value(json['attempts'] as int?),
-    notes: drift.Value(json['notes'] as String?),
-    durationSec: drift.Value((json['duration_sec'] as num?)?.toInt()),
+    drillId: log.drillId,
+    date: log.date,
+    score: log.score.toDouble(),
+    attempts: drift.Value(log.attempts),
+    notes: drift.Value(log.notes),
+    durationSec: drift.Value(log.durationSec),
     syncedAt: drift.Value(syncedAt),
   );
 }

@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// Chín nhóm kỹ năng: sáu nhóm cơ bản và ba nhóm nâng cao.
 ///
 /// Khóa giữ tiếng Anh; tên tiếng Việt nằm ở [Vi.skill].
@@ -16,66 +14,15 @@ import 'package:flutter/material.dart';
 /// `weakestSkill()` báo là yếu A băng rồi giao sai bài tập. Chủ sản
 /// phẩm chốt tách riêng.
 enum SkillCategory {
-  aiming(
-    fg: Color(0xFFE8B44C),
-    bg: Color(0xFF4A3A14),
-    borderColor: Color(0xFF6B5220),
-  ),
-  position(
-    fg: Color(0xFF6FA8D6),
-    bg: Color(0xFF1E3648),
-    borderColor: Color(0xFF2F5578),
-  ),
-  breakShot(
-    fg: Color(0xFFE2685C),
-    bg: Color(0xFF4A2320),
-    borderColor: Color(0xFF7A3A34),
-  ),
-  safety(
-    fg: Color(0xFF9B8BD6),
-    bg: Color(0xFF322B4A),
-    borderColor: Color(0xFF4B4277),
-  ),
-  kick(
-    fg: Color(0xFF4FB3A5),
-    bg: Color(0xFF14403C),
-    borderColor: Color(0xFF226B62),
-  ),
-  bank(
-    fg: Color(0xFFD98AC0),
-    bg: Color(0xFF43213A),
-    borderColor: Color(0xFF6F3760),
-  ),
-  dungCo(
-    fg: Color(0xFFA3C85A),
-    bg: Color(0xFF2F3E17),
-    borderColor: Color(0xFF4C6426),
-  ),
-  nhayBi(
-    fg: Color(0xFFF0904A),
-    bg: Color(0xFF4A2A12),
-    borderColor: Color(0xFF7A4620),
-  ),
-  matXe(
-    fg: Color(0xFFB4BCCB),
-    bg: Color(0xFF2E333D),
-    borderColor: Color(0xFF4A5262),
-  );
-
-  const SkillCategory({
-    required this.fg,
-    required this.bg,
-    required this.borderColor,
-  });
-
-  /// Màu chữ và icon.
-  final Color fg;
-
-  /// Màu nền viên thuốc.
-  final Color bg;
-
-  /// Màu viền viên thuốc.
-  final Color borderColor;
+  aiming,
+  position,
+  breakShot,
+  safety,
+  kick,
+  bank,
+  dungCo,
+  nhayBi,
+  matXe;
 
   /// Đây có phải nhóm nâng cao (spec 2026-10-29 §3) không: [dungCo],
   /// [nhayBi], [matXe].

@@ -5,17 +5,16 @@ import 'package:drift/drift.dart';
 import 'package:poolcoachai/data/database/category_compat.dart';
 import 'package:poolcoachai/data/database/converters.dart';
 import 'package:poolcoachai/data/database/database.dart';
+import 'package:poolcoachai/data/remote/codecs/cue_equipment_codec.dart';
+import 'package:poolcoachai/data/remote/codecs/remote_fields.dart';
+import 'package:poolcoachai/data/remote/codecs/remote_values.dart';
 import 'package:poolcoachai/data/remote/directus_client.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/sync/sync_service.dart' show SyncOutcome;
 import 'package:poolcoachai/domain/auth.dart';
-import 'package:poolcoachai/domain/cue_equipment.dart';
-import 'package:poolcoachai/domain/skill_category.dart';
 
-const cueEquipmentRemoteFields =
-    'id,user_created,name,type,weight_grams,shaft_brand,tip_diameter_mm,'
-    'tip_brand,tip_hardness,butt_brand,skill_categories,skill_categories_ext,last_tip_maintenance,tip_maintenance_due_date,'
-    'updated_at,is_deleted';
+export 'package:poolcoachai/data/remote/codecs/remote_fields.dart'
+    show cueEquipmentRemoteFields;
 
 Stream<List<CueEquipmentRow>> watchPendingCueEquipment(AppDatabase db) =>
     (db.select(
@@ -159,7 +158,7 @@ class CueEquipmentSyncService {
     List<Map<String, Object?>> remoteItems,
   ) async {
     final remoteById = {
-      for (final item in remoteItems) _requiredString(item, 'id'): item,
+      for (final item in remoteItems) remoteString(item, 'id'): item,
     };
     final pending =
         await (_db.select(_db.cueEquipmentRows)
@@ -178,7 +177,7 @@ class CueEquipmentSyncService {
       final localUpdatedAt = row.updatedAt;
       if (remote != null &&
           (localUpdatedAt == null ||
-              !localUpdatedAt.isAfter(_parseDate(remote, 'updated_at')))) {
+              !localUpdatedAt.isAfter(remoteInstant(remote, 'updated_at')))) {
         continue;
       }
 
@@ -226,7 +225,8 @@ class CueEquipmentSyncService {
     for (final item in remoteItems) {
       _checkAlive();
       _checkUser(userId);
-      final remote = _fromRemote(item);
+      final decoded = cueEquipmentFromRemote(item);
+      final remote = decoded.cue;
       await _db.transaction(() async {
         final local = await (_db.select(
           _db.cueEquipmentRows,
@@ -247,10 +247,10 @@ class CueEquipmentSyncService {
                 remote,
                 userId: userId,
                 syncedAt: receivedAt,
-                isDeleted: _remoteDeleted(item),
+                isDeleted: decoded.isDeleted,
               ),
             );
-        if (_remoteDeleted(item)) {
+        if (decoded.isDeleted) {
           await (_db.update(_db.timerSessionRows)..where(
                 (row) =>
                     row.userId.equals(userId) & row.cueId.equals(remote.id),
@@ -315,80 +315,6 @@ class CueEquipmentSyncService {
   Map<String, Object?> _withoutId(Map<String, Object?> body) =>
       Map<String, Object?>.of(body)..remove('id');
 
-  CueEquipment _fromRemote(Map<String, Object?> item) {
-    final type = CueType.values.firstWhere(
-      (value) => value.name == _requiredString(item, 'type'),
-      orElse: () =>
-          throw const FormatException('Loại cơ từ server không hợp lệ'),
-    );
-    final hardnessName = item['tip_hardness'] as String?;
-    final hardness = hardnessName == null
-        ? null
-        : TipHardness.values.firstWhere(
-            (value) => value.name == hardnessName,
-            orElse: () => throw const FormatException(
-              'Độ cứng đầu cơ từ server không hợp lệ',
-            ),
-          );
-    final categories = item['skill_categories'];
-    if (categories is! List<Object?> ||
-        categories.any((category) => category is! String)) {
-      throw const FormatException('Nhóm kỹ năng từ server không hợp lệ');
-    }
-    // Trường cũ vẫn parse nghiêm: tên lạ ở đây là dữ liệu hỏng, không phải
-    // nhóm của bản sau (nhóm của bản sau chỉ đi trong skill_categories_ext).
-    final legacyNames = [
-      for (final category in categories)
-        SkillCategory.values
-            .firstWhere(
-              (value) => value.name == category! as String,
-              orElse: () => throw const FormatException(
-                'Nhóm kỹ năng từ server không hợp lệ',
-              ),
-            )
-            .name,
-    ];
-    final skills = joinCategoryNames(
-      legacyNames,
-      item['skill_categories_ext'],
-    ).map(SkillCategory.values.byName).toList(growable: false);
-    final weight = item['weight_grams'];
-    final diameter = item['tip_diameter_mm'];
-    if (weight != null && (weight is! int || weight <= 0)) {
-      throw const FormatException('Trọng lượng cơ từ server không hợp lệ');
-    }
-    if (diameter != null &&
-        (diameter is! num || !diameter.isFinite || diameter <= 0)) {
-      throw const FormatException('Size ngọn từ server không hợp lệ');
-    }
-    final name = _requiredString(item, 'name');
-    if (name.trim().isEmpty) {
-      throw const FormatException('Tên cơ từ server không hợp lệ');
-    }
-    final cue = CueEquipment(
-      id: _requiredString(item, 'id'),
-      name: name,
-      type: type,
-      weightGrams: (weight as num?)?.toInt(),
-      shaftBrand: _nullableText(item, 'shaft_brand'),
-      shaftDiameterMm: (diameter as num?)?.toDouble(),
-      tipBrand: _nullableText(item, 'tip_brand'),
-      tipHardness: hardness,
-      buttBrand: _nullableText(item, 'butt_brand'),
-      skillCategories: skills,
-      lastTipMaintenance: _nullableDate(item, 'last_tip_maintenance'),
-      tipMaintenanceDueDate: _nullableDate(item, 'tip_maintenance_due_date'),
-      updatedAt: _parseDate(item, 'updated_at'),
-    );
-    if (!isMaintenanceDueDateValid(
-      lastMaintenance: cue.lastTipMaintenance,
-      dueDate: cue.tipMaintenanceDueDate,
-    )) {
-      throw const FormatException('Ngày bảo dưỡng cơ từ server không hợp lệ');
-    }
-    return cue;
-  }
-
   String _remoteOwner(Map<String, Object?> item) {
     final owner = item['user_created'];
     if (owner is String) return owner;
@@ -396,51 +322,6 @@ class CueEquipmentSyncService {
       return owner['id']! as String;
     }
     throw const FormatException('Chủ hồ sơ cơ từ server không hợp lệ');
-  }
-
-  bool _remoteDeleted(Map<String, Object?> item) {
-    final value = item['is_deleted'];
-    if (value is bool) return value;
-    throw const FormatException('Trạng thái xóa cơ từ server không hợp lệ');
-  }
-
-  String _requiredString(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value is String && value.isNotEmpty) return value;
-    throw FormatException('Trường $key từ server không hợp lệ');
-  }
-
-  String? _nullableText(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value == null) return null;
-    if (value is String) return value;
-    throw FormatException('Trường $key từ server không hợp lệ');
-  }
-
-  DateTime _parseDate(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value is String) return DateTime.parse(value).toUtc();
-    throw FormatException('Ngày $key từ server không hợp lệ');
-  }
-
-  DateTime? _nullableDate(Map<String, Object?> item, String key) {
-    final value = item[key];
-    if (value == null) return null;
-    if (value is String) {
-      final dateOnly = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
-      if (dateOnly != null) {
-        final year = int.parse(dateOnly[1]!);
-        final month = int.parse(dateOnly[2]!);
-        final day = int.parse(dateOnly[3]!);
-        final date = DateTime(year, month, day);
-        if (date.year != year || date.month != month || date.day != day) {
-          throw FormatException('Ngày $key từ server không hợp lệ');
-        }
-        return date;
-      }
-      return DateTime.parse(value).toLocal();
-    }
-    throw FormatException('Ngày $key từ server không hợp lệ');
   }
 
   String? _formatDateOnly(DateTime? value) => value == null

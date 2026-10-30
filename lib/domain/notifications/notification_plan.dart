@@ -209,7 +209,7 @@ List<PlannedNotification> planNotifications({
   final used = <int>{};
   final result = <PlannedNotification>[];
   for (final d in drafts.take(limit)) {
-    var id = _hash('${d.kind.name}|${d.key}|${d.at.toIso8601String()}|'
+    var id = notificationIdHash('${d.kind.name}|${d.key}|${d.at.toIso8601String()}|'
         '${d.title}|${d.body}');
     while (!used.add(id)) {
       id = (id + 1) & _idMask;
@@ -259,10 +259,17 @@ class _Draft {
 const _idMask = 0x7fffffff;
 
 /// FNV-1a 32 bit, bỏ bit dấu: id dương vừa cho cả Android lẫn iOS.
-int _hash(String text) {
+///
+/// Tính đúng từng bit trên mọi nền tảng, kể cả web (dart2js).
+int notificationIdHash(String text) => fnv32(text) & _idMask;
+
+/// FNV-1a 32 bit đầy đủ. Số nguyên tố 0x01000193 = 2^24 + 0x193; mỗi tích
+/// nhỏ hơn 2^53 nên số thực JS vẫn chính xác trên dart2js.
+int fnv32(String text) {
   var hash = 0x811c9dc5;
   for (final unit in text.codeUnits) {
-    hash = ((hash ^ unit) * 0x01000193) & 0xffffffff;
+    final x = hash ^ unit;
+    hash = ((x & 0xff) * 0x1000000 + x * 0x193) & 0xffffffff;
   }
-  return hash & _idMask;
+  return hash;
 }

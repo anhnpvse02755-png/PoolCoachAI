@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/core/theme/skill_category_colors.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
 double contrast(Color a, Color b) {
