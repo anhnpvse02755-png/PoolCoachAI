@@ -58,7 +58,7 @@ void main() {
   test('danh sách trường Player trong bootstrap.mjs khớp hằng số Dart', () {
     final boot = File('deploy/directus/bootstrap.mjs').readAsStringSync();
     String literal(String name) {
-      final m = RegExp("const $name = '([^']*)'\.split").firstMatch(boot);
+      final m = RegExp("const $name = '([^']*)'[.]split").firstMatch(boot);
       expect(m, isNotNull, reason: name);
       return m!.group(1)!;
     }
