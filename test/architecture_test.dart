@@ -485,4 +485,18 @@ void main() {
       );
     }
   });
+
+  test('lib/server thuần: không Flutter, dart:ui, drift, database hay sync (biên dịch AOT được)', () {
+    final files = dartFilesIn('lib/server');
+    expect(files, isNotEmpty);
+    for (final f in files) {
+      expect(
+        codeOnly(f.readAsStringSync()),
+        isNot(
+          matches(RegExp(r"package:(drift|flutter)|dart:ui|database\.dart|/sync/")),
+        ),
+        reason: f.path,
+      );
+    }
+  });
 }
