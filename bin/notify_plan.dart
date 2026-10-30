@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/data/seed/seed_knowledge.dart';
+import 'package:poolcoachai/domain/notifications/seed_fingerprint.dart';
 import 'package:poolcoachai/server/notify_plan.dart' show notifyPlanCollections;
 import 'package:poolcoachai/server/notify_plan_protocol.dart';
 
@@ -61,14 +62,15 @@ Future<void> main(List<String> args) async {
     );
     stdout.writeln(plan);
     await stdout.flush();
-    final ok = [info, plan].every(
-      (r) => (jsonDecode(r) as Map)['ok'] == true,
-    );
+    final ok =
+        [info, plan].every((r) => (jsonDecode(r) as Map)['ok'] == true) &&
+        (jsonDecode(info) as Map)['fingerprint'] ==
+            seedFingerprint(drills: seedDrills, knowledge: seedKnowledge);
     exit(ok ? 0 : 1);
   }
 
   await for (final line
-      in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
+      in notifyPlanLines(stdin)) {
     if (line.trim().isEmpty) continue;
     stdout.writeln(handle(line));
     await stdout.flush();

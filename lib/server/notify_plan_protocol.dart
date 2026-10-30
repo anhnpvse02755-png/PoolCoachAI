@@ -19,6 +19,12 @@ const notifyPlanSettingsFields =
     'id,recommendation,maintenance,schedule,streak,prefs_updated_at,'
     'last_seen_cat,last_seen_drill_id,last_seen_at,timezone,user_created';
 
+/// Tách luồng byte vào thành từng dòng chữ. Byte UTF-8 hỏng thành ký tự thay
+/// thế (dòng đó ra `bad_json`), không làm luồng ném và giết helper.
+Stream<String> notifyPlanLines(Stream<List<int>> input) => input
+    .transform(const Utf8Decoder(allowMalformed: true))
+    .transform(const LineSplitter());
+
 /// Xử lý một dòng yêu cầu, trả một dòng JSON (không có xuống dòng). Không bao
 /// giờ ném: lỗi bất ngờ cũng thành trả lời có cấu trúc.
 String handleNotifyPlanLine(
@@ -45,7 +51,7 @@ String handleNotifyPlanLine(
       return _error(reqId, 'unsupported_version');
     }
 
-    final fingerprint = seedFingerprint(drills: drills, knowledge: knowledge);
+    final fingerprint = _fingerprintOf(drills, knowledge);
     switch (req['op']) {
       case 'info':
         return jsonEncode({
@@ -62,9 +68,28 @@ String handleNotifyPlanLine(
       default:
         return _error(reqId, 'bad_request');
     }
-  } on Object {
-    return _error(reqId, 'bad_request');
+  } on Object catch (e) {
+    // Chỉ kiểu lỗi, không bao giờ nội dung: nó có thể chứa dữ liệu của người
+    // dùng.
+    return _error(reqId, 'internal', errorType: e.runtimeType.toString());
   }
+}
+
+// Bộ seed không đổi suốt đời tiến trình: tính dấu vân tay một lần cho mỗi
+// cặp danh sách (so theo danh tính; nơi gọi coi danh sách là bất biến).
+({List<Drill> drills, List<KnowledgeArticle> knowledge, String value})?
+_fingerprintCache;
+
+String _fingerprintOf(List<Drill> drills, List<KnowledgeArticle> knowledge) {
+  final cached = _fingerprintCache;
+  if (cached != null &&
+      identical(cached.drills, drills) &&
+      identical(cached.knowledge, knowledge)) {
+    return cached.value;
+  }
+  final value = seedFingerprint(drills: drills, knowledge: knowledge);
+  _fingerprintCache = (drills: drills, knowledge: knowledge, value: value);
+  return value;
 }
 
 String _plan(
@@ -78,8 +103,6 @@ String _plan(
   try {
     parsed = _parse(req);
   } on FormatException {
-    return _error(reqId, 'bad_request');
-  } on TypeError {
     return _error(reqId, 'bad_request');
   }
 
@@ -183,9 +206,10 @@ DateTime _utc(Object? x) {
   return t;
 }
 
-String _error(String? reqId, String error) => jsonEncode({
+String _error(String? reqId, String error, {String? errorType}) => jsonEncode({
   'v': notifyPlanProtocolVersion,
   'reqId': reqId,
   'ok': false,
   'error': error,
+  'errorType': ?errorType,
 });

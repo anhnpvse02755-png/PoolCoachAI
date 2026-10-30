@@ -517,4 +517,50 @@ void main() {
       expect(source, isNot(contains('seedKnowledge')), reason: f.path);
     }
   });
+  test('closure import của bin/notify_plan.dart thuần Dart: không Flutter, drift, dart:ui/html, database.dart, sync', () {
+    final closure = <String>{};
+    final queue = ['bin/notify_plan.dart'];
+    final importRe = RegExp(r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''', multiLine: true);
+    while (queue.isNotEmpty) {
+      final path = queue.removeLast();
+      if (!closure.add(path)) continue;
+      final source = codeOnly(File(path).readAsStringSync());
+      for (final m in importRe.allMatches(source)) {
+        final uri = m.group(1)!;
+        // Gói ngoài và dart: thư viện được kiểm ở dưới, không đi sâu vào.
+        if (uri.startsWith('package:poolcoachai/')) {
+          queue.add('lib/${uri.substring('package:poolcoachai/'.length)}');
+        } else if (!uri.contains(':')) {
+          final dir = path.substring(0, path.lastIndexOf('/'));
+          queue.add(Uri.parse('$dir/$uri').normalizePath().path);
+        }
+      }
+    }
+
+    // Không vô nghĩa: phải thấy cả hai tệp dữ liệu "trông giống DB" mà helper
+    // dùng, và kiểm bằng chính nội dung của chúng.
+    expect(closure, contains('lib/data/database/match_codec.dart'));
+    expect(closure, contains('lib/data/database/category_compat.dart'));
+    expect(closure, contains('lib/server/notify_plan.dart'));
+
+    final offenders = <String>[];
+    for (final path in closure) {
+      final source = codeOnly(File(path).readAsStringSync());
+      for (final m in importRe.allMatches(source)) {
+        final uri = m.group(1)!;
+        final bad =
+            uri.startsWith('package:flutter') ||
+            uri.startsWith('package:drift') ||
+            uri.startsWith('package:riverpod') ||
+            uri.startsWith('package:flutter_riverpod') ||
+            uri == 'dart:ui' ||
+            uri == 'dart:html' ||
+            uri.startsWith('dart:js') ||
+            uri.endsWith('database.dart') ||
+            uri.contains('/sync/');
+        if (bad) offenders.add('$path -> $uri');
+      }
+    }
+    expect(offenders, isEmpty);
+  });
 }

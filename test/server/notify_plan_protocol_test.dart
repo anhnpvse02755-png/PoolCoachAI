@@ -1,9 +1,11 @@
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/data/remote/codecs/remote_fields.dart';
 import 'package:poolcoachai/data/seed/seed_drills.dart';
 import 'package:poolcoachai/data/seed/seed_knowledge.dart';
+import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 import 'package:poolcoachai/domain/notifications/seed_fingerprint.dart';
 import 'package:poolcoachai/server/notify_plan.dart';
@@ -245,4 +247,106 @@ void main() {
     // reqId không phải chuỗi: trả null, không ném.
     expect(call({'v': 1, 'op': 'info', 'reqId': 5})['reqId'], isNull);
   });
+
+  test('lỗi bất ngờ: internal kèm kiểu lỗi, không bao giờ kèm nội dung lỗi', () {
+    final info = jsonEncode({'v': 1, 'op': 'info', 'reqId': 'i'});
+    final r =
+        jsonDecode(
+              handleNotifyPlanLine(
+                info,
+                drills: _ThrowingList<Drill>(failAtIteration: 1),
+                knowledge: seedKnowledge,
+              ),
+            )
+            as Map;
+    expect(r, {
+      'v': 1,
+      'reqId': 'i',
+      'ok': false,
+      'error': 'internal',
+      'errorType': 'StateError',
+    });
+    expect(jsonEncode(r), isNot(contains(_secret)));
+  });
+
+  test('lỗi bất ngờ trong bộ lập: internal, reqId giữ nguyên', () {
+    // Lần lặp đầu (dấu vân tay) qua được; bộ lập lặp lần hai thì ném.
+    final reply = handleNotifyPlanLine(
+      jsonEncode(
+        planRequest(
+          mode: 'due',
+          prefs: {
+            'recommendation': true,
+            'maintenance': false,
+            'schedule': false,
+            'streak': false,
+          },
+        ),
+      ),
+      drills: _ThrowingList<Drill>(failAtIteration: 2),
+      knowledge: seedKnowledge,
+    );
+    final r = jsonDecode(reply) as Map;
+    expect(r['error'], 'internal');
+    expect(r['errorType'], 'StateError');
+    expect(r['reqId'], 'r1');
+    expect(reply, isNot(contains(_secret)));
+  });
+
+  test('dấu vân tay tính một lần cho cùng một bộ seed', () {
+    final drills = _ThrowingList<Drill>(failAtIteration: 1 << 30);
+    for (var i = 0; i < 3; i++) {
+      handleNotifyPlanLine(
+        '{"v":1,"op":"info","reqId":"i"}',
+        drills: drills,
+        knowledge: seedKnowledge,
+      );
+    }
+    expect(drills.iterations, 1);
+  });
+
+  test('byte hỏng UTF-8 trên đường vào: một dòng bad_json, không giết luồng', () async {
+    final bytes = <int>[
+      0xff, 0x0a, // byte hỏng, ngoài chuỗi JSON
+      ...utf8.encode('{"v":1,"op":"info","reqId":"sau"}\n'),
+    ];
+    final lines = await notifyPlanLines(Stream.value(bytes)).toList();
+    expect(lines, hasLength(2));
+    final replies = [for (final l in lines) call(l)];
+    expect(replies[0]['error'], 'bad_json');
+    expect(replies[1]['ok'], isTrue);
+    expect(replies[1]['reqId'], 'sau');
+  });
+}
+
+const _secret = 'BÍ-MẬT-KHÔNG-ĐƯỢC-LỘ';
+
+/// Danh sách đúng seed, nhưng lần lặp thứ [failAtIteration] ném StateError
+/// (kèm nội dung bí mật để kiểm helper không lộ nội dung lỗi).
+final class _ThrowingList<T> extends ListBase<T> {
+  _ThrowingList({required this.failAtIteration});
+
+  final int failAtIteration;
+  int iterations = 0;
+
+  List<T> get _inner => (seedDrills as List).cast<T>();
+
+  @override
+  Iterator<T> get iterator {
+    iterations++;
+    if (iterations == failAtIteration) throw StateError(_secret);
+    return _inner.iterator;
+  }
+
+  @override
+  int get length => _inner.length;
+
+  @override
+  set length(int newLength) => throw UnsupportedError('chỉ đọc');
+
+  @override
+  T operator [](int index) => _inner[index];
+
+  @override
+  void operator []=(int index, T value) => throw UnsupportedError('chỉ đọc');
 }

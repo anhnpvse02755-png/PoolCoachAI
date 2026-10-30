@@ -405,4 +405,164 @@ void main() {
       expect(fields.split(',').where((f) => f == 'user_created'), hasLength(1));
     }
   });
+  group('lẻ giây, thứ tự bằng nhau và so chữ', () {
+    // Hôm nay thứ Tư (ngày 2); 07:00 giờ Việt Nam. Khung hôm nay gắn nhóm
+    // aiming nên gợi ý chọn trong aiming: d1 (cấp 1, ngưỡng 0.8) trước d2.
+    final nowUtc = DateTime.utc(2026, 10, 28);
+    Map<String, List<Map<String, Object?>>> twoLogsSameSecond(
+      List<Map<String, Object?>> logs,
+    ) => {
+      ...emptyRemoteData(),
+      'schedule_slots': [
+        slotRow(
+          id: 's1',
+          day: 2,
+          time: '18:00',
+          label: 'Tập',
+          updatedAt: DateTime.utc(2026, 10, 1),
+          cat: 'aiming',
+        ),
+      ],
+      'drill_logs': logs,
+    };
+    // d1: 1/10 = trượt, 9/10 = đạt. Hai lần ghi cùng giây 12:00:00, khác mili
+    // giây.
+    Map<String, Object?> fail(DateTime at) => drillLogRow(
+      id: 'fail',
+      drillId: 'd1',
+      date: at,
+      score: 1,
+      attempts: 10,
+    );
+    Map<String, Object?> pass(DateTime at) => drillLogRow(
+      id: 'pass',
+      drillId: 'd1',
+      date: at,
+      score: 9,
+      attempts: 10,
+    );
+    String recommended(Map<String, List<Map<String, Object?>>> data) => plan(
+      request(data, nowUtc: nowUtc, prefs: onlyRecommendation),
+    ).single.local.key;
+
+    test('lẻ giây bị bỏ như Drift: hai lần ghi cùng giây thì thứ tự nhập quyết định lần cuối', () {
+      final late = DateTime.utc(2026, 10, 27, 12, 0, 0, 900);
+      final early = DateTime.utc(2026, 10, 27, 12, 0, 0, 100);
+      // Cùng giây sau khi bỏ lẻ: lần cuối là phần tử nhập sau. Nếu giữ lẻ giây
+      // thì lần 900ms luôn là lần cuối, bất kể thứ tự nhập.
+      expect(
+        recommended(twoLogsSameSecond([fail(late), pass(early)])),
+        '2026-10-28:aiming:d2',
+        reason: 'lần cuối là bản đạt: sang bài kế',
+      );
+      expect(
+        recommended(twoLogsSameSecond([pass(late), fail(early)])),
+        '2026-10-28:aiming:d1',
+        reason: 'lần cuối là bản trượt: tập lại d1',
+      );
+    });
+
+    test('lẻ giây qua mili giây: giờ vào bộ đổi giờ địa phương luôn tròn giây', () {
+      final seen = <DateTime>[];
+      final clock = _RecordingClock(TzWallClock('Asia/Ho_Chi_Minh'), seen);
+      plan(
+        request(
+          twoLogsSameSecond([
+            fail(DateTime.utc(2026, 10, 27, 12, 0, 0, 900)),
+            pass(DateTime.utc(2026, 10, 27, 12, 0, 0, 100)),
+          ]),
+          nowUtc: nowUtc,
+          prefs: onlyRecommendation,
+        ),
+        clock: clock,
+      );
+      expect(
+        seen.any((t) => t.isAtSameMomentAs(DateTime.utc(2026, 10, 27, 12))),
+        isTrue,
+        reason: 'giờ dòng dữ liệu đã bỏ lẻ giây trước khi đổi giờ',
+      );
+      expect(
+        seen.any((t) => t.hour == 12 && t.millisecond != 0),
+        isFalse,
+        reason: 'không giờ lẻ giây của dòng dữ liệu nào lọt vào đồng hồ',
+      );
+    });
+
+    test('stableSorted giữ thứ tự nhập của các phần tử bằng nhau, kể cả danh sách dài', () {
+      // Hơn 32 phần tử: sort không ổn định của Dart sẽ xáo thứ tự bằng nhau.
+      final items = [for (var i = 0; i < 200; i++) (key: i % 3, order: i)];
+      final sorted = stableSorted(
+        items,
+        (a, b) => a.key.compareTo(b.key),
+      );
+      expect(sorted.map((e) => e.key), [
+        for (var k = 0; k < 3; k++)
+          ...List.filled(items.where((e) => e.key == k).length, k),
+      ]);
+      for (var k = 0; k < 3; k++) {
+        final orders = [
+          for (final e in sorted)
+            if (e.key == k) e.order,
+        ];
+        expect(orders, [...orders]..sort());
+      }
+      expect(items.first.order, 0, reason: 'không đổi danh sách gốc');
+    });
+
+    test('compareText so từng code point như SQLite, không từng đơn vị UTF-16', () {
+      const astral = '\u{1F3B1}'; // 🎱, ngoài mặt phẳng cơ bản
+      const bmpHigh = 'Ａ'; // Ａ toàn chiều rộng, code point nhỏ hơn
+      // UTF-16: 🎱 là cặp D83C DFB1, nhỏ hơn FF21. Code point: 1F3B1 > FF21.
+      expect(astral.compareTo(bmpHigh), lessThan(0));
+      expect(compareText(astral, bmpHigh), greaterThan(0));
+      expect(compareText(bmpHigh, astral), lessThan(0));
+      expect(compareText('a', 'a'), 0);
+      expect(compareText('a', 'ab'), lessThan(0));
+      expect(compareText('ab', 'a'), greaterThan(0));
+      expect(compareText('', ''), 0);
+      expect(compareText('', 'a'), lessThan(0));
+    });
+
+    test('lịch tập có giờ sai dạng: bad_data schedule_slots', () {
+      final data = {
+        ...emptyRemoteData(),
+        'schedule_slots': [
+          slotRow(
+            id: 's1',
+            day: 2,
+            time: '7:30',
+            label: 'Tập',
+            updatedAt: DateTime.utc(2026, 10, 1),
+          ),
+        ],
+      };
+      expect(
+        () => plan(request(data, nowUtc: nowUtc)),
+        throwsA(
+          isA<NotifyPlanDataError>().having(
+            (e) => e.collection,
+            'collection',
+            'schedule_slots',
+          ),
+        ),
+      );
+    });
+  });
+}
+
+/// Đồng hồ ghi lại mọi giờ UTC mà bộ lập đưa vào [local].
+final class _RecordingClock implements WallClock {
+  _RecordingClock(this._inner, this.seen);
+
+  final WallClock _inner;
+  final List<DateTime> seen;
+
+  @override
+  DateTime local(DateTime utc) {
+    seen.add(utc);
+    return _inner.local(utc);
+  }
+
+  @override
+  DateTime utc(DateTime local) => _inner.utc(local);
 }

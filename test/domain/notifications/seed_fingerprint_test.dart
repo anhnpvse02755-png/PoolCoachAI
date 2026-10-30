@@ -4,8 +4,6 @@ import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/domain/notifications/seed_fingerprint.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
 
-import '../../support/test_data.dart';
-
 BigInt _fnvFull(String s) {
   var h = BigInt.from(0x811c9dc5);
   for (final u in s.codeUnits) {
@@ -39,23 +37,47 @@ Drill _drill({
       target: target,
     );
 
+// Bộ riêng của test này (không nạp test_data.dart: bước Chrome của CI phải
+// chỉ biên dịch phần domain nhỏ).
+final _drills = [
+  _drill(id: 'a', name: 'A', pass: 0.8),
+  _drill(id: 'b', name: 'B', level: 3, pass: null, target: 30.5),
+  _drill(id: 'c', name: 'Cà phê', level: 2, pass: 0.333),
+];
+final _knowledge = [
+  const KnowledgeArticle(
+    id: 'k1',
+    cat: SkillCategory.aiming,
+    title: 't',
+    body: 'b',
+    relatedDrillIds: ['a', 'b'],
+  ),
+  const KnowledgeArticle(
+    id: 'k2',
+    cat: SkillCategory.aiming,
+    title: 't2',
+    body: 'b2',
+  ),
+];
+
 void main() {
   test('dấu vân tay: theo đúng dạng chuẩn', () {
     final canonical = [
-      for (final d in testDrills)
+      'r|$recommendationLogicVersion',
+      for (final d in _drills)
         'd|${d.id}|${d.cat.name}|${d.name}|${d.level}|'
             '${d.passThreshold == null ? '' : (d.passThreshold! * 1000).round()}|'
             '${d.target == null ? '' : (d.target! * 1000).round()}',
-      for (final k in testKnowledge)
+      for (final k in _knowledge)
         'k|${k.id}|${k.cat.name}|${k.relatedDrillIds.join(',')}',
     ].join('\n');
     final hex = _fnvFull(canonical).toRadixString(16).padLeft(8, '0');
     expect(
-      _fp(testDrills, testKnowledge),
-      'v1-${testDrills.length}-${testKnowledge.length}-$hex',
+      _fp(_drills, _knowledge),
+      'v1-${_drills.length}-${_knowledge.length}-$hex',
     );
     expect(
-      _fp(testDrills, testKnowledge),
+      _fp(_drills, _knowledge),
       matches(RegExp(r'^v1-\d+-\d+-[0-9a-f]{8}$')),
     );
   });
@@ -104,6 +126,25 @@ void main() {
     expect(
       _fp([_drill()], k),
       _fp([_drill(steps: ['x', 'y'], goal: 'khác')], k),
+    );
+  });
+  test('đổi phiên bản logic gợi ý: dấu đổi dù seed y nguyên', () {
+    final now = seedFingerprint(drills: _drills, knowledge: _knowledge);
+    expect(
+      seedFingerprint(
+        drills: _drills,
+        knowledge: _knowledge,
+        logicVersion: recommendationLogicVersion + 1,
+      ),
+      isNot(now),
+    );
+    expect(
+      seedFingerprint(
+        drills: _drills,
+        knowledge: _knowledge,
+        logicVersion: recommendationLogicVersion,
+      ),
+      now,
     );
   });
 }

@@ -69,6 +69,7 @@ void main() {
     required NotificationPrefs prefs,
     required SeenRecommendation? seen,
     required List<PlannedNotification> sent,
+    required bool assessmentMustSucceed,
   }) async {
     await upsertSeed(db);
 
@@ -120,8 +121,13 @@ void main() {
       ],
       [SyncOutcome.done, SyncOutcome.done, SyncOutcome.done],
     );
-    // BU hỏng có thể làm lượt đánh giá hỏng: đúng hành vi của app.
-    await assessment.syncNow();
+    // BU hỏng có thể làm lượt đánh giá hỏng: đúng hành vi của app. Với BU
+    // nguyên vẹn thì lượt này phải xong, kẻo "khớp" chỉ vì cả hai đường đều
+    // không có BU.
+    final assessmentOutcome = await assessment.syncNow();
+    if (assessmentMustSucceed) {
+      expect(assessmentOutcome, SyncOutcome.done);
+    }
 
     final log = NotificationLogRepository(db, userId: 'u1');
     for (final n in sent) {
@@ -198,6 +204,7 @@ void main() {
     NotificationPrefs prefs = const NotificationPrefs(),
     SeenRecommendation? seen,
     List<PlannedNotification> sent = const [],
+    bool assessmentMustSucceed = true,
   }) async {
     // Đóng ngay khi xong (không đợi tearDown): một test lập nhiều kế hoạch.
     final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -212,6 +219,7 @@ void main() {
         prefs: prefs,
         seen: seen,
         sent: sent,
+        assessmentMustSucceed: assessmentMustSucceed,
       );
     } finally {
       for (final dispose in disposers.reversed) {
@@ -368,11 +376,18 @@ void main() {
 
       // Gợi ý của hôm qua đã giao, mới hơn cặp đã thấy cũ.
       final yesterday = morning.subtract(const Duration(days: 1));
-      final sentYesterday = serverPlan(
-        data,
-        now: DateTime(yesterday.year, yesterday.month, yesterday.day, 7),
-        mode: NotifyPlanMode.upcoming,
-      ).where((s) => s.local.kind == NotificationKind.recommendation).first;
+      final sentAt = DateTime(yesterday.year, yesterday.month, yesterday.day, 8);
+      // Gợi ý hôm qua đúng cặp sắp gợi ý hôm nay: nó thành mốc "đã báo" và
+      // gợi ý đó phải biến mất khỏi kế hoạch.
+      final sentYesterday = PlannedNotification(
+        id: 1,
+        kind: NotificationKind.recommendation,
+        key: recommendationKey(yesterday, pair.cat, pair.drillId),
+        at: sentAt,
+        validUntil: sentAt.add(const Duration(hours: 16)),
+        title: 't',
+        body: 'b',
+      );
       final oldSeen = SeenRecommendation(
         cat: pair.cat,
         drillId: 'd1',
@@ -383,16 +398,29 @@ void main() {
         now: morning,
         mode: NotifyPlanMode.upcoming,
         seen: oldSeen,
-        sent: [sentYesterday.local],
+        sent: [sentYesterday],
       );
       final actualSent = serverPlan(
         data,
         now: morning,
         mode: NotifyPlanMode.upcoming,
         seen: oldSeen,
-        sent: [sentYesterday.local],
+        sent: [sentYesterday],
       );
       expectSame(actualSent, expectedSent);
+
+      // Gợi ý đã gửi phải thật sự đổi kết quả, kẻo so khớp không chứng minh gì.
+      final actualNoSent = serverPlan(
+        data,
+        now: morning,
+        mode: NotifyPlanMode.upcoming,
+        seen: oldSeen,
+      );
+      expect(
+        actualSent.map((s) => sig(s.local)),
+        isNot(actualNoSent.map((s) => sig(s.local))),
+        reason: 'có gợi ý đã gửi phải khác không có',
+      );
     },
   );
 
@@ -433,7 +461,12 @@ void main() {
         final now = mode == NotifyPlanMode.due
             ? DateTime(2026, 10, 28, 19)
             : upcomingNow;
-        final expected = await appPlan(data, now: now, mode: mode);
+        final expected = await appPlan(
+          data,
+          now: now,
+          mode: mode,
+          assessmentMustSucceed: name == 'có BU' || name == 'không BU',
+        );
         final actual = serverPlan(data, now: now, mode: mode);
         expect(
           actual.map((s) => sig(s.local)),

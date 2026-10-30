@@ -160,9 +160,15 @@ final class NotifyPlanRequest {
   final NotificationPrefs prefs;
 
   /// Cặp người chơi thấy lần cuối trên Trang chủ; null: chưa thấy lần nào.
+  ///
+  /// `atUtc` dùng nguyên giá trị đưa vào, KHÔNG cắt lẻ giây như giờ của các
+  /// dòng dữ liệu (`wholeSeconds`): nơi gọi muốn khớp tuyệt đối với app thì
+  /// đưa giờ đã lưu.
   final ({SkillCategory cat, String drillId, DateTime atUtc})? seen;
 
   /// Gợi ý máy chủ đã gửi (khoá và giờ), làm mốc "đã báo" như nhật ký app.
+  ///
+  /// `atUtc` dùng nguyên giá trị đưa vào, không cắt lẻ giây (xem [seen]).
   final List<({String key, DateTime atUtc})> sentRecommendations;
 
   /// Dòng Directus theo tên collection ([notifyPlanCollections]).
@@ -212,7 +218,7 @@ List<ServerPlannedNotification> planForUser(
   // Drift lưu giờ tới từng giây; app đọc lại thành giờ địa phương.
   DateTime toLocal(DateTime u) => clock.local(wholeSeconds(u));
 
-  final logs = _stableSorted(
+  final logs = stableSorted(
     _decode(
       r,
       'drill_logs',
@@ -220,7 +226,7 @@ List<ServerPlannedNotification> planForUser(
     ),
     (DrillLog a, DrillLog b) => a.date.compareTo(b.date),
   );
-  final timerSessions = _stableSorted(
+  final timerSessions = stableSorted(
     _decode(
       r,
       'timer_sessions',
@@ -228,32 +234,32 @@ List<ServerPlannedNotification> planForUser(
     ),
     (TimerSession a, TimerSession b) => b.date.compareTo(a.date),
   );
-  final slots = _stableSorted(
+  final slots = stableSorted(
     [
       for (final s in _decode(r, 'schedule_slots', scheduleSlotFromRemote))
         if (!s.isDeleted) s.slot,
     ],
     (ScheduleSlot a, ScheduleSlot b) {
       final byDay = a.day.compareTo(b.day);
-      return byDay != 0 ? byDay : _compareText(a.time, b.time);
+      return byDay != 0 ? byDay : compareText(a.time, b.time);
     },
   );
-  final cues = _stableSorted([
+  final cues = stableSorted([
     for (final c in _decode(
       r,
       'cue_equipment',
       (row) => cueEquipmentFromRemote(row, toLocal: toLocal),
     ))
       if (!c.isDeleted) c.cue,
-  ], (CueEquipment a, CueEquipment b) => _compareText(a.name, b.name));
-  final matches = _stableSorted(
+  ], (CueEquipment a, CueEquipment b) => compareText(a.name, b.name));
+  final matches = stableSorted(
     _decode(r, 'pool_matches', (row) {
       final m = poolMatchFromRemote(row, toLocal: toLocal);
       return m.isDeleted ? null : _matchOf(m);
     }).nonNulls.toList(),
     (PoolMatch a, PoolMatch b) {
       final byStart = b.startedAt.compareTo(a.startedAt);
-      return byStart != 0 ? byStart : _compareText(a.id, b.id);
+      return byStart != 0 ? byStart : compareText(a.id, b.id);
     },
   );
   final latestBu = _latestBu(r, toLocal);
@@ -403,8 +409,9 @@ BuResult? _latestBu(NotifyPlanRequest r, ToLocal toLocal) {
   }
 }
 
-/// Sắp xếp giữ nguyên thứ tự gốc của các phần tử bằng nhau.
-List<T> _stableSorted<T>(List<T> items, int Function(T a, T b) compare) {
+/// Sắp xếp giữ nguyên thứ tự gốc của các phần tử bằng nhau (`List.sort` của
+/// Dart không bảo đảm điều này với danh sách dài). Công khai để test khoá.
+List<T> stableSorted<T>(List<T> items, int Function(T a, T b) compare) {
   final indexed = [for (var i = 0; i < items.length; i++) (i, items[i])];
   indexed.sort((a, b) {
     final c = compare(a.$2, b.$2);
@@ -414,8 +421,9 @@ List<T> _stableSorted<T>(List<T> items, int Function(T a, T b) compare) {
 }
 
 /// So chữ như SQLite (BINARY: từng byte UTF-8, tức từng code point), không
-/// như `String.compareTo` (từng đơn vị UTF-16).
-int _compareText(String a, String b) {
+/// như `String.compareTo` (từng đơn vị UTF-16). Khác nhau ở ký tự ngoài mặt
+/// phẳng cơ bản (emoji…). Công khai để test khoá.
+int compareText(String a, String b) {
   final x = a.runes.iterator;
   final y = b.runes.iterator;
   while (true) {

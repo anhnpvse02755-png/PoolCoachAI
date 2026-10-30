@@ -48,7 +48,10 @@ jobs:
 
       - run: flutter test
 
+      # Chỉ hai tệp domain nhẹ (không nạp test_data.dart hay cả app qua
+      # dart2js); có hạn giờ để một lần treo không giữ cả pipeline.
       - run: flutter test --platform chrome test/domain/notifications/notification_id_test.dart test/domain/notifications/seed_fingerprint_test.dart
+        timeout-minutes: 10
 
       - run: flutter build apk --debug
 

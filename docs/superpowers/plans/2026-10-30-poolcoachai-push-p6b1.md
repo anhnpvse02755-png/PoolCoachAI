@@ -219,7 +219,7 @@ final x = hash ^ unit;
 hash = ((x & 0xff) * 0x1000000 + x * 0x193) & 0xffffffff;
 ```
 
-  - `String seedFingerprint({required List<Drill> drills, required List<KnowledgeArticle> knowledge})` in `seed_fingerprint.dart` (no Flutter, no `Vi`).
+  - `String seedFingerprint({required List<Drill> drills, required List<KnowledgeArticle> knowledge})` in `seed_fingerprint.dart` (no Flutter, no `Vi`). It also folds in `const recommendationLogicVersion`, to bump whenever the recommendation logic or the Vi reminder text changes.
     - The canonical string has one line per drill in list order: `d|<id>|<cat.name>|<name>|<level>|<milli(passThreshold)>|<milli(target)>`. `milli(x)` is `(x * 1000).round()`, or empty when null.
     - Then one line per article: `k|<id>|<cat.name>|<relatedDrillIds joined by ','>`.
     - Lines are joined with `\n`. The result is `'v1-<drill count>-<knowledge count>-<8 lowercase hex digits of the FNV-1a 32-bit hash of the canonical string>'`. Use `notificationIdHash`'s arithmetic without the sign mask; factor a private `_fnv32` shared by both.
@@ -399,11 +399,11 @@ test('dòng đã xoá mềm không tạo nhắc', …);
   - `String handleNotifyPlanLine(String line, {required List<Drill> drills, required List<KnowledgeArticle> knowledge})` never throws. Wire format, one JSON object per line:
     - `{"v":1,"op":"info","reqId":"…"}` → `{"v":1,"reqId":"…","ok":true,"fingerprint":"<seedFingerprint>","kinds":["recommendation","maintenance","schedule","streak"],"fields":{"drill_logs":"…","timer_sessions":"…","schedule_slots":"…","cue_equipment":"…","pool_matches":"…","bu_tests":"<remoteTestFields>,user_created","bu_drill_results":"<remoteResultFields>,user_created"}}`. The field strings are the Task 3 constants, with `,user_created` appended only where it is absent (so `pool_matches` equals `poolMatchRemoteFields` exactly).
     - `{"v":1,"op":"plan","reqId":"…","userId":"…","nowUtc":"<ISO Z>","tz":"<IANA>","mode":"upcoming"|"due","prefs":{"recommendation":bool,"maintenance":bool,"schedule":bool,"streak":bool},"seen":{"cat":"…","drillId":"…","atUtc":"…"}|null,"sentRecommendations":[{"key":"…","atUtc":"…"}],"data":{…}}` → `{"v":1,"reqId":"…","ok":true,"fingerprint":"…","items":[{"id":int,"kind":"…","key":"…","at":"<local ISO, no offset>","atUtc":"<ISO Z>","validUntil":"…","validUntilUtc":"…","title":"…","body":"…","payload":"…"}]}`
-    - Errors: `{"v":1,"reqId":<string or null>,"ok":false,"error":"bad_json"|"bad_request"|"unsupported_version"|"bad_tz"|"bad_data"}`. `bad_data` adds `"collection":"…"`.
+    - Errors: `{"v":1,"reqId":<string or null>,"ok":false,"error":"bad_json"|"bad_request"|"unsupported_version"|"bad_tz"|"bad_data"|"internal"}`. `bad_data` adds `"collection":"…"`. `internal` (any unexpected error, from the outermost catch) adds `"errorType":"<runtimeType>"` and never the error message, which may hold user data.
   - `bin/notify_plan.dart` `main(List<String> args)`:
     - **Zone guard (★16).** If the process zone's `timeZoneOffset` differs between any two of the 13 monthly samples from now − 6 months to now + 6 months, write `Múi giờ tiến trình có đổi giờ — chạy với TZ=UTC` to stderr and `exit(2)`.
     - `--self-test`: print the `info` reply and the reply of a `due` plan with empty data, then exit 0 only if both are `ok`.
-    - Otherwise read stdin with `utf8.decoder` and `LineSplitter`, and for each non-empty line write `handleNotifyPlanLine(line, drills: seedDrills, knowledge: seedKnowledge)` followed by a newline. Flush. Exit 0 when stdin closes.
+    - Otherwise read stdin with `const Utf8Decoder(allowMalformed: true)` and `LineSplitter` (`notifyPlanLines`; a malformed byte becomes one `bad_json` line, it must not kill the helper), and for each non-empty line write `handleNotifyPlanLine(line, drills: seedDrills, knowledge: seedKnowledge)` followed by a newline. Flush. Exit 0 when stdin closes.
     - This is the only file outside `lib/data/seed` and `upsert_seed.dart` that names `seedDrills`/`seedKnowledge`.
 - `.github/workflows/android.yml`: after `flutter analyze`, add `- run: dart compile exe bin/notify_plan.dart -o build/notify_plan` and `- run: build/notify_plan --self-test`. This catches any Flutter import leaking into the closure.
 

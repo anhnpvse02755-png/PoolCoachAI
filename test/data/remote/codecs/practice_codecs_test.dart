@@ -135,6 +135,31 @@ void main() {
     );
   });
 
+  test('lịch tập: giờ sai dạng (ngoài HH:MM 24 giờ) đều ném, giờ biên thì nhận', () {
+    for (final bad in [
+      '24:00',
+      '12:60',
+      '7:30',
+      '07:3',
+      '07:30:00',
+      '07-30',
+      ' 07:30',
+      '07:30 ',
+      '07:30\n',
+      '٠٧:٣٠', // chữ số Ả Rập
+      '',
+    ]) {
+      expect(
+        () => scheduleSlotFromRemote(slot({'time': bad})),
+        throwsFormatException,
+        reason: 'giờ "$bad"',
+      );
+    }
+    for (final good in ['00:00', '23:59', '12:05']) {
+      expect(scheduleSlotFromRemote(slot({'time': good})).slot.time, good);
+    }
+  });
+
   test('trận: giữ nguyên JSON thô của rack và cú đánh; JSON hỏng ném; poolMatchFromColumns đọc lại đúng', () {
     final m = poolMatchFromRemote(match(), toLocal: plus7);
     expect(m.rackWinnersJson, jsonEncode(['player', 'opponent']));
