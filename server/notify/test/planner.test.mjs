@@ -274,3 +274,41 @@ test('cap is released on timeout and crash', async () => {
   assert.equal((await last).ok, true);
   p.close();
 });
+
+test('queued waiter behind a child that crashes gets the slot and completes on a fresh child', async () => {
+  const { spawn, children } = fakeSpawn();
+  const p = createPlanner({ bin: 'x', spawn, maxInFlight: 1, timeoutMs: 5_000 });
+  const a = p.plan({ userId: 'a' });
+  const b = p.plan({ userId: 'b' });
+  await tick();
+  assert.equal(children[0].written.length, 1, 'b is queued behind a');
+  children[0].emit('close', 1, null); // con chết khi đang xử lý a
+  await assert.rejects(a, (e) => e.code === 'exited');
+  await tick();
+  assert.equal(children.length, 2, 'fresh child for the waiter');
+  assert.equal(children[0].written.length, 1, 'nothing written to the dead child');
+  assert.equal(children[1].written.length, 1);
+  assert.equal(children[1].written[0].userId, 'b');
+  ok(children[1], 0);
+  assert.equal((await b).ok, true);
+  assert.equal(p.healthy, true);
+  p.close();
+});
+
+test('queued waiter behind a child that times out gets the slot and completes on a fresh child', async () => {
+  const { spawn, children } = fakeSpawn();
+  const p = createPlanner({ bin: 'x', spawn, maxInFlight: 1, timeoutMs: 40 });
+  const a = p.plan({ userId: 'a' });
+  const b = p.plan({ userId: 'b' });
+  await tick();
+  assert.equal(children[0].written.length, 1, 'b is queued behind a');
+  await assert.rejects(a, (e) => e.code === 'timeout');
+  assert.equal(children[0].killed, true);
+  await tick();
+  assert.equal(children.length, 2, 'fresh child for the waiter');
+  assert.equal(children[0].written.length, 1, 'nothing written to the killed child');
+  assert.equal(children[1].written[0].userId, 'b');
+  ok(children[1], 0); // trả lời ngay: b có đồng hồ riêng, bắt đầu khi được ghi
+  assert.equal((await b).ok, true);
+  p.close();
+});

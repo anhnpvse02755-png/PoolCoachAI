@@ -21,10 +21,31 @@ function bearerToken(h) {
   return m ? m[1] : null;
 }
 
+// Bộ lọc kiểu Directus (`filter[f][_eq|_gte|_lt]`), chỉ dùng khi `filters: true`.
+function passes(value, op, wanted) {
+  if (op === '_eq') return value !== undefined && value !== null && String(value) === String(wanted);
+  const a = Date.parse(value);
+  const b = Date.parse(wanted);
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  return op === '_gte' ? a >= b : a < b;
+}
+function matchesParams(row, params) {
+  for (const [k, v] of params) {
+    const m = /^filter\[([a-z_]+)\]\[(_eq|_gte|_lt)\]$/.exec(k);
+    if (m && !passes(row[m[1]], m[2], v)) return false;
+  }
+  return true;
+}
+function matchesFilter(row, filter) {
+  return Object.entries(filter ?? {}).every(([f, ops]) => Object.entries(ops).every(([op, v]) => passes(row[f], op, v)));
+}
+
 /// Directus giả. `users` ánh xạ token người chơi sang id. `items` là kho
 /// dòng theo collection (mảng) dùng cho GET; `reply` cho test ghi đè phản
 /// hồi (nhận `{method, path, url, body}`, trả Response hoặc undefined).
-export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' }, items = {} } = {}) {
+/// `filters: true` áp đúng các bộ lọc danh sách như Directus thật (mặc định
+/// chỉ lọc theo id, để test cũ giữ nguyên hành vi).
+export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' }, items = {}, filters = false } = {}) {
   const calls = [];
   const state = { calls, items, down: false, reply: null, handle };
 
@@ -53,6 +74,7 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
       if (method === 'GET' && !id) {
         const wanted = url.searchParams.get('filter[id][_eq]');
         const rows = state.items[coll] ?? [];
+        if (filters) return jsonResponse(200, { data: rows.filter((r) => matchesParams(r, url.searchParams)).map((r) => ({ ...r })) });
         return jsonResponse(200, { data: wanted === null ? rows : rows.filter((r) => r.id === wanted) });
       }
       // Directus thật: một dòng đơn không có (hoặc không đọc được) trả 403, KHÔNG phải 404.
@@ -75,6 +97,8 @@ export function fakeDirectus({ users = { 'tok-a': 'user-a', 'tok-b': 'user-b' },
           rows.splice(idx, 1);
         } else if (Array.isArray(body)) {
           state.items[coll] = rows.filter((r) => !body.includes(r.id));
+        } else if (filters && body?.query?.filter) {
+          state.items[coll] = rows.filter((r) => !matchesFilter(r, body.query.filter));
         }
         return new Response(null, { status: 204 });
       }

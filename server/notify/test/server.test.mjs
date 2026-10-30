@@ -21,11 +21,15 @@ test('healthz: enabled, lastCycleAt, helper', async (t) => {
   const base = await start(t, { scheduler: { lastCycleAt: new Date('2026-10-30T02:45:00Z') } });
   const r = await fetch(`${base}/healthz`);
   assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), { ok: true, enabled: true, lastCycleAt: '2026-10-30T02:45:00.000Z', helper: 'ok' });
+  assert.deepEqual(await r.json(), { ok: true, enabled: true, lastCycleAt: '2026-10-30T02:45:00.000Z', helper: 'ok', push: 'ok' });
+});
+test('healthz: push service từ chối VAPID thì push=auth_failing', async (t) => {
+  const base = await start(t, { scheduler: { lastCycleAt: null, pushStatus: 'auth_failing' } });
+  assert.equal((await (await fetch(`${base}/healthz`)).json()).push, 'auth_failing');
 });
 test('healthz: chưa có chu kỳ và helper chết', async (t) => {
   const base = await start(t, { config: { enabled: false }, planner: { healthy: false } });
-  assert.deepEqual(await (await fetch(`${base}/healthz`)).json(), { ok: true, enabled: false, lastCycleAt: null, helper: 'down' });
+  assert.deepEqual(await (await fetch(`${base}/healthz`)).json(), { ok: true, enabled: false, lastCycleAt: null, helper: 'down', push: 'ok' });
 });
 test('push/config: khoá công khai, CORS chỉ cho nguồn được phép', async (t) => {
   const base = await start(t);

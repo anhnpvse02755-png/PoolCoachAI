@@ -34,3 +34,13 @@ export const REGISTER_IP_PER_MIN = 60;
 export const LIMITER_MAX_KEYS = 10_000;
 // Số dòng giành trước ghi song song khi đăng ký.
 export const CLAIM_CONCURRENCY = 4;
+// Số người xử lý song song trong một chu kỳ hay một nhịp (mỗi người ~9 lần đọc
+// Directus): giữ Directus khỏi bị dội (R-F5).
+export const USER_CONCURRENCY = 4;
+// Chỉ gia hạn lease khi còn dưới 5 giờ (LEASE_MS − 1 giờ): chu kỳ 15 phút không
+// PATCH mọi thiết bị mỗi lần (R-F5).
+export const LEASE_RENEW_BELOW_MS = LEASE_MS - 3_600_000;
+// Hai lần thử lại sau 429/5xx (★10): chờ ít nhất chừng này, hoặc Retry-After nếu dài hơn.
+export const RETRY_FLOORS_MS = [2_000, 8_000];
+// Tắt êm: đợi việc đang chạy của bộ lập lịch tối đa chừng này.
+export const SHUTDOWN_WAIT_MS = 20_000;

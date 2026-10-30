@@ -85,6 +85,13 @@ test('nhật ký gửi: theo người chơi và mốc, sửa, xoá trước mộ
   assert.deepEqual(last(d).body, { query: { filter: { at: { _lt: '2026-09-30T00:00:00.000Z' } } } });
   assert.deepEqual(await directus.getDelivery('x1'), { id: 'x1', shown_at: 'now' });
 });
+test('deleteDelivery: DELETE một dòng theo id; lỗi thì ném', async () => {
+  const { d, directus } = setup({ items: { push_deliveries: [{ id: 'x1' }, { id: 'x2' }] } });
+  await directus.deleteDelivery('x1');
+  assert.deepEqual([last(d).method, last(d).path], ['DELETE', '/items/push_deliveries/x1']);
+  assert.deepEqual(d.items.push_deliveries, [{ id: 'x2' }]);
+  await assert.rejects(directus.deleteDelivery('missing'), (e) => e instanceof DirectusError && e.status === 403);
+});
 test('claimDelivery: true khi tạo được, false khi RECORD_NOT_UNIQUE, lỗi khác ném', async () => {
   const { d, directus } = setup();
   assert.equal(await directus.claimDelivery({ id: 'a' }), true);

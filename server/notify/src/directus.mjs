@@ -153,11 +153,13 @@ export function createDirectus({ url, serviceToken, fetch, timeoutMs = 10_000, s
   }
   const getDelivery = (id) => getById('push_deliveries', id);
   const updateDelivery = (id, patch) => send(`/items/push_deliveries/${q(id)}`, 'PATCH', patch);
+  /// Nhả dòng đã giành (chỉ dòng chính tiến trình này vừa tạo và chắc chắn chưa gửi).
+  const deleteDelivery = (id) => send(`/items/push_deliveries/${q(id)}`, 'DELETE');
   const deleteDeliveriesBefore = (iso) =>
     send('/items/push_deliveries', 'DELETE', { query: { filter: { at: { _lt: iso } } } });
 
   return {
     userIdForToken, listServerDevices, devicesOfUser, getDevice, createDevice, updateDevice, deleteDevices,
-    readUserData, readSettings, deliveriesOfUser, claimDelivery, getDelivery, updateDelivery, deleteDeliveriesBefore,
+    readUserData, readSettings, deliveriesOfUser, claimDelivery, getDelivery, updateDelivery, deleteDelivery, deleteDeliveriesBefore,
   };
 }

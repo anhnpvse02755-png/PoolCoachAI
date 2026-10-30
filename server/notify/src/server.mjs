@@ -201,6 +201,8 @@ export function createApp({ config, directus, planner, scheduler, now = () => ne
         enabled: config.enabled,
         lastCycleAt: scheduler.lastCycleAt?.toISOString() ?? null,
         helper: planner.healthy ? 'ok' : 'down',
+        // 'auth_failing': push service từ chối VAPID của dịch vụ (lỗi phía server, không phải thiết bị).
+        push: scheduler.pushStatus ?? 'ok',
       }, origin, config.allowedOrigins);
       return; // healthz không ghi nhật ký
     }
