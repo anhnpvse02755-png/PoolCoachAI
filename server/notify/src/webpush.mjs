@@ -39,7 +39,7 @@ export function ttlSeconds(validUntilUtcIso, now) {
 }
 
 /// Endpoint phải là https, không cổng, không userinfo, host thuộc PUSH_HOSTS (R-F14).
-function endpointAllowed(endpoint) {
+export function endpointAllowed(endpoint) {
   let url;
   try {
     url = new URL(endpoint);

@@ -25,3 +25,6 @@ export const PUSH_HOSTS = [
   /\.notify\.windows\.com$/,
   /\.push\.apple\.com$/,
 ];
+// Trần theo IP cho ack và DELETE (R-F14), cửa sổ một phút.
+export const ACK_PER_MIN = 60;
+export const DELETE_PER_MIN = 60;

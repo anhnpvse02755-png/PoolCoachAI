@@ -1,0 +1,15 @@
+{
+  "channel": "web",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/dQw4w9WgXcQ:APA91bExampleEndpointToken",
+  "keys": {
+    "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM",
+    "auth": "tBHItJI5svbpez7KI4CCXg"
+  },
+  "timezone": "Asia/Ho_Chi_Minh",
+  "seedFingerprint": "seed-fp-0001",
+  "vapidPublicKey": "pub-key",
+  "shownToday": [
+    { "kind": "streak", "key": "2026-10-30" },
+    { "kind": "maintenance", "key": "cue-1:2026-10-30" }
+  ]
+}
