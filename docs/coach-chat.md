@@ -4,12 +4,13 @@ Sổ tay vận hành cho dịch vụ `server/coach-chat` (chat trong tab Hỏi
 huấn luyện viên). Thiết kế ban đầu:
 `docs/superpowers/specs/2026-10-22-poolcoachai-coach-chat-design.md`.
 
-**Cấu hình hiện tại (2026-11-02):** Mã Coach Chat đã chuyển sang Ollama local,
-mặc định model `qwen2.5:3b`; không cần `ANTHROPIC_API_KEY` và không phát sinh
-phí theo token. Backend vẫn cần Directus URL/service token để xác thực người chơi và
-quản lý hạn mức. Ollama cần chạy tại `http://127.0.0.1:11434`; model nhỏ trên
-CPU có thể trả lời chậm. Các mục dưới đây mô tả triển khai Claude/Easypanel
-trước đây, không dùng các bước cấu hình khóa Anthropic cho bản local.
+**Cấu hình hiện tại (2026-11-03):** Coach Chat dùng Ollama với model
+`qwen2.5:3b`; không cần khóa Anthropic và không tính phí theo token. Backend
+vẫn cần Directus URL/service token để xác thực người chơi và quản lý hạn mức.
+Trong production, Ollama chạy bằng service nội bộ `ollama` cùng project
+Easypanel `test-va`; Coach Chat gọi `http://ollama:11434`. Không gắn domain
+công khai hay publish cổng Ollama. Model được tải khi service khởi động lần
+đầu và giữ trong volume bền vững. Phần Anthropic bên dưới là tài liệu lịch sử.
 
 Chạy thủ công từ `server/coach-chat`:
 
@@ -131,58 +132,32 @@ Không cần thực hiện chúng để dùng model local.
    `bootstrap.mjs` ghi giá trị đó làm `token` tĩnh của chính user Directus mà
    dịch vụ coach-chat dùng để tự giới thiệu.
 
-## 5. Gộp nhánh feat/coach-chat vào main
+## 5. Easypanel — service `ollama` trong project `test-va`
 
-`server/coach-chat` hiện chỉ có trên nhánh `feat/coach-chat`. Mục 6 (service
-Easypanel `coach-chat`) build từ `main` tại đường dẫn `/server/coach-chat`,
-nên nhánh phải gộp vào `main` trước — không làm được sau hoặc song song với
-mục 6.
-
-1. **Cần chủ sản phẩm đồng ý** — đây là lần đổi `main` của bản thật, không
-   lùi lại dễ như một worktree.
-2. Gộp `feat/coach-chat` vào `main` theo quy ước hiện tại của repo, đẩy
-   `main` lên GitHub thật.
-3. Xác nhận GitHub đã có `server/coach-chat` trên `main`. Easypanel (mục 6)
-   build từ `main` CỦA GITHUB, không phải nhánh `main` cục bộ của máy đang
-   gõ lệnh, nên phải lấy về mới nhất rồi kiểm đúng `origin/main`:
-   ```bash
-   git fetch origin main
-   git log --oneline -1 origin/main -- server/coach-chat
-   ```
-   ra một dòng — mục 6 dựa vào đúng điều này.
+- Nguồn GitHub: `anhnpvse02755-png/PoolCoachAI`, nhánh `main`, đường dẫn
+  `/server/ollama`, builder **Dockerfile**.
+- Giữ đúng một replica. Gắn volume bền vững vào `/root/.ollama`; entrypoint
+  chạy `ollama serve`, tải `OLLAMA_MODEL` (mặc định `qwen2.5:3b`) vào volume
+  rồi giữ máy chủ chạy.
+- Đặt `OLLAMA_HOST=0.0.0.0:11434` để các service cùng mạng nội bộ Easypanel
+  truy cập được. Không cấu hình domain và không publish cổng 11434 ra host.
+- Khi kiểm tra log, chờ `ollama pull` hoàn tất trước khi gửi câu hỏi đầu tiên.
 
 ## 6. Easypanel — service `coach-chat` trong project `test-va`
 
-1. Tạo app service mới (**cần chủ sản phẩm đồng ý** — tạo hạ tầng thật, lưu
-   khoá API thật, gắn domain thật):
-   - Nguồn: GitHub `anhnpvse02755-png/PoolCoachAI`, nhánh `main` (đã có
-     `server/coach-chat` từ mục 5), đường dẫn build `/server/coach-chat`,
-     builder **Dockerfile**.
-   - Biến môi trường (bảng đầy đủ ở mục 2): bắt buộc `ANTHROPIC_API_KEY`,
-     `DIRECTUS_URL=https://poolcoachai-api.kjdybl.easypanel.host`,
-     `DIRECTUS_SERVICE_TOKEN` (= giá trị `COACH_CHAT_SERVICE_TOKEN` ở mục 4),
-     `ALLOWED_ORIGINS=https://poolcoachai.kjdybl.easypanel.host,http://localhost:5555`;
-     tuỳ chọn `CLAUDE_MODEL`, `CLAUDE_EFFORT`, `DAILY_QUESTION_LIMIT`,
-     `CLAUDE_FALLBACKS` — bỏ hẳn hay để rỗng đều dùng mặc định (mục 2).
-   - Domain: `poolcoachai-coach.kjdybl.easypanel.host` → cổng **8080**.
-   - **Chạy ĐÚNG MỘT replica — KHÔNG bật auto-scale hay nhiều instance.**
-     Hạn mức mỗi người mỗi ngày (`quota.mjs`) khoá bằng một `Map` trong bộ
-     nhớ của một tiến trình (`withLock`, `quota.mjs:43`), không phải khoá
-     phân tán qua Directus — hai replica trở lên mỗi cái tự khoá riêng,
-     không biết gì về yêu cầu đang chạy ở replica khác, nên hai câu hỏi
-     cùng lúc của một người có thể lọt qua cả hai mà vẫn được cả hai
-     replica tính là còn lượt.
-2. Deploy bằng thủ tục MCP `deployAppService` (qua `execute_destructive` —
-   đổi hạ tầng thật, **cần chủ sản phẩm đồng ý**).
-3. Kiểm `inspectAppService` → trường `commit.hash` đúng là đầu `main` hiện
-   tại (sau mục 5). **Bỏ qua kiểm này từng để production cũ sáu ngày** — luôn
-   kiểm trước khi coi là xong.
-4. Kiểm: `curl https://poolcoachai-coach.kjdybl.easypanel.host/healthz` →
-   `ok`.
-
-Chưa chạy bước nào ở trên tới giờ viết bài này (xem tình trạng ở đầu bài):
-nhánh `feat/coach-chat` chưa gộp vào `main` (mục 5), service chưa tồn tại,
-`Dockerfile` chưa được Easypanel build lần nào.
+- Nguồn GitHub: cùng repo, nhánh `main`, đường dẫn `/server/coach-chat`,
+  builder **Dockerfile**.
+- Giữ đúng một replica: hạn mức và khóa lượt chạy trong bộ nhớ của một tiến
+  trình.
+- Biến môi trường: `DIRECTUS_URL`,
+  `DIRECTUS_SERVICE_TOKEN` (khớp token user dịch vụ đã bootstrap),
+  `ALLOWED_ORIGINS`, `OLLAMA_URL=http://ollama:11434`,
+  `OLLAMA_MODEL=qwen2.5:3b`. Không đặt `ANTHROPIC_API_KEY`.
+- Domain `poolcoachai-coach.kjdybl.easypanel.host` → cổng **8080**.
+- Deploy Ollama trước, chờ model tải xong, rồi deploy Coach Chat. Xác nhận
+  `inspectAppService` → `commit.hash` đúng `origin/main`; kiểm
+  `https://poolcoachai-coach.kjdybl.easypanel.host/healthz` trả `ok`.
+  `/healthz` không kiểm tra Ollama; xem log Ollama để xác nhận model sẵn sàng.
 
 ## 7. Phát hành app, sau khi merge
 
@@ -235,8 +210,8 @@ chỉ lần đầu — mỗi bài tốn (hoặc không tốn) khác nhau:
     DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… \
     node tool/e2e/coach_chat.mjs
   ```
-  Gọi Claude thật **hai lần** (hai câu hỏi) — khoảng **4 xu Mỹ** một lần
-  chạy (mục 12). `COACH_CHAT_URL` phải là origin trần —
+  Gọi Ollama thật **hai lần** (hai câu hỏi), không phát sinh phí token.
+  `COACH_CHAT_URL` phải là origin trần —
   `scheme://host[:port]`, KHÔNG dấu `/` cuối, KHÔNG đường dẫn (đúng:
   `https://poolcoachai-coach.kjdybl.easypanel.host`; sai: có `/` cuối, hay
   thêm `.../v1`) — bài này nối thẳng chuỗi đó với từng đường dẫn endpoint,
@@ -245,10 +220,17 @@ chỉ lần đầu — mỗi bài tốn (hoặc không tốn) khác nhau:
   — một câu hỏi thật trên Chrome thật, trừ một lượt hạn mức của tài khoản
   thử.
 - `DIRECTUS_URL=… DIRECTUS_ADMIN_EMAIL=… DIRECTUS_ADMIN_PASSWORD=… node tool/e2e/responsive.mjs https://poolcoachai.kjdybl.easypanel.host`
-  — không gọi Claude, chỉ mở các màn (kể cả `/coach/chat`) ở bốn cỡ màn; vẫn
+  — không gọi model, chỉ mở các màn (kể cả `/coach/chat`) ở bốn cỡ màn; vẫn
   tạo và xoá một user thật.
 
-## 9. Đổi model, effort hay hạn mức
+## 9. Đổi model hoặc hạn mức
+
+Đặt `OLLAMA_MODEL` và tải model đó vào volume (entrypoint tự tải model đang
+được cấu hình khi service khởi động); `DAILY_QUESTION_LIMIT` chỉ cần đổi ở
+service `coach-chat`. Deploy lại service đã đổi. Sau đó chạy
+`tool/e2e/coach_chat.mjs` (mục 8) để xác nhận model trả lời được.
+
+### Cấu hình Claude cũ (không áp dụng)
 
 Đổi biến môi trường tương ứng trên Easypanel (mục 2) rồi deploy lại
 (`deployAppService`) — **cần chủ sản phẩm đồng ý**, vì đây là đổi cấu hình
@@ -267,7 +249,26 @@ Mỗi câu trả lời bị bộ lọc phía app chặn được app báo lên m
 service `coach-chat`; trường `rule` trong mỗi dòng nói rõ luật nào ở
 `lib/domain/coach/chat_filter.dart` đã chặn câu đó.
 
-## 11. Khi có lỗi
+## 11. Khi có lỗi với Ollama
+
+- `503 {error: "unavailable"}`: Ollama hoặc Directus không kết nối được.
+  `/healthz` vẫn có thể trả `ok`; kiểm tra service `ollama` đang chạy, model
+  đã tải xong, `OLLAMA_URL=http://ollama:11434` và log Coach Chat/Directus.
+- `503 {error: "busy"}`: Ollama trả `429` hoặc `503`; chờ model rảnh rồi thử
+  lại. Lượt hỏi được hoàn.
+- `502 {error: "upstream"}`: Ollama trả HTTP lỗi khác; kiểm tra log service
+  `ollama` và tên `OLLAMA_MODEL`.
+- `502 {error: "truncated"}`: câu trả lời chạm giới hạn sinh token; lượt
+  không được hoàn.
+- `500 {error: "internal"}`: lỗi giao thức hoặc lỗi lập trình; xem log của
+  Coach Chat theo thời điểm yêu cầu.
+- `401`: xác thực người chơi với Directus không qua. Kiểm tra Directus URL,
+  user/token dịch vụ và việc app đăng nhập đúng Directus.
+
+`GET /healthz` chỉ xác nhận tiến trình Coach Chat còn sống, không kiểm tra
+Directus, kết nối Ollama hay model đã sẵn sàng.
+
+### Hướng dẫn lỗi Claude cũ (không áp dụng)
 
 - `413 {error: "invalid", field: "body"}`: thân yêu cầu vượt quá 64 KB —
   không phải lỗi hạn mức hay lỗi Claude. App không nên gửi facts/history lớn
@@ -354,6 +355,12 @@ service `coach-chat`; trường `rule` trong mỗi dòng nói rõ luật nào �
   giờ máy chủ.
 
 ## 12. Chi phí
+
+Production hiện dùng Ollama tự host nên không có phí theo token. Dự trù tài
+nguyên máy Easypanel (CPU/RAM/lưu trữ model); model `qwen2.5:3b` chiếm khoảng
+2 GB dung lượng và suy luận CPU có thể chậm.
+
+### Ước tính Claude trước đây (không áp dụng)
 
 Ước tính trên giấy (spec mục 10, **chưa đo thật**): mỗi câu hỏi khoảng 2–3
 nghìn token vào (phần lời dặn hệ thống được đệm) và vài trăm token ra. Với
