@@ -5,6 +5,8 @@ import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
+import 'package:poolcoachai/data/seed/seed_knowledge.dart';
+import 'package:poolcoachai/domain/knowledge_article.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_library_screen.dart';
 import 'package:poolcoachai/features/knowledge/presentation/knowledge_screen.dart';
 import 'package:poolcoachai/features/training/presentation/drill_detail_screen.dart';
@@ -12,10 +14,14 @@ import 'package:poolcoachai/features/training/presentation/drill_detail_screen.d
 import '../../support/test_data.dart';
 
 void main() {
-  Future<void> openAt(WidgetTester tester, String path) async {
+  Future<void> openAt(
+    WidgetTester tester,
+    String path, {
+    List<KnowledgeArticle>? knowledge,
+  }) async {
     final router = createAppRouter(auth: signedInGate());
     addTearDown(router.dispose);
-    final container = testContainer();
+    final container = testContainer(knowledge: knowledge);
     addTearDown(container.dispose);
     tester.view.physicalSize = const Size(800, 1400);
     tester.view.devicePixelRatio = 1;
@@ -48,6 +54,18 @@ void main() {
 
     expect(find.byType(KnowledgeScreen), findsOneWidget);
     expect(find.text('Thân bài kiến thức về cân bi.'), findsOneWidget);
+  });
+
+  testWidgets('liệt kê và mở bài áp phê mới từ seed', (tester) async {
+    final article = seedKnowledge.singleWhere((article) => article.id == 'k7');
+    await openAt(tester, Routes.knowledge, knowledge: seedKnowledge);
+
+    expect(find.text(article.title), findsOneWidget);
+    await tester.tap(find.text(article.title));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(KnowledgeScreen), findsOneWidget);
+    expect(find.text(article.body), findsOneWidget);
   });
 
   testWidgets('Luyện tập có mục Kiến thức dẫn tới thư viện', (tester) async {

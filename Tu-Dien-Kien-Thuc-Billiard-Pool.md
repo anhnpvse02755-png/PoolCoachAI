@@ -207,6 +207,7 @@
 **Các lưu ý để thực hiện:**
 - Với bi sát băng, biên độ sai số cho phép rất nhỏ – chỉ cần lệch nhẹ bi mục tiêu dễ đi vào băng thay vì lỗ.
 - Cần đánh với lực và xoáy hạn chế (thường dùng stun hoặc xoáy nhẹ) để tránh bi cái nảy ngược vào băng gây khó kiểm soát vị trí sau đó.
+- Đây là lựa chọn cơ bản để ưu tiên kiểm soát bi cái. Khi cần đưa bi mục tiêu sát băng vào lỗ, có thể thử áp phê thuận theo mục 5.9; cách này cần bù squirt và tính trước đường đi của bi cái.
 
 **Các lỗi thường gặp:**
 - Ngắm theo thói quen ghost ball thông thường mà không tính đến việc băng "che" một phần góc tiếp cận, dẫn đến chọn sai điểm chạm.
@@ -291,6 +292,128 @@
 - Dành riêng thời gian luyện các cú cắt mỏng dọc băng vào lỗ giữa (xem thêm bài tập liên quan ở Mục 5.4) vì đây là điểm yếu phổ biến ngay cả với người chơi có kinh nghiệm.
 
 ---
+
+### 5.8. Squirt, Swerve và Throw
+
+**Mô tả:** Đây là ba hiệu ứng khác nhau cần phân biệt khi đánh áp phê:
+- **Squirt:** bi cái lệch khỏi hướng cơ ngay sau khi đầu cơ chạm bi.
+- **Swerve:** bi cái cong dần trên đường đi, thường rõ hơn khi nâng đuôi cơ.
+- **Throw:** bi mục tiêu lệch khỏi đường nối tâm hai bi do ma sát khi va chạm. Throw cũng xảy ra ở cú cắt không áp phê; một ví dụ được Dr. Dave nêu là cú stun cắt 35° có thể làm hướng bi mục tiêu lệch khoảng 5,8°.
+
+**Hướng dẫn thực hiện:**
+1. Xác định đường nối tâm hai bi để dự đoán hướng bi mục tiêu nếu không có throw.
+2. Tính riêng đường đi của bi cái (squirt/swerve) và hướng bi mục tiêu (throw).
+3. Nếu dùng áp phê, bù squirt theo cây cơ và cách đánh của mình; xử lý throw theo mục 5.10 hoặc 5.11 khi phù hợp.
+
+**Các lưu ý để thực hiện:**
+- Throw thường rõ hơn ở cú đánh chậm; mức độ còn tùy góc cắt, tốc độ và độ xoáy.
+- Squirt và swerve thay đổi theo cây cơ, độ dài cầu tay và độ nâng cơ.
+- Con số 5,8° là ví dụ cho một tình huống cụ thể, không phải mức bù áp dụng cho mọi cú đánh.
+
+**Các lỗi thường gặp:**
+- Bi mục tiêu lệch dù đã ngắm ghost ball: có thể do chưa tính throw.
+- Bi cái lệch khỏi hướng ngắm khi dùng áp phê: có thể do chưa bù squirt.
+
+**Cách sửa:**
+- Luyện ở lực cố định, ghi lại hướng bi lệch trước khi điều chỉnh điểm ngắm.
+- Tập nhận biết từng hiệu ứng riêng trước khi kết hợp áp phê trong ván đấu.
+
+---
+
+### 5.9. Bi Mục Tiêu Sát Băng: Áp Phê Thuận
+
+**Mô tả:** Với bi mục tiêu sát băng, có thể dùng áp phê thuận để bi cái chạm băng trước rồi mới chạm bi mục tiêu. Hiệu ứng throw của áp phê thuận có thể giúp đưa bi mục tiêu vào lỗ dù điểm ngắm phải bù squirt. Đây là phương án bổ sung cho cách stun hoặc xoáy nhẹ ở mục 5.4, không phải lựa chọn phù hợp cho mọi thế bi.
+
+**Hướng dẫn thực hiện:**
+1. Xác định đường bi mục tiêu cần đi vào lỗ theo cách ở mục 5.4.
+2. Chọn áp phê thuận theo hướng bi cái chạy về phía băng và bù squirt theo cây cơ đang dùng.
+3. Đánh đủ chắc để bi cái chạm băng trước, đồng thời tính trước vị trí bi cái sau va chạm.
+
+**Các lưu ý để thực hiện:**
+- Không có điểm ngắm bù chung cho mọi cây cơ; mức áp phê, lực và khoảng cách đều ảnh hưởng kết quả.
+- Ưu tiên stun hoặc xoáy nhẹ nếu giữ vị trí bi cái quan trọng hơn việc chọn đường áp phê thuận.
+
+**Các lỗi thường gặp:**
+- Bi mục tiêu hụt về phía băng: có thể chưa bù đủ squirt hoặc đã đánh quá dày.
+- Bi cái đi xa hơn dự tính: chưa tính đến đường đi thay đổi do áp phê thuận.
+- Nhầm phía áp phê: xác định trái/phải theo hướng bi mục tiêu đi thay vì theo hướng bi cái chạy.
+
+**Cách sửa:**
+- Luyện ở các vị trí và lực cố định, ghi lại điểm ngắm bù phù hợp.
+- Gọi tên điểm chạm trên bi cái (ví dụ 3 giờ hoặc 9 giờ) trước khi vào cơ.
+
+---
+
+### 5.10. Áp Phê Ngược Gearing Để Giảm Throw
+
+**Mô tả:** Lượng áp phê ngược vừa đủ, gọi là **gearing**, có thể làm giảm throw do cú cắt để bi mục tiêu đi gần theo đường nối tâm hai bi. Ít hơn mức gearing vẫn có throw theo một phía; nhiều hơn mức đó có thể làm throw đổi sang phía ngược lại do xoáy.
+
+**Hướng dẫn thực hiện:**
+1. Xác định đường nối tâm hai bi tới lỗ.
+2. Tăng dần áp phê ngược theo góc cắt; góc cắt càng lớn thường cần mức áp phê cao hơn.
+3. Bù squirt theo mục 5.12 rồi đánh với lực nhất quán.
+
+**Các lưu ý để thực hiện:**
+- Gearing có thể hữu ích khi bi bám nhau (cling), nhưng không phải phương án tốt nhất cho mọi cú.
+- Không có mức áp phê cố định dùng chung; ở một số góc cắt lớn, có thể không đạt gearing.
+
+**Các lỗi thường gặp:**
+- Bi mục tiêu vẫn lệch: mức áp phê có thể chưa phù hợp với góc cắt.
+- Bi mục tiêu throw sang phía ngược: có thể đã vượt quá mức gearing.
+
+**Cách sửa:**
+- Luyện với vài góc cắt chuẩn và lực cố định, tăng hoặc giảm áp phê từng bước.
+- Nếu bi có vạch, quan sát độ xoay sau va chạm như một chỉ báo, không phải phép đo tuyệt đối.
+
+---
+
+### 5.11. Bù Throw Bằng Cách Cắt Dày Hơn
+
+**Mô tả:** Khi dự kiến throw sẽ làm bi mục tiêu lệch khỏi lỗ, có thể ngắm dày hơn một chút để throw đưa bi về phía tâm lỗ. Chỉ áp dụng khi throw đáng kể; đây không phải quy tắc ngắm cho mọi cú cắt.
+
+**Hướng dẫn thực hiện:**
+1. Ước lượng hướng throw của cú đánh.
+2. Dịch điểm ngắm một lượng nhỏ về phía cắt dày để bù hướng lệch đó.
+3. Giữ lực ổn định trong lúc luyện vì throw thay đổi theo tốc độ.
+
+**Các lưu ý để thực hiện:**
+- Throw thường lớn hơn khi đánh chậm nên mức bù cần thay đổi theo lực.
+- Có thể cân nhắc dùng áp phê ngược gearing theo mục 5.10 thay vì bù điểm ngắm.
+
+**Các lỗi thường gặp:**
+- Vẫn hụt hoặc hụt sang phía đối diện: điểm bù có thể chưa đủ hoặc đã quá mức.
+- Cắt dày theo thói quen cả khi throw nhỏ: áp dụng mẹo quá rộng.
+
+**Cách sửa:**
+- Ghi lại mức bù theo một số góc cắt và lực chuẩn.
+- Chỉ dùng khi đã nhận diện được throw có ảnh hưởng đáng kể.
+
+---
+
+### 5.12. Bù Squirt Bằng BHE hoặc FHE
+
+**Mô tả:** Squirt làm bi cái lệch khỏi hướng cơ khi đánh lệch tâm. Có thể bù bằng **BHE** (back-hand English: xoay cơ quanh cầu tay bằng tay sau) hoặc **FHE** (front-hand English: dịch điểm ngắm bằng tay trước).
+
+**Hướng dẫn thực hiện:**
+1. Ngắm đường cơ bản như khi đánh tâm bi.
+2. Với BHE, xoay cơ quanh điểm cầu tay để đầu cơ đến điểm áp phê đã chọn; với FHE, dịch điểm ngắm theo mức bù đã luyện.
+3. Giữ đường đẩy thẳng và thực hiện cú đánh.
+
+**Các lưu ý để thực hiện:**
+- Lượng bù phụ thuộc cây cơ, độ dài cầu tay và điểm chạm; cơ low-deflection cũng cần được hiệu chỉnh riêng.
+- Luyện trên cùng một bàn, cùng lực và cùng mức áp phê để so sánh ổn định.
+
+**Các lỗi thường gặp:**
+- Dùng áp phê nhưng ngắm như đánh tâm: bi cái lệch khỏi đường dự tính.
+- Bù quá nhiều: bi cái lệch sang phía đối diện.
+
+**Cách sửa:**
+- Luyện BHE trên đường thẳng không có bi mục tiêu, quan sát hướng lăn của bi cái.
+- Ghi lại mức bù cho từng mức áp phê của cây cơ đang dùng.
+
+---
+
+### 6. Phá Bi (Break Shot)
 
 **Mô tả:** Cú đánh mở màn ván đấu, phá vỡ hình tam giác/kim cương bi để bắt đầu ván chơi.
 
@@ -529,7 +652,7 @@
 
 ### 14. Throw Effect & Squirt / Swerve
 
-**Mô tả:** Các hiệu ứng vật lý làm bi đi lệch khỏi đường ngắm lý thuyết: Throw (bi mục tiêu bị "kéo" lệch do ma sát khi có xoáy ngang), Squirt (bi cái lệch hướng ban đầu do dùng English), Swerve (bi cái đi cong khi dùng English kết hợp cơ nâng cao đầu).
+**Mô tả:** Các hiệu ứng vật lý làm bi đi lệch khỏi đường ngắm lý thuyết: Throw (bi mục tiêu lệch do ma sát khi va chạm), Squirt (bi cái lệch hướng ban đầu do dùng English), Swerve (bi cái đi cong dần trên đường đi, thường rõ hơn khi cơ nâng cao đầu). Throw cũng có thể xảy ra khi không dùng áp phê; xem mục 5.8 đến 5.11 để biết cách nhận diện và bù.
 
 **Hướng dẫn thực hiện:**
 1. Nhận diện tình huống nào sẽ gây throw (cú cắt góc hẹp + có xoáy/tốc độ chậm).
@@ -539,6 +662,7 @@
 **Các lưu ý để thực hiện:**
 - Throw effect giảm khi lực đánh mạnh hơn, tăng khi đánh nhẹ và có xoáy ngang.
 - Squirt phụ thuộc vào loại shaft cơ (shaft carbon/low-deflection sẽ giảm squirt).
+- Có thể dùng BHE hoặc FHE để bù squirt; xem cách luyện ở mục 5.12.
 
 **Các lỗi thường gặp:**
 - Không nhận ra throw effect khi đánh cú cắt nhẹ có xoáy, dẫn đến trượt bi liên tục.
@@ -686,6 +810,7 @@ Các đường xuất phát song song với nhau ở đoạn đầu sẽ hội t
 **Các lưu ý để thực hiện:**
 - Combination có sai số cộng dồn (sai lệch nhỏ ở bi đầu sẽ khuếch đại ở bi cuối), nên độ khó tăng theo khoảng cách.
 - Chỉ nên thực hiện khi 2 bi (trung gian và mục tiêu) gần thẳng hàng với lỗ.
+- Khi hai bi trong combo ở sát nhau, throw có thể làm đổi hướng bi đáng kể; cần quan sát cả vị trí và góc cắt thay vì chỉ ngắm đường thẳng tới lỗ.
 
 **Các lỗi thường gặp:**
 - Đánh combination khi các bi không đủ thẳng hàng, tỉ lệ thành công rất thấp.

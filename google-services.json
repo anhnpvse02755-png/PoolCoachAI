@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "194365664015",
+    "project_id": "poolcoachai",
+    "storage_bucket": "poolcoachai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:194365664015:android:198224318c495e6f382c7a",
+        "android_client_info": {
+          "package_name": "vn.poolcoachai.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDw8loH3J8edFSWjHNYLtd3gifr8_JV25Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,26 +1,37 @@
 # Coach Chat (Hỏi huấn luyện viên) — vận hành và deploy
 
-Sổ tay vận hành cho dịch vụ `server/coach-chat` (chat với Claude trong tab Hỏi
-huấn luyện viên) — dành cho chủ sản phẩm, từ lúc chưa deploy lần nào tới việc
-đổi model/hạn mức sau này. Thiết kế đầy đủ:
+Sổ tay vận hành cho dịch vụ `server/coach-chat` (chat trong tab Hỏi
+huấn luyện viên). Thiết kế ban đầu:
 `docs/superpowers/specs/2026-10-22-poolcoachai-coach-chat-design.md`.
 
-**Tình trạng lúc viết bài này:** code đã xong và có test cục bộ (`npm test`
-trong `server/coach-chat`, test Dart, hai bài kiểm Chrome Task 12), nhưng
-**chưa deploy thật lần nào**. `server/coach-chat/**` chưa đẩy lên `main` (mục
-5), service Easypanel chưa tồn tại, `bootstrap.mjs`/`verify.mjs` chưa chạy
-phần coach-chat trên Directus thật, và vì vậy job CI `coach-chat / test`
-(`.github/workflows/coach-chat.yml`, chạy khi push/PR đổi
-`server/coach-chat/**`) cũng chưa chạy lần nào. Làm theo thứ tự các mục dưới.
+**Cấu hình hiện tại (2026-11-02):** Mã Coach Chat đã chuyển sang Ollama local,
+mặc định model `qwen2.5:3b`; không cần `ANTHROPIC_API_KEY` và không phát sinh
+phí theo token. Backend vẫn cần Directus URL/service token để xác thực người chơi và
+quản lý hạn mức. Ollama cần chạy tại `http://127.0.0.1:11434`; model nhỏ trên
+CPU có thể trả lời chậm. Các mục dưới đây mô tả triển khai Claude/Easypanel
+trước đây, không dùng các bước cấu hình khóa Anthropic cho bản local.
+
+Chạy thủ công từ `server/coach-chat`:
+
+```bash
+OLLAMA_URL=http://127.0.0.1:11434 \
+OLLAMA_MODEL=qwen2.5:3b \
+DIRECTUS_URL=https://poolcoachai-api.kjdybl.easypanel.host \
+DIRECTUS_SERVICE_TOKEN=<token-dich-vu> \
+ALLOWED_ORIGINS=https://poolcoachai.kjdybl.easypanel.host \
+npm start
+```
+
+Tải model một lần bằng `ollama pull qwen2.5:3b`, rồi chạy `npm test` để xác
+nhận backend. Không đặt Directus service token vào Git hay app Flutter.
 
 ## 1. Dịch vụ này là gì
 
-`server/coach-chat` là một dịch vụ Node riêng (không phải phần mở rộng
-Directus) đứng giữa app và Claude: giữ khoá API, đếm hạn mức câu hỏi mỗi
-người mỗi ngày, và chỉ nhận dữ liệu có cấu trúc do app tính sẵn — không bao
+`server/coach-chat` là dịch vụ Node riêng đứng giữa app và Ollama local:
+đếm hạn mức câu hỏi mỗi người mỗi ngày, và chỉ nhận dữ liệu có cấu trúc do app tính sẵn — không bao
 giờ tự tính số mới. Bốn endpoint:
 
-- `GET /healthz` → `200` chữ thường `ok`; không gọi Claude, không gọi
+- `GET /healthz` → `200` chữ thường `ok`; không gọi Ollama, không gọi
   Directus, không cần đăng nhập; **KHÔNG ghi dòng log nào** (ngoại lệ so với
   ba endpoint dưới). Vì vậy `/healthz` trả `ok` KHÔNG chứng minh Directus
   hay token đúng — xem mục 11.
@@ -31,14 +42,11 @@ giờ tự tính số mới. Bốn endpoint:
   model, remainingToday, usage: {input, output, cacheRead}}`; `400` body
   sai; `401` token sai/hết hạn; `413 {error: "invalid", field: "body"}` thân
   yêu cầu vượt quá 64 KB; `429 {error: "quota", limit, resetAt}`;
-  `502 {error: "refused"|"truncated", remainingToday}` Claude từ chối hoặc
-  bị cắt, lượt KHÔNG được hoàn nên thân có `remainingToday` (R7); `502
-  {error: "upstream"}` lỗi Claude API khác, ĐÃ hoàn lượt nên thân không có
-  `remainingToday`; `503 {error: "busy"}` Claude quá tải, đã hoàn lượt;
-  `503 {error: "unavailable"}` Directus không trả lời được HOẶC máy chủ
-  coach-chat không kết nối được tới Claude — hai nguyên nhân khác hẳn nhau
-  cho cùng một mã, xem mục 11; `500 {error: "internal"}` lỗi không phân
-  loại được từ Claude hoặc lỗi lập trình ở bước khác, xem mục 11.
+  `502 {error: "truncated", remainingToday}` model bị cắt, lượt KHÔNG được
+  hoàn; `502 {error: "upstream"}` Ollama trả lỗi khác, ĐÃ hoàn lượt;
+  `503 {error: "busy"}` Ollama đang bận; `503 {error: "unavailable"}`
+  Ollama hoặc Directus không truy cập được; `500 {error: "internal"}` lỗi
+  giao thức hoặc lỗi lập trình.
 - `POST /v1/coach-chat/blocked` body `{rule}` — app báo một câu trả lời đã
   bị bộ lọc phía app (`chat_filter.dart`) chặn → `204`; `400` rule sai;
   `401` token sai; `413` thân yêu cầu vượt quá 64 KB; `503 {error:
@@ -49,38 +57,30 @@ Mỗi yêu cầu (trừ `/healthz`, xem trên) ghi một dòng log JSON:
 không phải id thật) khi đã xác thực; `error` khi có lỗi — mã đã phân loại
 (`busy`/`unavailable`/`refused`/`truncated`/`upstream`/`internal`/…), KHÔNG
 BAO GIỜ thông báo lỗi gốc; `model`/`stop` (không phải `stop_reason`) khi đã
-gọi Claude; `in`/`out`/`cacheRead` khi có usage. Log KHÔNG chứa câu hỏi, câu
+gọi Ollama; `in`/`out`/`cacheRead` khi có usage. Log KHÔNG chứa câu hỏi, câu
 trả lời hay dữ kiện của người chơi — để biết câu nào bị chặn, xem mục 10.
 
 ## 2. Biến môi trường
 
-Bảng dưới theo đúng `server/coach-chat/src/config.mjs` (mã thật lúc chạy, có
-test), vì mục 7.7 của bản thiết kế không nói rõ biến nào bắt buộc so với có
-mặc định. `CLAUDE_FALLBACKS` không nằm trong mục 7.7 của bản thiết kế, nhưng
-tới từ plan (R13) và spec issue S4 — mục 7.5/13.8 của bản thiết kế cũng mô tả
-hành vi của nó. Bảng dưới gộp cả các nguồn này và là nguồn đúng để đặt biến
-trên Easypanel (mục 6).
+Bảng dưới theo đúng `server/coach-chat/src/config.mjs` hiện tại.
 
 | Biến | Bắt buộc | Mặc định | Ý nghĩa |
 |---|---|---|---|
-| `ANTHROPIC_API_KEY` | Có | (không có) | Khoá API Claude, tạo ở mục 3. |
+| `OLLAMA_URL` | Không | `http://127.0.0.1:11434` | Địa chỉ Ollama local. |
+| `OLLAMA_MODEL` | Không | `qwen2.5:3b` | Tên model đã tải bằng `ollama pull`. |
 | `DIRECTUS_URL` | Có | (không có) | Địa chỉ Directus (backend chính). |
 | `DIRECTUS_SERVICE_TOKEN` | Có | (không có) | Token tĩnh của user dịch vụ coach-chat trên Directus — phải khớp giá trị `COACH_CHAT_SERVICE_TOKEN` đưa cho `bootstrap.mjs` (mục 4). |
 | `ALLOWED_ORIGINS` | Có | (không có) | Danh sách origin được phép gọi CORS, phân tách bằng dấu phẩy; rỗng cũng coi là thiếu. |
 | `PORT` | Không | `8080` | Cổng HTTP máy chủ lắng nghe (1–65535). |
-| `CLAUDE_MODEL` | Không | `claude-opus-5` | Model Claude dùng để trả lời (mục 3, mục 9). |
-| `CLAUDE_EFFORT` | Không | `low` | Mức effort: `low`/`medium`/`high`/`xhigh`/`max`. |
 | `DAILY_QUESTION_LIMIT` | Không | `30` | Hạn mức câu hỏi mỗi người mỗi ngày, tính theo giờ Việt Nam. |
-| `CLAUDE_FALLBACKS` | Không | `default` | `default` (bật dự phòng phía máy chủ) hoặc `off` — dùng `off` khi đổi model mà gặp `502 upstream` (mục 9). |
 
-Biến tuỳ chọn (`PORT`, `CLAUDE_MODEL`, `CLAUDE_EFFORT`, `CLAUDE_FALLBACKS`,
-`DAILY_QUESTION_LIMIT`) bỏ hẳn HAY để giá trị rỗng đều rơi về mặc định
-(`config.mjs`, `isBlank`) — không còn khác nhau, không còn gây crash-loop.
+Biến tuỳ chọn (`PORT`, `OLLAMA_URL`, `OLLAMA_MODEL`,
+`DAILY_QUESTION_LIMIT`) bỏ hẳn hoặc để rỗng đều rơi về mặc định.
 
-## 3. Việc chủ sản phẩm cần làm, trước khi deploy
+## 3. Thiết lập Anthropic cũ (không áp dụng cho Ollama local)
 
-Ba việc sau chỉ chủ sản phẩm làm được (cần đăng nhập Anthropic Console); các
-mục dưới không chạy được nếu còn thiếu:
+Các hướng dẫn Anthropic/Easypanel bên dưới được giữ lại làm tài liệu lịch sử.
+Không cần thực hiện chúng để dùng model local.
 
 1. Tạo một **API key** trên Anthropic Console, trong một **workspace riêng
    cho PoolCoachAI** — tách khỏi workspace chung/cá nhân để dễ xem chi phí và

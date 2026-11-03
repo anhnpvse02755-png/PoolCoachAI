@@ -1,4 +1,4 @@
-# Dịch vụ coach-chat (spec 2026-10-22 mục 7). Easypanel build từ thư mục này.
+# Dịch vụ coach-chat dùng Ollama local. Easypanel build từ thư mục này.
 FROM node:24-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./

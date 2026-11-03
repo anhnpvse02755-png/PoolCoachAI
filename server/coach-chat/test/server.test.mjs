@@ -3,27 +3,27 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createApp } from '../src/server.mjs';
 import { SYSTEM_PROMPT } from '../src/prompt.mjs';
-import { DIRECTUS, SERVICE_TOKEN, fakeDirectus, fakeFetch, claudeStream, claudeError } from './fakes.mjs';
+import { DIRECTUS, SERVICE_TOKEN, fakeDirectus, fakeFetch, ollamaResponse } from './fakes.mjs';
 
 const WEB = 'https://poolcoachai.kjdybl.easypanel.host';
 
 async function start(t, { config = {}, now = '2026-10-22T03:00:00Z', nowFn, wrapFetch } = {}) {
   const directus = fakeDirectus();
-  const claudeBodies = [];
-  let reply = () => claudeStream({ text: 'Hôm nay tập Phòng thủ.' });
-  const claude = async (url, init) => { claudeBodies.push(JSON.parse(init.body)); return reply(); };
+  const ollamaBodies = [];
+  let reply = () => ollamaResponse({ text: 'Hôm nay tập Phòng thủ.' });
+  const ollama = async (url, init) => { ollamaBodies.push(JSON.parse(init.body)); return reply(); };
   const lines = [];
-  const baseFetch = fakeFetch({ directus, claude });
+  const baseFetch = fakeFetch({ directus, ollama });
   const handler = createApp({
-    config: { port: 0, anthropicApiKey: 'sk-test-key', model: 'claude-opus-5', effort: 'low', fallbacks: true, dailyLimit: 30,
+    config: { port: 0, ollamaUrl: 'http://ollama.test:11434', model: 'qwen2.5:3b', dailyLimit: 30,
       directusUrl: DIRECTUS, directusServiceToken: SERVICE_TOKEN, allowedOrigins: [WEB, 'http://localhost:5555'], ...config },
     fetch: wrapFetch ? wrapFetch(baseFetch) : baseFetch,
-    now: nowFn ?? (() => new Date(now)), log: (l) => lines.push(l), claudeMaxRetries: 0,
+    now: nowFn ?? (() => new Date(now)), log: (l) => lines.push(l),
   });
   const server = http.createServer(handler);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   t.after(() => new Promise((r) => server.close(r)));
-  return { base: `http://127.0.0.1:${server.address().port}`, directus, claudeBodies, lines, setReply: (f) => { reply = f; } };
+  return { base: `http://127.0.0.1:${server.address().port}`, directus, ollamaBodies, lines, setReply: (f) => { reply = f; } };
 }
 
 /// Chuỗi [s] là một mốc thời gian ISO 8601 hợp lệ, lấy từ đồng hồ thật
@@ -41,12 +41,12 @@ test('healthz: ok, không gọi gì, không ghi nhật ký', async (t) => {
   const s = await start(t);
   const r = await fetch(`${s.base}/healthz`);
   assert.deepEqual([r.status, await r.text()], [200, 'ok']);
-  assert.deepEqual([s.directus.calls.length, s.claudeBodies.length, s.lines.length], [0, 0, 0]);
+  assert.deepEqual([s.directus.calls.length, s.ollamaBodies.length, s.lines.length], [0, 0, 0]);
 });
-test('không token hoặc token sai: 401, không gọi Claude', async (t) => {
+test('không token hoặc token sai: 401, không gọi model', async (t) => {
   const s = await start(t);
   for (const token of [null, 'sai']) assert.equal((await ask(s.base, { token })).status, 401);
-  assert.equal(s.claudeBodies.length, 0);
+  assert.equal(s.ollamaBodies.length, 0);
 });
 test('body sai: 400 kèm trường; thân vượt MAX_BODY_BYTES: 413 (controller ruling 1 — máy chủ đọc hết thân rồi mới trả lời, khách không bị đứt kết nối)', async (t) => {
   const s = await start(t);
@@ -63,22 +63,22 @@ test('trả lời: 200 đủ trường, trừ một lượt, cộng token', asyn
   const s = await start(t);
   const r = await ask(s.base);
   assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), { text: 'Hôm nay tập Phòng thủ.', model: 'claude-opus-5', remainingToday: 29,
-    usage: { input: 900, output: 120, cacheRead: 1800 } });
+  assert.deepEqual(await r.json(), { text: 'Hôm nay tập Phòng thủ.', model: 'qwen2.5:3b', remainingToday: 29,
+    usage: { input: 900, output: 120, cacheRead: 0 } });
   const row = s.directus.rows.get('user-a_2026-10-22');
-  assert.deepEqual([row.questions, row.input_tokens, row.output_tokens, row.cache_read_tokens], [1, 900, 120, 1800]);
+  assert.deepEqual([row.questions, row.input_tokens, row.output_tokens, row.cache_read_tokens], [1, 900, 120, 0]);
 });
-test('hết lượt: 429 có limit và resetAt, không gọi Claude', async (t) => {
+test('hết lượt: 429 có limit và resetAt, không gọi model', async (t) => {
   const s = await start(t, { config: { dailyLimit: 1 } });
   await ask(s.base);
   const r = await ask(s.base);
   assert.equal(r.status, 429);
   assert.deepEqual(await r.json(), { error: 'quota', limit: 1, resetAt: '2026-10-22T17:00:00.000Z' });
-  assert.equal(s.claudeBodies.length, 1);
+  assert.equal(s.ollamaBodies.length, 1);
 });
-test('Claude quá tải hoặc mất kết nối: 503 và hoàn lượt, nhật ký mang mã lỗi (ruling 5)', async (t) => {
+test('model quá tải hoặc mất kết nối: 503 và hoàn lượt, nhật ký mang mã lỗi (ruling 5)', async (t) => {
   const s = await start(t);
-  for (const [reply, code] of [[() => claudeError(529, 'overloaded_error'), 'busy'], [() => { throw new TypeError('fetch failed'); }, 'unavailable']]) {
+  for (const [reply, code] of [[() => ollamaResponse({ status: 503 }), 'busy'], [() => { throw new TypeError('fetch failed'); }, 'unavailable']]) {
     s.setReply(reply);
     const r = await ask(s.base);
     assert.deepEqual([r.status, (await r.json()).error], [503, code]);
@@ -87,25 +87,18 @@ test('Claude quá tải hoặc mất kết nối: 503 và hoàn lượt, nhật 
     assert.equal(last.error, code);
   }
 });
-test('Claude vứt lỗi không phân loại được (không phải APIError/APIConnectionError/RateLimitError của SDK): 500 internal, vẫn hoàn lượt (ruling 2)', async (t) => {
+test('model trả JSON sai: 500 internal, vẫn hoàn lượt (ruling 2)', async (t) => {
   const s = await start(t);
-  // Phản hồi 200 nhưng không có đoạn SSE nào: SDK ném AnthropicError (không phải
-  // APIError hay APIConnectionError) — classifyClaudeError trả null, rơi vào
-  // nhánh mặc định 500/'internal'. Đây là một lỗi "lập trình/giao thức", không
-  // phải lỗi mạng hay lỗi do Claude từ chối.
-  s.setReply(() => new Response('', { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+  s.setReply(() => new Response('{not json', { status: 200, headers: { 'content-type': 'application/json' } }));
   const r = await ask(s.base);
   assert.deepEqual([r.status, await r.json()], [500, { error: 'internal' }]);
   assert.equal(s.directus.rows.get('user-a_2026-10-22').questions, 0);
   assert.equal(JSON.parse(s.lines.at(-1)).error, 'internal');
 });
-test('Claude từ chối hoặc bị cắt: 502 kèm remainingToday, không hoàn lượt (R7)', async (t) => {
+test('model bị cắt: 502 kèm remainingToday, không hoàn lượt (R7)', async (t) => {
   const s = await start(t);
-  s.setReply(() => claudeStream({ text: '', stopReason: 'refusal' }));
-  const r = await ask(s.base);
-  assert.deepEqual([r.status, await r.json()], [502, { error: 'refused', remainingToday: 29 }]);
-  s.setReply(() => claudeStream({ text: 'dở', stopReason: 'max_tokens' }));
-  assert.deepEqual(await (await ask(s.base)).json(), { error: 'truncated', remainingToday: 28 });
+  s.setReply(() => ollamaResponse({ text: 'dở', doneReason: 'length' }));
+  assert.deepEqual(await (await ask(s.base)).json(), { error: 'truncated', remainingToday: 29 });
 });
 test('Directus sập: 503 unavailable', async (t) => {
   const s = await start(t);
@@ -136,7 +129,7 @@ test('R15: addUsage lỗi (chỉ PATCH cộng token sập) vẫn trả lời 200
   assert.deepEqual([errorLine.event, errorLine.where], ['error', 'addUsage']);
   assertIsoAt(errorLine.at);
 });
-test('M11a: Claude lỗi rồi hoàn lượt cũng lỗi — vẫn trả đúng mã đã phân loại từ lỗi Claude, không phải lỗi hoàn lượt; có dòng nhật ký lỗi riêng where:"refund"', async (t) => {
+test('M11a: model lỗi rồi hoàn lượt cũng lỗi — vẫn trả đúng mã đã phân loại từ lỗi model; có dòng nhật ký lỗi riêng where:"refund"', async (t) => {
   // Người dùng mới trong ngày: take() tạo dòng bằng POST (createUsage, questions:1 đặt
   // sẵn trong thân tạo), không qua PATCH — nên PATCH mang khoá `questions` duy nhất
   // trong cả lượt hỏi thất bại này là của refund() (server.mjs:188-192), chặn thẳng nó.
@@ -153,7 +146,7 @@ test('M11a: Claude lỗi rồi hoàn lượt cũng lỗi — vẫn trả đúng 
       return base(input, init);
     },
   });
-  s.setReply(() => claudeError(529, 'overloaded_error')); // -> classifyClaudeError: {status:503, code:'busy'}
+  s.setReply(() => ollamaResponse({ status: 503 }));
   const r = await ask(s.base);
   assert.deepEqual([r.status, (await r.json()).error], [503, 'busy']);
   // Hoàn lượt không thành (PATCH của refund() bị chặn), nên lượt đã trừ ở take() còn nguyên.
@@ -192,8 +185,8 @@ test('lời dặn hệ thống giống hệt từng byte giữa các lượt và
   const s = await start(t);
   await ask(s.base);
   await ask(s.base, { token: 'tok-b', payload: { facts: { rank: 'a' }, history: [{ fromPlayer: true, text: 'Q' }, { fromPlayer: false, text: 'A' }], question: 'Khác' } });
-  assert.equal(JSON.stringify(s.claudeBodies[0].system), JSON.stringify(s.claudeBodies[1].system));
-  assert.equal(s.claudeBodies[0].system[0].text, SYSTEM_PROMPT);
+  assert.equal(s.ollamaBodies[0].messages[0].content, SYSTEM_PROMPT);
+  assert.equal(s.ollamaBodies[0].messages[0].content, s.ollamaBodies[1].messages[0].content);
 });
 test('nhật ký: một dòng JSON mỗi yêu cầu, không câu hỏi, không dữ kiện, không token, không khoá', async (t) => {
   const s = await start(t);
@@ -202,14 +195,14 @@ test('nhật ký: một dòng JSON mỗi yêu cầu, không câu hỏi, không d
   assert.equal(s.lines.length, 2);
   const first = JSON.parse(s.lines[0]);
   assert.deepEqual([first.method, first.path, first.status, first.model, first.stop, first.in, first.out, first.cacheRead],
-    ['POST', '/v1/coach-chat', 200, 'claude-opus-5', 'end_turn', 900, 120, 1800]);
+    ['POST', '/v1/coach-chat', 200, 'qwen2.5:3b', 'stop', 900, 120, 0]);
   assert.match(first.user, /^[0-9a-f]{16}$/);
   assert.equal(typeof first.ms, 'number');
   // Ruling 1: mỗi dòng nhật ký mang mốc thời gian thật (không phải `now` tiêm cho test).
   assertIsoAt(first.at);
   assert.notEqual(first.at, '2026-10-22T03:00:00.000Z');
   const all = s.lines.join('\n');
-  for (const secret of ['Hôm nay tôi nên tập gì', 'Hôm nay tập Phòng thủ', 'FACT-MARKER', 'tok-a', 'sk-test-key', 'service-token-test', 'user-a']) {
+  for (const secret of ['Hôm nay tôi nên tập gì', 'Hôm nay tập Phòng thủ', 'FACT-MARKER', 'tok-a', 'service-token-test', 'user-a']) {
     assert.ok(!all.includes(secret), secret);
   }
 });

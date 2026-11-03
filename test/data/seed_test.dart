@@ -11,14 +11,33 @@ import 'package:poolcoachai/domain/skill_category.dart';
 
 void main() {
   group('dữ liệu khởi tạo', () {
-    test('có đúng 19 bài tập và 6 bài kiến thức', () {
+    test('có đúng 19 bài tập và 11 bài kiến thức', () {
       expect(seedDrills.length, 19);
-      expect(seedKnowledge.length, 6);
+      expect(seedKnowledge.length, 11);
     });
 
     test('mã bài tập không trùng nhau', () {
       final ids = seedDrills.map((d) => d.id).toSet();
       expect(ids.length, seedDrills.length);
+    });
+
+    test('mã bài kiến thức không trùng nhau', () {
+      final ids = seedKnowledge.map((article) => article.id).toSet();
+      expect(ids.length, seedKnowledge.length);
+    });
+
+    test('các mục áp phê mới đều có nội dung và thuộc Ngắm bi', () {
+      const newIds = {'k7', 'k8', 'k9', 'k10', 'k11'};
+      final newArticles = seedKnowledge.where(
+        (article) => newIds.contains(article.id),
+      );
+
+      expect(newArticles.length, 5);
+      for (final article in newArticles) {
+        expect(article.cat, SkillCategory.aiming, reason: article.id);
+        expect(article.title.trim(), isNotEmpty, reason: article.id);
+        expect(article.body.trim(), isNotEmpty, reason: article.id);
+      }
     });
 
     test('mỗi bài tập chấm được điểm', () {

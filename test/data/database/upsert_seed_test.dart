@@ -23,14 +23,14 @@ void main() {
   tearDown(() => db.close());
 
   group('nạp seed lần đầu', () {
-    test('ra đủ 10 bài tập và 6 bài đọc', () async {
+    test('ra đủ 19 bài tập và 11 bài đọc', () async {
       await upsertSeed(db);
 
       final drills = await db.select(db.drillRows).get();
       final articles = await db.select(db.knowledgeRows).get();
 
       expect(drills.length, 19);
-      expect(articles.length, 6);
+      expect(articles.length, 11);
     });
 
     test('mọi bài tập đọc lên lại đúng là bài trong seed', () async {
@@ -71,7 +71,7 @@ void main() {
       await upsertSeed(db);
 
       expect((await db.select(db.drillRows).get()).length, 19);
-      expect((await db.select(db.knowledgeRows).get()).length, 6);
+      expect((await db.select(db.knowledgeRows).get()).length, 11);
     });
 
     test('bản ghi cũ trên máy đã cài bị bản trong mã ghi đè', () async {

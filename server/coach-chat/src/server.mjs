@@ -1,11 +1,11 @@
-// Máy chủ HTTP Coach Chat: định tuyến, CORS, hoàn lượt khi Claude lỗi, một
+// Máy chủ HTTP Coach Chat: định tuyến, CORS, hoàn lượt khi Ollama lỗi, một
 // dòng nhật ký JSON mỗi yêu cầu (spec mục 7, R7, R8, R10, R12, R15, R16,
 // R17). Không log câu hỏi, câu trả lời, facts hay token ở đây.
 
 import { createDirectus, DirectusError } from './directus.mjs';
 import { createAuth } from './auth.mjs';
 import { createQuota } from './quota.mjs';
-import { createClaude, classifyClaudeError } from './claude.mjs';
+import { createOllama, classifyOllamaError } from './ollama.mjs';
 import { parseChatRequest, parseBlockedReport, RequestError, MAX_BODY_BYTES } from './validate.mjs';
 import { hashUserId } from './log.mjs';
 
@@ -63,21 +63,18 @@ function sendNoBody(res, status, headers = {}) {
   res.end();
 }
 
-/// Tạo đối tượng Coach Chat cho [config, fetch, now, log, claudeMaxRetries]
+/// Tạo đối tượng Coach Chat cho [config, fetch, now, log]
 /// (spec mục 7, hợp đồng dây giữa app và máy chủ). `directus`, `auth`,
-/// `quota` và `claude` được tạo đúng một lần mỗi tiến trình (controller
+/// `quota` và model Ollama được tạo đúng một lần mỗi tiến trình (controller
 /// ruling 2), không tạo lại mỗi yêu cầu.
-export function createApp({ config, fetch = globalThis.fetch, now = () => new Date(), log = (line) => process.stdout.write(`${line}\n`), claudeMaxRetries = 1 }) {
+export function createApp({ config, fetch = globalThis.fetch, now = () => new Date(), log = (line) => process.stdout.write(`${line}\n`) }) {
   const directus = createDirectus({ url: config.directusUrl, serviceToken: config.directusServiceToken, fetch });
   const auth = createAuth({ directus, now });
   const quota = createQuota({ directus, limit: config.dailyLimit, now });
-  const claude = createClaude({
-    apiKey: config.anthropicApiKey,
+  const model = createOllama({
+    baseUrl: config.ollamaUrl,
     model: config.model,
-    effort: config.effort,
-    fallbacks: config.fallbacks,
     fetch,
-    maxRetries: claudeMaxRetries,
   });
 
   /// Ghi đúng một dòng nhật ký JSON cho yêu cầu — không bao giờ câu hỏi,
@@ -156,7 +153,7 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
       return;
     }
 
-    // 4. Trừ một lượt trước khi gọi Claude (controller ruling 3).
+    // 4. Trừ một lượt trước khi gọi model cục bộ (controller ruling 3).
     let take;
     try {
       take = await quota.take(userId);
@@ -175,22 +172,22 @@ export function createApp({ config, fetch = globalThis.fetch, now = () => new Da
     }
     const { day, remainingToday } = take;
 
-    // 5. Gọi Claude. Lỗi SDK/transport thì hoàn lượt trước (chỉ sau khi
+    // 5. Gọi Ollama. Lỗi transport/model thì hoàn lượt trước (chỉ sau khi
     // chắc đã trừ được — controller ruling 3). Hoàn với BẤT KỲ lỗi ném ra
-    // từ claude.ask, kể cả lỗi không phân loại được (classifyClaudeError
+    // từ model.ask, kể cả lỗi không phân loại được (classifyOllamaError
     // trả null → 500/'internal'): người chơi không nhận được câu trả lời
     // nên không nên mất lượt (controller ruling, fix round 1 #2). Từ
     // chối/bị cắt (R7) không ném lỗi — vẫn tốn lượt, không hoàn ở đây.
     let ask;
     try {
-      ask = await claude.ask(parsed);
+      ask = await model.ask(parsed);
     } catch (err) {
       try {
         await quota.refund(userId, day);
       } catch (refundErr) {
         logError('refund', refundErr);
       }
-      const classified = classifyClaudeError(err) ?? { status: 500, code: 'internal' };
+      const classified = classifyOllamaError(err) ?? { status: 500, code: 'internal' };
       sendJson(res, classified.status, { error: classified.code }, origin, config.allowedOrigins);
       writeLog({ method: 'POST', path: PATH_CHAT, status: classified.status, error: classified.code, userId, startedAt });
       return;

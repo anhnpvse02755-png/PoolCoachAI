@@ -90,6 +90,8 @@ Lộ trình (đã làm, spec 2026-10-15): mỗi tài khoản một mục tiêu �
 
 Một Drill có nhiều **Level** (VD: Stop Shot — Easy/Medium/Hard) với **progression gate**: phải đạt yêu cầu ở Skill Test mới được mở level tiếp theo. Cơ chế này chỉ khóa progression trong nội bộ một Drill, không khóa toàn bộ Training Center.
 
+**Trạng thái triển khai hiện tại:** App có 10 bài tập seed thuộc sáu nhóm, cùng thư viện, lọc và chi tiết bài tập. Chưa có Skill Test riêng hoặc tự mở level; readiness đang hiển thị như tiến độ tham khảo (xem mục 6.7).
+
 ### 6.3 Drill Recording (luồng thực hiện một bài tập)
 ```
 Drill Detail → Recording Preparation → Drill Session → Completion
@@ -97,9 +99,9 @@ Drill Detail → Recording Preparation → Drill Session → Completion
 - **Drill Detail**: tên bài + level, mục tiêu, các bước thực hiện, bài Knowledge liên quan, lịch sử kết quả gần nhất *(nội dung hướng dẫn từng bước lấy từ định dạng Drill của Luyện Cơ)*
 - **Recording Preparation**: setup bàn/camera (nếu dùng), checklist, xác nhận "Tôi đã sẵn sàng"
 - **Drill Session**: thực hiện bài tập, ghi nhận kết quả theo 1 trong 2 cách:
-  1. **Camera/Vision** — tự động nhận diện kết quả cú đánh, người chơi xác nhận/sửa nếu sai
-  2. **Ghi nhận thủ công** — hai nút ✓ Thành công / ✗ Thất bại sau mỗi cú đánh, **hoặc** nhập nhanh kết quả tổng (VD: 7/10, hay khoảng cách kéo bi tính bằng cm) cho các bài đo bằng đơn vị khác (thời gian, khoảng cách) *(cách nhập theo đơn vị linh hoạt lấy từ Luyện Cơ, để hỗ trợ các bài không phải dạng đếm cú như Draw/Follow)*
-  - Camera là phương thức **tự động hóa việc ghi nhận**, không phải điều kiện để được tập hoặc hoàn thành bài.
+  1. **Camera/Vision** — hướng phát triển để tự động nhận diện kết quả cú đánh; người chơi xác nhận/sửa nếu sai.
+  2. **Ghi nhận thủ công** — hai nút ✓ Thành công / ✗ Thất bại sau mỗi cú đánh, **hoặc** nhập nhanh kết quả tổng (VD: 7/10, hay khoảng cách kéo bi tính bằng cm) cho các bài đo bằng đơn vị khác (thời gian, khoảng cách).
+  - Camera là phương thức tự động hóa dự kiến, không phải điều kiện để được tập hoặc hoàn thành bài.
 - **Completion**: cập nhật tỷ lệ thành công, số cú thành công/thất bại, tiến bộ qua các buổi, mức hoàn thành Drill, và đẩy dữ liệu vào Player Intelligence.
 
 ### 6.4 Mô phỏng góc cắt (Cut Angle Simulator)
@@ -109,6 +111,8 @@ Công cụ độc lập trong Training Center, không gắn với một Drill ha
 - Đặt bi cái, bi mục tiêu và chọn lỗ trên bàn mô phỏng
 - Hệ thống tự vẽ đường ngắm bằng phương pháp bi ma (ghost ball), tính góc cắt và ước lượng độ khó
 - Có thể được **AI Learning Path gợi ý sử dụng** trước khi vào một Drill về ngắm bi, hoặc người chơi tự mở qua Quick Actions ở AI Home
+
+**Trạng thái triển khai hiện tại:** Mô phỏng góc cắt đã có trong Trung tâm Luyện tập, gồm bố trí bi/lỗ, đường ngắm và thông tin góc.
 
 ### 6.5 Đồng hồ & Lịch tập (Practice Timer & Schedule)
 *(module mới, đưa vào từ Luyện Cơ)*
@@ -126,6 +130,8 @@ Công cụ độc lập trong Training Center, không gắn với một Drill ha
 
 ### 6.6 Knowledge
 Phần học lý thuyết, không khóa chặt vào Drill: kỹ thuật, cách thực hiện, lỗi thường gặp, nguyên lý, tình huống áp dụng. Một Drill có thể liên kết tới Knowledge và ngược lại (Knowledge ↔ Drill là quan hệ hỗ trợ, không phải dependency cứng). Người dùng có quyền khám phá Knowledge độc lập, tương tự thư viện bài viết ngắn theo từng kỹ năng.
+
+**Trạng thái triển khai hiện tại:** Thư viện đọc bài đã hoạt động và gom nội dung theo nhóm kỹ năng. App seed 11 bài kiến thức; 5 bài mới tóm lược các mục squirt/swerve/throw, áp phê thuận cho bi sát băng, gearing, bù throw và BHE/FHE từ phần bổ sung đợt 3. Bài tập liên quan chỉ hiện khi có liên kết hợp lệ; các bài mới chưa gắn drill vì chưa có bài tập tương ứng đủ sát. Những mục khác trong từ điển vẫn cần biên tập và bổ sung theo từng đợt.
 
 ### 6.7 Skill Test / Certification
 Kiểm tra người chơi đã đạt yêu cầu của một level hay chưa, dựa trên kết quả thực hiện thực tế — không phải một nút "Hoàn thành Level 1" giả. Certification thể hiện các level/kỹ năng đã đạt, hiển thị lại ở Profile.
@@ -145,7 +151,8 @@ Nơi dành cho chơi thực tế, tách biệt hoàn toàn với Drill Session:
 - Đã có ghi cú theo từng ván: người đánh, phá/cú thường/phòng thủ, có bi/trượt/phạm lỗi/scratch, kết quả vị trí bi cái và ghi chú tùy chọn. Có thể hoàn tác cú cuối của ván đang diễn ra.
 - Có thể sửa thể loại, tên hai người chơi và số ván thắng; kết quả rack/cú đã ghi được giữ nguyên, trạng thái hoàn tất được tính lại theo thể thức mới.
 - Đã có xóa trận với bước xác nhận. Trận bị ẩn cùng tỷ số và cú đánh, đánh dấu đã xóa (`is_deleted`) và đồng bộ lên server, nên lần đồng bộ sau không kéo trận đó về lại và các thiết bị khác của tài khoản cũng ẩn trận.
-- **Còn thiếu:** phân tích sâu chuỗi break/lỗi vị trí/mẫu chiến thuật và giải đấu. Kết quả từng cú là ghi nhận thủ công, chưa tự suy luận luật hay đánh giá AI.
+- Đã có phân tích các cú được ghi nhận trong trận và tổng hợp theo nhóm kỹ năng; dữ liệu phân tích được dùng trong Statistics, Player Intelligence, gợi ý, Coach và Lộ trình. Kết luận chỉ dựa trên trận/cú đã ghi đủ điều kiện, không suy đoán từ trận dở dang.
+- **Còn thiếu:** quản lý giải đấu và nhận diện cú bằng Camera/Vision. Người chơi vẫn nhập kết quả cú thủ công; phân tích hiện tại không thay thế ghi nhận đầy đủ hay tự suy luận luật.
 
 ## 8. Intelligence & Coach
 
@@ -161,6 +168,8 @@ AI có thể phát hiện: easy miss, lỗi vị trí (position error), lỗi gi
 - **Coach Chat** — trả lời các câu hỏi như "Hôm nay tôi nên tập gì?", "Tại sao tôi thua trận vừa rồi?", "Tôi đang yếu kỹ năng nào?"
 - **Coach Recommendation** — dùng Assessment, lịch sử Drill (bao gồm cả buổi tập tự do qua Đồng hồ), Knowledge, lịch sử trận, Statistics và Player Intelligence để tạo đề xuất, có thể bao gồm cả gợi ý dùng Mô phỏng góc cắt cho các lỗi ngắm bi lặp lại.
 
+**Trạng thái triển khai hiện tại:** Player Intelligence, recommendation và phân tích trận dùng các phép tính Dart có kiểm thử. Coach Chat gọi dịch vụ riêng dùng Ollama local để diễn giải dữ kiện đã tính; LLM không tự chấm kỹ năng, kết luận hạng hoặc thay đổi Lộ trình.
+
 ## 9. Statistics
 
 Nơi xem dữ liệu chi tiết — Dashboard chỉ đưa insight quan trọng, Statistics hiển thị đầy đủ: lịch sử, performance, thống kê trận đấu, thống kê luyện tập (bao gồm biểu đồ theo từng kỹ năng và xu hướng điểm số theo từng Drill theo thời gian), tổng giờ tập, streak, và các xu hướng kết hợp cả Training lẫn Play.
@@ -173,7 +182,8 @@ Nơi xem dữ liệu chi tiết — Dashboard chỉ đưa insight quan trọng, 
 - Đã có biểu đồ hoạt động theo ngày trong tuần hiện tại, kết hợp số buổi Drill/Timer và số trận bắt đầu; hiển thị ngày tập, ngày thi đấu và ngày có cả hai. Đây là xu hướng hoạt động, không phải đánh giá tác động của luyện tập lên kết quả trận.
 - Đã có số trận đã ghi/hoàn tất và tổng trận thắng/thua từ các rack đã nhập; đây là thống kê tỷ số cơ bản, không phải phân tích chất lượng từng cú.
 - Đã có tổng hợp số cú đã ghi, break, safety, trượt, phạm lỗi, scratch và tỷ lệ vị trí thành công từ dữ liệu người dùng nhập.
-- **Còn thiếu:** phân tích chuỗi/chiến thuật trận. Thời lượng Drill chỉ được đo từ lúc mở màn ghi kết quả đến lúc lưu, không phải cảm biến hoạt động tập thực tế.
+- Đã có phân tích trận gần đây dựa trên các trận đã hoàn tất và các cú đủ dữ liệu; không xem dữ liệu trận dở dang là kết luận về điểm yếu.
+- Thời lượng Drill chỉ được đo từ lúc mở màn ghi kết quả đến lúc lưu, không phải cảm biến hoạt động tập thực tế.
 
 ## 10. Profile
 
@@ -195,9 +205,11 @@ Trả lời câu hỏi "tôi là ai và tôi đã tiến bộ thế nào" (khác
 
 Smart Notifications — nhắc lịch tập đã đặt, nhắc bảo dưỡng cơ khi quá hạn, nhắc Coach recommendation mới, nhắc streak sắp bị ngắt.
 
+**Trạng thái triển khai hiện tại:** Đã có nhắc lịch tập, streak và bảo dưỡng cơ theo giới hạn nền tảng (cục bộ/trình duyệt khi app đang mở). Thông báo khi có gợi ý mới từ Coach và push khi ứng dụng đã đóng chưa hoàn tất.
+
 ## 12. Backend
 
-Hoạt động trước với local data (giống cách Luyện Cơ lưu trên thiết bị), sau đó kết nối backend (Supabase: Authentication, Database, Sync, Cloud backup) để đồng bộ đa thiết bị và cung cấp dữ liệu cho Player Intelligence. Business logic và UI không phụ thuộc cứng vào backend implementation.
+App lưu dữ liệu cục bộ bằng SQLite/Drift và dùng Directus cho xác thực, đồng bộ dữ liệu theo tài khoản và đa thiết bị. Coach Chat dùng dịch vụ riêng kết nối Ollama local. Business logic và UI không phụ thuộc cứng vào backend implementation; mọi lỗi tải/đồng bộ cần được hiển thị, không giả thành dữ liệu thành công.
 
 ## 13. Sơ đồ module tổng thể
 
@@ -257,5 +269,5 @@ PoolCoachAI là nền tảng huấn luyện bida cá nhân hóa, kết hợp b�
 
 ### Ghi chú hợp nhất
 - Các phần **in nghiêng có chú thích nguồn** ở trên là nội dung được đưa thêm từ Luyện Cơ, không có trong bản PoolCoachAI gốc: Mô phỏng góc cắt, Đồng hồ & Lịch tập, chi tiết quản lý Equipment/Cơ bi-a, taxonomy 5 kỹ năng cụ thể, và cách ghi nhận kết quả theo đơn vị linh hoạt (không chỉ đếm cú ✓/✗).
-- Các phần chỉ có ở PoolCoachAI và được giữ nguyên: Onboarding/Assessment & hệ rank, AI Learning Path, Skill Test/Certification với progression gate, Camera/Vision, toàn bộ Play (Match Recording/History/Tournament), Coach Chat, Player Intelligence, Notifications, kiến trúc Backend/Supabase.
+- Các phần chỉ có ở PoolCoachAI và được giữ nguyên: Onboarding/Assessment & hệ rank, AI Learning Path, Skill Test/Certification với progression gate, Camera/Vision, toàn bộ Play (Match Recording/History/Tournament), Coach Chat, Player Intelligence, Notifications và kiến trúc Backend.
 - Các phần trùng khái niệm đã được hợp nhất thành một mục duy nhất: Dashboard/AI Home, Drill Library, Knowledge, Statistics, Equipment.

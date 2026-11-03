@@ -1,8 +1,5 @@
-// Đọc biến môi trường thành cấu hình máy chủ Coach Chat (spec mục 7.7, 13.8).
+// Đọc biến môi trường thành cấu hình máy chủ Coach Chat.
 // Không log hay đưa giá trị biến ra ngoài khi báo lỗi — chỉ nêu tên biến.
-
-const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
-const FALLBACKS = new Set(['default', 'off']);
 
 /// Biến bắt buộc thiếu hẳn hay chỉ có khoảng trắng đều coi là thiếu
 /// (spec 7.7: máy chủ không khởi động được khi thiếu biến bắt buộc).
@@ -34,9 +31,6 @@ function parsePort(raw) {
 export function loadConfig(env) {
   const missingOrBad = [];
 
-  const anthropicApiKey = env.ANTHROPIC_API_KEY;
-  if (isBlank(anthropicApiKey)) missingOrBad.push('ANTHROPIC_API_KEY');
-
   const directusUrlRaw = env.DIRECTUS_URL;
   if (isBlank(directusUrlRaw)) missingOrBad.push('DIRECTUS_URL');
 
@@ -51,14 +45,19 @@ export function loadConfig(env) {
   const port = parsePort(portRaw);
   if (port === null) missingOrBad.push('PORT');
 
-  const modelRaw = env.CLAUDE_MODEL;
-  const model = isBlank(modelRaw) ? 'claude-opus-5' : modelRaw.trim();
+  const ollamaUrlRaw = isBlank(env.OLLAMA_URL) ? 'http://127.0.0.1:11434' : env.OLLAMA_URL.trim();
+  let ollamaUrl;
+  try {
+    const parsed = new URL(ollamaUrlRaw);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+      throw new Error('invalid URL');
+    }
+    ollamaUrl = parsed.toString().replace(/\/+$/, '');
+  } catch {
+    missingOrBad.push('OLLAMA_URL');
+  }
 
-  const effort = isBlank(env.CLAUDE_EFFORT) ? 'low' : env.CLAUDE_EFFORT.trim();
-  if (!EFFORTS.has(effort)) missingOrBad.push('CLAUDE_EFFORT');
-
-  const fallbacksRaw = isBlank(env.CLAUDE_FALLBACKS) ? 'default' : env.CLAUDE_FALLBACKS.trim();
-  if (!FALLBACKS.has(fallbacksRaw)) missingOrBad.push('CLAUDE_FALLBACKS');
+  const model = isBlank(env.OLLAMA_MODEL) ? 'qwen2.5:3b' : env.OLLAMA_MODEL.trim();
 
   const dailyLimitRaw = isBlank(env.DAILY_QUESTION_LIMIT) ? '30' : env.DAILY_QUESTION_LIMIT.trim();
   const dailyLimit = Number.parseInt(dailyLimitRaw, 10);
@@ -72,10 +71,8 @@ export function loadConfig(env) {
 
   return {
     port,
-    anthropicApiKey,
+    ollamaUrl,
     model,
-    effort,
-    fallbacks: fallbacksRaw === 'default',
     dailyLimit,
     directusUrl: directusUrlRaw.trim().replace(/\/+$/, ''),
     directusServiceToken,
