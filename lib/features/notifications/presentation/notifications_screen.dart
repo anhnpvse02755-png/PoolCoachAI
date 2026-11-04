@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/push_providers.dart';
 import 'package:poolcoachai/core/router/notification_tap_listener.dart';
 import 'package:poolcoachai/core/strings/vi.dart';
 import 'package:poolcoachai/core/theme/app_colors.dart';
@@ -16,6 +17,7 @@ import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/push_state.dart';
 
 /// Màn Thông báo, mở đè lên shell từ chuông trên thanh tiêu đề.
 ///
@@ -161,46 +163,49 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text(Vi.notificationsTitle)),
-      body: PcReadableWidth(child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          _permissionCard(),
-          _sent(),
-          const PcSectionHeader(title: Vi.notificationsSettingsTitle),
-          PcCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final kind in NotificationKind.values)
-                  SwitchListTile(
-                    title: Text(Vi.notificationKind(kind)),
-                    subtitle: Text(Vi.notificationKindHint(kind)),
-                    value: prefs.isEnabled(kind),
-                    onChanged: (enabled) => ref
-                        .read(notificationPrefsProvider.notifier)
-                        .setEnabled(kind, enabled),
-                  ),
-              ],
-            ),
-          ),
-          const PcSectionHeader(title: Vi.notificationsUpcomingTitle),
-          if (upcoming.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Text(
-                Vi.notificationsUpcomingEmpty,
-                style: TextStyle(color: AppColors.textMuted),
+      body: PcReadableWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          children: [
+            _permissionCard(),
+            _sent(),
+            const PcSectionHeader(title: Vi.notificationsSettingsTitle),
+            PcCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (final kind in NotificationKind.values)
+                    SwitchListTile(
+                      title: Text(Vi.notificationKind(kind)),
+                      subtitle: Text(Vi.notificationKindHint(kind)),
+                      value: prefs.isEnabled(kind),
+                      onChanged: (enabled) => ref
+                          .read(notificationPrefsProvider.notifier)
+                          .setEnabled(kind, enabled),
+                    ),
+                ],
               ),
-            )
-          else
-            ..._grouped(upcoming, now),
-        ],
-      )),
+            ),
+            const PcSectionHeader(title: Vi.notificationsUpcomingTitle),
+            if (upcoming.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  Vi.notificationsUpcomingEmpty,
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
+              )
+            else
+              ..._grouped(upcoming, now),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _permissionCard() {
     final service = ref.watch(notificationServiceProvider);
+    final push = ref.watch(pushStateProvider);
     if (!service.isSupported) {
       return const PcCard(
         child: ListTile(
@@ -232,9 +237,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         inBackground: service.schedulesInBackground,
                       ),
               ),
-              trailing: granted
-                  ? const Icon(Icons.check_circle_outline)
-                  : null,
+              trailing: granted ? const Icon(Icons.check_circle_outline) : null,
             )
           else
             // Nút xuống dưới chữ khi cột chữ hẹp (màn nhỏ, chữ lớn).
@@ -245,12 +248,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               actionLabel: Vi.equipmentReminderEnable,
               onAction: _enable,
             ),
-          for (final note in service.schedulesInBackground
-              ? const [
-                  Vi.notificationsBackgroundNote,
-                  Vi.notificationsRecommendationLimit,
-                ]
-              : [Vi.notificationsWebOnlyWhileOpen])
+          for (final note
+              in service.schedulesInBackground
+                  ? const [
+                      Vi.notificationsBackgroundNote,
+                      Vi.notificationsRecommendationLimit,
+                    ]
+                  : _webPushNotes(push))
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
@@ -268,6 +272,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
+  List<String> _webPushNotes(AsyncValue<PushState> push) {
+    if (!push.hasValue || push.isLoading) {
+      return [Vi.notificationsWebOnlyWhileOpen];
+    }
+    return switch (push.requireValue) {
+      PushServer(:final lease) =>
+        lease.serverKinds.contains(NotificationKind.recommendation)
+            ? [Vi.notificationsWebPushOn]
+            : [
+                Vi.notificationsWebPushOn,
+                Vi.notificationsWebPushRecommendationLocal,
+              ],
+      PushUnavailable() => [
+        Vi.notificationsWebOnlyWhileOpen,
+        Vi.notificationsWebPushUnavailable,
+      ],
+      PushLocal() => [Vi.notificationsWebOnlyWhileOpen],
+    };
+  }
+
   List<Widget> _grouped(List<PlannedNotification> upcoming, DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
     final widgets = <Widget>[];
@@ -276,9 +300,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final day = DateTime(n.at.year, n.at.month, n.at.day);
       if (day != currentDay) {
         currentDay = day;
-        final offset = DateTime(day.year, day.month, day.day)
-            .difference(today)
-            .inDays;
+        final offset = DateTime(
+          day.year,
+          day.month,
+          day.day,
+        ).difference(today).inDays;
         widgets.add(
           PcSectionHeader(
             title: switch (offset) {

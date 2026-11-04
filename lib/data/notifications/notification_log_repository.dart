@@ -121,6 +121,47 @@ class NotificationLogRepository {
     });
   }
 
+  /// Ghi các thông báo Web Push đã hiện. Chỉ dòng mới kích hoạt dọn nhật ký;
+  /// một lần kéo lặp lại không phát thêm câu lệnh ghi.
+  Future<void> recordDelivered(List<NotificationLogEntry> entries) async {
+    final byId = <int, NotificationLogEntry>{
+      for (final entry in entries) entry.id: entry,
+    };
+    if (byId.isEmpty) return;
+    await _db.transaction(() async {
+      final existing = await (_db.select(
+        _t,
+      )..where((r) => r.userId.equals(userId) & r.id.isIn(byId.keys))).get();
+      final present = {for (final row in existing) row.id};
+      final missing = [
+        for (final entry in byId.values)
+          if (!present.contains(entry.id)) entry,
+      ];
+      if (missing.isEmpty) return;
+      for (final entry in missing) {
+        await _db
+            .into(_t)
+            .insert(
+              NotificationLogRowsCompanion.insert(
+                userId: userId,
+                id: entry.id,
+                kind: entry.kind.name,
+                key: entry.key,
+                at: entry.at,
+                title: entry.title,
+                body: entry.body,
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+      }
+      final cutoff = _cutoff(DateTime.now());
+      await (_db.delete(_t)..where(
+            (r) => r.userId.equals(userId) & r.at.isSmallerOrEqualValue(cutoff),
+          ))
+          .go();
+    });
+  }
+
   /// Đánh dấu đã đọc những mục chưa đọc trong [ids].
   Future<void> markRead(Iterable<int> ids, {required DateTime at}) async {
     final list = ids.toList();

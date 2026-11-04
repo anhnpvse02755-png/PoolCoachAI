@@ -8,6 +8,7 @@ import 'package:poolcoachai/data/notifications/notification_log_repository.dart'
 import 'package:poolcoachai/data/notifications/notification_platform.dart';
 import 'package:poolcoachai/data/notifications/notification_schedule_version_store.dart';
 import 'package:poolcoachai/data/notifications/notification_scheduler.dart';
+import 'package:poolcoachai/domain/notifications/push_state.dart';
 import 'package:poolcoachai/data/repositories/auth_repository.dart';
 import 'package:poolcoachai/data/repositories/drift_practice_repositories.dart';
 import 'package:poolcoachai/data/repositories/drift_repositories.dart';
@@ -67,6 +68,7 @@ class NotificationService {
   /// Không xoá khi đổi tài khoản: nguồn sẵn sàng chỉ được dùng khi `userId`
   /// của nó là người đang đăng nhập.
   AsyncValue<RecommendationSource> _source = const AsyncLoading();
+  AsyncValue<PushState> _pushState = const AsyncData(PushUnavailable());
 
   /// Nhật ký của người đang đăng nhập; null tới lần phát đầu tiên.
   List<NotificationLogEntry>? _log;
@@ -146,17 +148,31 @@ class NotificationService {
     // khoản thì coi như của người đang đăng nhập.
     if (tap.userId != null && tap.userId != userId) return;
     if (userId != null) {
-      unawaited(
-        NotificationLogRepository(_db, userId: userId)
-            .markReadByKey(tap.kind, tap.key, now: _now().toLocal())
-            .catchError((Object _) {}),
-      );
+      unawaited(_markTappedRead(userId, tap));
     }
+
     final handler = _tapHandler;
     if (handler != null) {
       handler(tap);
     } else {
       _bufferedTap = tap;
+    }
+  }
+
+  Future<void> _markTappedRead(String userId, NotificationTap tap) async {
+    try {
+      await beforeMarkRead?.call().timeout(const Duration(seconds: 5));
+    } on Object {
+      // The tap still navigates if delivery synchronization is unavailable.
+    }
+    if (_disposed || _userId != userId) return;
+    try {
+      await NotificationLogRepository(
+        _db,
+        userId: userId,
+      ).markReadByKey(tap.kind, tap.key, now: _now().toLocal());
+    } on Object {
+      // Reading the inbox is best-effort; do not block navigation.
     }
   }
 
@@ -177,11 +193,22 @@ class NotificationService {
     if (_started && !_disposed) checkNow();
   }
 
+  void setPushState(AsyncValue<PushState> state) {
+    _pushState = state;
+    if (_started && !_disposed) checkNow();
+  }
+
+  Future<void> Function()? beforeMarkRead;
+  void Function()? onPermissionChanged;
+
   @visibleForTesting
   NotificationPrefs? get prefs => _prefs;
 
   @visibleForTesting
   AsyncValue<RecommendationSource> get recommendationSource => _source;
+
+  @visibleForTesting
+  AsyncValue<PushState> get pushState => _pushState;
 
   NotificationScheduler? get _scheduler => _platform.scheduler;
 
@@ -245,13 +272,19 @@ class NotificationService {
     // Gợi ý chỉ khi nguồn là của người đang đăng nhập và nhật ký của họ đã
     // nạp (mốc "đã thấy" cần cả hai).
     final ready = log != null ? mine : null;
+    final local = localPrefsUnder(
+      prefs,
+      _pushState.value,
+      userId: _userId,
+      now: _now().toLocal(),
+    );
     // Android/iOS, nguồn chưa sẵn sàng (không lỗi): giữ gợi ý tương lai đã
     // đặt, để id y nguyên và lịch hệ điều hành lẫn nhật ký không bị đụng.
     final keep =
         log != null &&
         mine == null &&
         source is! AsyncError &&
-        prefs.recommendation &&
+        local.recommendation &&
         _scheduler != null;
     final plan = planNotifications(
       recommendation: ready?.inputs,
@@ -269,7 +302,7 @@ class NotificationService {
         timerSessions: _timerSessions,
         today: now,
       ),
-      prefs: prefs,
+      prefs: local,
       now: now,
       limit: keep ? 1 << 20 : cap,
     );
@@ -284,80 +317,83 @@ class NotificationService {
   void _syncSchedule(NotificationScheduler scheduler) {
     if (_syncQueued) return;
     _syncQueued = true;
-    _syncChain = _syncChain.then((_) async {
-      _syncQueued = false;
-      // Đọc lại quyền mỗi lần: người dùng có thể tắt nó trong Cài đặt bất cứ
-      // lúc nào, và nhật ký không được giữ mục tương lai khi không có quyền.
-      try {
-        await _platform.loadPermission();
-      } on Object {
-        // Đọc lỗi thì giữ quyền đã biết.
-      }
-      if (_disposed) return;
-      final userId = _userId;
-      // Đủ dữ liệu của đúng người này để lập kế hoạch. Kiểm lại sau mỗi lần
-      // chờ: trong lúc đó tài khoản có thể đổi đi rồi đổi lại (các luồng
-      // của người đó phát lại từ đầu) hay cài đặt về "chưa nạp", và một kế
-      // hoạch lập từ dữ liệu trống sẽ huỷ mọi thông báo đang chờ.
-      bool ready() =>
-          !_disposed &&
-          _userId == userId &&
-          _prefs != null &&
-          _awaitingFirst == 0;
-      if (userId == null) {
-        await scheduler.cancelAll();
-      } else if (ready()) {
-        final now = _now().toLocal();
-        final log = NotificationLogRepository(_db, userId: userId);
-        if (_platform.permission == 'granted') {
-          // Kế hoạch đọc lại chính nhật ký nó ghi (gợi ý giữ lại, mốc đã
-          // thấy), nên phải đọc bản hiện tại trong DB. Bản của luồng theo dõi
-          // có thể chậm một lần ghi: lập từ nó thì lần này thêm lại cái lần
-          // trước vừa xoá, luồng phát bản cũ, lần sau xoá lại… không dừng.
-          final current = await log.all();
-          if (!ready()) return;
-          final outdatedGeneration = _outdatedGeneration;
-          final replaceAll = await _scheduleOutdated;
-          if (!ready()) return;
-          final plan = _plan(now, current: current);
-          // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
-          // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
-          final gone = <int>{};
+    _syncChain = _syncChain
+        .then((_) async {
+          _syncQueued = false;
+          // Đọc lại quyền mỗi lần: người dùng có thể tắt nó trong Cài đặt bất cứ
+          // lúc nào, và nhật ký không được giữ mục tương lai khi không có quyền.
           try {
-            await reconcileNotifications(
-              scheduler,
-              plan,
-              userId: userId,
-              keep: dueEarlierToday(current, now),
-              replaceAll: replaceAll,
-              gone: gone,
-            );
+            await _platform.loadPermission();
           } on Object {
-            // Hệ điều hành ném giữa chừng: cái đã huỷ không còn dòng nào; kế
-            // hoạch chưa đặt xong thì chưa ghi (lần đồng bộ sau làm tiếp).
-            await log.forgetUnsent(gone);
-            rethrow;
+            // Đọc lỗi thì giữ quyền đã biết.
           }
-          await log.syncPlanned(plan, now: now, cancelled: gone);
-          if (replaceAll) await _markScheduleCurrent(outdatedGeneration);
-        } else {
-          // Không có quyền thì không đặt gì: huỷ cái còn chờ (kể cả cái quá
-          // giờ chưa giao, giờ sẽ không bao giờ hiện) và nhật ký không giữ
-          // mục tương lai hay dòng của cái vừa huỷ.
-          final gone = <int>{};
-          try {
-            await reconcileNotifications(
-              scheduler,
-              const [],
-              userId: userId,
-              gone: gone,
-            );
-          } finally {
-            await log.syncPlanned(const [], now: now, cancelled: gone);
+          if (_disposed) return;
+          final userId = _userId;
+          // Đủ dữ liệu của đúng người này để lập kế hoạch. Kiểm lại sau mỗi lần
+          // chờ: trong lúc đó tài khoản có thể đổi đi rồi đổi lại (các luồng
+          // của người đó phát lại từ đầu) hay cài đặt về "chưa nạp", và một kế
+          // hoạch lập từ dữ liệu trống sẽ huỷ mọi thông báo đang chờ.
+          bool ready() =>
+              !_disposed &&
+              _userId == userId &&
+              _prefs != null &&
+              _pushState is! AsyncLoading &&
+              _awaitingFirst == 0;
+          if (userId == null) {
+            await scheduler.cancelAll();
+          } else if (ready()) {
+            final now = _now().toLocal();
+            final log = NotificationLogRepository(_db, userId: userId);
+            if (_platform.permission == 'granted') {
+              // Kế hoạch đọc lại chính nhật ký nó ghi (gợi ý giữ lại, mốc đã
+              // thấy), nên phải đọc bản hiện tại trong DB. Bản của luồng theo dõi
+              // có thể chậm một lần ghi: lập từ nó thì lần này thêm lại cái lần
+              // trước vừa xoá, luồng phát bản cũ, lần sau xoá lại… không dừng.
+              final current = await log.all();
+              if (!ready()) return;
+              final outdatedGeneration = _outdatedGeneration;
+              final replaceAll = await _scheduleOutdated;
+              if (!ready()) return;
+              final plan = _plan(now, current: current);
+              // Quá giờ mà hệ điều hành còn chờ (giao muộn) thì để yên trong
+              // ngày; cái nào bị huỷ khi chưa hiện thì xoá dòng của nó.
+              final gone = <int>{};
+              try {
+                await reconcileNotifications(
+                  scheduler,
+                  plan,
+                  userId: userId,
+                  keep: dueEarlierToday(current, now),
+                  replaceAll: replaceAll,
+                  gone: gone,
+                );
+              } on Object {
+                // Hệ điều hành ném giữa chừng: cái đã huỷ không còn dòng nào; kế
+                // hoạch chưa đặt xong thì chưa ghi (lần đồng bộ sau làm tiếp).
+                await log.forgetUnsent(gone);
+                rethrow;
+              }
+              await log.syncPlanned(plan, now: now, cancelled: gone);
+              if (replaceAll) await _markScheduleCurrent(outdatedGeneration);
+            } else {
+              // Không có quyền thì không đặt gì: huỷ cái còn chờ (kể cả cái quá
+              // giờ chưa giao, giờ sẽ không bao giờ hiện) và nhật ký không giữ
+              // mục tương lai hay dòng của cái vừa huỷ.
+              final gone = <int>{};
+              try {
+                await reconcileNotifications(
+                  scheduler,
+                  const [],
+                  userId: userId,
+                  gone: gone,
+                );
+              } finally {
+                await log.syncPlanned(const [], now: now, cancelled: gone);
+              }
+            }
           }
-        }
-      }
-    }).catchError((Object _) {});
+        })
+        .catchError((Object _) {});
   }
 
   /// Android/iOS: người dùng vừa rời [userId] (đăng xuất, tự đăng xuất, đổi
@@ -366,14 +402,16 @@ class NotificationService {
   /// mục đã quá giờ mà hệ điều hành còn chờ (chưa hiện), kẻo hộp "Đã gửi"
   /// liệt kê cái chưa từng được gửi.
   void _forgetFuture(String userId, NotificationScheduler scheduler) {
-    _syncChain = _syncChain.then((_) async {
-      if (_disposed) return;
-      final pending = await scheduler.pendingIds();
-      await NotificationLogRepository(
-        _db,
-        userId: userId,
-      ).syncPlanned(const [], now: _now().toLocal(), cancelled: pending);
-    }).catchError((Object _) {});
+    _syncChain = _syncChain
+        .then((_) async {
+          if (_disposed) return;
+          final pending = await scheduler.pendingIds();
+          await NotificationLogRepository(
+            _db,
+            userId: userId,
+          ).syncPlanned(const [], now: _now().toLocal(), cancelled: pending);
+        })
+        .catchError((Object _) {});
   }
 
   /// App vừa quay lại từ nền: quyền có thể đã đổi trong Cài đặt, và giờ có
@@ -392,11 +430,13 @@ class NotificationService {
   Future<String?> requestPermission() async {
     if (!_platform.isSupported) return null;
     final result = await _platform.requestPermission();
+    onPermissionChanged?.call();
     checkNow();
     return result;
   }
 
   void checkNow() {
+    if (_scheduler == null && _pushState is AsyncLoading) return;
     final scheduler = _scheduler;
     if (scheduler != null) {
       if (!_disposed) _syncSchedule(scheduler);
@@ -433,6 +473,32 @@ class NotificationService {
       _platform.writeValue(key, now.toIso8601String());
       unawaited(log.recordShown(n, at: now).catchError((Object _) {}));
     }
+  }
+
+  Future<void> ingestDelivered(
+    String userId,
+    List<NotificationLogEntry> entries,
+  ) async {
+    if (_disposed || userId != _userId) return;
+    if (_scheduler == null) {
+      final now = _now().toLocal();
+      for (final entry in entries) {
+        final planned = PlannedNotification(
+          id: entry.id,
+          kind: entry.kind,
+          key: entry.key,
+          at: entry.at,
+          validUntil: DateTime(entry.at.year, entry.at.month, entry.at.day + 1),
+          title: entry.title,
+          body: entry.body,
+        );
+        _platform.writeValue(_storageKey(planned), now.toIso8601String());
+      }
+    }
+    await NotificationLogRepository(
+      _db,
+      userId: userId,
+    ).recordDelivered(entries);
   }
 
   /// Khoá bảo dưỡng giữ nguyên dạng cũ để người đã được báo không bị báo

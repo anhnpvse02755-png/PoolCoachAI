@@ -22,7 +22,8 @@ import '../../support/fake_recommendation_seen_store.dart';
 
 final _at = DateTime(2026, 10, 21, 9);
 
-CoachAttempt sample(String id, {String userId = 'u1', DateTime? finishedAt}) => CoachAttempt(
+CoachAttempt sample(String id, {String userId = 'u1', DateTime? finishedAt}) =>
+    CoachAttempt(
       id: id,
       userId: userId,
       situationKey: 'gen-v1-position-easy-42',
@@ -47,7 +48,10 @@ CoachAttempt sample(String id, {String userId = 'u1', DateTime? finishedAt}) => 
           outcome: CoachOutcome.wrong,
           fault: CoachFault.spinUnneeded,
         ),
-        CoachAnswerRecord(kind: CoachAnswerKind.safety, outcome: CoachOutcome.undecided),
+        CoachAnswerRecord(
+          kind: CoachAnswerKind.safety,
+          outcome: CoachOutcome.undecided,
+        ),
       ],
       outcome: CoachAttemptOutcome.revealed,
       firstFault: CoachFault.strokeWorse,
@@ -79,8 +83,10 @@ void main() {
   }
 
   void serve({List<Map<String, Object?>> attempts = const []}) {
-    server.routes['GET /items/coach_attempts'] = (_) => FakeDirectus.ok(attempts);
-    server.routes['POST /items/coach_attempts'] = (req) => FakeDirectus.ok(jsonDecode(req.body));
+    server.routes['GET /items/coach_attempts'] = (_) =>
+        FakeDirectus.ok(attempts);
+    server.routes['POST /items/coach_attempts'] = (req) =>
+        FakeDirectus.ok(jsonDecode(req.body));
   }
 
   group('bộ mã hoá', () {
@@ -101,8 +107,11 @@ void main() {
       expect(back.topic, a.topic);
       final remote = toRemoteCoachAttempt(row);
       expect(remote['answers'], isA<List<Object?>>());
-      final pulled = coachAttemptFromRemote(jsonDecode(jsonEncode(remote)) as Map<String, Object?>,
-          userId: 'u1', syncedAt: now);
+      final pulled = coachAttemptFromRemote(
+        jsonDecode(jsonEncode(remote)) as Map<String, Object?>,
+        userId: 'u1',
+        syncedAt: now,
+      );
       expect(toCoachAttempt(pulled).answers, a.answers);
       expect(pulled.finishedAt, row.finishedAt);
       expect(pulled.syncedAt, now);
@@ -112,9 +121,16 @@ void main() {
   test('repository: chỉ thêm, chỉ của người này, mới nhất trước', () async {
     final repo = CoachAttemptRepository(db, userId: 'u1');
     await repo.record(sample('a', finishedAt: _at));
-    await repo.record(sample('b', finishedAt: _at.add(const Duration(hours: 1))));
-    await repo.record(sample('a', finishedAt: _at.add(const Duration(days: 1)))); // trùng id: bỏ qua
-    await CoachAttemptRepository(db, userId: 'u2').record(sample('c', userId: 'u2'));
+    await repo.record(
+      sample('b', finishedAt: _at.add(const Duration(hours: 1))),
+    );
+    await repo.record(
+      sample('a', finishedAt: _at.add(const Duration(days: 1))),
+    ); // trùng id: bỏ qua
+    await CoachAttemptRepository(
+      db,
+      userId: 'u2',
+    ).record(sample('c', userId: 'u2'));
     final list = await repo.watchAttempts().first;
     expect(list.map((a) => a.id), ['b', 'a']);
     expect(await pendingCoachCount(db, 'u1'), 2);
@@ -135,19 +151,33 @@ void main() {
     await repo.record(sample('b'));
     expect(await build().syncNow(), SyncOutcome.done);
     expect(server.sent('POST', '/items/coach_attempts'), hasLength(2));
-    final body = FakeDirectus.body(server.sent('POST', '/items/coach_attempts').first);
+    final body = FakeDirectus.body(
+      server.sent('POST', '/items/coach_attempts').first,
+    );
     expect(body['situation_key'], 'gen-v1-position-easy-42');
     expect(body.containsKey('user_id'), isFalse);
-    expect((await db.select(db.coachAttemptRows).get()).every((r) => r.syncedAt == now), isTrue);
+    expect(
+      (await db.select(db.coachAttemptRows).get()).every(
+        (r) => r.syncedAt == now,
+      ),
+      isTrue,
+    );
   });
 
-  test('máy chủ từ chối (4xx khác) thì dòng nằm chờ, không chặn lượt', () async {
-    serve();
-    server.routes['POST /items/coach_attempts'] = (_) => FakeDirectus.error(403, 'FORBIDDEN');
-    await CoachAttemptRepository(db, userId: 'u1').record(sample('a'));
-    expect(await build().syncNow(), SyncOutcome.done);
-    expect((await db.select(db.coachAttemptRows).getSingle()).syncedAt, isNull);
-  });
+  test(
+    'máy chủ từ chối (4xx khác) thì dòng nằm chờ, không chặn lượt',
+    () async {
+      serve();
+      server.routes['POST /items/coach_attempts'] = (_) =>
+          FakeDirectus.error(403, 'FORBIDDEN');
+      await CoachAttemptRepository(db, userId: 'u1').record(sample('a'));
+      expect(await build().syncNow(), SyncOutcome.done);
+      expect(
+        (await db.select(db.coachAttemptRows).getSingle()).syncedAt,
+        isNull,
+      );
+    },
+  );
 
   test('kéo về khi đăng nhập: thêm dòng còn thiếu', () async {
     serve(attempts: [toRemoteCoachAttempt(toCoachAttemptRow(sample('far')))]);
@@ -166,16 +196,25 @@ void main() {
     expect(await watchPendingCoach(db).first, 1);
   });
 
-  test('đăng xuất và quên: xoá lần làm Coach của người này, giữ của người khác', () async {
-    await CoachAttemptRepository(db, userId: 'u1').record(sample('a'));
-    await CoachAttemptRepository(db, userId: 'u2').record(sample('b', userId: 'u2'));
-    await signOutAndForget(
-      db: db,
-      auth: FakeAuthRepository.signedIn(),
-      userId: 'u1',
-      forgetChatInFlight: (_) {},
-      recommendationSeen: FakeRecommendationSeenStore(),
-    );
-    expect((await db.select(db.coachAttemptRows).get()).map((r) => r.id), ['b']);
-  });
+  test(
+    'đăng xuất và quên: xoá lần làm Coach của người này, giữ của người khác',
+    () async {
+      await CoachAttemptRepository(db, userId: 'u1').record(sample('a'));
+      await CoachAttemptRepository(
+        db,
+        userId: 'u2',
+      ).record(sample('b', userId: 'u2'));
+      await signOutAndForget(
+        db: db,
+        auth: FakeAuthRepository.signedIn(),
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+        unregisterPush: (_) async {},
+        recommendationSeen: FakeRecommendationSeenStore(),
+      );
+      expect((await db.select(db.coachAttemptRows).get()).map((r) => r.id), [
+        'b',
+      ]);
+    },
+  );
 }

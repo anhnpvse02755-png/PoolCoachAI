@@ -97,10 +97,9 @@ class NotifyClient {
     final http.Response response;
     try {
       // Một giới hạn duy nhất cho cả gửi lẫn nhận thân.
-      response = await (() async =>
-          http.Response.fromStream(await _client.send(request)))().timeout(
-        _timeout,
-      );
+      response = await (() async => http.Response.fromStream(
+        await _client.send(request),
+      ))().timeout(_timeout);
     } on Exception {
       // Hết giờ, ClientException, SocketException, HandshakeException...:
       // mọi lỗi truyền tải đều là "không tới được". Huỷ yêu cầu còn treo.

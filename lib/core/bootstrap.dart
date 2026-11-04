@@ -4,6 +4,7 @@ import 'package:poolcoachai/core/providers/assessment_providers.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/core/providers/push_providers.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/data/database/upsert_seed.dart';
 
@@ -34,11 +35,9 @@ void startSync(ProviderContainer container) {
   container.read(cueEquipmentSyncProvider);
   container.read(practiceSyncProvider);
   startNotifications(container);
+  startPush(container);
   // Giữ đăng ký nghe: `read` đóng ngay nên provider autoDispose sẽ bị huỷ.
-  container
-      .listen(notificationSettingsSyncProvider, (_, _) {})
-      .read()
-      .start();
+  container.listen(notificationSettingsSyncProvider, (_, _) {}).read().start();
   container.read(assessmentSyncProvider);
   container.read(roadmapSyncProvider);
   container.read(coachSyncProvider);

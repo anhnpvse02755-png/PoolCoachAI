@@ -18,6 +18,8 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/notifications/notification_payload.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/notification_log.dart';
+import 'package:poolcoachai/domain/notifications/push_state.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/domain/skill_category.dart';
@@ -89,14 +91,16 @@ void main() {
     int day = 1,
     String time = '18:00',
     String label = 'Tập ngắm',
-  }) => DriftScheduleRepository(db, userId: 'u1', now: () => now).save(
-    ScheduleSlot(id: id, day: day, time: time, label: label),
-  );
+  }) => DriftScheduleRepository(
+    db,
+    userId: 'u1',
+    now: () => now,
+  ).save(ScheduleSlot(id: id, day: day, time: time, label: label));
 
-  Future<void> practice(DateTime at) =>
-      DriftTimerSessionRepository(db, userId: 'u1').add(
-        TimerSession(id: 't$at', date: at, durationSec: 600),
-      );
+  Future<void> practice(DateTime at) => DriftTimerSessionRepository(
+    db,
+    userId: 'u1',
+  ).add(TimerSession(id: 't$at', date: at, durationSec: 600));
 
   RecommendationInputs inputsWith(List<Drill> drills) => RecommendationInputs(
     drills: drills,
@@ -215,17 +219,20 @@ void main() {
       expect(platform.notifications.single.body, contains('18:00'));
     });
 
-    test('schedule reminder is not sent late, after the slot started', () async {
-      await saveSlot(time: '18:00');
-      platform.permissionValue = 'granted';
-      final reminders = service()..start();
-      addTearDown(reminders.dispose);
-      await pumpEventQueue();
+    test(
+      'schedule reminder is not sent late, after the slot started',
+      () async {
+        await saveSlot(time: '18:00');
+        platform.permissionValue = 'granted';
+        final reminders = service()..start();
+        addTearDown(reminders.dispose);
+        await pumpEventQueue();
 
-      now = DateTime(2026, 10, 13, 18, 5);
-      reminders.checkNow();
-      expect(platform.notifications, isEmpty);
-    });
+        now = DateTime(2026, 10, 13, 18, 5);
+        reminders.checkNow();
+        expect(platform.notifications, isEmpty);
+      },
+    );
 
     test('streak reminder at 20:00 only while today is unpracticed', () async {
       await practice(DateTime(2026, 10, 11, 10));
@@ -262,9 +269,8 @@ void main() {
     test('a disabled kind is not sent; enabling it later sends it', () async {
       await saveSlot(time: '18:00');
       platform.permissionValue = 'granted';
-      final reminders = service(
-        prefs: const NotificationPrefs(schedule: false),
-      )..start();
+      final reminders = service(prefs: const NotificationPrefs(schedule: false))
+        ..start();
       addTearDown(reminders.dispose);
       await pumpEventQueue();
 
@@ -409,65 +415,73 @@ void main() {
       expect((await logRows()).single.readAt, now);
     });
 
-    test('chạm trước khi có handler: giữ lại, giao một lần khi handler tới', () async {
-      final s = await shownSchedule();
-      final payload = platform.notifications.single.payload;
-      platform.onTap!(payload);
-      await pumpEventQueue();
+    test(
+      'chạm trước khi có handler: giữ lại, giao một lần khi handler tới',
+      () async {
+        final s = await shownSchedule();
+        final payload = platform.notifications.single.payload;
+        platform.onTap!(payload);
+        await pumpEventQueue();
 
-      final got = <NotificationTap>[];
-      s.setTapHandler(got.add);
-      expect(got, [parseNotificationPayload(payload)]);
-      s.setTapHandler(null);
-      s.setTapHandler(got.add);
-      expect(got, hasLength(1), reason: 'giao một lần rồi xoá');
+        final got = <NotificationTap>[];
+        s.setTapHandler(got.add);
+        expect(got, [parseNotificationPayload(payload)]);
+        s.setTapHandler(null);
+        s.setTapHandler(got.add);
+        expect(got, hasLength(1), reason: 'giao một lần rồi xoá');
 
-      platform.onTap!(payload);
-      expect(got, hasLength(2), reason: 'có handler thì giao thẳng');
-    });
+        platform.onTap!(payload);
+        expect(got, hasLength(2), reason: 'có handler thì giao thẳng');
+      },
+    );
 
-    test('khởi động lạnh: payload mở app được giao và đánh dấu đã đọc', () async {
-      await saveSlot(time: '18:00');
-      platform.permissionValue = 'granted';
-      now = DateTime(2026, 10, 13, 17, 30);
-      final first = service()..start();
-      await pumpEventQueue();
-      final payload = platform.notifications.single.payload;
-      first.dispose();
+    test(
+      'khởi động lạnh: payload mở app được giao và đánh dấu đã đọc',
+      () async {
+        await saveSlot(time: '18:00');
+        platform.permissionValue = 'granted';
+        now = DateTime(2026, 10, 13, 17, 30);
+        final first = service()..start();
+        await pumpEventQueue();
+        final payload = platform.notifications.single.payload;
+        first.dispose();
 
-      platform.launch = payload;
-      final s = service()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final got = <NotificationTap>[];
-      s.setTapHandler(got.add);
-      expect(got, [parseNotificationPayload(payload)]);
-      expect((await logRows()).single.readAt, now);
-    });
+        platform.launch = payload;
+        final s = service()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final got = <NotificationTap>[];
+        s.setTapHandler(got.add);
+        expect(got, [parseNotificationPayload(payload)]);
+        expect((await logRows()).single.readAt, now);
+      },
+    );
 
-    test('payload mang tài khoản; chạm thông báo của tài khoản khác: bỏ qua',
-        () async {
-      final s = await shownSchedule();
-      final shown = parseNotificationPayload(
-        platform.notifications.single.payload,
-      )!;
-      expect(shown.userId, 'u1');
-      final got = <NotificationTap>[];
-      s.setTapHandler(got.add);
+    test(
+      'payload mang tài khoản; chạm thông báo của tài khoản khác: bỏ qua',
+      () async {
+        final s = await shownSchedule();
+        final shown = parseNotificationPayload(
+          platform.notifications.single.payload,
+        )!;
+        expect(shown.userId, 'u1');
+        final got = <NotificationTap>[];
+        s.setTapHandler(got.add);
 
-      platform.onTap!(
-        notificationPayload(shown.kind, shown.key, userId: 'u2'),
-      );
-      await pumpEventQueue();
-      expect(got, isEmpty);
-      expect((await logRows()).single.readAt, isNull);
+        platform.onTap!(
+          notificationPayload(shown.kind, shown.key, userId: 'u2'),
+        );
+        await pumpEventQueue();
+        expect(got, isEmpty);
+        expect((await logRows()).single.readAt, isNull);
 
-      // Bản cũ không có tài khoản: coi như của người đang đăng nhập.
-      platform.onTap!(notificationPayload(shown.kind, shown.key));
-      await pumpEventQueue();
-      expect(got, hasLength(1));
-      expect((await logRows()).single.readAt, now);
-    });
+        // Bản cũ không có tài khoản: coi như của người đang đăng nhập.
+        platform.onTap!(notificationPayload(shown.kind, shown.key));
+        await pumpEventQueue();
+        expect(got, hasLength(1));
+        expect((await logRows()).single.readAt, now);
+      },
+    );
 
     test('đã đăng xuất: chạm thông báo có tài khoản thì bỏ qua', () async {
       final s = await shownSchedule();
@@ -481,57 +495,63 @@ void main() {
       expect(got, isEmpty);
     });
 
-    test('chạm chỉ đánh dấu dòng đã tới giờ của người đang đăng nhập', () async {
-      await shownSchedule();
-      final mine = (await logRows()).single;
-      PlannedNotification same(DateTime at) => PlannedNotification(
-        id: mine.id + 1,
-        kind: NotificationKind.schedule,
-        key: mine.key,
-        at: at,
-        validUntil: at.add(const Duration(hours: 1)),
-        title: mine.title,
-        body: mine.body,
-      );
-      // Cùng (loại, khoá): một dòng tương lai của u1, một dòng của u2.
-      await NotificationLogRepository(
-        db,
-        userId: 'u1',
-      ).syncPlanned([same(DateTime(2026, 10, 20, 17, 30))], now: now);
-      await NotificationLogRepository(
-        db,
-        userId: 'u2',
-      ).recordShown(same(mine.at), at: mine.at);
-
-      platform.onTap!(platform.notifications.single.payload);
-      await pumpEventQueue();
-      final u1 = {for (final r in await logRows()) r.id: r.readAt};
-      expect(u1, {mine.id: now, mine.id + 1: null});
-      expect((await logRows('u2')).single.readAt, isNull);
-    });
-
-    test('khởi động lạnh: start lần hai hay handler mới không giao lại', () async {
-      await saveSlot(time: '18:00');
-      platform
-        ..permissionValue = 'granted'
-        ..launch = notificationPayload(
-          NotificationKind.schedule,
-          's1:2026-10-13',
-          userId: 'u1',
+    test(
+      'chạm chỉ đánh dấu dòng đã tới giờ của người đang đăng nhập',
+      () async {
+        await shownSchedule();
+        final mine = (await logRows()).single;
+        PlannedNotification same(DateTime at) => PlannedNotification(
+          id: mine.id + 1,
+          kind: NotificationKind.schedule,
+          key: mine.key,
+          at: at,
+          validUntil: at.add(const Duration(hours: 1)),
+          title: mine.title,
+          body: mine.body,
         );
-      final s = service()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final got = <NotificationTap>[];
-      s.setTapHandler(got.add);
-      expect(got, hasLength(1));
+        // Cùng (loại, khoá): một dòng tương lai của u1, một dòng của u2.
+        await NotificationLogRepository(
+          db,
+          userId: 'u1',
+        ).syncPlanned([same(DateTime(2026, 10, 20, 17, 30))], now: now);
+        await NotificationLogRepository(
+          db,
+          userId: 'u2',
+        ).recordShown(same(mine.at), at: mine.at);
 
-      s.start();
-      await pumpEventQueue();
-      s.setTapHandler((tap) => got.add(tap));
-      await pumpEventQueue();
-      expect(got, hasLength(1));
-    });
+        platform.onTap!(platform.notifications.single.payload);
+        await pumpEventQueue();
+        final u1 = {for (final r in await logRows()) r.id: r.readAt};
+        expect(u1, {mine.id: now, mine.id + 1: null});
+        expect((await logRows('u2')).single.readAt, isNull);
+      },
+    );
+
+    test(
+      'khởi động lạnh: start lần hai hay handler mới không giao lại',
+      () async {
+        await saveSlot(time: '18:00');
+        platform
+          ..permissionValue = 'granted'
+          ..launch = notificationPayload(
+            NotificationKind.schedule,
+            's1:2026-10-13',
+            userId: 'u1',
+          );
+        final s = service()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final got = <NotificationTap>[];
+        s.setTapHandler(got.add);
+        expect(got, hasLength(1));
+
+        s.start();
+        await pumpEventQueue();
+        s.setTapHandler((tap) => got.add(tap));
+        await pumpEventQueue();
+        expect(got, hasLength(1));
+      },
+    );
 
     test('payload rác: không gọi handler, không đổi dòng nào', () async {
       final s = await shownSchedule();
@@ -545,37 +565,44 @@ void main() {
       expect((await logRows()).single.readAt, isNull);
     });
 
-    test('Android/iOS: nền tảng nhận onTap, payload mở app qua scheduler', () async {
-      final scheduler = _FakeScheduler()..granted = true..launch = 'streak|k1';
-      final s = service(using: _SchedulingPlatform(scheduler));
-      s.start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final got = <NotificationTap>[];
-      s.setTapHandler(got.add);
-      expect(got, [const NotificationTap(NotificationKind.streak, 'k1')]);
-      scheduler.onTapHandler!('schedule|s1:2026-9-22');
-      expect(
-        got.last,
-        const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'),
-      );
-    });
-
-    test('Android/iOS: thông báo đặt vào lịch mang tài khoản trong payload',
-        () async {
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      final scheduler = _FakeScheduler()..granted = true;
-      final s = service(using: _SchedulingPlatform(scheduler))..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(scheduler.payloads.values, hasLength(2));
-      for (final entry in scheduler.pending.entries) {
+    test(
+      'Android/iOS: nền tảng nhận onTap, payload mở app qua scheduler',
+      () async {
+        final scheduler = _FakeScheduler()
+          ..granted = true
+          ..launch = 'streak|k1';
+        final s = service(using: _SchedulingPlatform(scheduler));
+        s.start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final got = <NotificationTap>[];
+        s.setTapHandler(got.add);
+        expect(got, [const NotificationTap(NotificationKind.streak, 'k1')]);
+        scheduler.onTapHandler!('schedule|s1:2026-9-22');
         expect(
-          parseNotificationPayload(scheduler.payloads[entry.key]),
-          NotificationTap(entry.value.kind, entry.value.key, userId: 'u1'),
+          got.last,
+          const NotificationTap(NotificationKind.schedule, 's1:2026-9-22'),
         );
-      }
-    });
+      },
+    );
+
+    test(
+      'Android/iOS: thông báo đặt vào lịch mang tài khoản trong payload',
+      () async {
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        final scheduler = _FakeScheduler()..granted = true;
+        final s = service(using: _SchedulingPlatform(scheduler))..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.payloads.values, hasLength(2));
+        for (final entry in scheduler.pending.entries) {
+          expect(
+            parseNotificationPayload(scheduler.payloads[entry.key]),
+            NotificationTap(entry.value.kind, entry.value.key, userId: 'u1'),
+          );
+        }
+      },
+    );
   });
 
   group('native scheduling', () {
@@ -616,23 +643,26 @@ void main() {
       ]);
     });
 
-    test('picks up an existing grant and reschedules when cues change', () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      final reminders = scheduling()..start();
-      addTearDown(reminders.dispose);
-      await pumpEventQueue();
-      expect(reminders.permission, 'granted');
-      expect(scheduler.scheduled, hasLength(2));
+    test(
+      'picks up an existing grant and reschedules when cues change',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        final reminders = scheduling()..start();
+        addTearDown(reminders.dispose);
+        await pumpEventQueue();
+        expect(reminders.permission, 'granted');
+        expect(scheduler.scheduled, hasLength(2));
 
-      await saveCue(id: 'cue-2', dueDate: DateTime(2026, 11, 20));
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(4));
+        await saveCue(id: 'cue-2', dueDate: DateTime(2026, 11, 20));
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(4));
 
-      await DriftCueEquipmentRepository(db, userId: 'u1').remove('cue-2');
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(2));
-    });
+        await DriftCueEquipmentRepository(db, userId: 'u1').remove('cue-2');
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(2));
+      },
+    );
 
     test('reconcile only touches the difference', () async {
       scheduler.granted = true;
@@ -668,20 +698,23 @@ void main() {
       ]);
     });
 
-    test('logging practice today cancels the pending streak reminder', () async {
-      scheduler.granted = true;
-      await practice(DateTime(2026, 10, 11, 10));
-      await practice(DateTime(2026, 10, 12, 10));
-      final reminders = scheduling()..start();
-      addTearDown(reminders.dispose);
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(1));
+    test(
+      'logging practice today cancels the pending streak reminder',
+      () async {
+        scheduler.granted = true;
+        await practice(DateTime(2026, 10, 11, 10));
+        await practice(DateTime(2026, 10, 12, 10));
+        final reminders = scheduling()..start();
+        addTearDown(reminders.dispose);
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(1));
 
-      await practice(DateTime(2026, 10, 13, 8));
-      await pumpEventQueue();
-      expect(scheduler.scheduled, isEmpty);
-      expect(scheduler.cancelled, hasLength(1));
-    });
+        await practice(DateTime(2026, 10, 13, 8));
+        await pumpEventQueue();
+        expect(scheduler.scheduled, isEmpty);
+        expect(scheduler.cancelled, hasLength(1));
+      },
+    );
 
     test('turning a kind off cancels it, turning it on schedules it', () async {
       scheduler.granted = true;
@@ -834,23 +867,26 @@ void main() {
 
     // Android đặt lịch "không chính xác": thông báo 08:00 có thể tới muộn vài
     // phút. Trong lúc đó hệ điều hành vẫn giữ nó là đang chờ.
-    test('quá giờ mà hệ điều hành còn chờ, cùng ngày: giữ, không huỷ', () async {
-      scheduler.granted = true;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final id = recommendations().single.id;
+    test(
+      'quá giờ mà hệ điều hành còn chờ, cùng ngày: giữ, không huỷ',
+      () async {
+        scheduler.granted = true;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final id = recommendations().single.id;
 
-      // 08:03, chưa được giao; dữ liệu đổi nên đồng bộ chạy lại.
-      now = DateTime(2026, 10, 14, 8, 3);
-      await saveSlot(time: '18:00');
-      await pumpEventQueue();
-      expect(scheduler.cancelled, isNot(contains(id)));
-      expect(scheduler.pending.keys, contains(id));
-      expect((await logRows()).map((x) => x.id), contains(id));
-    });
+        // 08:03, chưa được giao; dữ liệu đổi nên đồng bộ chạy lại.
+        now = DateTime(2026, 10, 14, 8, 3);
+        await saveSlot(time: '18:00');
+        await pumpEventQueue();
+        expect(scheduler.cancelled, isNot(contains(id)));
+        expect(scheduler.pending.keys, contains(id));
+        expect((await logRows()).map((x) => x.id), contains(id));
+      },
+    );
 
     test('quá ngày mà hệ điều hành còn chờ: huỷ và xoá khỏi nhật ký', () async {
       scheduler.granted = true;
@@ -893,7 +929,11 @@ void main() {
       final gone = scheduler.cancelled.toSet().intersection(overdue);
       expect(gone, hasLength(1));
       final rows = {for (final r in await logRows()) r.id};
-      expect(rows.intersection(gone), isEmpty, reason: 'đã huỷ: không còn dòng');
+      expect(
+        rows.intersection(gone),
+        isEmpty,
+        reason: 'đã huỷ: không còn dòng',
+      );
       expect(
         rows.intersection(overdue.difference(gone)),
         hasLength(1),
@@ -901,106 +941,116 @@ void main() {
       );
     });
 
-    test('mất quyền khi một thông báo quá giờ còn chờ: huỷ, xoá dòng', () async {
-      scheduler.granted = true;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final id = recommendations().single.id;
+    test(
+      'mất quyền khi một thông báo quá giờ còn chờ: huỷ, xoá dòng',
+      () async {
+        scheduler.granted = true;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final id = recommendations().single.id;
 
-      // 08:03, chưa giao; quyền bị tắt: thông báo đó sẽ không bao giờ hiện.
-      now = DateTime(2026, 10, 14, 8, 3);
-      scheduler.granted = false;
-      await saveSlot(time: '18:00');
-      await pumpEventQueue();
-      expect(s.permission, 'denied');
-      expect(scheduler.pending.keys, isNot(contains(id)));
-      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-    });
+        // 08:03, chưa giao; quyền bị tắt: thông báo đó sẽ không bao giờ hiện.
+        now = DateTime(2026, 10, 14, 8, 3);
+        scheduler.granted = false;
+        await saveSlot(time: '18:00');
+        await pumpEventQueue();
+        expect(s.permission, 'denied');
+        expect(scheduler.pending.keys, isNot(contains(id)));
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      },
+    );
 
-    test('đổi tài khoản giữa lúc đặt lại hết: tài khoản mới vẫn được đặt lại',
-        () async {
-      scheduler.granted = true;
-      // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
-      for (final user in ['u1', 'u2']) {
-        for (final day in [11, 12]) {
-          await DriftTimerSessionRepository(db, userId: user).add(
-            TimerSession(
-              id: '$user-$day',
-              date: DateTime(2026, 10, day, 10),
-              durationSec: 600,
-            ),
-          );
+    test(
+      'đổi tài khoản giữa lúc đặt lại hết: tài khoản mới vẫn được đặt lại',
+      () async {
+        scheduler.granted = true;
+        // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
+        for (final user in ['u1', 'u2']) {
+          for (final day in [11, 12]) {
+            await DriftTimerSessionRepository(db, userId: user).add(
+              TimerSession(
+                id: '$user-$day',
+                date: DateTime(2026, 10, day, 10),
+                durationSec: 600,
+              ),
+            );
+          }
         }
-      }
-      // Bản cũ đã đặt nhắc streak; lần mở này phải đặt lại hết.
-      final old = scheduling()..start();
-      await pumpEventQueue();
-      old.dispose();
-      await pumpEventQueue();
-      final id = scheduler.pending.keys.single;
+        // Bản cũ đã đặt nhắc streak; lần mở này phải đặt lại hết.
+        final old = scheduling()..start();
+        await pumpEventQueue();
+        old.dispose();
+        await pumpEventQueue();
+        final id = scheduler.pending.keys.single;
 
-      final gate = Completer<void>();
-      scheduler.holdSchedule = gate;
-      final s = scheduling(scheduleVersion: _FakeScheduleVersionStore())
-        ..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      // Lần đặt lại của u1 đang dở thì đổi sang u2.
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
-      await pumpEventQueue();
-      scheduler.holdSchedule = null;
-      gate.complete();
-      await pumpEventQueue();
-      expect(scheduler.pending.keys, [id]);
-      expect(parseNotificationPayload(scheduler.payloads[id])?.userId, 'u2');
-    });
+        final gate = Completer<void>();
+        scheduler.holdSchedule = gate;
+        final s = scheduling(scheduleVersion: _FakeScheduleVersionStore())
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        // Lần đặt lại của u1 đang dở thì đổi sang u2.
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+        await pumpEventQueue();
+        scheduler.holdSchedule = null;
+        gate.complete();
+        await pumpEventQueue();
+        expect(scheduler.pending.keys, [id]);
+        expect(parseNotificationPayload(scheduler.payloads[id])?.userId, 'u2');
+      },
+    );
 
-    test('đăng xuất khi một thông báo quá giờ còn chờ: xoá dòng của nó', () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final id = recommendations().single.id;
-      // Hệ điều hành đã giao thông báo bảo dưỡng 09:00 ngày 13.
-      scheduler.pending.removeWhere(
-        (_, n) => n.at == DateTime(2026, 10, 13, 9),
-      );
+    test(
+      'đăng xuất khi một thông báo quá giờ còn chờ: xoá dòng của nó',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final id = recommendations().single.id;
+        // Hệ điều hành đã giao thông báo bảo dưỡng 09:00 ngày 13.
+        scheduler.pending.removeWhere(
+          (_, n) => n.at == DateTime(2026, 10, 13, 9),
+        );
 
-      now = DateTime(2026, 10, 14, 8, 3);
-      auth.emit(const SignedOut());
-      await pumpEventQueue();
-      expect(scheduler.scheduled, isEmpty);
-      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-      // Thông báo bảo dưỡng 09:00 ngày 13 đã được giao (không còn chờ): dòng
-      // của nó ở lại.
-      expect(
-        (await logRows()).map((x) => x.at),
-        contains(DateTime(2026, 10, 13, 9)),
-      );
-    });
+        now = DateTime(2026, 10, 14, 8, 3);
+        auth.emit(const SignedOut());
+        await pumpEventQueue();
+        expect(scheduler.scheduled, isEmpty);
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+        // Thông báo bảo dưỡng 09:00 ngày 13 đã được giao (không còn chờ): dòng
+        // của nó ở lại.
+        expect(
+          (await logRows()).map((x) => x.at),
+          contains(DateTime(2026, 10, 13, 9)),
+        );
+      },
+    );
 
-    test('đổi tài khoản khi một thông báo quá giờ còn chờ: xoá dòng của u1',
-        () async {
-      scheduler.granted = true;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final id = recommendations().single.id;
+    test(
+      'đổi tài khoản khi một thông báo quá giờ còn chờ: xoá dòng của u1',
+      () async {
+        scheduler.granted = true;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final id = recommendations().single.id;
 
-      now = DateTime(2026, 10, 14, 8, 3);
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
-      await pumpEventQueue();
-      expect(scheduler.pending.keys, isNot(contains(id)));
-      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-    });
+        now = DateTime(2026, 10, 14, 8, 3);
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+        await pumpEventQueue();
+        expect(scheduler.pending.keys, isNot(contains(id)));
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      },
+    );
 
     test(
       'chưa cấp quyền: không đặt gì, nhật ký không có mục tương lai',
@@ -1077,18 +1127,21 @@ void main() {
       return id;
     }
 
-    test('mở app khi nguồn gợi ý còn đang tải: giữ nguyên gợi ý đã đặt', () async {
-      final id = await previousRun();
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(const AsyncLoading());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(scheduler.cancelled, isEmpty);
-      expect(scheduler.everScheduled, isEmpty);
-      expect(recommendations().map((n) => n.id), [id]);
-      expect((await logRows()).map((x) => x.id), contains(id));
-    });
+    test(
+      'mở app khi nguồn gợi ý còn đang tải: giữ nguyên gợi ý đã đặt',
+      () async {
+        final id = await previousRun();
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(const AsyncLoading());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.cancelled, isEmpty);
+        expect(scheduler.everScheduled, isEmpty);
+        expect(recommendations().map((n) => n.id), [id]);
+        expect((await logRows()).map((x) => x.id), contains(id));
+      },
+    );
 
     test('nguồn sẵn sàng với cặp khác: huỷ gợi ý cũ, đặt gợi ý mới', () async {
       final id = await previousRun();
@@ -1107,155 +1160,162 @@ void main() {
       expect((await logRows()).map((x) => x.id), [next.id]);
     });
 
-    test(
-      'nguồn gợi ý lỗi: bỏ gợi ý, các loại khác vẫn được đặt',
-      () async {
-        await saveCue(dueDate: DateTime(2026, 10, 20));
-        await saveSlot(time: '18:00');
-        await practice(DateTime(2026, 10, 11, 10));
-        await practice(DateTime(2026, 10, 12, 10));
-        final id = await previousRun();
-        final s = scheduling()
-          ..start()
-          ..setRecommendationSource(
-            AsyncError(StateError('hỏng'), StackTrace.empty),
-          );
-        addTearDown(s.dispose);
-        await pumpEventQueue();
-        expect(scheduler.cancelled, [id]);
-        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-        expect(scheduler.scheduled.map((n) => n.kind).toSet(), {
-          NotificationKind.maintenance,
-          NotificationKind.schedule,
-          NotificationKind.streak,
-        });
-      },
-    );
-
-    test('nguồn đổi lỗi ↔ đang tải dồn dập: hội tụ về đúng trạng thái', () async {
-      await previousRun();
+    test('nguồn gợi ý lỗi: bỏ gợi ý, các loại khác vẫn được đặt', () async {
+      await saveCue(dueDate: DateTime(2026, 10, 20));
+      await saveSlot(time: '18:00');
+      await practice(DateTime(2026, 10, 11, 10));
+      await practice(DateTime(2026, 10, 12, 10));
+      final id = await previousRun();
       final s = scheduling()
         ..start()
-        ..setRecommendationSource(const AsyncLoading());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-
-      // Lỗi xoá gợi ý; đang tải ngay sau đó, khi luồng nhật ký chưa kịp phát
-      // bản mới, không được thêm lại cái vừa xoá từ bản cũ.
-      for (var i = 0; i < 6; i++) {
-        s.setRecommendationSource(
+        ..setRecommendationSource(
           AsyncError(StateError('hỏng'), StackTrace.empty),
         );
-        await Future<void>.delayed(Duration.zero);
-        s.setRecommendationSource(const AsyncLoading());
-        await Future<void>.delayed(Duration.zero);
-      }
+      addTearDown(s.dispose);
       await pumpEventQueue();
-      final pendingReco = recommendations().map((n) => n.id).toSet();
-      final futureRows = {
-        for (final r in await logRows())
-          if (r.at.isAfter(now) &&
-              r.kind == NotificationKind.recommendation.name)
-            r.id,
-      };
-      // Lịch hệ điều hành và nhật ký khớp nhau. Lần lỗi đã xoá gợi ý, nên
-      // "đang tải" sau đó không còn gì để giữ.
-      expect(pendingReco, futureRows);
-      expect(pendingReco, isEmpty);
+      expect(scheduler.cancelled, [id]);
+      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      expect(scheduler.scheduled.map((n) => n.kind).toSet(), {
+        NotificationKind.maintenance,
+        NotificationKind.schedule,
+        NotificationKind.streak,
+      });
+    });
 
-      // Nguồn sẵn sàng trở lại: đúng một gợi ý, có cả trong nhật ký.
-      s.setRecommendationSource(source());
-      await pumpEventQueue();
-      final reco = recommendations().single;
-      expect(reco.at, DateTime(2026, 10, 14, 8));
-      expect(
-        {
+    test(
+      'nguồn đổi lỗi ↔ đang tải dồn dập: hội tụ về đúng trạng thái',
+      () async {
+        await previousRun();
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(const AsyncLoading());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+
+        // Lỗi xoá gợi ý; đang tải ngay sau đó, khi luồng nhật ký chưa kịp phát
+        // bản mới, không được thêm lại cái vừa xoá từ bản cũ.
+        for (var i = 0; i < 6; i++) {
+          s.setRecommendationSource(
+            AsyncError(StateError('hỏng'), StackTrace.empty),
+          );
+          await Future<void>.delayed(Duration.zero);
+          s.setRecommendationSource(const AsyncLoading());
+          await Future<void>.delayed(Duration.zero);
+        }
+        await pumpEventQueue();
+        final pendingReco = recommendations().map((n) => n.id).toSet();
+        final futureRows = {
           for (final r in await logRows())
             if (r.at.isAfter(now) &&
                 r.kind == NotificationKind.recommendation.name)
               r.id,
-        },
-        {reco.id},
-      );
-    });
+        };
+        // Lịch hệ điều hành và nhật ký khớp nhau. Lần lỗi đã xoá gợi ý, nên
+        // "đang tải" sau đó không còn gì để giữ.
+        expect(pendingReco, futureRows);
+        expect(pendingReco, isEmpty);
+
+        // Nguồn sẵn sàng trở lại: đúng một gợi ý, có cả trong nhật ký.
+        s.setRecommendationSource(source());
+        await pumpEventQueue();
+        final reco = recommendations().single;
+        expect(reco.at, DateTime(2026, 10, 14, 8));
+        expect(
+          {
+            for (final r in await logRows())
+              if (r.at.isAfter(now) &&
+                  r.kind == NotificationKind.recommendation.name)
+                r.id,
+          },
+          {reco.id},
+        );
+      },
+    );
 
     test('nguồn đang tải mà tắt loại gợi ý: gợi ý đã đặt bị huỷ', () async {
       final id = await previousRun();
-      final s = scheduling(
-        prefs: const NotificationPrefs(recommendation: false),
-      )
-        ..start()
-        ..setRecommendationSource(const AsyncLoading());
+      final s =
+          scheduling(prefs: const NotificationPrefs(recommendation: false))
+            ..start()
+            ..setRecommendationSource(const AsyncLoading());
       addTearDown(s.dispose);
       await pumpEventQueue();
       expect(scheduler.cancelled, [id]);
       expect(await logRows(), isEmpty);
     });
 
-    test('nguồn đang tải mà mất quyền: gợi ý đã giữ không còn trong nhật ký',
-        () async {
-      final id = await previousRun();
-      scheduler.granted = false;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(const AsyncLoading());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-    });
+    test(
+      'nguồn đang tải mà mất quyền: gợi ý đã giữ không còn trong nhật ký',
+      () async {
+        final id = await previousRun();
+        scheduler.granted = false;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(const AsyncLoading());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      },
+    );
 
-    test('mở app: không huỷ rồi đặt lại thông báo bảo dưỡng đang chờ', () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      final first = scheduling()..start();
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(2));
-      first.dispose();
-      await pumpEventQueue();
-      scheduler
-        ..cancelled.clear()
-        ..everScheduled.clear();
+    test(
+      'mở app: không huỷ rồi đặt lại thông báo bảo dưỡng đang chờ',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        final first = scheduling()..start();
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(2));
+        first.dispose();
+        await pumpEventQueue();
+        scheduler
+          ..cancelled.clear()
+          ..everScheduled.clear();
 
-      final s = scheduling()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(scheduler.cancelled, isEmpty);
-      expect(scheduler.everScheduled, isEmpty);
-      expect(scheduler.scheduled, hasLength(2));
-    });
+        final s = scheduling()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.cancelled, isEmpty);
+        expect(scheduler.everScheduled, isEmpty);
+        expect(scheduler.scheduled, hasLength(2));
+      },
+    );
 
-    test('nâng cấp từ bản cũ: đặt lại mọi thông báo đang chờ, một lần', () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      // Bản cũ đã đặt hai thông báo bảo dưỡng (không có payload).
-      final old = scheduling()..start();
-      await pumpEventQueue();
-      old.dispose();
-      await pumpEventQueue();
-      final ids = scheduler.pending.keys.toSet();
-      expect(ids, hasLength(2));
-      scheduler.everScheduled.clear();
+    test(
+      'nâng cấp từ bản cũ: đặt lại mọi thông báo đang chờ, một lần',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        // Bản cũ đã đặt hai thông báo bảo dưỡng (không có payload).
+        final old = scheduling()..start();
+        await pumpEventQueue();
+        old.dispose();
+        await pumpEventQueue();
+        final ids = scheduler.pending.keys.toSet();
+        expect(ids, hasLength(2));
+        scheduler.everScheduled.clear();
 
-      final store = _FakeScheduleVersionStore();
-      final s = scheduling(scheduleVersion: store)..start();
-      await pumpEventQueue();
-      expect(scheduler.everScheduled.map((n) => n.id).toSet(), ids);
-      expect(scheduler.pending.keys.toSet(), ids);
-      expect(store.version, notificationScheduleVersion);
-      expect(
-        (await logRows()).map((x) => x.id).toSet(),
-        ids,
-        reason: 'đặt lại không xoá dòng nhật ký của chính nó',
-      );
-      s.dispose();
-      await pumpEventQueue();
+        final store = _FakeScheduleVersionStore();
+        final s = scheduling(scheduleVersion: store)..start();
+        await pumpEventQueue();
+        expect(scheduler.everScheduled.map((n) => n.id).toSet(), ids);
+        expect(scheduler.pending.keys.toSet(), ids);
+        expect(store.version, notificationScheduleVersion);
+        expect(
+          (await logRows()).map((x) => x.id).toSet(),
+          ids,
+          reason: 'đặt lại không xoá dòng nhật ký của chính nó',
+        );
+        s.dispose();
+        await pumpEventQueue();
 
-      scheduler.everScheduled.clear();
-      final again = scheduling(scheduleVersion: store)..start();
-      addTearDown(again.dispose);
-      await pumpEventQueue();
-      expect(scheduler.everScheduled, isEmpty, reason: 'chỉ một lần');
-    });
+        scheduler.everScheduled.clear();
+        final again = scheduling(scheduleVersion: store)..start();
+        addTearDown(again.dispose);
+        await pumpEventQueue();
+        expect(scheduler.everScheduled, isEmpty, reason: 'chỉ một lần');
+      },
+    );
 
     test('nâng cấp: lỗi đọc cờ thì không đặt lại (không lặp)', () async {
       scheduler.granted = true;
@@ -1278,38 +1338,43 @@ void main() {
       ]);
     });
 
-    test('một luồng dữ liệu lỗi ngay lần đầu: các loại khác vẫn được đặt', () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      // Luồng buổi đồng hồ lỗi (bảng hỏng) và không bao giờ phát giá trị.
-      await db.customStatement('DROP TABLE timer_session_rows');
-      final s = scheduling()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(2));
-    });
+    test(
+      'một luồng dữ liệu lỗi ngay lần đầu: các loại khác vẫn được đặt',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        // Luồng buổi đồng hồ lỗi (bảng hỏng) và không bao giờ phát giá trị.
+        await db.customStatement('DROP TABLE timer_session_rows');
+        final s = scheduling()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(2));
+      },
+    );
 
-    test('cài đặt về "chưa nạp" khi đồng bộ đang đọc nhật ký: không huỷ gì',
-        () async {
-      scheduler.granted = true;
-      await saveCue(dueDate: DateTime(2026, 10, 20));
-      final s = scheduling()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(scheduler.scheduled, hasLength(2));
+    test(
+      'cài đặt về "chưa nạp" khi đồng bộ đang đọc nhật ký: không huỷ gì',
+      () async {
+        scheduler.granted = true;
+        await saveCue(dueDate: DateTime(2026, 10, 20));
+        final s = scheduling()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(scheduler.scheduled, hasLength(2));
 
-      // Giữ DB bận: lần đồng bộ sau đứng ở bước đọc nhật ký.
-      final gate = Completer<void>();
-      final busy = db.transaction(() => gate.future);
-      s.setPrefs(const NotificationPrefs(streak: false));
-      await pumpEventQueue();
-      s.setPrefs(null);
-      gate.complete();
-      await busy;
-      await pumpEventQueue();
-      expect(scheduler.cancelled, isEmpty);
-      expect(scheduler.scheduled, hasLength(2));
-    });
+        // Giữ DB bận: lần đồng bộ sau đứng ở bước đọc nhật ký.
+        final gate = Completer<void>();
+        final busy = db.transaction(() => gate.future);
+        s.setPrefs(const NotificationPrefs(streak: false));
+        await pumpEventQueue();
+        s.setPrefs(null);
+        gate.complete();
+        await busy;
+        await pumpEventQueue();
+        expect(scheduler.cancelled, isEmpty);
+        expect(scheduler.scheduled, hasLength(2));
+      },
+    );
 
     test('nhiều thay đổi dồn dập: số lần đồng bộ có giới hạn', () async {
       scheduler.granted = true;
@@ -1330,74 +1395,87 @@ void main() {
       expect(recommendations(), hasLength(1));
     });
 
-    test('đăng xuất (không quên): mục tương lai của tài khoản cũ bị xoá', () async {
-      scheduler.granted = true;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final id = recommendations().single.id;
-      expect((await logRows()).map((x) => x.id), contains(id));
+    test(
+      'đăng xuất (không quên): mục tương lai của tài khoản cũ bị xoá',
+      () async {
+        scheduler.granted = true;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final id = recommendations().single.id;
+        expect((await logRows()).map((x) => x.id), contains(id));
 
-      auth.emit(const SignedOut());
-      await pumpEventQueue();
-      expect(await logRows(), isEmpty);
+        auth.emit(const SignedOut());
+        await pumpEventQueue();
+        expect(await logRows(), isEmpty);
 
-      // Quay lại sau giờ giao: hộp thư không được liệt kê cái đã huỷ.
-      now = DateTime(2026, 10, 14, 9);
-      auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
-      await pumpEventQueue();
-      expect((await logRows()).map((x) => x.id), isNot(contains(id)));
-    });
+        // Quay lại sau giờ giao: hộp thư không được liệt kê cái đã huỷ.
+        now = DateTime(2026, 10, 14, 9);
+        auth.emit(const SignedIn(userId: 'u1', displayName: 'An'));
+        await pumpEventQueue();
+        expect((await logRows()).map((x) => x.id), isNot(contains(id)));
+      },
+    );
 
-    test('đổi thẳng sang tài khoản khác: mục tương lai của u1 bị xoá', () async {
-      scheduler.granted = true;
-      final s = scheduling()
-        ..start()
-        ..setRecommendationSource(source());
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      expect(await logRows(), isNotEmpty);
+    test(
+      'đổi thẳng sang tài khoản khác: mục tương lai của u1 bị xoá',
+      () async {
+        scheduler.granted = true;
+        final s = scheduling()
+          ..start()
+          ..setRecommendationSource(source());
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(await logRows(), isNotEmpty);
 
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
-      await pumpEventQueue();
-      expect(await logRows(), isEmpty);
-      // Nguồn của u1 còn giữ nhưng không được dùng cho u2.
-      expect(recommendations(), isEmpty);
-      expect(await logRows('u2'), isEmpty);
-    });
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+        await pumpEventQueue();
+        expect(await logRows(), isEmpty);
+        // Nguồn của u1 còn giữ nhưng không được dùng cho u2.
+        expect(recommendations(), isEmpty);
+        expect(await logRows('u2'), isEmpty);
+      },
+    );
 
-    test('đổi tài khoản: thông báo trùng id được đặt lại với tài khoản mới',
-        () async {
-      scheduler.granted = true;
-      // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
-      for (final user in ['u1', 'u2']) {
-        for (final day in [11, 12]) {
-          await DriftTimerSessionRepository(db, userId: user).add(
-            TimerSession(
-              id: '$user-$day',
-              date: DateTime(2026, 10, day, 10),
-              durationSec: 600,
-            ),
+    test(
+      'đổi tài khoản: thông báo trùng id được đặt lại với tài khoản mới',
+      () async {
+        scheduler.granted = true;
+        // Hai tài khoản cùng tập hai ngày qua: nhắc giữ streak trùng id.
+        for (final user in ['u1', 'u2']) {
+          for (final day in [11, 12]) {
+            await DriftTimerSessionRepository(db, userId: user).add(
+              TimerSession(
+                id: '$user-$day',
+                date: DateTime(2026, 10, day, 10),
+                durationSec: 600,
+              ),
+            );
+          }
+        }
+        final s = scheduling()..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final ids = scheduler.pending.keys.toSet();
+        expect(ids, hasLength(1));
+        expect(
+          parseNotificationPayload(scheduler.payloads[ids.single])?.userId,
+          'u1',
+        );
+
+        auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
+        await pumpEventQueue();
+        expect(scheduler.pending.keys.toSet(), ids);
+        for (final id in ids) {
+          expect(
+            parseNotificationPayload(scheduler.payloads[id])?.userId,
+            'u2',
           );
         }
-      }
-      final s = scheduling()..start();
-      addTearDown(s.dispose);
-      await pumpEventQueue();
-      final ids = scheduler.pending.keys.toSet();
-      expect(ids, hasLength(1));
-      expect(parseNotificationPayload(scheduler.payloads[ids.single])?.userId,
-          'u1');
-
-      auth.emit(const SignedIn(userId: 'u2', displayName: 'Bình'));
-      await pumpEventQueue();
-      expect(scheduler.pending.keys.toSet(), ids);
-      for (final id in ids) {
-        expect(parseNotificationPayload(scheduler.payloads[id])?.userId, 'u2');
-      }
-    });
+      },
+    );
   });
 
   group('reconcileNotifications', () {
@@ -1412,8 +1490,7 @@ void main() {
     );
 
     test('cancels stale ids, schedules missing ones, keeps the rest', () async {
-      final scheduler = _FakeScheduler()
-        ..pending = {1: n(1), 2: n(2)};
+      final scheduler = _FakeScheduler()..pending = {1: n(1), 2: n(2)};
       await reconcileNotifications(scheduler, [n(2), n(3)], userId: 'u1');
       expect(scheduler.pending.keys, {2, 3});
       expect(scheduler.cancelled, [1]);
@@ -1425,8 +1502,7 @@ void main() {
     });
 
     test('keep: còn chờ thì để yên; trả về id đã huỷ', () async {
-      final scheduler = _FakeScheduler()
-        ..pending = {1: n(1), 2: n(2), 4: n(4)};
+      final scheduler = _FakeScheduler()..pending = {1: n(1), 2: n(2), 4: n(4)};
       final cancelled = await reconcileNotifications(
         scheduler,
         [n(3)],
@@ -1439,8 +1515,7 @@ void main() {
     });
 
     test('replaceAll: đặt lại cả cái đang chờ đúng id, keep để yên', () async {
-      final scheduler = _FakeScheduler()
-        ..pending = {1: n(1), 2: n(2), 4: n(4)};
+      final scheduler = _FakeScheduler()..pending = {1: n(1), 2: n(2), 4: n(4)};
       final cancelled = await reconcileNotifications(
         scheduler,
         [n(2), n(3)],
@@ -1452,6 +1527,174 @@ void main() {
       expect(scheduler.cancelled.toSet(), {2, 4});
       expect(scheduler.everScheduled.map((x) => x.id), [2, 3]);
       expect(scheduler.pending.keys.toSet(), {1, 2, 3});
+    });
+  });
+
+  group('web push lease', () {
+    Future<void> prepareStreak() async {
+      await practice(DateTime(2026, 10, 11, 10));
+      await practice(DateTime(2026, 10, 12, 10));
+      platform.permissionValue = 'granted';
+      now = DateTime(2026, 10, 13, 19, 59);
+    }
+
+    PushLease lease({
+      String userId = 'u1',
+      DateTime? until,
+      Set<NotificationKind> kinds = const {NotificationKind.streak},
+    }) => PushLease(
+      userId: userId,
+      deviceId: 'device-$userId',
+      serverKinds: kinds,
+      until: until ?? DateTime(2026, 10, 13, 21),
+    );
+
+    test(
+      'active lease suppresses local notifications for server-owned kinds',
+      () async {
+        await prepareStreak();
+        final s = service()
+          ..setPushState(AsyncData(PushServer(lease())))
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+
+        expect(platform.notifications, isEmpty);
+      },
+    );
+
+    test(
+      'lease from another user does not suppress the signed-in user',
+      () async {
+        await prepareStreak();
+        now = DateTime(2026, 10, 13, 20);
+        final s = service()
+          ..setPushState(AsyncData(PushServer(lease(userId: 'u2'))))
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        s.checkNow();
+
+        expect(platform.notifications, hasLength(1));
+      },
+    );
+
+    test('expired lease returns its kinds to local delivery', () async {
+      await prepareStreak();
+      now = DateTime(2026, 10, 13, 20);
+      final s = service()
+        ..setPushState(
+          AsyncData(PushServer(lease(until: DateTime(2026, 10, 13, 19, 58)))),
+        )
+        ..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      s.checkNow();
+
+      expect(platform.notifications, hasLength(1));
+    });
+
+    test(
+      'loading push state pauses web notifications until resolution',
+      () async {
+        await prepareStreak();
+        final s = service()
+          ..setPushState(const AsyncLoading())
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        expect(platform.notifications, isEmpty);
+
+        now = DateTime(2026, 10, 13, 20);
+        s.setPushState(const AsyncData(PushLocal()));
+        s.checkNow();
+        expect(platform.notifications, hasLength(1));
+      },
+    );
+
+    test(
+      'delivery ingest records and suppresses a duplicate local reminder',
+      () async {
+        await prepareStreak();
+        final s = service()
+          ..setPushState(const AsyncLoading())
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+        final entry = NotificationLogEntry(
+          id: 501,
+          kind: NotificationKind.streak,
+          key: '2026-10-13',
+          at: DateTime(2026, 10, 13, 19, 58),
+          title: 'Push',
+          body: 'Đã được gửi',
+        );
+        await s.ingestDelivered('u1', [entry]);
+        s.setPushState(const AsyncData(PushLocal()));
+        s.checkNow();
+
+        expect(platform.notifications, isEmpty);
+        expect((await logRows()).map((row) => row.id), [501]);
+      },
+    );
+
+    test(
+      'tap waits for delivery pull before marking the matching row read',
+      () async {
+        now = DateTime(2026, 10, 13, 20, 5);
+        final s = service();
+        final pull = Completer<void>();
+        final taps = <NotificationTap>[];
+        final entry = NotificationLogEntry(
+          id: 501,
+          kind: NotificationKind.streak,
+          key: '2026-10-13',
+          at: DateTime(2026, 10, 13, 20),
+          title: 'Push',
+          body: 'Đã được gửi',
+        );
+        s
+          ..beforeMarkRead = () async {
+            await pull.future;
+            await NotificationLogRepository(
+              db,
+              userId: 'u1',
+            ).recordDelivered([entry]);
+          }
+          ..setTapHandler(taps.add)
+          ..start();
+        addTearDown(s.dispose);
+        await pumpEventQueue();
+
+        platform.onTap!(
+          notificationPayload(NotificationKind.streak, entry.key, userId: 'u1'),
+        );
+        expect(taps, hasLength(1));
+        await pumpEventQueue();
+        expect(await logRows(), isEmpty);
+
+        pull.complete();
+        await pumpEventQueue();
+        expect((await logRows()).single.readAt, isNotNull);
+      },
+    );
+
+    test('delivered entries for another account are ignored', () async {
+      final s = service()..start();
+      addTearDown(s.dispose);
+      await pumpEventQueue();
+      await s.ingestDelivered('u2', [
+        NotificationLogEntry(
+          id: 501,
+          kind: NotificationKind.streak,
+          key: '2026-10-13',
+          at: now,
+          title: 'Other',
+          body: 'Other',
+        ),
+      ]);
+
+      expect(await logRows(), isEmpty);
     });
   });
 }

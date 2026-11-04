@@ -259,6 +259,7 @@ void main() {
       auth: auth,
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      unregisterPush: (_) async {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
 
@@ -327,6 +328,7 @@ void main() {
         auth: auth,
         userId: 'u1',
         forgetChatInFlight: (_) {},
+        unregisterPush: (_) async {},
         recommendationSeen: FakeRecommendationSeenStore(),
       );
       await pumpEventQueue();
@@ -414,6 +416,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      unregisterPush: (_) async {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
 
@@ -494,6 +497,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      unregisterPush: (_) async {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
 
@@ -518,6 +522,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      unregisterPush: (_) async {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
     expect((await db.select(db.coachChatTurnRows).get()).map((r) => r.userId), [
@@ -526,55 +531,62 @@ void main() {
     ]);
   });
 
-  test('đăng xuất xoá nhật ký thông báo của người đó, giữ của người khác', () async {
-    for (final user in ['u1', 'u2']) {
-      await db
-          .into(db.notificationLogRows)
-          .insert(
-            NotificationLogRowsCompanion.insert(
-              userId: user,
-              id: 1,
-              kind: 'streak',
-              key: 'k',
-              at: DateTime(2026, 10, 13, 20),
-              title: 'T',
-              body: 'B',
-            ),
-          );
-    }
-    await signOutAndForget(
-      db: db,
-      auth: FakeAuthRepository.signedIn(userId: 'u1'),
-      userId: 'u1',
-      forgetChatInFlight: (_) {},
-      recommendationSeen: FakeRecommendationSeenStore(),
-    );
-    final rows = await db.select(db.notificationLogRows).get();
-    expect(rows.map((r) => r.userId), ['u2']);
-  });
-
-  test('đăng xuất quên cặp gợi ý đã thấy của người đó, giữ của người khác',
-      () async {
-    final seen = FakeRecommendationSeenStore();
-    for (final user in ['u1', 'u2']) {
-      await seen.save(
-        user,
-        SeenRecommendation(
-          cat: SkillCategory.aiming,
-          drillId: 'd1',
-          at: DateTime(2026, 10, 13, 9),
-        ),
+  test(
+    'đăng xuất xoá nhật ký thông báo của người đó, giữ của người khác',
+    () async {
+      for (final user in ['u1', 'u2']) {
+        await db
+            .into(db.notificationLogRows)
+            .insert(
+              NotificationLogRowsCompanion.insert(
+                userId: user,
+                id: 1,
+                kind: 'streak',
+                key: 'k',
+                at: DateTime(2026, 10, 13, 20),
+                title: 'T',
+                body: 'B',
+              ),
+            );
+      }
+      await signOutAndForget(
+        db: db,
+        auth: FakeAuthRepository.signedIn(userId: 'u1'),
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+        unregisterPush: (_) async {},
+        recommendationSeen: FakeRecommendationSeenStore(),
       );
-    }
-    await signOutAndForget(
-      db: db,
-      auth: FakeAuthRepository.signedIn(userId: 'u1'),
-      userId: 'u1',
-      forgetChatInFlight: (_) {},
-      recommendationSeen: seen,
-    );
-    expect(seen.saved.keys, ['u2']);
-  });
+      final rows = await db.select(db.notificationLogRows).get();
+      expect(rows.map((r) => r.userId), ['u2']);
+    },
+  );
+
+  test(
+    'đăng xuất quên cặp gợi ý đã thấy của người đó, giữ của người khác',
+    () async {
+      final seen = FakeRecommendationSeenStore();
+      for (final user in ['u1', 'u2']) {
+        await seen.save(
+          user,
+          SeenRecommendation(
+            cat: SkillCategory.aiming,
+            drillId: 'd1',
+            at: DateTime(2026, 10, 13, 9),
+          ),
+        );
+      }
+      await signOutAndForget(
+        db: db,
+        auth: FakeAuthRepository.signedIn(userId: 'u1'),
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+        unregisterPush: (_) async {},
+        recommendationSeen: seen,
+      );
+      expect(seen.saved.keys, ['u2']);
+    },
+  );
 
   test(
     'đăng xuất xoá lần kiểm tra kỹ năng của người đó, giữ của người khác',
@@ -600,6 +612,7 @@ void main() {
         auth: FakeAuthRepository.signedIn(),
         userId: 'u1',
         forgetChatInFlight: (_) {},
+        unregisterPush: (_) async {},
         recommendationSeen: FakeRecommendationSeenStore(),
       );
       expect((await db.select(db.skillTestRows).get()).map((r) => r.id), [
@@ -660,6 +673,7 @@ void main() {
       auth: FakeAuthRepository.signedIn(userId: 'u1'),
       userId: 'u1',
       forgetChatInFlight: (_) {},
+      unregisterPush: (_) async {},
       recommendationSeen: FakeRecommendationSeenStore(),
     );
     expect((await db.select(db.tournamentRows).get()).map((r) => r.id), [
@@ -675,6 +689,30 @@ void main() {
       await addTournament('da', 'u1', syncedAt: DateTime(2026, 10, 28, 12));
       await addTournament('khac', 'u2');
       expect(await pendingPracticeCount(db, 'u1'), 2);
+    },
+  );
+
+  test(
+    'huỷ push trước khi đăng xuất; lỗi huỷ vẫn không chặn đăng xuất',
+    () async {
+      final auth = FakeAuthRepository.signedIn(userId: 'u1');
+      var unregisterCalled = false;
+      await signOutAndForget(
+        db: db,
+        auth: auth,
+        userId: 'u1',
+        forgetChatInFlight: (_) {},
+        unregisterPush: (userId) async {
+          expect(userId, 'u1');
+          expect(auth.current, isA<SignedIn>());
+          unregisterCalled = true;
+          throw StateError('offline');
+        },
+        recommendationSeen: FakeRecommendationSeenStore(),
+      );
+
+      expect(unregisterCalled, isTrue);
+      expect(auth.current, isA<SignedOut>());
     },
   );
 }

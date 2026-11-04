@@ -25,21 +25,29 @@ void main() {
   test('gửi body JSON và giữ nguyên chữ tiếng Việt', () async {
     server.routes['POST /users/register'] = (_) => FakeDirectus.noContent();
 
-    final data = await api.post('/users/register', body: {'first_name': 'Nguyễn Ân'});
+    final data = await api.post(
+      '/users/register',
+      body: {'first_name': 'Nguyễn Ân'},
+    );
 
     expect(data, isNull);
-    expect(FakeDirectus.body(server.requests.single)['first_name'], 'Nguyễn Ân');
+    expect(
+      FakeDirectus.body(server.requests.single)['first_name'],
+      'Nguyễn Ân',
+    );
   });
 
   test('lỗi server thành DirectusError mang mã của Directus', () async {
-    server.routes['POST /auth/login'] =
-        (_) => FakeDirectus.error(401, 'INVALID_CREDENTIALS');
+    server.routes['POST /auth/login'] = (_) =>
+        FakeDirectus.error(401, 'INVALID_CREDENTIALS');
 
     expect(
       () => api.post('/auth/login', body: {}),
-      throwsA(isA<DirectusError>()
-          .having((e) => e.status, 'status', 401)
-          .having((e) => e.code, 'code', 'INVALID_CREDENTIALS')),
+      throwsA(
+        isA<DirectusError>()
+            .having((e) => e.status, 'status', 401)
+            .having((e) => e.code, 'code', 'INVALID_CREDENTIALS'),
+      ),
     );
   });
 
@@ -67,11 +75,18 @@ void main() {
 
   test('patch gửi PATCH kèm token và thân JSON, trả trường data', () async {
     final server = FakeDirectus()
-      ..routes['PATCH /items/player_ranks/u1'] =
-          ((req) => FakeDirectus.ok({'id': 'u1', ...FakeDirectus.body(req)}));
-    final api = DirectusClient(client: server.client, baseUrl: FakeDirectus.baseUrl);
+      ..routes['PATCH /items/player_ranks/u1'] = ((req) =>
+          FakeDirectus.ok({'id': 'u1', ...FakeDirectus.body(req)}));
+    final api = DirectusClient(
+      client: server.client,
+      baseUrl: FakeDirectus.baseUrl,
+    );
 
-    final data = await api.patch('/items/player_ranks/u1', token: 'tk', body: {'rank': 'g'});
+    final data = await api.patch(
+      '/items/player_ranks/u1',
+      token: 'tk',
+      body: {'rank': 'g'},
+    );
 
     expect(data, {'id': 'u1', 'rank': 'g'});
     final req = server.sent('PATCH', '/items/player_ranks/u1').single;

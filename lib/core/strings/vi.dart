@@ -712,6 +712,12 @@ abstract final class Vi {
       'Gợi ý tập mới được tính từ dữ liệu trên máy này lúc ứng dụng mở lần cuối. Nếu bạn tập trên máy khác, thông báo có thể chưa theo kịp.';
   static String get notificationsWebOnlyWhileOpen =>
       'Trên trình duyệt, thông báo chỉ hiện khi ứng dụng đang mở. Gợi ý tập mới chỉ hiện nếu trang đã mở từ trước ${recommendationReminderHour.toString().padLeft(2, '0')}:00.';
+  static const notificationsWebPushOn =
+      'Thông báo được gửi từ máy chủ, nên vẫn đến khi đã đóng tab.';
+  static const notificationsWebPushRecommendationLocal =
+      'Riêng Gợi ý tập mới vẫn được tính trên trình duyệt này, nên chỉ hiện khi tab đang mở.';
+  static const notificationsWebPushUnavailable =
+      'Trình duyệt này chưa nhận được thông báo khi đã đóng tab. Trên iPhone (iOS 16.4 trở lên), hãy thêm ứng dụng vào Màn hình chính rồi mở từ đó.';
 
   // Màn AI Home — mục 6.1 của thiết kế lát dọc Phase 1.
   //

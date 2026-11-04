@@ -52,6 +52,9 @@ Future<void> discardUnsyncableLogs(AppDatabase db, String userId) async {
 /// gọi nào cũng phải nghĩ tới câu đang chờ; ProfileScreen truyền
 /// `CoachChatController.forgetInFlight`.
 ///
+/// [unregisterPush] chạy trước đăng xuất khi access token còn dùng được; lỗi
+/// huỷ đăng ký không được giữ người chơi lại ở màn hình tài khoản.
+///
 /// Đăng xuất **trước** rồi mới xoá: lượt đồng bộ đang chạy thấy người
 /// dùng đổi thì bỏ kết quả kéo về, nên không dựng lại những dòng vừa xoá.
 ///
@@ -65,9 +68,15 @@ Future<void> signOutAndForget({
   required AuthRepository auth,
   required String userId,
   required void Function(String userId) forgetChatInFlight,
+  required Future<void> Function(String userId) unregisterPush,
   required RecommendationSeenStore recommendationSeen,
 }) async {
   forgetChatInFlight(userId);
+  try {
+    await unregisterPush(userId);
+  } on Object {
+    // Đăng xuất vẫn phải hoàn tất nếu máy chủ push không tới được.
+  }
   await auth.signOut();
   await (db.delete(
     db.drillLogRows,

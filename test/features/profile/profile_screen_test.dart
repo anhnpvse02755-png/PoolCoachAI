@@ -15,6 +15,7 @@ import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/coach_chat_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/push_providers.dart';
 import 'package:poolcoachai/core/providers/roadmap_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
@@ -203,6 +204,7 @@ void main() {
         appDatabaseProvider.overrideWithValue(db),
         nowProvider.overrideWithValue(() => today),
         authRepositoryProvider.overrideWithValue(auth),
+        pushUnregisterProvider.overrideWithValue((_) async {}),
         syncServiceProvider.overrideWithValue(sync),
         cueEquipmentSyncProvider.overrideWithValue(cueEquipmentSync),
         practiceSyncProvider.overrideWithValue(practiceSync),

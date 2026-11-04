@@ -11,10 +11,8 @@ import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
 void main() {
   final base = Uri.parse('https://notify.example.invalid');
   const sub = PushSubscriptionInfo(
-    endpoint:
-        'https://fcm.googleapis.com/fcm/send/dQw4w9WgXcQ:APA91bExampleEndpointToken',
-    p256dh:
-        'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM',
+    endpoint: 'https://fcm.googleapis.com/fcm/send/dQw4w9WgXcQ:APA91bExampleEndpointToken',
+    p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM',
     auth: 'tBHItJI5svbpez7KI4CCXg',
   );
 
@@ -269,7 +267,10 @@ void main() {
 
   test('baseUrl có đường dẫn, có hoặc không dấu / cuối', () async {
     final seen = <String>[];
-    for (final b in ['https://h.example.invalid/api', 'https://h.example.invalid/api/']) {
+    for (final b in [
+      'https://h.example.invalid/api',
+      'https://h.example.invalid/api/',
+    ]) {
       final c = NotifyClient(
         client: MockClient((req) async {
           seen.add(req.url.toString());
@@ -338,7 +339,9 @@ void main() {
         PushShownRef(kind: NotificationKind.streak, key: 'x' * 201),
       ],
     );
-    final keys = [for (final e in body['shownToday'] as List) (e as Map)['key']];
+    final keys = [
+      for (final e in body['shownToday'] as List) (e as Map)['key'],
+    ];
     expect(keys.length, 50);
     expect(keys.first, 'k10');
     expect(keys.last, 'k59');

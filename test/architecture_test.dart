@@ -64,7 +64,8 @@ void main() {
     expect(
       readers.where((p) => p.endsWith('bin/notify_plan.dart')),
       isNotEmpty,
-      reason: 'bin/notify_plan.dart là nơi duy nhất nạp seed cho helper; '
+      reason:
+          'bin/notify_plan.dart là nơi duy nhất nạp seed cho helper; '
           'mất khỏi bin/ thì luật này xanh một cách vô nghĩa',
     );
 
@@ -485,17 +486,22 @@ void main() {
     },
   );
 
-  test('bộ giải mã Directus thuần: không import drift, database, sync hay Flutter', () {
-    final files = dartFilesIn('lib/data/remote/codecs');
-    expect(files, isNotEmpty);
-    for (final f in files) {
-      expect(
-        codeOnly(f.readAsStringSync()),
-        isNot(matches(RegExp(r"package:(drift|flutter)|database\.dart|/sync/"))),
-        reason: f.path,
-      );
-    }
-  });
+  test(
+    'bộ giải mã Directus thuần: không import drift, database, sync hay Flutter',
+    () {
+      final files = dartFilesIn('lib/data/remote/codecs');
+      expect(files, isNotEmpty);
+      for (final f in files) {
+        expect(
+          codeOnly(f.readAsStringSync()),
+          isNot(
+            matches(RegExp(r"package:(drift|flutter)|database\.dart|/sync/")),
+          ),
+          reason: f.path,
+        );
+      }
+    },
+  );
 
   test('lib/server và bin thuần: không Flutter, dart:ui, drift, database hay sync; lib/server không đọc seed', () {
     final server = dartFilesIn('lib/server');
@@ -506,7 +512,9 @@ void main() {
       expect(
         codeOnly(f.readAsStringSync()),
         isNot(
-          matches(RegExp(r"package:(drift|flutter)|dart:ui|database\.dart|/sync/")),
+          matches(
+            RegExp(r"package:(drift|flutter)|dart:ui|database\.dart|/sync/"),
+          ),
         ),
         reason: f.path,
       );
@@ -520,7 +528,10 @@ void main() {
   test('closure import của bin/notify_plan.dart thuần Dart: không Flutter, drift, dart:ui/html, database.dart, sync', () {
     final closure = <String>{};
     final queue = ['bin/notify_plan.dart'];
-    final importRe = RegExp(r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''', multiLine: true);
+    final importRe = RegExp(
+      r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''',
+      multiLine: true,
+    );
     while (queue.isNotEmpty) {
       final path = queue.removeLast();
       if (!closure.add(path)) continue;
@@ -562,5 +573,17 @@ void main() {
       }
     }
     expect(offenders, isEmpty);
+  });
+
+  test('worker đẩy nằm ở /push/, bootstrap không đăng ký service worker của Flutter, không route nào bắt đầu bằng /push', () {
+    expect(File('web/push/sw.js').existsSync(), isTrue);
+    expect(
+      File('web/flutter_bootstrap.js').readAsStringSync(),
+      isNot(contains('serviceWorkerSettings')),
+    );
+    expect(
+      File('lib/core/router/routes.dart').readAsStringSync(),
+      isNot(contains("'/push")),
+    );
   });
 }

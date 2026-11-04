@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/database_provider.dart';
 import 'package:poolcoachai/core/providers/async_gate.dart';
 import 'package:poolcoachai/core/providers/now_provider.dart';
+import 'package:poolcoachai/core/providers/notification_platform_provider.dart';
 import 'package:poolcoachai/core/providers/recommendation_provider.dart';
 import 'package:poolcoachai/core/providers/stream_providers.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
@@ -12,6 +15,7 @@ import 'package:poolcoachai/data/notifications/notification_schedule_version_sto
 import 'package:poolcoachai/data/notifications/notification_service.dart';
 import 'package:poolcoachai/data/notifications/recommendation_seen_store.dart';
 import 'package:poolcoachai/data/sync/notification_settings_sync.dart';
+import 'package:poolcoachai/core/providers/push_providers.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_plan.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
@@ -27,9 +31,10 @@ final notificationPrefsStoreProvider = Provider<NotificationPrefsStore>(
 /// [AsyncLoading] tới khi đọc xong: dịch vụ không được báo gì trước đó,
 /// kẻo báo nhầm loại người dùng đã tắt.
 final notificationPrefsProvider =
-    NotifierProvider<NotificationPrefsController, AsyncValue<NotificationPrefs>>(
-      NotificationPrefsController.new,
-    );
+    NotifierProvider<
+      NotificationPrefsController,
+      AsyncValue<NotificationPrefs>
+    >(NotificationPrefsController.new);
 
 class NotificationPrefsController
     extends Notifier<AsyncValue<NotificationPrefs>> {
@@ -106,10 +111,7 @@ class RecommendationSeenController
     ref
         .read(recommendationSeenStoreProvider)
         .load(userId)
-        .then<SeenRecommendation?>(
-          (seen) => seen,
-          onError: (Object _) => null,
-        )
+        .then<SeenRecommendation?>((seen) => seen, onError: (Object _) => null)
         .then((seen) {
           // Đã ghi trong lúc đang đọc thì giữ cặp mới nhất.
           if (!disposed && state is AsyncLoading) state = AsyncData(seen);
@@ -158,7 +160,7 @@ final notificationSettingsSyncProvider =
         meta: ref.watch(notificationSettingsMetaStoreProvider),
         now: ref.watch(nowProvider),
         // Task 16 nối vào nền tảng đẩy.
-        timeZone: () => null,
+        timeZone: () => ref.read(pushPlatformProvider).timeZone,
         onAdopted: (userId, {prefs, seen}) {
           if (prefs != null) {
             ref.read(notificationPrefsProvider.notifier).adopt(userId, prefs);
@@ -177,33 +179,35 @@ final notificationSettingsSyncProvider =
 /// [AsyncLoading] khi chưa có tài khoản hoặc còn nguồn đang tải / đang tải
 /// lại: dịch vụ giữ nguyên gợi ý đã đặt. [AsyncError] khi một nguồn lỗi: dịch
 /// vụ bỏ gợi ý, các loại khác vẫn chạy.
-final recommendationSourceProvider =
-    Provider<AsyncValue<RecommendationSource>>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      final inputs = ref.watch(recommendationInputsProvider);
-      final seen = ref.watch(recommendationSeenProvider);
-      if (userId == null) return const AsyncLoading();
-      final blocked = gate<RecommendationSource>([inputs, seen]);
-      if (blocked != null) return blocked;
-      return AsyncData(
-        RecommendationSource(
-          userId: userId,
-          inputs: inputs.requireValue,
-          seen: seen.requireValue,
-        ),
-      );
-    });
+final recommendationSourceProvider = Provider<AsyncValue<RecommendationSource>>(
+  (ref) {
+    final userId = ref.watch(currentUserIdProvider);
+    final inputs = ref.watch(recommendationInputsProvider);
+    final seen = ref.watch(recommendationSeenProvider);
+    if (userId == null) return const AsyncLoading();
+    final blocked = gate<RecommendationSource>([inputs, seen]);
+    if (blocked != null) return blocked;
+    return AsyncData(
+      RecommendationSource(
+        userId: userId,
+        inputs: inputs.requireValue,
+        seen: seen.requireValue,
+      ),
+    );
+  },
+);
 
 /// Nhật ký thông báo của người đang đăng nhập; null khi chưa đăng nhập.
-final notificationLogRepositoryProvider =
-    Provider<NotificationLogRepository?>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      if (userId == null) return null;
-      return NotificationLogRepository(
-        ref.watch(appDatabaseProvider),
-        userId: userId,
-      );
-    });
+final notificationLogRepositoryProvider = Provider<NotificationLogRepository?>((
+  ref,
+) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+  return NotificationLogRepository(
+    ref.watch(appDatabaseProvider),
+    userId: userId,
+  );
+});
 
 final notificationLogProvider = StreamProvider<List<NotificationLogEntry>>(
   (ref) =>
@@ -224,6 +228,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
     auth: ref.watch(authRepositoryProvider),
     now: ref.watch(nowProvider),
     scheduleVersion: ref.watch(notificationScheduleVersionStoreProvider),
+    platform: ref.watch(notificationPlatformProvider),
   );
   ref.listen(
     notificationPrefsProvider,
@@ -235,6 +240,21 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
     (_, next) => service.setRecommendationSource(next),
     fireImmediately: true,
   );
+  ref.listen(
+    pushStateProvider,
+    (_, next) => service.setPushState(next),
+    fireImmediately: true,
+  );
+  ref.listen(pushDeliveredProvider, (_, next) {
+    final delivered = next.value;
+    if (delivered != null) {
+      service.ingestDelivered(delivered.$1, delivered.$2);
+    }
+  });
+  service.beforeMarkRead = ref.read(pushServiceProvider).pullDeliveries;
+  service.onPermissionChanged = ref
+      .read(pushServiceProvider)
+      .refreshAfterPermissionChange;
   ref.onDispose(service.dispose);
   return service;
 });

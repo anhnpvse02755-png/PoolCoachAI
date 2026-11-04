@@ -122,7 +122,7 @@ Công cụ độc lập trong Training Center, không gắn với một Drill ha
 - Dữ liệu được lưu cục bộ và cô lập theo tài khoản trên cùng thiết bị. Dữ liệu lịch/buổi tập cũ không có chủ được giữ ở trạng thái chưa gán, không tự động tiết lộ cho tài khoản mới.
 - Đã đồng bộ buổi đồng hồ (`timer_sessions`) và khung lịch (`schedule_slots`) theo tài khoản qua `practice_sync.dart`.
 - Đã có nhắc lịch tập và nhắc giữ streak (`NotificationKind.schedule`, `NotificationKind.streak`), kèm kênh thông báo Android riêng; lịch nhắc được lập cục bộ trên thiết bị (nhắc lịch trước giờ bắt đầu trong 7 ngày tới, nhắc streak lúc 20:00 nếu hôm nay chưa tập). Có thêm thông báo **Gợi ý tập mới** (`NotificationKind.recommendation`, kênh Android `recommendation_reminder`): 08:00 khi gợi ý của ngày khác gợi ý người chơi thấy lần cuối ở Trang chủ hoặc trong thông báo đã gửi, tính bằng đúng `computeRecommendation`; hộp **Đã gửi** 30 ngày với số chưa đọc trên chuông; chạm thông báo mở đúng màn (spec P6a 2026-10-29).
-- **Còn thiếu:** điều chỉnh mục tiêu theo thời lượng dự kiến của khung lịch (hiện lịch chỉ ưu tiên nhóm kỹ năng trong gợi ý); push khi ứng dụng đã đóng (thông báo hiện là cục bộ: Android/iOS vẫn đến khi ứng dụng đóng, web chỉ khi tab còn mở; push từ máy chủ là P6b).
+- **Còn thiếu:** điều chỉnh mục tiêu theo thời lượng dự kiến của khung lịch (hiện lịch chỉ ưu tiên nhóm kỹ năng trong gợi ý); push Android từ máy chủ (P6b-2, FCM) và iOS (P6b-3).
 
 ### 6.6 Knowledge
 Phần học lý thuyết, không khóa chặt vào Drill: kỹ thuật, cách thực hiện, lỗi thường gặp, nguyên lý, tình huống áp dụng. Một Drill có thể liên kết tới Knowledge và ngược lại (Knowledge ↔ Drill là quan hệ hỗ trợ, không phải dependency cứng). Người dùng có quyền khám phá Knowledge độc lập, tương tự thư viện bài viết ngắn theo từng kỹ năng.
@@ -185,7 +185,7 @@ Trả lời câu hỏi "tôi là ai và tôi đã tiến bộ thế nào" (khác
 **Trạng thái triển khai hiện tại**
 - Đã có thêm/sửa/xóa hồ sơ cơ với loại, trọng lượng, đường kính/độ cứng tip, kỹ năng phù hợp và ngày bảo dưỡng do người chơi nhập.
 - Đã có cảnh báo trực quan khi đến hạn hoặc còn tối đa 7 ngày tới hạn; danh sách ưu tiên cơ quá hạn và sắp đến hạn gần nhất.
-- Người chơi có thể bật thông báo: nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó. Trên Android/iOS hệ điều hành giữ lịch nên thông báo đến cả khi ứng dụng đóng; trên web chỉ khi tab còn mở (push từ máy chủ là P6b).
+- Người chơi có thể bật thông báo: nhắc lúc 09:00 ngày đến hạn và 7 ngày trước đó. Trên Android/iOS hệ điều hành giữ lịch nên thông báo đến cả khi ứng dụng đóng; trên web, máy chủ gửi Web Push nên thông báo đến cả khi đã đóng tab (P6b-1); trình duyệt không hỗ trợ thì chỉ khi tab còn mở.
 - Có thể chọn cơ cho buổi tập tự do trong Đồng hồ. Nếu xóa cơ, buổi tập cũ vẫn được giữ nhưng bỏ liên kết tới cơ đã xóa.
 - Trang Equipment hiển thị tổng thời gian tập tự do và ngày sử dụng gần nhất theo từng cây cơ, lấy từ các Timer session đã ghi.
 - Hồ sơ cơ đồng bộ đa thiết bị qua Directus theo `user_created`; xóa mềm dùng tombstone để không tải hồ sơ đã xóa về lại. Dữ liệu cục bộ cô lập theo tài khoản (schema Drift v9) và được xóa khi người chơi chủ động đăng xuất. Cần chạy bootstrap Directus trên môi trường triển khai để tạo collection và quyền.

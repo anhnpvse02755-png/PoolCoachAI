@@ -11,10 +11,41 @@ class NotificationPlatform {
   NotificationPlatform({NotificationScheduler? scheduler});
 
   /// Dịch vụ đặt vào đây để nhận lần chạm thông báo.
-  void Function(String payload)? onTap;
+  void Function(String payload)? _onTap;
+  web.BroadcastChannel? _pushChannel;
 
-  /// Trình duyệt không có thông báo mở app từ trạng thái đóng.
-  Future<String?> takeLaunchPayload() => Future.value();
+  set onTap(void Function(String payload)? callback) {
+    _onTap = callback;
+    _pushChannel?.close();
+    _pushChannel = null;
+    if (callback == null) return;
+    final channel = web.BroadcastChannel('pcai-push');
+    channel.onmessage = ((web.MessageEvent event) {
+      try {
+        final data = event.data.dartify();
+        if (web.document.visibilityState == 'visible' &&
+            data is Map &&
+            data['type'] == 'tap' &&
+            data['payload'] is String) {
+          _onTap?.call(data['payload'] as String);
+        }
+      } on Object {
+        // Ignore malformed messages from other tabs or workers.
+      }
+    }).toJS;
+    _pushChannel = channel;
+  }
+
+  /// Đọc một lần payload từ URL mở app lạnh, rồi bỏ query khỏi thanh địa chỉ.
+  Future<String?> takeLaunchPayload() async {
+    final uri = Uri.base;
+    final payload = uri.queryParameters['n'];
+    if (payload == null) return null;
+    final query = Map<String, String>.from(uri.queryParameters)..remove('n');
+    final cleanUri = uri.replace(queryParameters: query.isEmpty ? null : query);
+    web.window.history.replaceState(null, '', cleanUri.toString());
+    return payload;
+  }
 
   /// Trình duyệt không đặt lịch được: dịch vụ tự kiểm tra bằng timer.
   NotificationScheduler? get scheduler => null;
@@ -41,7 +72,7 @@ class NotificationPlatform {
       web.NotificationOptions(body: body, tag: tag),
     );
     notification.onclick = (web.Event _) {
-      onTap?.call(payload);
+      _onTap?.call(payload);
       web.window.focus();
       notification.close();
     }.toJS;
@@ -54,5 +85,4 @@ class NotificationPlatform {
   }
 }
 
-NotificationPlatform createNotificationPlatform() =>
-    NotificationPlatform();
+NotificationPlatform createNotificationPlatform() => NotificationPlatform();

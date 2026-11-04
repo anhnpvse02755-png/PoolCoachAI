@@ -44,8 +44,7 @@ class DirectusClient {
     String path, {
     String? token,
     Map<String, String>? query,
-  }) =>
-      _send('GET', path, token: token, query: query);
+  }) => _send('GET', path, token: token, query: query);
 
   Future<Object?> post(String path, {Object? body, String? token}) =>
       _send('POST', path, body: body, token: token);

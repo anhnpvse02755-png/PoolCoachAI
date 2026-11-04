@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poolcoachai/app.dart';
 import 'package:poolcoachai/core/providers/auth_providers.dart';
 import 'package:poolcoachai/core/providers/notification_providers.dart';
+import 'package:poolcoachai/core/providers/push_providers.dart';
 import 'package:poolcoachai/core/router/app_router.dart';
 import 'package:poolcoachai/core/router/routes.dart';
 import 'package:poolcoachai/data/notifications/notification_log_repository.dart';
@@ -22,6 +23,7 @@ import 'package:poolcoachai/domain/drill.dart';
 import 'package:poolcoachai/domain/drill_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_log.dart';
 import 'package:poolcoachai/domain/notifications/notification_prefs.dart';
+import 'package:poolcoachai/domain/notifications/push_state.dart';
 import 'package:poolcoachai/domain/notifications/recommendation_reminder.dart';
 import 'package:poolcoachai/domain/schedule_slot.dart';
 import 'package:poolcoachai/features/notifications/presentation/notifications_screen.dart';
@@ -57,10 +59,7 @@ class _Platform extends NotificationPlatform {
 
 void main() {
   // testToday = Thứ Ba 2026-09-22 10:00 (day index 1).
-  Future<void> open(
-    WidgetTester tester,
-    ProviderContainer container,
-  ) async {
+  Future<void> open(WidgetTester tester, ProviderContainer container) async {
     addTearDown(container.dispose);
     tester.view.physicalSize = const Size(900, 2400);
     tester.view.devicePixelRatio = 1;
@@ -243,7 +242,7 @@ void main() {
     });
     tearDown(() => db.close());
 
-    ProviderContainer withService() {
+    ProviderContainer withService({PushState pushState = const PushLocal()}) {
       final service = NotificationService(
         db: db,
         auth: FakeAuthRepository.signedIn(),
@@ -251,9 +250,14 @@ void main() {
         platform: platform,
       );
       addTearDown(service.dispose);
+      final parent = containerWith();
+      addTearDown(parent.dispose);
       return ProviderContainer(
-        parent: containerWith(),
-        overrides: [notificationServiceProvider.overrideWithValue(service)],
+        parent: parent,
+        overrides: [
+          notificationServiceProvider.overrideWithValue(service),
+          pushStateProvider.overrideWith((ref) => Stream.value(pushState)),
+        ],
       );
     }
 
@@ -296,6 +300,66 @@ void main() {
         Vi.notificationsWebOnlyWhileOpen,
         contains('${recommendationReminderHour.toString().padLeft(2, '0')}:00'),
       );
+    });
+
+    PushServer serverState(Set<NotificationKind> kinds) => PushServer(
+      PushLease(
+        userId: 'u1',
+        deviceId: 'device-1',
+        serverKinds: kinds,
+        until: DateTime(2026, 9, 22, 16),
+      ),
+    );
+
+    testWidgets(
+      'web push máy chủ lo cả bốn loại: nói rõ vẫn đến khi đóng tab',
+      (tester) async {
+        await open(
+          tester,
+          withService(pushState: serverState(NotificationKind.values.toSet())),
+        );
+        expect(find.text(Vi.notificationsWebPushOn), findsOneWidget);
+        expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsNothing);
+        expect(
+          find.text(Vi.notificationsWebPushRecommendationLocal),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'web push máy chủ không lo gợi ý: nói gợi ý chỉ hiện khi tab mở',
+      (tester) async {
+        await open(
+          tester,
+          withService(
+            pushState: serverState({
+              NotificationKind.maintenance,
+              NotificationKind.schedule,
+              NotificationKind.streak,
+            }),
+          ),
+        );
+        expect(find.text(Vi.notificationsWebPushOn), findsOneWidget);
+        expect(
+          find.text(Vi.notificationsWebPushRecommendationLocal),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('web cục bộ nói chỉ hiện khi tab đang mở', (tester) async {
+      await open(tester, withService(pushState: const PushLocal()));
+      expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsOneWidget);
+      expect(find.text(Vi.notificationsWebPushOn), findsNothing);
+    });
+
+    testWidgets('web không hỗ trợ push thêm hướng dẫn cho iPhone', (
+      tester,
+    ) async {
+      await open(tester, withService(pushState: const PushUnavailable()));
+      expect(find.text(Vi.notificationsWebOnlyWhileOpen), findsOneWidget);
+      expect(find.text(Vi.notificationsWebPushUnavailable), findsOneWidget);
     });
 
     testWidgets('điện thoại: ghi chú nền và giới hạn gợi ý, không có ghi chú '
@@ -453,20 +517,23 @@ void main() {
       },
     );
 
-    testWidgets('mở màn: chưa đọc in đậm và được đánh dấu đã đọc, vẫn đậm trong '
-        'lượt xem này', (tester) async {
-      await add(1, hourAgo);
-      await add(2, hourAgo.subtract(const Duration(minutes: 5)), read: true);
-      await add(3, testToday.add(const Duration(hours: 1)));
-      await openDb(tester);
-      final rows = {for (final e in await repo.all()) e.id: e.readAt};
-      expect(rows[1], isNotNull);
-      expect(rows[3], isNull);
-      FontWeight? weight(String t) =>
-          tester.widget<Text>(find.text(t)).style!.fontWeight;
-      expect(weight('Tiêu đề 1'), FontWeight.w700);
-      expect(weight('Tiêu đề 2'), FontWeight.w400);
-    });
+    testWidgets(
+      'mở màn: chưa đọc in đậm và được đánh dấu đã đọc, vẫn đậm trong '
+      'lượt xem này',
+      (tester) async {
+        await add(1, hourAgo);
+        await add(2, hourAgo.subtract(const Duration(minutes: 5)), read: true);
+        await add(3, testToday.add(const Duration(hours: 1)));
+        await openDb(tester);
+        final rows = {for (final e in await repo.all()) e.id: e.readAt};
+        expect(rows[1], isNotNull);
+        expect(rows[3], isNull);
+        FontWeight? weight(String t) =>
+            tester.widget<Text>(find.text(t)).style!.fontWeight;
+        expect(weight('Tiêu đề 1'), FontWeight.w700);
+        expect(weight('Tiêu đề 2'), FontWeight.w400);
+      },
+    );
 
     testWidgets('một mục tới giờ khi màn đang mở: hiện đậm và được đánh dấu '
         'đã đọc', (tester) async {
@@ -622,4 +689,3 @@ void main() {
     },
   );
 }
-
